@@ -4,7 +4,7 @@ import { Package, ShoppingBag } from "lucide-react";
 
 export const ShedStockWidget = ({ data }) => {
   return (
-    <StatCard title="Shed Stock Details" icon={Package} className="col-span-1 md:col-span-2 xl:col-span-2">
+    <StatCard title="Shed Stock Details" icon={Package} className="h-full">
       <div className="flex flex-col gap-4 mt-2">
         {data.map((item, i) => {
           const maxTarget = item.stock + 20; // fake max for progress bar
@@ -35,7 +35,7 @@ export const ShedStockWidget = ({ data }) => {
 
 export const RecentPurchasesWidget = ({ data }) => {
   return (
-    <StatCard title="Recently Purchased Items" icon={ShoppingBag} className="col-span-1 md:col-span-2 xl:col-span-1">
+    <StatCard title="Recently Purchased Items" icon={ShoppingBag} className="h-full">
       <div className="flex flex-col gap-2 mt-2">
         {data.map((item, i) => (
           <div key={i} className="flex justify-between items-center p-3 border border-gray-100 rounded-lg hover:shadow-sm">

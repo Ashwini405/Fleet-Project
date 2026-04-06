@@ -105,34 +105,34 @@ export default function FuelDashboard() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left whitespace-nowrap text-sm">
+          <table className="w-full text-left whitespace-nowrap text-xs md:text-sm">
             <thead className="text-slate-400 font-bold uppercase tracking-wider text-[10px]">
               <tr className="border-b border-slate-100">
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Vehicle</th>
-                <th className="px-6 py-4">Tyre Count</th>
-                <th className="px-6 py-4">Qty (L)</th>
-                <th className="px-6 py-4">Rate</th>
-                <th className="px-6 py-4">Cost</th>
-                <th className="px-6 py-4">Mileage</th>
-                <th className="px-6 py-4">Vendor</th>
+                <th className="px-3 md:px-6 py-3">Date</th>
+                <th className="px-3 md:px-6 py-3">Vehicle</th>
+                <th className="hidden sm:table-cell px-3 md:px-6 py-3">Tyre Count</th>
+                <th className="px-3 md:px-6 py-3">Qty (L)</th>
+                <th className="hidden md:table-cell px-3 md:px-6 py-3">Rate</th>
+                <th className="px-3 md:px-6 py-3">Cost</th>
+                <th className="hidden lg:table-cell px-3 md:px-6 py-3">Mileage</th>
+                <th className="hidden xl:table-cell px-3 md:px-6 py-3">Vendor</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100/60">
               {dummyFuelLogs.map((log) => (
                 <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4 text-slate-600 font-medium">{log.date}</td>
-                  <td className="px-6 py-4 font-bold text-slate-800">{log.vehicle}</td>
-                  <td className="px-6 py-4 text-slate-500">{log.tyreCount}</td>
-                  <td className="px-6 py-4 font-bold text-slate-700">{log.qty}</td>
-                  <td className="px-6 py-4 text-slate-600">{log.rate}</td>
-                  <td className="px-6 py-4 font-bold text-slate-800">{log.cost}</td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${getMileageStatus(log.mileageStatus)}`}>
+                  <td className="px-3 md:px-6 py-3 text-slate-600 font-medium text-xs md:text-sm">{log.date}</td>
+                  <td className="px-3 md:px-6 py-3 font-bold text-slate-800 text-xs md:text-sm truncate">{log.vehicle}</td>
+                  <td className="hidden sm:table-cell px-3 md:px-6 py-3 text-slate-500 text-xs md:text-sm">{log.tyreCount}</td>
+                  <td className="px-3 md:px-6 py-3 font-bold text-slate-700 text-xs md:text-sm">{log.qty}</td>
+                  <td className="hidden md:table-cell px-3 md:px-6 py-3 text-slate-600 text-xs md:text-sm">{log.rate}</td>
+                  <td className="px-3 md:px-6 py-3 font-bold text-slate-800 text-xs md:text-sm">{log.cost}</td>
+                  <td className="hidden lg:table-cell px-3 md:px-6 py-3">
+                    <span className={`inline-flex px-1 md:px-2 py-0.5 rounded text-[10px] md:text-[11px] font-bold ${getMileageStatus(log.mileageStatus)}`}>
                       {log.mileage}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-slate-600">{log.vendor}</td>
+                  <td className="hidden xl:table-cell px-3 md:px-6 py-3 text-slate-600 text-xs md:text-sm">{log.vendor}</td>
                 </tr>
               ))}
             </tbody>
@@ -157,7 +157,7 @@ export default function FuelDashboard() {
 
             <div className="p-6 bg-slate-50/50 space-y-6">
               
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5">Date</label>
                   <input type="date" name="date" value={addForm.date} onChange={handleFormChange} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
@@ -172,7 +172,7 @@ export default function FuelDashboard() {
               </div>
 
               {/* Auto Fetched */}
-              <div className="grid grid-cols-2 gap-5 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
                 <div>
                   <label className="block text-[11px] font-bold tracking-wide text-indigo-400 uppercase mb-1.5">Auto-Fetched Driver</label>
                   <input type="text" value={addForm.vehicle === 'AP-21-TA-1234' ? 'Ramesh Kumar' : ''} readOnly className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 cursor-not-allowed shadow-inner" />
@@ -183,7 +183,7 @@ export default function FuelDashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                 <div>
                   <label className="block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5">Distance Travelled (KM)</label>
                   <input type="number" name="distance" value={addForm.distance} onChange={handleFormChange} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
@@ -198,7 +198,7 @@ export default function FuelDashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                  <div>
                     <label className="block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5">Total Cost (₹)</label>
                     <input type="text" value={calculatedCost.toFixed(2)} readOnly className="w-full px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm font-bold text-indigo-700 cursor-not-allowed shadow-inner" />
@@ -209,7 +209,7 @@ export default function FuelDashboard() {
                  </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-5 border-t border-slate-200 pt-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 border-t border-slate-200 pt-5">
                 <div>
                   <label className="block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5">Fuel Vendor</label>
                   <select name="vendor" value={addForm.vendor} onChange={handleFormChange} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 appearance-none">

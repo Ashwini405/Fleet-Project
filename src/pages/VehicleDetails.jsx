@@ -149,7 +149,7 @@ export default function VehicleDetails() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-8 font-sans text-slate-800">
+    <div className="font-sans text-slate-800">
       
       {/* Top Header & Navigation */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -193,7 +193,7 @@ export default function VehicleDetails() {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
+              className={`px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
                 activeTab === tab 
                   ? 'border-indigo-600 text-indigo-600' 
                   : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
@@ -209,14 +209,14 @@ export default function VehicleDetails() {
       <div className="bg-white p-6 md:p-8 rounded-b-xl shadow-sm border border-slate-200 min-h-[500px]">
         
         {activeTab === 'Overview' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
             
             {/* Basic Information */}
             <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
               <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200 flex items-center gap-2">
                 <FiActivity className="text-slate-400" /> Basic Information
               </h3>
-              <div className="grid grid-cols-2 gap-y-6 gap-x-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 md:gap-y-6 gap-x-4">
                 <InfoItem label="Registration No" value={vehicle.truckNo} />
                 <InfoItem label="Make / Model" value={vehicle.makeModel} />
                 <InfoItem label="Chassis Number" value={vehicle.chassisNo} />
@@ -231,7 +231,7 @@ export default function VehicleDetails() {
             {/* Finance Details */}
             <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
               <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200">Finance Details</h3>
-              <div className="grid grid-cols-2 gap-y-6 gap-x-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 md:gap-y-6 gap-x-4">
                 <InfoItem label="Financier Name" value={vehicle.financierName} />
                 <InfoItem label="Loan Account No" value={vehicle.loanAccountNo} />
                 <InfoItem label="EMI Amount" value={vehicle.emiAmount} />
@@ -396,7 +396,7 @@ export default function VehicleDetails() {
               <div className="col-span-1 xl:col-span-2 flex flex-col gap-4">
                 
                 {/* Header Info Banner */}
-                <div className="flex items-center gap-6 px-5 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-sm">
+                <div className="flex flex-wrap items-center gap-3 md:gap-6 px-4 md:px-5 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-xs md:text-sm">
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-slate-800">Total Tyres:</span>
                     <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-bold">{totalTyres}</span>

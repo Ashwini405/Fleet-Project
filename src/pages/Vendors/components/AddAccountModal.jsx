@@ -7,7 +7,7 @@ export default function AddAccountModal({ isOpen, onClose, categoryName }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-opacity">
       <div 
-        className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform transition-all"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-sm sm:max-w-lg overflow-hidden transform transition-all"
         style={{ animation: "modalSlideIn 0.3s ease-out" }}
       >
         <div className="flex justify-between items-center p-5 bg-gray-900 border-b border-gray-100">
@@ -26,7 +26,7 @@ export default function AddAccountModal({ isOpen, onClose, categoryName }) {
                <input type="text" placeholder="e.g. City Mechanics" className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm" required />
              </div>
 
-             <div className="grid grid-cols-2 gap-4">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">Mobile Number</label>
                   <input type="text" placeholder="e.g. 9876543210" className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm" required />
@@ -44,7 +44,7 @@ export default function AddAccountModal({ isOpen, onClose, categoryName }) {
                     <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Bank Name</label>
                     <input type="text" placeholder="e.g. HDFC Bank" className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm" />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Account Number / UPI ID</label>
                       <input type="text" placeholder="e.g. 5010..." className="w-full p-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm" />

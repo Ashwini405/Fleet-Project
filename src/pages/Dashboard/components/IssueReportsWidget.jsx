@@ -6,7 +6,7 @@ export const IssueReportsWidget = ({ data }) => {
   if (!data) return null;
 
   return (
-    <StatCard title={`Issue Reports (${data.open} Open)`} icon={AlertCircle} className="flex-1 min-w-[250px] col-span-1 md:col-span-2 xl:col-span-1">
+    <StatCard title={`Issue Reports (${data.open} Open)`} icon={AlertCircle} className="h-full">
       <div className="flex flex-col gap-3 mt-2 overflow-y-auto max-h-[140px] pr-1 styled-scrollbar">
         {data.incidents.map((incident, i) => (
           <div key={i} className="flex justify-between items-center p-2 hover:bg-gray-50 rounded border-b border-gray-50 last:border-0">

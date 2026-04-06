@@ -6,7 +6,7 @@ export const FleetStatusWidget = ({ data }) => {
   if (!data) return null;
 
   return (
-    <StatCard title="Fleet Status Overview" icon={Truck} className="col-span-full md:col-span-2 lg:col-span-2 bg-gradient-to-br from-white to-indigo-50/30">
+    <StatCard title="Fleet Status Overview" icon={Truck} className="h-full bg-gradient-to-br from-white to-indigo-50/30">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 flex-1 h-full items-center text-center">
         
         <div className="flex flex-col items-center justify-center p-4 rounded-2xl bg-gradient-to-b from-indigo-50 to-white border border-indigo-100 shadow-[0_4px_20px_-4px_rgba(99,102,241,0.1)] hover:scale-105 transition-transform duration-300">

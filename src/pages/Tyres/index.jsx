@@ -15,10 +15,10 @@ export default function TyresModule() {
   ];
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-gray-50/50">
+    <div className="flex flex-col md:flex-row min-h-[calc(100vh-4rem)] bg-gray-50/50">
       
-      {/* Sidebar Overview */}
-      <div className="w-[280px] bg-[#1e293b] text-white flex-shrink-0 flex flex-col hidden md:flex">
+      {/* Sidebar Overview — desktop only */}
+      <div className="w-[280px] bg-[#1e293b] text-white flex-shrink-0 flex-col hidden md:flex">
         <div className="p-6 pb-4">
            <h2 className="text-xl font-bold tracking-tight text-white/90">TYRES MANAGEMENT</h2>
         </div>
@@ -42,10 +42,10 @@ export default function TyresModule() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc] overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc]">
         
         {/* Top Navbar */}
-        <div className="bg-white border-b border-gray-200 px-6 pt-6 shrink-0 relative z-10 flex flex-col items-center">
+        <div className="bg-white border-b border-gray-200 px-4 pt-4 shrink-0 relative z-10 flex flex-col items-center">
             
           <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 shadow-sm shadow-slate-200/50 mb-4">
             {tabs.map((tab) => (

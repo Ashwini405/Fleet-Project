@@ -57,12 +57,12 @@ export default function StationsTab() {
            <table className="w-full text-left border-collapse mt-2">
              <thead>
                <tr className="border-b border-gray-100 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
-                 <th className="p-4">Station Name</th>
-                 <th className="p-4">Station Code</th>
-                 <th className="p-4">Location</th>
-                 <th className="p-4">Manager</th>
-                 <th className="p-4">Contact</th>
-                 <th className="p-4 text-center">Actions</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4">Station Name</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">Station Code</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4">Location</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell">Manager</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">Contact</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4 text-center">Actions</th>
                </tr>
              </thead>
              <tbody className="divide-y divide-gray-50">
@@ -74,28 +74,28 @@ export default function StationsTab() {
                     key={station.id} 
                     className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
                  >
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4">
                      <span className="font-bold text-gray-800 text-sm tracking-tight">{station.name}</span>
                    </td>
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">
                      <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md tracking-wider">
                        {station.id}
                      </span>
                    </td>
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4">
                      <span className="flex items-center gap-1.5 text-sm font-medium text-slate-600">
                         <MapPin className="w-3.5 h-3.5 text-slate-400" /> {station.location}
                      </span>
                    </td>
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell">
                      <span className="text-sm font-semibold text-slate-700">{station.manager}</span>
                    </td>
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">
                      <span className="text-[13px] font-medium text-slate-500 flex items-center gap-1.5">
                         <Phone className="w-3.5 h-3.5 text-slate-400" /> {station.contact}
                      </span>
                    </td>
-                   <td className="p-4 text-center">
+                   <td className="py-2 px-2 md:py-4 md:px-4 text-center">
                      <button 
                        onClick={(e) => { e.stopPropagation(); setViewStation(station); }}
                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors"

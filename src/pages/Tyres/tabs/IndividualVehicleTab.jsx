@@ -52,11 +52,11 @@ export default function IndividualVehicleTab() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-200 bg-slate-50/50 text-gray-500 text-[10px] font-bold uppercase tracking-wider">
-                <th className="p-4">Truck No</th>
-                <th className="p-4 text-center">Model</th>
-                <th className="p-4 text-center">Total Tyres</th>
-                <th className="p-4 text-center">Recent Changes</th>
-                <th className="p-4 text-right">Layout of Trucks</th>
+                <th className="py-2 px-2 md:py-4 md:px-4">Truck No</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell text-center">Model</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 text-center">Total Tyres</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell text-center">Recent Changes</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 text-right">Layout of Trucks</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -68,19 +68,19 @@ export default function IndividualVehicleTab() {
                   key={truck.id} 
                   className="hover:bg-slate-50/50 transition-colors group"
                 >
-                  <td className="p-4">
-                    <span className="font-bold text-gray-800 tracking-tight">{truck.id}</span>
+                  <td className="py-2 px-2 md:py-4 md:px-4">
+                    <span className="font-bold text-gray-800 tracking-tight text-sm">{truck.id}</span>
                   </td>
-                  <td className="p-4 text-center">
+                  <td className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell text-center">
                     <span className="text-xs font-semibold text-gray-600">{truck.model}</span>
                   </td>
-                  <td className="p-4 text-center">
+                  <td className="py-2 px-2 md:py-4 md:px-4 text-center">
                     <span className="text-sm font-bold text-slate-700 font-mono">{truck.totalTyres}</span>
                   </td>
-                  <td className="p-4 text-center">
+                  <td className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell text-center">
                     <span className="text-xs text-gray-500">{truck.recentChanges}</span>
                   </td>
-                  <td className="p-4 text-right">
+                  <td className="py-2 px-2 md:py-4 md:px-4 text-right">
                     <button 
                        onClick={() => setViewingLayoutFor(truck)}
                        className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white bg-slate-800 hover:bg-slate-700 px-4 py-2 rounded-lg transition-colors border border-transparent shadow-[0_2px_10px_-3px_rgba(0,0,0,0.3)] hover:shadow-none"

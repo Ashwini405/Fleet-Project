@@ -26,10 +26,10 @@ export default function IncidentsModule() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] bg-[#f8fafc] overflow-hidden">
+    <div className="flex flex-col md:flex-row min-h-[calc(100vh-4rem)] bg-[#f8fafc]">
       
-      {/* Secondary Sidebar */}
-      <div className="w-[280px] bg-[#1e293b] text-white flex-shrink-0 flex flex-col hidden md:flex">
+      {/* Secondary Sidebar — desktop only */}
+      <div className="w-[280px] bg-[#1e293b] text-white flex-shrink-0 flex-col hidden md:flex">
         <div className="p-6 pb-4 border-b border-white/10">
            <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
              <AlertTriangle className="w-5 h-5 text-red-500" />
@@ -54,10 +54,10 @@ export default function IncidentsModule() {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0">
         
         {/* Header & Controls */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-4 z-10">
+        <div className="bg-white border-b border-gray-200 px-4 py-3 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-10">
            
            <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100 self-start sm:self-auto">
              {tabs.map((tab) => {
@@ -67,7 +67,7 @@ export default function IncidentsModule() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`relative flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-colors ${
+                    className={`relative flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 text-xs md:text-sm font-bold rounded-lg transition-colors ${
                       isActive ? 'text-slate-800 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
                     }`}
                   >
@@ -79,7 +79,7 @@ export default function IncidentsModule() {
         </div>
 
         {/* Scrollable Viewport */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50">
            <AnimatePresence mode="wait">
               {activeTab === 'Dashboard' && (
                 <motion.div key="Dashboard" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>

@@ -236,21 +236,21 @@ export default function ProfitLossReports() {
 
   const renderTrucksList = () => (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden animate-in fade-in duration-300">
-      <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-        <div className="relative">
+      <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
           <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
           <input 
             type="text" 
             placeholder="Search by Truck Number or Plant..." 
-            className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-80 shadow-sm"
+            className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
           />
         </div>
-        <div className="flex gap-3">
-          <button className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 px-4 py-2 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
-            <FiFilter className="w-4 h-4"/> Advanced Filters
+        <div className="flex gap-2">
+          <button className="flex items-center gap-2 text-sm font-bold text-slate-600 bg-white border border-slate-200 px-3 py-2 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
+            <FiFilter className="w-4 h-4"/> <span className="hidden sm:inline">Advanced Filters</span>
           </button>
-          <button className="flex items-center gap-2 text-sm font-bold text-white bg-indigo-600 border border-indigo-700 px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
-            <FiDownload className="w-4 h-4"/> Export P&L
+          <button className="flex items-center gap-2 text-sm font-bold text-white bg-indigo-600 border border-indigo-700 px-3 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+            <FiDownload className="w-4 h-4"/> <span className="hidden sm:inline">Export P&L</span>
           </button>
         </div>
       </div>
@@ -260,31 +260,31 @@ export default function ProfitLossReports() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-sm text-left">
+        <table className="w-full text-xs md:text-sm text-left">
           <thead className="bg-white text-[10px] font-black text-slate-400 uppercase tracking-wider">
             <tr>
-              <th className="px-6 py-4 border-b border-slate-100">Truck No</th>
-              <th className="px-6 py-4 border-b border-slate-100">Running Plant</th>
-              <th className="px-6 py-4 border-b border-slate-100 text-right">Revenue</th>
-              <th className="px-6 py-4 border-b border-slate-100 text-right">Total Exp.</th>
-              <th className="px-6 py-4 border-b border-slate-100 text-right">Net P/L</th>
-              <th className="px-6 py-4 border-b border-slate-100 text-center">Actions</th>
+              <th className="py-2 px-2 md:px-6 md:py-4 border-b border-slate-100">Truck No</th>
+              <th className="py-2 px-2 md:px-6 md:py-4 border-b border-slate-100 hidden sm:table-cell">Running Plant</th>
+              <th className="py-2 px-2 md:px-6 md:py-4 border-b border-slate-100 text-right">Revenue</th>
+              <th className="py-2 px-2 md:px-6 md:py-4 border-b border-slate-100 text-right">Total Exp.</th>
+              <th className="py-2 px-2 md:px-6 md:py-4 border-b border-slate-100 text-right">Net P/L</th>
+              <th className="py-2 px-2 md:px-6 md:py-4 border-b border-slate-100 text-center hidden md:table-cell">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {DETAILED_FLEET.map(row => (
               <tr key={row.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4 font-bold text-slate-800">{row.truck}</td>
-                <td className="px-6 py-4 font-medium text-slate-500 flex items-center gap-2"><FiCheckCircle className="text-slate-300 w-3 h-3"/> {row.plant}</td>
-                <td className="px-6 py-4 font-bold text-slate-700 text-right">{formatCur(row.revenue)}</td>
-                <td className="px-6 py-4 font-medium text-slate-500 text-right">{formatCur(row.expenses)}</td>
-                <td className={`px-6 py-4 font-black text-right ${row.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                <td className="py-2 md:py-4 px-2 md:px-6 font-bold text-slate-800 text-xs md:text-sm">{row.truck}</td>
+                <td className="py-2 md:py-4 px-2 md:px-6 hidden sm:table-cell font-medium text-slate-500 flex items-center gap-2 text-xs md:text-sm"><FiCheckCircle className="text-slate-300 w-3 h-3"/> {row.plant}</td>
+                <td className="py-2 md:py-4 px-2 md:px-6 font-bold text-slate-700 text-right text-xs md:text-sm">{formatCur(row.revenue)}</td>
+                <td className="py-2 md:py-4 px-2 md:px-6 font-medium text-slate-500 text-right text-xs md:text-sm">{formatCur(row.expenses)}</td>
+                <td className={`py-2 md:py-4 px-2 md:px-6 font-black text-right text-xs md:text-sm ${row.profit >= 0 ? 'text-green-600' : 'text-red-500'}`}>
                   {formatCur(row.profit)}
                 </td>
-                <td className="px-6 py-4 text-center">
+                <td className="py-2 md:py-4 px-2 md:px-6 hidden md:table-cell text-center">
                   <button 
                     onClick={() => setSelectedTruck(row)}
-                    className="bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white px-3 py-1.5 rounded text-xs font-bold transition-colors uppercase tracking-wider flex items-center gap-1 mx-auto"
+                    className="bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white px-2 md:px-3 py-1 md:py-1.5 rounded text-xs font-bold transition-colors uppercase tracking-wider flex items-center gap-1 mx-auto"
                   >
                     <FiSearch className="w-3 h-3"/> View
                   </button>
@@ -490,36 +490,33 @@ export default function ProfitLossReports() {
     <div className="flex flex-col h-full animate-in fade-in duration-200">
       
       {/* HEADER */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Profit & Loss Reports</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Profit & Loss Reports</h1>
           <p className="text-slate-500 text-sm mt-1">Comprehensive financial performance across the fleet.</p>
         </div>
         
-        <div className="flex gap-4 items-center">
-           {/* High level tabs */}
+        <div className="flex flex-wrap gap-2 items-center">
            <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-200 flex">
              <button 
                onClick={()=>setActiveTab('dashboard')} 
-               className={`px-5 py-2 font-bold text-sm rounded-lg flex items-center gap-2 transition-colors ${activeTab === 'dashboard' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'} `}
+               className={`px-3 sm:px-5 py-2 font-bold text-sm rounded-lg flex items-center gap-2 transition-colors ${activeTab === 'dashboard' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'} `}
              >
-               <FiPieChart className="w-4 h-4"/> Dashboard
+               <FiPieChart className="w-4 h-4"/> <span className="hidden sm:inline">Dashboard</span>
              </button>
              <button 
                onClick={()=>setActiveTab('list')} 
-               className={`px-5 py-2 font-bold text-sm rounded-lg flex items-center gap-2 transition-colors ${activeTab === 'list' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'} `}
+               className={`px-3 sm:px-5 py-2 font-bold text-sm rounded-lg flex items-center gap-2 transition-colors ${activeTab === 'list' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'} `}
              >
-               <FiFileText className="w-4 h-4"/> Trucks P&L
+               <FiFileText className="w-4 h-4"/> <span className="hidden sm:inline">Trucks P&L</span>
              </button>
            </div>
            
-           <div className="h-8 w-px bg-slate-300 mx-2"></div>
-           
-           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold shadow-sm hover:bg-slate-50 text-slate-700">
-             <FiTrendingUp className="w-4 h-4 text-slate-400"/> Last 30 Days <FiChevronDown className="ml-1 opacity-50"/>
+           <button className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold shadow-sm hover:bg-slate-50 text-slate-700">
+             <FiTrendingUp className="w-4 h-4 text-slate-400"/> <span className="hidden sm:inline">Last 30 Days</span> <FiChevronDown className="opacity-50"/>
            </button>
            
-           <button className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold shadow-sm hover:bg-slate-50 text-slate-700">
+           <button className="flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-bold shadow-sm hover:bg-slate-50 text-slate-700">
              <FiFilter className="w-4 h-4 text-slate-400"/> Filter
            </button>
         </div>

@@ -40,7 +40,7 @@ export const VendorLedgersWidget = ({ data }) => (
 );
 
 export const GarageBillsWidget = ({ data }) => (
-  <StatCard title="Garage / Spares Bills" icon={Wrench} className="md:col-span-2 xl:col-span-2">
+  <StatCard title="Garage / Spares Bills" icon={Wrench} className="h-full">
     <div className="flex flex-col md:flex-row gap-4 mt-2 justify-center h-full items-stretch">
       <div className="flex-1 flex flex-col justify-between p-5 bg-gradient-to-br from-orange-50 to-orange-100/50 rounded-2xl border border-orange-100/50 shadow-sm relative overflow-hidden group hover:shadow-md transition-shadow">
         <div className="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform duration-500">

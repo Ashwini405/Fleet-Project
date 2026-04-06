@@ -73,37 +73,37 @@ export default function Documents() {
           </div>
 
           <div className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden auto-cols-min w-full">
-            <table className="w-full text-left text-sm table-auto max-w-full">
+            <table className="w-full text-left text-xs md:text-sm table-auto max-w-full">
               <thead className="bg-gray-50 text-gray-500 uppercase text-xs font-bold border-b border-gray-100">
                 <tr>
-                  <th className="px-6 py-4">Document Name</th>
-                  <th className="px-6 py-4 hidden md:table-cell">Category</th>
-                  <th className="px-6 py-4 hidden sm:table-cell">Size & Date</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                  <th className="py-2 px-2 md:px-6 md:py-4">Document Name</th>
+                  <th className="py-2 px-2 md:px-6 md:py-4 hidden md:table-cell">Category</th>
+                  <th className="py-2 px-2 md:px-6 md:py-4 hidden sm:table-cell">Size & Date</th>
+                  <th className="py-2 px-2 md:px-6 md:py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredDocs.length > 0 ? filteredDocs.map((doc) => (
                   <tr key={doc.id} className="hover:bg-gray-50 transition group">
-                    <td className="px-6 py-4">
+                    <td className="py-2 md:py-4 px-2 md:px-6">
                       <div className="flex items-center gap-3">
                         <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg shrink-0">
                           {doc.name.endsWith('.pdf') ? <FileText className="w-5 h-5" /> : <File className="w-5 h-5" />}
                         </div>
                         <div>
-                          <div className="font-bold text-gray-800 break-words">{doc.name}</div>
+                          <div className="font-bold text-gray-800 text-xs md:text-sm break-words">{doc.name}</div>
                           <div className="text-xs text-gray-400 mt-0.5">Uploaded by {doc.uploadedBy}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 hidden md:table-cell font-medium text-gray-600">
+                    <td className="py-2 md:py-4 px-2 md:px-6 hidden md:table-cell font-medium text-gray-600 text-xs md:text-sm">
                       {doc.category}
                     </td>
-                    <td className="px-6 py-4 hidden sm:table-cell">
-                      <div className="text-gray-800 font-medium">{doc.size}</div>
+                    <td className="py-2 md:py-4 px-2 md:px-6 hidden sm:table-cell">
+                      <div className="text-gray-800 font-medium text-xs md:text-sm">{doc.size}</div>
                       <div className="text-xs text-gray-400 mt-0.5">{doc.date}</div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="py-2 md:py-4 px-2 md:px-6">
                       <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button className="p-2 bg-white border border-gray-200 text-gray-600 rounded-lg hover:text-indigo-600 hover:border-indigo-200 transition" title="Download">
                           <Download className="w-4 h-4" />

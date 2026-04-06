@@ -89,15 +89,15 @@ export default function AllTyresTab() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-200 bg-orange-50/30 text-gray-500 text-[10px] font-bold uppercase tracking-wider">
-                <th className="p-4">Truck No</th>
-                <th className="p-4">Tyre No</th>
-                <th className="p-4">Tyre Make</th>
-                <th className="p-4">Fitted Date</th>
-                <th className="p-4 text-right">Fitted Odo</th>
-                <th className="p-4 text-right">Present Odo</th>
-                <th className="p-4 text-right text-blue-600">Ran KMs</th>
-                <th className="p-4 text-center">Health</th>
-                <th className="p-4 text-center">Action</th>
+                <th className="py-2 px-2 md:py-4 md:px-4">Truck No</th>
+                <th className="py-2 px-2 md:py-4 md:px-4">Tyre No</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">Tyre Make</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell">Fitted Date</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell text-right">Fitted Odo</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell text-right">Present Odo</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell text-right text-blue-600">Ran KMs</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 text-center">Health</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -111,11 +111,11 @@ export default function AllTyresTab() {
                     key={tyre.id} 
                     className="hover:bg-blue-50/30 transition-colors group"
                   >
-                    <td className="p-4">
-                      <span className="font-bold text-gray-800 tracking-tight">{tyre.truckNo}</span>
+                    <td className="py-2 px-2 md:py-4 md:px-4">
+                      <span className="font-bold text-gray-800 tracking-tight text-xs md:text-sm">{tyre.truckNo}</span>
                       <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mt-0.5">{tyre.position}</div>
                     </td>
-                    <td className="p-4">
+                    <td className="py-2 px-2 md:py-4 md:px-4">
                       <button 
                          onClick={() => setViewingTyre({ ...tyre, runningKm })}
                          className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline transition-colors"
@@ -123,28 +123,28 @@ export default function AllTyresTab() {
                          {tyre.id}
                       </button>
                     </td>
-                    <td className="p-4">
+                    <td className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">
                       <span className="text-sm font-semibold text-gray-700">{tyre.make}</span>
                       <div className="text-[10px] text-gray-500 mt-0.5">{tyre.model}</div>
                     </td>
-                    <td className="p-4">
+                    <td className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell">
                       <span className="text-xs font-medium text-gray-600">{tyre.fittedDate}</span>
                     </td>
-                    <td className="p-4 text-right">
+                    <td className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell text-right">
                       <span className="text-xs text-gray-600 font-mono">{tyre.fittedOdo.toLocaleString()}</span>
                     </td>
-                    <td className="p-4 text-right">
+                    <td className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell text-right">
                       <span className="text-xs text-gray-600 font-mono">{tyre.presentOdo.toLocaleString()}</span>
                     </td>
-                    <td className="p-4 text-right">
+                    <td className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell text-right">
                       <span className="text-sm font-bold text-blue-600 font-mono">{runningKm.toLocaleString()} <span className="text-[10px]">km</span></span>
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="py-2 px-2 md:py-4 md:px-4 text-center">
                        <span className={`inline-flex items-center text-[10px] uppercase font-bold tracking-widest px-2 py-1 rounded ${getHealthColor(tyre.health)}`}>
                          {tyre.health}
                        </span>
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="py-2 px-2 md:py-4 md:px-4 text-center">
                       <button 
                          onClick={() => setViewingTyre({ ...tyre, runningKm })}
                          className="inline-flex items-center gap-1.5 text-[10px] font-bold text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors border border-transparent shadow-sm"

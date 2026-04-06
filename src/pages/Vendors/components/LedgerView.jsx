@@ -71,43 +71,43 @@ export default function LedgerView({ vendor, onBack }) {
            <table className="w-full text-left border-collapse mt-2">
              <thead>
                <tr className="border-b border-gray-100 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
-                 <th className="p-4">Date</th>
-                 <th className="p-4">Truck No</th>
-                 <th className="p-4">Description</th>
-                 <th className="p-4 text-right">Debit (+)</th>
-                 <th className="p-4 text-right">Credit (-)</th>
-                 <th className="p-4 text-center">Action</th>
+                 <th className="py-2 px-2 md:px-4">Date</th>
+                 <th className="py-2 px-2 md:px-4 hidden sm:table-cell">Truck No</th>
+                 <th className="py-2 px-2 md:px-4">Description</th>
+                 <th className="py-2 px-2 md:px-4 text-right">Debit (+)</th>
+                 <th className="py-2 px-2 md:px-4 text-right">Credit (-)</th>
+                 <th className="py-2 px-2 md:px-4 text-center hidden md:table-cell">Action</th>
                </tr>
              </thead>
              <tbody className="divide-y divide-gray-50">
                {transactions.map((txn) => (
                  <tr key={txn.id} className="hover:bg-gray-50/50 transition-colors">
-                   <td className="p-4">
+                   <td className="py-2 md:py-4 px-2 md:px-4">
                      <span className="text-xs font-bold text-gray-600 tracking-wide">{txn.date}</span>
                    </td>
-                   <td className="p-4">
-                     <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">
+                   <td className="py-2 md:py-4 px-2 md:px-4 hidden sm:table-cell">
+                     <span className="text-xs font-medium text-gray-500 bg-gray-100 px-1 md:px-2 py-1 rounded">
                        {txn.truckId || '-'}
                      </span>
                    </td>
-                   <td className="p-4">
-                     <span className="text-sm font-semibold text-gray-700">{txn.desc}</span>
+                   <td className="py-2 md:py-4 px-2 md:px-4">
+                     <span className="text-xs md:text-sm font-semibold text-gray-700">{txn.desc}</span>
                    </td>
-                   <td className="p-4 text-right">
+                   <td className="py-2 md:py-4 px-2 md:px-4 text-right">
                      {txn.debit > 0 ? (
-                        <span className="font-bold text-red-500">₹{txn.debit.toLocaleString()}</span>
+                        <span className="font-bold text-red-500 text-xs md:text-sm">₹{txn.debit.toLocaleString()}</span>
                      ) : (
                         <span className="font-bold text-gray-300">-</span>
                      )}
                    </td>
-                   <td className="p-4 text-right">
+                   <td className="py-2 md:py-4 px-2 md:px-4 text-right">
                      {txn.credit > 0 ? (
-                        <span className="font-bold text-green-500">₹{txn.credit.toLocaleString()}</span>
+                        <span className="font-bold text-green-500 text-xs md:text-sm">₹{txn.credit.toLocaleString()}</span>
                      ) : (
                         <span className="font-bold text-gray-300">-</span>
                      )}
                    </td>
-                   <td className="p-4 text-center">
+                   <td className="py-2 md:py-4 px-2 md:px-4 text-center hidden md:table-cell">
                      <button 
                        onClick={() => setSelectedTxn(txn)}
                        className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"

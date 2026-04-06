@@ -51,34 +51,34 @@ export default function Overview({ onVendorClick }) {
           <table className="w-full text-left border-collapse mt-2">
             <thead>
               <tr className="border-b border-gray-100 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
-                <th className="p-4">Account Name</th>
-                <th className="p-4">Category</th>
-                <th className="p-4">Contact</th>
-                <th className="p-4 text-right">Balance Amount</th>
-                <th className="p-4 text-center">Status</th>
+                <th className="py-2 px-2 md:px-4">Account Name</th>
+                <th className="py-2 px-2 md:px-4 hidden sm:table-cell">Category</th>
+                <th className="py-2 px-2 md:px-4 hidden md:table-cell">Contact</th>
+                <th className="py-2 px-2 md:px-4 text-right">Balance Amount</th>
+                <th className="py-2 px-2 md:px-4 text-center">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {[...dummyVendors].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance)).map((vendor) => (
                 <tr key={vendor.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => onVendorClick(vendor)}>
-                  <td className="p-4">
-                    <div className="font-bold text-gray-700 text-sm">{vendor.name}</div>
+                  <td className="py-2 md:py-4 px-2 md:px-4">
+                    <div className="font-bold text-gray-700 text-xs md:text-sm">{vendor.name}</div>
                   </td>
-                  <td className="p-4">
-                    <span className="text-[10px] bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full font-bold tracking-wide">
+                  <td className="py-2 md:py-4 px-2 md:px-4 hidden sm:table-cell">
+                    <span className="text-[10px] bg-slate-100 text-slate-500 px-1.5 md:px-2.5 py-1 rounded-full font-bold tracking-wide">
                       {getCategoryLabel(vendor.category)}
                     </span>
                   </td>
-                  <td className="p-4">
-                    <div className="text-sm font-medium text-gray-500">{vendor.contact}</div>
+                  <td className="py-2 md:py-4 px-2 md:px-4 hidden md:table-cell">
+                    <div className="text-xs md:text-sm font-medium text-gray-500">{vendor.contact}</div>
                   </td>
-                  <td className="p-4 text-right">
-                    <div className={`font-bold ${vendor.balance < 0 ? 'text-green-500' : 'text-red-500'} font-medium`}>
+                  <td className="py-2 md:py-4 px-2 md:px-4 text-right">
+                    <div className={`font-bold text-xs md:text-sm ${vendor.balance < 0 ? 'text-green-500' : 'text-red-500'} font-medium`}>
                       ₹{Math.abs(vendor.balance).toLocaleString()}
                     </div>
                   </td>
-                  <td className="p-4 text-center">
-                    <span className={`text-[9px] px-2 py-1 rounded font-bold uppercase tracking-widest ${
+                  <td className="py-2 md:py-4 px-2 md:px-4 text-center">
+                    <span className={`text-[9px] px-1 md:px-2 py-1 rounded font-bold uppercase tracking-widest ${
                       vendor.status === 'Advance Paid' ? 'bg-green-50 text-green-600' :
                       vendor.status === 'Payment Due' ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-500'
                     }`}>

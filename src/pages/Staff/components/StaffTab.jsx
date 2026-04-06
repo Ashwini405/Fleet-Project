@@ -70,14 +70,14 @@ export default function StaffTab({ role }) {
            <table className="w-full text-left border-collapse mt-2">
              <thead>
                <tr className="border-b border-gray-100 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
-                 <th className="p-4">Profile</th>
-                 <th className="p-4">Name</th>
-                 <th className="p-4">ID Card No</th>
-                 <th className="p-4">Contact</th>
-                 <th className="p-4">Place of Allotment</th>
-                 <th className="p-4">Wallet Balance</th>
-                 <th className="p-4">Status</th>
-                 <th className="p-4 text-center">Actions</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4">Profile</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4">Name</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">ID Card No</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4">Contact</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell">Place of Allotment</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">Wallet Balance</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4">Status</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4 text-center">Actions</th>
                </tr>
              </thead>
              <tbody className="divide-y divide-gray-50">
@@ -89,38 +89,38 @@ export default function StaffTab({ role }) {
                     key={person.id} 
                     className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
                  >
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4">
                      <div className="w-10 h-10 rounded-full border border-gray-200 bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500 shrink-0">
                         {person.name.split(' ').map(n=>n[0]).join('')}
                      </div>
                    </td>
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4">
                      <span className="font-bold text-gray-800 text-sm tracking-tight">{person.name}</span>
                    </td>
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">
                      <span className="text-[11px] font-bold text-slate-500 tracking-wider">
                        {person.id}
                      </span>
                    </td>
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4">
                      <span className="text-[13px] font-medium text-slate-500">{person.contact}</span>
                    </td>
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell">
                      <span className="flex items-center gap-1.5 text-[13px] font-medium text-slate-600">
                         <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {person.allotment}
                      </span>
                    </td>
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">
                      <span className="font-bold text-green-600 tracking-tight">₹{person.wallet?.toLocaleString()}</span>
                    </td>
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4">
                      {person.status === 'Active' ? (
                        <span className="text-[10px] font-bold uppercase tracking-widest text-green-600 bg-green-50 px-2 py-1 rounded">Active</span>
                      ) : (
                        <span className="text-[10px] font-bold uppercase tracking-widest text-red-500 bg-red-50 px-2 py-1 rounded">Inactive</span>
                      )}
                    </td>
-                   <td className="p-4 text-center">
+                   <td className="py-2 px-2 md:py-4 md:px-4 text-center">
                      <button 
                        onClick={(e) => { e.stopPropagation(); setViewStaff(person); }}
                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors"

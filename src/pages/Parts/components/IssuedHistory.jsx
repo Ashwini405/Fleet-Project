@@ -21,10 +21,10 @@ export default function IssuedHistory({ history }) {
          <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-100 bg-white sticky top-0 z-10 text-slate-400 text-[9px] font-bold uppercase tracking-widest">
-              <th className="py-4 px-5 w-1/4">Date</th>
-              <th className="py-4 px-5 w-1/4">Part</th>
-              <th className="py-4 px-5 w-1/4">Truck / Odo</th>
-              <th className="py-4 px-5 w-1/4 text-center">Qty</th>
+              <th className="py-2 px-2 md:py-4 md:px-5 w-1/4">Date</th>
+              <th className="py-2 px-2 md:py-4 md:px-5 w-1/4">Part</th>
+              <th className="py-2 px-2 md:py-4 md:px-5 w-1/4 hidden sm:table-cell">Truck / Odo</th>
+              <th className="py-2 px-2 md:py-4 md:px-5 w-1/4 text-center">Qty</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50 relative">
@@ -38,19 +38,19 @@ export default function IssuedHistory({ history }) {
                    transition={{ duration: 0.3, delay: index * 0.05 }}
                    className="hover:bg-slate-50 transition-colors group"
                  >
-                   <td className="py-4 px-5">
+                   <td className="py-2 px-2 md:py-4 md:px-5">
                      <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">{record.date}</span>
                    </td>
-                   <td className="py-4 px-5">
+                   <td className="py-2 px-2 md:py-4 md:px-5">
                      <span className="text-xs font-bold text-slate-800 tracking-tight truncate block max-w-[120px]">{record.itemName}</span>
                    </td>
-                   <td className="py-4 px-5">
+                   <td className="py-2 px-2 md:py-4 md:px-5 hidden sm:table-cell">
                       <div className="flex items-center gap-1.5 mb-0.5">
                          <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{record.truckNo}</span>
                       </div>
                       <span className="text-[10px] font-medium text-slate-500">{record.odometer}</span>
                    </td>
-                   <td className="py-4 px-5 text-center">
+                   <td className="py-2 px-2 md:py-4 md:px-5 text-center">
                      <span className="inline-flex items-center justify-center font-black text-slate-700 bg-slate-100 w-6 h-6 rounded text-xs">
                         {record.qty}
                      </span>

@@ -52,13 +52,13 @@ export default function OldTyresStockTab() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-200 bg-orange-50/30 text-gray-500 text-[10px] font-bold uppercase tracking-wider">
-                <th className="p-4">Vehicle No</th>
-                <th className="p-4">Tyre No</th>
-                <th className="p-4">Entry Date</th>
-                <th className="p-4 text-right">Ran KMs</th>
-                <th className="p-4">Store Location</th>
-                <th className="p-4 text-center">Status</th>
-                <th className="p-4 text-center">Action</th>
+                <th className="py-2 px-2 md:py-4 md:px-4">Vehicle No</th>
+                <th className="py-2 px-2 md:py-4 md:px-4">Tyre No</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">Entry Date</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell text-right">Ran KMs</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">Store Location</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 text-center">Status</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -70,27 +70,27 @@ export default function OldTyresStockTab() {
                   key={tyre.tyreNo} 
                   className="hover:bg-orange-50/30 transition-colors group"
                 >
-                  <td className="p-4">
-                    <span className="font-bold text-gray-800 tracking-tight">{tyre.vehicleNo}</span>
+                  <td className="py-2 px-2 md:py-4 md:px-4">
+                    <span className="font-bold text-gray-800 tracking-tight text-sm">{tyre.vehicleNo}</span>
                   </td>
-                  <td className="p-4">
+                  <td className="py-2 px-2 md:py-4 md:px-4">
                     <span className="text-sm font-semibold text-gray-700">{tyre.tyreNo}</span>
                   </td>
-                  <td className="p-4">
+                  <td className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">
                     <span className="text-xs font-medium text-gray-600">{tyre.entryDate}</span>
                   </td>
-                  <td className="p-4 text-right">
+                  <td className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell text-right">
                     <span className="text-xs text-gray-600 font-mono">{tyre.runningKm.toLocaleString()} km</span>
                   </td>
-                  <td className="p-4">
+                  <td className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">
                     <span className="text-xs font-medium text-gray-700">{tyre.storeLocation}</span>
                   </td>
-                  <td className="p-4 text-center">
+                  <td className="py-2 px-2 md:py-4 md:px-4 text-center">
                      <span className={`inline-flex items-center text-[10px] uppercase font-bold tracking-widest px-2 py-1 rounded ${tyre.status === 'Reusable' ? 'text-blue-700 bg-blue-100' : 'text-orange-700 bg-orange-100'}`}>
                        {tyre.status}
                      </span>
                   </td>
-                  <td className="p-4 text-center">
+                  <td className="py-2 px-2 md:py-4 md:px-4 text-center">
                     <button 
                        onClick={() => setEditingTyre(tyre)}
                        className="inline-flex items-center gap-1.5 text-[10px] font-bold text-slate-500 hover:text-orange-600 transition-colors"

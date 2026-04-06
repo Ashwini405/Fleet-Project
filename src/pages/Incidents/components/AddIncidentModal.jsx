@@ -42,7 +42,7 @@ export default function AddIncidentModal({ isOpen, onClose, onSubmit }) {
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="bg-white rounded-3xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]"
+          className="bg-white rounded-3xl shadow-xl w-full max-w-sm sm:max-w-2xl md:max-w-3xl overflow-hidden flex flex-col max-h-[90vh]"
         >
           {/* Header */}
           <div className="flex justify-between items-center px-6 py-5 bg-[#1e293b] text-white shrink-0">
@@ -58,12 +58,12 @@ export default function AddIncidentModal({ isOpen, onClose, onSubmit }) {
           </div>
           
           {/* Content */}
-          <div className="p-6 overflow-y-auto bg-slate-50 flex-1 space-y-8">
+          <div className="p-4 md:p-6 overflow-y-auto bg-slate-50 flex-1 space-y-6 md:space-y-8">
              
              {/* Incident Type Cards */}
              <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-3">Incident Type</label>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4">
                    {types.map(t => {
                       const Icon = t.icon;
                       const isActive = formData.type === t.id;
@@ -85,7 +85,7 @@ export default function AddIncidentModal({ isOpen, onClose, onSubmit }) {
                 </div>
              </div>
 
-             <div className="grid grid-cols-2 gap-6 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-white p-4 md:p-5 rounded-2xl border border-slate-200 shadow-sm">
                 <div>
                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Truck ID</label>
                    <select 
@@ -103,7 +103,7 @@ export default function AddIncidentModal({ isOpen, onClose, onSubmit }) {
                 </div>
              </div>
 
-             <div className="grid grid-cols-3 gap-6">
+             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
                 <div>
                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Date</label>
                    <div className="relative">
@@ -192,7 +192,7 @@ export default function AddIncidentModal({ isOpen, onClose, onSubmit }) {
 
           </div>
 
-          <div className="p-6 bg-white border-t border-slate-100 flex justify-end gap-3 shrink-0">
+          <div className="p-4 md:p-6 bg-white border-t border-slate-100 flex flex-col sm:flex-row justify-end gap-3 shrink-0">
              <button onClick={onClose} className="px-6 py-2.5 text-sm font-bold text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
                 Cancel
              </button>

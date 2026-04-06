@@ -31,7 +31,7 @@ export default function AuditLogs() {
         <p className="text-gray-500 mt-1">Immutable timeline of every critical action performed within the fleet system.</p>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row gap-3 mb-8">
         <div className="relative flex-1">
           <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input 
@@ -42,12 +42,12 @@ export default function AuditLogs() {
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {['All', 'create', 'update', 'critical'].map(f => (
             <button 
               key={f} 
               onClick={() => setFilter(f)}
-              className={`px-4 py-2.5 rounded-xl text-sm font-semibold capitalize transition border ${
+              className={`px-3 py-2 rounded-xl text-sm font-semibold capitalize transition border ${
                 filter === f ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
               }`}
             >

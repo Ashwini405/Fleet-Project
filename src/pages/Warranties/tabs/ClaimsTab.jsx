@@ -73,13 +73,13 @@ export default function ClaimsTab({ claimsData, onAdd, onView }) {
          <table className="w-full text-left border-collapse min-w-[950px]">
            <thead>
              <tr className="border-b border-slate-100 bg-slate-50 text-slate-400 text-[9px] font-bold uppercase tracking-widest sticky top-0 z-10">
-               <th className="py-4 px-6 w-1/6">Claim ID</th>
-               <th className="py-4 px-6 w-1/6">Submit Date</th>
-               <th className="py-4 px-6 w-1/6">Warranty Ref</th>
-               <th className="py-4 px-6 w-1/6">Complaint No</th>
-               <th className="py-4 px-6 w-1/4">Issue</th>
-               <th className="py-4 px-6 w-1/6">Status</th>
-               <th className="py-4 px-6 text-right w-12">View</th>
+               <th className="py-2 px-2 md:py-4 md:px-6 w-1/6">Claim ID</th>
+               <th className="py-2 px-2 md:py-4 md:px-6 hidden sm:table-cell w-1/6">Submit Date</th>
+               <th className="py-2 px-2 md:py-4 md:px-6 hidden md:table-cell w-1/6">Warranty Ref</th>
+               <th className="py-2 px-2 md:py-4 md:px-6 hidden lg:table-cell w-1/6">Complaint No</th>
+               <th className="py-2 px-2 md:py-4 md:px-6 w-1/4">Issue</th>
+               <th className="py-2 px-2 md:py-4 md:px-6 w-1/6">Status</th>
+               <th className="py-2 px-2 md:py-4 md:px-6 text-right w-12">View</th>
              </tr>
            </thead>
            <tbody className="divide-y divide-slate-50">
@@ -92,20 +92,20 @@ export default function ClaimsTab({ claimsData, onAdd, onView }) {
                    className="hover:bg-slate-50 transition-colors group cursor-pointer"
                    onClick={() => onView(c)}
                 >
-                  <td className="py-4 px-6">
-                     <span className="font-bold text-slate-800 text-sm block">{c.id}</span>
+                  <td className="py-2 md:py-4 px-2 md:px-6">
+                     <span className="font-bold text-slate-800 text-xs md:text-sm block">{c.id}</span>
                      <span className="text-[10px] text-slate-400 font-medium block mt-0.5">{c.itemType} - {c.sn}</span>
                   </td>
-                  <td className="py-4 px-6 text-xs text-slate-500 font-semibold flex items-center gap-2">
+                  <td className="py-2 md:py-4 px-2 md:px-6 hidden sm:table-cell text-xs text-slate-500 font-semibold flex items-center gap-2">
                      <CalendarIcon className="w-3.5 h-3.5 text-slate-400" /> {c.date}
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="py-2 md:py-4 px-2 md:px-6 hidden md:table-cell">
                      <span className="text-xs font-bold text-blue-600 cursor-pointer hover:underline">{c.ref}</span>
                   </td>
-                  <td className="py-4 px-6 text-xs text-slate-500 font-mono font-bold">
+                  <td className="py-2 md:py-4 px-2 md:px-6 hidden lg:table-cell text-xs text-slate-500 font-mono font-bold">
                      {c.complaint}
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="py-2 md:py-4 px-2 md:px-6">
                      <div className="flex items-center gap-2">
                         <AlertCircle className={`w-3.5 h-3.5 shrink-0 ${c.status === 'Approved' ? 'text-green-500' : 'text-orange-400'}`} />
                         <span className="text-xs text-slate-700 font-medium truncate max-w-[200px] block" title={c.issue}>
@@ -113,8 +113,8 @@ export default function ClaimsTab({ claimsData, onAdd, onView }) {
                         </span>
                      </div>
                   </td>
-                  <td className="py-4 px-6">
-                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-widest border ${
+                  <td className="py-2 md:py-4 px-2 md:px-6">
+                     <span className={`inline-flex items-center px-1 md:px-2 py-0.5 rounded text-[10px] font-bold tracking-widest border ${
                         c.status === 'Pending' ? 'bg-orange-50 text-orange-600 border-orange-100' :
                         c.status === 'Submitted' ? 'bg-blue-50 text-blue-600 border-blue-100' :
                         c.status === 'Approved' ? 'bg-green-50 text-green-600 border-green-100' :
@@ -123,7 +123,7 @@ export default function ClaimsTab({ claimsData, onAdd, onView }) {
                         {c.status}
                      </span>
                   </td>
-                  <td className="py-4 px-6 text-right">
+                  <td className="py-2 md:py-4 px-2 md:px-6 text-right">
                      <button className="text-slate-300 group-hover:text-blue-600 transition-colors p-1.5 rounded-full group-hover:bg-blue-50">
                         <Search className="w-4 h-4" />
                      </button>

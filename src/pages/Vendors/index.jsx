@@ -37,20 +37,19 @@ export default function Vendors() {
     <div className="max-w-7xl mx-auto font-sans text-gray-800">
       {/* Top Header */}
       {!selectedVendor && (
-         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
+         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
             <div>
-               <h1 className="text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-700 uppercase">
+               <h1 className="text-xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-indigo-700 uppercase">
                  Vendor Ledgers Overview
                </h1>
             </div>
 
-            {/* Custom Tab Bar matching screenshot exactly */}
-            <div className="flex bg-white rounded-xl shadow-sm border border-gray-100 p-1 overflow-x-auto w-full md:w-auto">
+            <div className="flex bg-white rounded-xl shadow-sm border border-gray-100 p-1 overflow-x-auto">
                {vendorCategories.map((tab) => (
                   <button
                      key={tab.id}
                      onClick={() => setActiveTab(tab.id)}
-                     className={`flex flex-col items-center justify-center min-w-[72px] px-3 py-2 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all duration-200 ${
+                     className={`flex flex-col items-center justify-center min-w-[60px] px-2 py-2 rounded-lg text-[10px] uppercase font-bold tracking-wider transition-all duration-200 ${
                         activeTab === tab.id 
                         ? "bg-blue-600 text-white shadow-md" 
                         : "text-gray-400 hover:text-gray-700 hover:bg-gray-50"

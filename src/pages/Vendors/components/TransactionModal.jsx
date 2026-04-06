@@ -10,7 +10,7 @@ export default function TransactionModal({ isOpen, onClose, vendor }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-opacity">
       <div 
-        className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all"
+        className="bg-white rounded-xl shadow-2xl w-full max-w-sm sm:max-w-lg overflow-hidden transform transition-all"
         style={{ animation: "modalSlideIn 0.2s ease-out" }}
       >
         <div className="flex justify-between items-center p-5 bg-[#1e293b] border-b border-gray-700">
@@ -50,7 +50,7 @@ export default function TransactionModal({ isOpen, onClose, vendor }) {
                 </button>
              </div>
 
-             <div className="grid grid-cols-2 gap-6">
+             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                <div>
                   <label className="block text-[11px] font-bold text-gray-500 capitalize tracking-wide mb-1.5">Date</label>
                   <input type="date" className="w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 text-[14px] text-gray-700" required />

@@ -13,7 +13,7 @@ export const StatCard = ({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, delay, ease: "easeOut" }}
-      className={`bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-sm border border-gray-100/80 flex flex-col hover:-translate-y-1 hover:shadow-xl transition-all duration-300 group ${className}`}
+      className={`bg-white/80 backdrop-blur-xl rounded-2xl p-6 shadow-sm border border-gray-100/80 flex flex-col h-full hover:-translate-y-1 hover:shadow-xl transition-all duration-300 group ${className}`}
     >
       <div className="flex items-center gap-3 mb-5 text-sm font-bold text-gray-800 tracking-wide">
         {Icon && (

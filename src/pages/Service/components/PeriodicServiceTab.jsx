@@ -67,15 +67,15 @@ export default function PeriodicServiceTab() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50/80 text-gray-500 text-[10px] font-bold uppercase tracking-wider">
-                <th className="p-4">Date</th>
-                <th className="p-4">Truck No</th>
-                <th className="p-4">Garage / Vendor</th>
-                <th className="p-4">Odometer</th>
-                <th className="p-4">Interval</th>
-                <th className="p-4 text-orange-600">Next Due</th>
-                <th className="p-4 text-right">Total Cost</th>
-                <th className="p-4 text-center">Status</th>
-                <th className="p-4 text-center">Actions</th>
+                <th className="py-2 px-2 md:py-4 md:px-4">Date</th>
+                <th className="py-2 px-2 md:py-4 md:px-4">Truck No</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">Garage / Vendor</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell">Odometer</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">Interval</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell text-orange-600">Next Due</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 text-right">Total Cost</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 text-center">Status</th>
+                <th className="py-2 px-2 md:py-4 md:px-4 text-center">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -87,28 +87,28 @@ export default function PeriodicServiceTab() {
                   key={log.id} 
                   className="hover:bg-teal-50/30 transition-colors group"
                 >
-                  <td className="p-4">
+                  <td className="py-2 px-2 md:py-4 md:px-4">
                     <span className="text-sm font-medium text-gray-600">{log.date}</span>
                   </td>
-                  <td className="p-4">
-                    <span className="font-bold text-gray-800 tracking-tight">{log.truckNo}</span>
+                  <td className="py-2 px-2 md:py-4 md:px-4">
+                    <span className="font-bold text-gray-800 tracking-tight text-sm">{log.truckNo}</span>
                   </td>
-                  <td className="p-4">
+                  <td className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">
                     <span className="text-sm font-semibold text-gray-700">{log.garage}</span>
                   </td>
-                  <td className="p-4">
+                  <td className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell">
                     <span className="text-sm text-gray-600 font-mono">{log.odometer.toLocaleString()}</span>
                   </td>
-                  <td className="p-4">
+                  <td className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">
                     <span className="text-sm text-gray-500 font-mono">{log.interval.toLocaleString()}</span>
                   </td>
-                  <td className="p-4">
+                  <td className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">
                     <span className="text-sm font-bold text-orange-600 font-mono">{log.nextDue.toLocaleString()}</span>
                   </td>
-                  <td className="p-4 text-right">
-                    <span className="font-bold text-gray-900 tracking-tight">₹ {log.totalCost.toLocaleString()}</span>
+                  <td className="py-2 px-2 md:py-4 md:px-4 text-right">
+                    <span className="font-bold text-gray-900 tracking-tight text-sm">₹ {log.totalCost.toLocaleString()}</span>
                   </td>
-                  <td className="p-4 text-center">
+                  <td className="py-2 px-2 md:py-4 md:px-4 text-center">
                     {log.status === 'Completed' ? (
                       <span className="inline-flex items-center text-[10px] uppercase font-bold tracking-widest text-green-700 bg-green-100 px-2 py-1 rounded">
                         Completed
@@ -119,7 +119,7 @@ export default function PeriodicServiceTab() {
                       </span>
                     )}
                   </td>
-                  <td className="p-4 text-center">
+                  <td className="py-2 px-2 md:py-4 md:px-4 text-center">
                     <button 
                       onClick={() => setViewLog(log)}
                       className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-500 group-hover:text-teal-600 hover:bg-teal-50 px-2 py-1.5 rounded-lg transition-colors border border-transparent group-hover:border-teal-200"

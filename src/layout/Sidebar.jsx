@@ -6,9 +6,13 @@ import {
   IndianRupee, Users, CreditCard, PieChart, UserCircle, Settings, ChevronRight, ChevronDown, FolderLock, Activity
 } from "lucide-react";
 
-export default function Sidebar() {
+export default function Sidebar({ onClose }) {
   const [open, setOpen] = useState('assets');
   const [collapsed, setCollapsed] = useState(false);
+
+  const handleNavClick = () => {
+    if (onClose) onClose();
+  };
 
   const toggleGroup = (section) => {
     if (collapsed) setCollapsed(false);
@@ -89,6 +93,7 @@ export default function Sidebar() {
         <NavLink 
           to="/" 
           title="Dashboard"
+          onClick={handleNavClick}
           className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-200 ${
             isActive ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
           } ${collapsed ? 'justify-center' : ''}`}
@@ -133,7 +138,8 @@ export default function Sidebar() {
                 {group.items.map((item, i) => (
                   <NavLink 
                     key={i} 
-                    to={item.path} 
+                    to={item.path}
+                    onClick={handleNavClick}
                     className={({ isActive }) => `px-3 py-2 rounded-lg text-sm transition-colors relative ${
                       isActive 
                         ? 'bg-indigo-50 text-indigo-700 font-semibold before:absolute before:left-[-12px] before:top-1/2 before:w-[12px] before:h-px before:bg-indigo-600' 

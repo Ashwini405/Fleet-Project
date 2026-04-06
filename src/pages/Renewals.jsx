@@ -41,18 +41,18 @@ export default function Renewals() {
           <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Renewal Reminders</h1>
           <p className="text-sm text-slate-500 mt-1">Track expiring documents and compliance validity</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="relative">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
             <input 
               type="text" 
               placeholder="Search trucks..." 
-              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64 shadow-sm"
+              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-56 shadow-sm"
             />
           </div>
           <button 
             onClick={() => setIsUploadModalOpen(true)}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm"
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm whitespace-nowrap"
           >
             <FiPlus className="w-4 h-4" />
             Upload Document
@@ -63,50 +63,52 @@ export default function Renewals() {
       {/* Main Table Card */}
       <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden flex-1">
         <div className="overflow-x-auto">
-          <table className="w-full text-left whitespace-nowrap text-sm">
+          <table className="w-full text-left whitespace-nowrap text-xs md:text-sm">
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 font-semibold uppercase tracking-wider text-xs">
               <tr>
-                <th className="px-6 py-4">Vehicle No</th>
-                <th className="px-6 py-4">Insurance</th>
-                <th className="px-6 py-4">FC Expiry</th>
-                <th className="px-6 py-4">Permit</th>
-                <th className="px-6 py-4">Tax</th>
-                <th className="px-6 py-4">Pollution</th>
-                <th className="px-6 py-4">CLL</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-center">Action</th>
+                <th className="px-3 md:px-6 py-3">Vehicle No</th>
+                <th className="px-3 md:px-6 py-3">Insurance</th>
+                <th className="hidden md:table-cell px-3 md:px-6 py-3">FC Expiry</th>
+                <th className="hidden lg:table-cell px-3 md:px-6 py-3">Permit</th>
+                <th className="hidden lg:table-cell px-3 md:px-6 py-3">Tax</th>
+                <th className="hidden xl:table-cell px-3 md:px-6 py-3">Pollution</th>
+                <th className="hidden xl:table-cell px-3 md:px-6 py-3">CLL</th>
+                <th className="px-3 md:px-6 py-3">Status</th>
+                <th className="px-3 md:px-6 py-3 text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {dummyRenewals.map((item) => (
                 <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-6 py-4 font-bold text-indigo-900">{item.vehicle}</td>
-                  <td className="px-6 py-4 text-slate-600">{item.insurance}</td>
-                  <td className="px-6 py-4 text-slate-600">{item.fc}</td>
-                  <td className="px-6 py-4 text-slate-600">{item.permit}</td>
-                  <td className="px-6 py-4 text-slate-600">{item.tax}</td>
-                  <td className="px-6 py-4 text-slate-600">{item.pollution}</td>
-                  <td className="px-6 py-4 text-slate-600">{item.cll}</td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${
+                  <td className="px-3 md:px-6 py-3 font-bold text-indigo-900 text-xs md:text-sm">{item.vehicle}</td>
+                  <td className="px-3 md:px-6 py-3 text-slate-600 text-xs md:text-sm">{item.insurance}</td>
+                  <td className="hidden md:table-cell px-3 md:px-6 py-3 text-slate-600 text-xs md:text-sm">{item.fc}</td>
+                  <td className="hidden lg:table-cell px-3 md:px-6 py-3 text-slate-600 text-xs md:text-sm">{item.permit}</td>
+                  <td className="hidden lg:table-cell px-3 md:px-6 py-3 text-slate-600 text-xs md:text-sm">{item.tax}</td>
+                  <td className="hidden xl:table-cell px-3 md:px-6 py-3 text-slate-600 text-xs md:text-sm">{item.pollution}</td>
+                  <td className="hidden xl:table-cell px-3 md:px-6 py-3 text-slate-600 text-xs md:text-sm">{item.cll}</td>
+                  <td className="px-3 md:px-6 py-3">
+                    <span className={`inline-flex items-center gap-1 md:gap-1.5 px-1.5 md:px-2.5 py-1 rounded-md text-xs font-medium border ${
                       item.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' :
                       item.status === 'Expiring Soon' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                       'bg-red-50 text-red-700 border-red-200'
                     }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${
+                      <span className={`w-1 h-1 rounded-full ${
                         item.status === 'Active' ? 'bg-green-500' :
                         item.status === 'Expiring Soon' ? 'bg-amber-500' :
                         'bg-red-500'
                       }`}></span>
-                      {item.status}
+                      <span className="hidden sm:inline">{item.status}</span>
+                      <span className="sm:hidden">{item.status === 'Expiring Soon' ? 'Soon' : item.status}</span>
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-center">
+                  <td className="px-3 md:px-6 py-3 text-center">
                     <button 
                       onClick={() => openViewModal(item)}
-                      className="inline-flex py-1.5 px-3 text-xs font-medium text-slate-600 border border-slate-300 rounded hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                      className="inline-flex py-1 px-2 md:py-1.5 md:px-3 text-xs font-medium text-slate-600 border border-slate-300 rounded hover:bg-slate-100 hover:text-indigo-600 transition-colors"
                     >
-                      View Docs
+                      <span className="hidden sm:inline">View Docs</span>
+                      <span className="sm:hidden">View</span>
                     </button>
                   </td>
                 </tr>
@@ -120,7 +122,7 @@ export default function Renewals() {
       {isUploadModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsUploadModalOpen(false)}></div>
-          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm sm:max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-5 border-b border-slate-100">
               <h2 className="text-xl font-bold text-slate-800 tracking-tight">Upload Document</h2>
               <button onClick={() => setIsUploadModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
@@ -135,7 +137,7 @@ export default function Renewals() {
                   {dummyRenewals.map(r => <option key={r.id} value={r.vehicle}>{r.vehicle}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Document Type</label>
                   <select name="type" value={uploadForm.type} onChange={handleUploadFormChange} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none">
@@ -162,9 +164,9 @@ export default function Renewals() {
                 </div>
               </div>
             </div>
-            <div className="p-5 border-t border-slate-100 bg-slate-50/80 flex justify-end gap-3 rounded-b-xl">
-              <button onClick={() => setIsUploadModalOpen(false)} className="px-5 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50">Cancel</button>
-              <button onClick={() => setIsUploadModalOpen(false)} className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm">Upload File</button>
+            <div className="p-4 md:p-5 border-t border-slate-100 bg-slate-50/80 flex flex-col sm:flex-row justify-end gap-3 rounded-b-xl">
+              <button onClick={() => setIsUploadModalOpen(false)} className="px-4 md:px-5 py-2 md:py-2.5 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 order-2 sm:order-1">Cancel</button>
+              <button onClick={() => setIsUploadModalOpen(false)} className="px-4 md:px-5 py-2 md:py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm order-1 sm:order-2">Upload File</button>
             </div>
           </div>
         </div>
@@ -201,11 +203,11 @@ export default function Renewals() {
                 </span>
               </div>
             </div>
-            <div className="p-5 border-t border-slate-100 bg-slate-50 flex gap-3 rounded-b-xl">
-              <button onClick={() => setIsViewModalOpen(false)} className="flex-1 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 flex justify-center items-center gap-2 transition-colors">
+            <div className="p-4 md:p-5 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row gap-3 rounded-b-xl">
+              <button onClick={() => setIsViewModalOpen(false)} className="flex-1 py-2 md:py-2.5 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 flex justify-center items-center gap-2 transition-colors order-2 sm:order-1">
                 <FiEye className="w-4 h-4" /> View
               </button>
-              <button onClick={() => setIsViewModalOpen(false)} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex justify-center items-center gap-2 shadow-sm transition-colors">
+              <button onClick={() => setIsViewModalOpen(false)} className="flex-1 py-2 md:py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 flex justify-center items-center gap-2 shadow-sm transition-colors order-1 sm:order-2">
                 <FiDownload className="w-4 h-4" /> Download
               </button>
             </div>

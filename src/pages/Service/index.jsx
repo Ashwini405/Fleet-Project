@@ -16,10 +16,10 @@ export default function ServiceModule() {
   ];
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-gray-50/50">
+    <div className="flex flex-col md:flex-row min-h-[calc(100vh-4rem)] bg-gray-50/50">
       
-      {/* Sidebar Overview */}
-      <div className="w-[280px] bg-[#1e293b] text-white flex-shrink-0 flex flex-col hidden md:flex">
+      {/* Sidebar Overview — desktop only */}
+      <div className="w-[280px] bg-[#1e293b] text-white flex-shrink-0 flex-col hidden md:flex">
         <div className="p-6">
            <h2 className="text-xl font-bold tracking-tight text-white/90">SERVICE & MAINTENANCE</h2>
            <p className="text-sm font-semibold text-teal-400 mt-1 uppercase tracking-widest">Overview</p>
@@ -62,33 +62,33 @@ export default function ServiceModule() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc] overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc]">
         
         {/* Top Navbar */}
-        <div className="bg-white border-b border-gray-200 px-6 pt-6 shrink-0 relative z-10">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div className="bg-white border-b border-gray-200 px-4 pt-4 shrink-0 relative z-10">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
              {/* We can put global action buttons here if needed, or leave it cleaner */}
-             <div className="flex gap-4 items-center">
+             <div className="flex gap-2 md:gap-4 items-center overflow-x-auto hide-scrollbar">
                  {/* Top center buttons representing the mockup (Service, Parts, Reminders) */}
-                 <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-sm shadow-slate-200/50">
+                 <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-sm shadow-slate-200/50 flex-shrink-0">
                    <button 
                      onClick={() => setTopModule('SERVICE')}
-                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${topModule === 'SERVICE' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                     className={`flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all ${topModule === 'SERVICE' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
                    >
-                     <Wrench className="w-3.5 h-3.5" /> SERVICE
+                     <Wrench className="w-3.5 h-3.5" /> <span className="hidden sm:inline">SERVICE</span>
                    </button>
                    <button 
                      onClick={() => setTopModule('PARTS')}
-                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${topModule === 'PARTS' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                     className={`flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all ${topModule === 'PARTS' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
                    >
-                     <Settings2 className="w-3.5 h-3.5" /> PARTS
+                     <Settings2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">PARTS</span>
                    </button>
                    <button 
                      onClick={() => setTopModule('REMINDERS')}
-                     className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all relative ${topModule === 'REMINDERS' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
+                     className={`flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all relative ${topModule === 'REMINDERS' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
                    >
-                     <Clock className="w-3.5 h-3.5" /> REMINDERS
-                     <span className="absolute top-1 right-2 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
+                     <Clock className="w-3.5 h-3.5" /> <span className="hidden sm:inline">REMINDERS</span>
+                     <span className="absolute top-1 right-1 md:right-2 w-1.5 h-1.5 bg-red-500 rounded-full"></span>
                    </button>
                  </div>
              </div>

@@ -4,14 +4,14 @@ import { Link } from "react-router-dom";
 
 export const DashboardHeader = () => {
   return (
-    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 relative z-0">
-      <div className="flex items-center gap-2 text-indigo-900 font-black text-xl tracking-tight uppercase">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 relative z-0">
+      <div className="flex items-center gap-2 text-indigo-900 font-black text-lg sm:text-xl tracking-tight uppercase">
         <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
         Fleet Dashboard Overview
       </div>
       
-      <div className="flex items-center gap-4 w-full md:w-auto">
-        <div className="relative w-full md:w-80 border-gray-200">
+      <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="relative flex-1 sm:flex-none sm:w-72">
           <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input 
             type="text" 
@@ -20,7 +20,7 @@ export const DashboardHeader = () => {
           />
         </div>
         
-        <button className="relative p-2 bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-colors">
+        <button className="relative shrink-0 p-2 bg-white border border-gray-200 rounded-full hover:bg-gray-50 transition-colors">
           <Bell className="w-5 h-5 text-gray-600" />
           <span className="absolute top-0 right-0 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
         </button>
@@ -44,8 +44,8 @@ export const DashboardFilters = () => {
   }, []);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 mb-6 relative z-20">
-      <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center justify-between gap-3 mb-6 relative z-20">
+      <div className="flex flex-wrap items-center gap-2">
         <select className="bg-white border border-gray-200 text-gray-700 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer">
           <option>All Groups</option>
           <option>North Region</option>

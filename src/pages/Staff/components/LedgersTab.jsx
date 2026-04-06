@@ -59,12 +59,12 @@ export default function LedgersTab() {
            <table className="w-full text-left border-collapse mt-2">
              <thead>
                <tr className="border-b border-gray-100 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
-                 <th className="p-4">Date</th>
-                 <th className="p-4">Staff Name</th>
-                 <th className="p-4">Type</th>
-                 <th className="p-4">Description</th>
-                 <th className="p-4 text-right">Amount (₹)</th>
-                 <th className="p-4 text-center">Action</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4">Date</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">Staff Name</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4">Type</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4">Description</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4 text-right">Amount (₹)</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4 text-center">Action</th>
                </tr>
              </thead>
              <tbody className="divide-y divide-gray-50">
@@ -76,14 +76,14 @@ export default function LedgersTab() {
                     key={txn.id} 
                     className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
                  >
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4">
                      <span className="font-bold text-gray-600 text-[13px] tracking-wide">{txn.date}</span>
                    </td>
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">
                      <span className="font-bold text-gray-800 text-sm tracking-tight">Robert Ford</span> {/* mocked attached staff */}
                      <span className="block text-[10px] text-gray-400 mt-0.5">SUP-001</span>
                    </td>
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4">
                      {txn.type === 'credit' ? (
                        <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-green-600 bg-green-50 px-2 py-1 rounded">
                          <ArrowUpRight className="w-3 h-3" /> Credit
@@ -94,15 +94,15 @@ export default function LedgersTab() {
                        </span>
                      )}
                    </td>
-                   <td className="p-4">
+                   <td className="py-2 px-2 md:py-4 md:px-4">
                      <span className="text-sm font-semibold text-slate-700">{txn.title}</span>
                    </td>
-                   <td className="p-4 text-right">
+                   <td className="py-2 px-2 md:py-4 md:px-4 text-right">
                      <span className={`font-black text-[15px] tracking-tight ${txn.type === 'credit' ? 'text-green-600' : 'text-red-500'}`}>
                        {txn.type === 'credit' ? '+' : '-'}₹{txn.amount.toLocaleString()}
                      </span>
                    </td>
-                   <td className="p-4 text-center">
+                   <td className="py-2 px-2 md:py-4 md:px-4 text-center">
                      <button className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors">
                         <Eye className="w-3.5 h-3.5" /> View
                      </button>

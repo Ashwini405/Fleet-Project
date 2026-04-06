@@ -68,14 +68,14 @@ export default function WarrantyTab({ warrantiesData, onAdd, onView }) {
          <table className="w-full text-left border-collapse min-w-[900px]">
            <thead>
              <tr className="border-b border-slate-100 bg-slate-50 text-slate-400 text-[9px] font-bold uppercase tracking-widest sticky top-0 z-10">
-               <th className="py-4 px-6">Item</th>
-               <th className="py-4 px-6">Category</th>
-               <th className="py-4 px-6">Vehicle</th>
-               <th className="py-4 px-6">Start Date</th>
-               <th className="py-4 px-6">End Date</th>
-               <th className="py-4 px-6">Coverage</th>
-               <th className="py-4 px-6">Status</th>
-               <th className="py-4 px-6 text-right">View</th>
+               <th className="py-2 px-2 md:py-4 md:px-6">Item</th>
+               <th className="py-2 px-2 md:py-4 md:px-6 hidden sm:table-cell">Category</th>
+               <th className="py-2 px-2 md:py-4 md:px-6">Vehicle</th>
+               <th className="py-2 px-2 md:py-4 md:px-6 hidden md:table-cell">Start Date</th>
+               <th className="py-2 px-2 md:py-4 md:px-6 hidden md:table-cell">End Date</th>
+               <th className="py-2 px-2 md:py-4 md:px-6 hidden lg:table-cell">Coverage</th>
+               <th className="py-2 px-2 md:py-4 md:px-6">Status</th>
+               <th className="py-2 px-2 md:py-4 md:px-6 text-right">View</th>
              </tr>
            </thead>
            <tbody className="divide-y divide-slate-50">
@@ -88,23 +88,23 @@ export default function WarrantyTab({ warrantiesData, onAdd, onView }) {
                    className="hover:bg-slate-50 transition-colors group cursor-pointer"
                    onClick={() => onView(w)}
                 >
-                  <td className="py-4 px-6">
-                     <span className="font-bold text-slate-800 text-sm block">{w.item}</span>
+                  <td className="py-2 md:py-4 px-2 md:px-6">
+                     <span className="font-bold text-slate-800 text-xs md:text-sm block">{w.item}</span>
                      <span className="text-[10px] text-slate-400 font-medium block mt-0.5">{w.id}</span>
                   </td>
-                  <td className="py-4 px-6">
-                     <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded uppercase tracking-widest border border-slate-200">
+                  <td className="py-2 md:py-4 px-2 md:px-6 hidden sm:table-cell">
+                     <span className="text-[9px] font-bold text-slate-500 bg-slate-100 px-1 md:px-2 py-0.5 rounded uppercase tracking-widest border border-slate-200">
                         {w.category}
                      </span>
                   </td>
-                  <td className="py-4 px-6">
+                  <td className="py-2 md:py-4 px-2 md:px-6">
                      <span className="text-xs font-bold text-slate-700">{w.vehicle}</span>
                   </td>
-                  <td className="py-4 px-6 text-xs text-slate-500 font-semibold">{w.start}</td>
-                  <td className="py-4 px-6 text-xs text-slate-500 font-semibold">{w.end}</td>
-                  <td className="py-4 px-6 text-xs text-slate-500 font-medium">{w.coverage}</td>
-                  <td className="py-4 px-6">
-                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold tracking-widest ${
+                  <td className="py-2 md:py-4 px-2 md:px-6 hidden md:table-cell text-xs text-slate-500 font-semibold">{w.start}</td>
+                  <td className="py-2 md:py-4 px-2 md:px-6 hidden md:table-cell text-xs text-slate-500 font-semibold">{w.end}</td>
+                  <td className="py-2 md:py-4 px-2 md:px-6 hidden lg:table-cell text-xs text-slate-500 font-medium">{w.coverage}</td>
+                  <td className="py-2 md:py-4 px-2 md:px-6">
+                     <span className={`inline-flex items-center px-1 md:px-2 py-0.5 rounded text-[10px] font-bold tracking-widest ${
                         w.status === 'Active' ? 'bg-green-50 text-green-600' :
                         w.status === 'Replaced' ? 'bg-purple-50 text-purple-600' :
                         'bg-red-50 text-red-600'
@@ -112,7 +112,7 @@ export default function WarrantyTab({ warrantiesData, onAdd, onView }) {
                         {w.status}
                      </span>
                   </td>
-                  <td className="py-4 px-6 text-right">
+                  <td className="py-2 md:py-4 px-2 md:px-6 text-right">
                      <button className="text-slate-300 group-hover:text-blue-600 transition-colors p-1.5 rounded-full group-hover:bg-blue-50">
                         <Search className="w-4 h-4" />
                      </button>

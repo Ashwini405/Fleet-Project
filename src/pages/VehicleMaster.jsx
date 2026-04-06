@@ -35,7 +35,7 @@ export default function VehicleMaster() {
   const uniqueStatuses = ["All", "Active", "Inactive", "Maintenance"];
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-8 font-sans text-slate-800">
+    <div className="font-sans text-slate-800">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
         <div>
@@ -43,11 +43,11 @@ export default function VehicleMaster() {
           <p className="text-sm text-slate-500 mt-1">Manage and track your entire fleet operations</p>
         </div>
         
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input 
-              type="text" 
+              type="text"
               placeholder="Search trucks..." 
               className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent w-full md:w-64 transition-shadow shadow-sm"
               value={searchTerm}
@@ -56,26 +56,26 @@ export default function VehicleMaster() {
           </div>
           <button 
             onClick={() => navigate('/vehicles/add')}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
+            className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
           >
             <FiPlus className="w-4 h-4" />
-            <span>Add Vehicle</span>
+            Add Vehicle
           </button>
         </div>
       </div>
 
       {/* Filters Section */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap gap-4 items-center">
+      <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap gap-3 md:gap-4 items-center">
         <div className="flex items-center gap-2 text-slate-700 font-semibold text-sm mr-2 border-r border-slate-200 pr-4">
           <FiFilter className="w-4 h-4 text-slate-400" />
           <span>All Trucks ({dummyData.length})</span>
         </div>
         
-        <div className="flex flex-wrap gap-3 flex-1">
+        <div className="flex flex-wrap gap-2 md:gap-3 flex-1">
           <select 
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block px-3 py-2 cursor-pointer hover:bg-slate-100 transition-colors outline-none"
+            className="bg-slate-50 border border-slate-200 text-slate-700 text-xs md:text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block px-2 md:px-3 py-2 cursor-pointer hover:bg-slate-100 transition-colors outline-none"
           >
             <option disabled value="">Status</option>
             {uniqueStatuses.map(status => (
@@ -86,7 +86,7 @@ export default function VehicleMaster() {
           <select 
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block px-3 py-2 cursor-pointer hover:bg-slate-100 transition-colors outline-none"
+            className="bg-slate-50 border border-slate-200 text-slate-700 text-xs md:text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block px-2 md:px-3 py-2 cursor-pointer hover:bg-slate-100 transition-colors outline-none"
           >
             <option disabled value="">Type</option>
             {uniqueTypes.map(type => (
@@ -97,7 +97,7 @@ export default function VehicleMaster() {
           <select 
             value={filterSupervisor}
             onChange={(e) => setFilterSupervisor(e.target.value)}
-            className="bg-slate-50 border border-slate-200 text-slate-700 text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block px-3 py-2 cursor-pointer hover:bg-slate-100 transition-colors outline-none"
+            className="bg-slate-50 border border-slate-200 text-slate-700 text-xs md:text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block px-2 md:px-3 py-2 cursor-pointer hover:bg-slate-100 transition-colors outline-none"
           >
             <option disabled value="">Supervisor</option>
             {uniqueSupervisors.map(sup => (
@@ -113,7 +113,7 @@ export default function VehicleMaster() {
                 setFilterSupervisor("All");
                 setSearchTerm("");
               }}
-              className="text-sm text-indigo-600 hover:text-indigo-800 font-medium px-2 py-2 transition-colors ml-auto"
+              className="text-xs md:text-sm text-indigo-600 hover:text-indigo-800 font-medium px-2 py-2 transition-colors ml-auto"
             >
               Clear filters
             </button>
@@ -124,16 +124,16 @@ export default function VehicleMaster() {
       {/* Table Section */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left whitespace-nowrap">
+          <table className="w-full text-xs md:text-sm text-left whitespace-nowrap">
             <thead className="bg-slate-50/80 text-slate-500 text-xs uppercase font-semibold tracking-wider border-b border-slate-200">
               <tr>
-                <th scope="col" className="px-6 py-4 rounded-tl-xl pe-2">Truck No</th>
-                <th scope="col" className="px-6 py-4">Vehicle Status</th>
-                <th scope="col" className="px-6 py-4">Type of Truck</th>
-                <th scope="col" className="px-6 py-4">Running Plant</th>
-                <th scope="col" className="px-6 py-4">Make & Year</th>
-                <th scope="col" className="px-6 py-4">Meter Reading</th>
-                <th scope="col" className="px-6 py-4 rounded-tr-xl">Supervisor</th>
+                <th scope="col" className="px-3 md:px-6 py-3 rounded-tl-xl pe-2">Truck No</th>
+                <th scope="col" className="px-3 md:px-6 py-3">Status</th>
+                <th scope="col" className="px-3 md:px-6 py-3">Type</th>
+                <th scope="col" className="hidden sm:table-cell px-3 md:px-6 py-3">Plant</th>
+                <th scope="col" className="hidden md:table-cell px-3 md:px-6 py-3">Make & Year</th>
+                <th scope="col" className="hidden lg:table-cell px-3 md:px-6 py-3">Odometer</th>
+                <th scope="col" className="px-3 md:px-6 py-3 rounded-tr-xl">Supervisor</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
@@ -144,9 +144,9 @@ export default function VehicleMaster() {
                     onClick={() => navigate(`/vehicles/${vehicle.id}`)}
                     className="hover:bg-slate-50/80 transition-colors group cursor-pointer"
                   >
-                    <td className="px-6 py-4 relative pe-2 min-w-[200px]">
+                    <td className="px-3 md:px-6 py-3 relative pe-2 min-w-[120px] md:min-w-[200px]">
                       <div className="flex items-center justify-between">
-                        <span className="font-medium text-slate-900">{vehicle.truckNo}</span>
+                        <span className="font-medium text-slate-900 text-xs md:text-sm">{vehicle.truckNo}</span>
                         <div className="relative">
                           <button 
                             onClick={(e) => { 
@@ -201,24 +201,25 @@ export default function VehicleMaster() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
+                    <td className="px-3 md:px-6 py-3">
+                      <span className={`inline-flex items-center px-1.5 md:px-2.5 py-0.5 rounded-full text-xs font-medium border ${
                         vehicle.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 
                         vehicle.status === 'Inactive' ? 'bg-red-50 text-red-700 border-red-200' : 
                         'bg-yellow-50 text-yellow-700 border-yellow-200'
                       }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+                        <span className={`w-1 h-1 rounded-full mr-1 md:mr-1.5 ${
                           vehicle.status === 'Active' ? 'bg-green-500' : 
                           vehicle.status === 'Inactive' ? 'bg-red-500' : 'bg-yellow-500'
                         }`}></span>
-                        {vehicle.status}
+                        <span className="hidden sm:inline">{vehicle.status}</span>
+                        <span className="sm:hidden">{vehicle.status === 'Maintenance' ? 'Maint.' : vehicle.status}</span>
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-slate-600">{vehicle.type}</td>
-                    <td className="px-6 py-4 text-slate-600">{vehicle.plant}</td>
-                    <td className="px-6 py-4 text-slate-600">{vehicle.makeYear}</td>
-                    <td className="px-6 py-4 text-slate-600 font-mono text-xs">{vehicle.km} km</td>
-                    <td className="px-6 py-4 text-slate-600">{vehicle.supervisor}</td>
+                    <td className="px-3 md:px-6 py-3 text-slate-600 text-xs md:text-sm">{vehicle.type}</td>
+                    <td className="hidden sm:table-cell px-3 md:px-6 py-3 text-slate-600 text-xs md:text-sm">{vehicle.plant}</td>
+                    <td className="hidden md:table-cell px-3 md:px-6 py-3 text-slate-600 text-xs md:text-sm">{vehicle.makeYear}</td>
+                    <td className="hidden lg:table-cell px-3 md:px-6 py-3 text-slate-600 font-mono text-xs">{vehicle.km} km</td>
+                    <td className="px-3 md:px-6 py-3 text-slate-600 text-xs md:text-sm">{vehicle.supervisor}</td>
                   </tr>
                 ))
               ) : (
@@ -239,14 +240,14 @@ export default function VehicleMaster() {
         </div>
         
         {/* Pagination / Footer Info Card */}
-        <div className="px-6 py-4 border-t border-slate-200 bg-slate-50 transition-colors flex items-center justify-between">
-          <span className="text-sm text-slate-500 font-medium">
+        <div className="px-3 md:px-6 py-3 md:py-4 border-t border-slate-200 bg-slate-50 transition-colors flex flex-col sm:flex-row items-center justify-between gap-2">
+          <span className="text-xs md:text-sm text-slate-500 font-medium">
             Showing <strong className="text-slate-900">{filteredData.length}</strong> of <strong className="text-slate-900">{dummyData.length}</strong> vehicles
           </span>
 
           <div className="flex gap-2">
-            <button className="px-3 py-1 border border-slate-200 rounded text-slate-600 bg-white hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm">Prev</button>
-            <button className="px-3 py-1 border border-slate-200 rounded text-slate-600 bg-white hover:bg-slate-50 transition-colors text-sm font-medium shadow-sm">Next</button>
+            <button className="px-2 md:px-3 py-1 border border-slate-200 rounded text-slate-600 bg-white hover:bg-slate-50 transition-colors text-xs md:text-sm font-medium shadow-sm">Prev</button>
+            <button className="px-2 md:px-3 py-1 border border-slate-200 rounded text-slate-600 bg-white hover:bg-slate-50 transition-colors text-xs md:text-sm font-medium shadow-sm">Next</button>
           </div>
         </div>
       </div>

@@ -6,7 +6,7 @@ export const InspectionWidget = ({ data }) => {
   if (!data) return null;
 
   return (
-    <StatCard title="Truck Inspection" icon={ClipboardCheck} className="flex-1 min-w-[200px]">
+    <StatCard title="Truck Inspection" icon={ClipboardCheck} className="h-full">
       <div className="flex justify-around items-center h-full pt-4 pb-2">
         <div className="text-center">
           <div className="text-3xl font-bold text-green-600">{data.completed}</div>

@@ -83,10 +83,10 @@ export default function InventoryTable({ inventory, setInventory, setHistory }) 
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-slate-200 bg-white sticky top-0 z-10 text-slate-500 text-[10px] font-bold uppercase tracking-widest shadow-sm">
-              <th className="p-5 w-2/5">Item</th>
-              <th className="p-5 w-1/5">Brand</th>
-              <th className="p-5 w-1/5 text-center">QTY</th>
-              <th className="p-5 w-1/5 text-right">Action</th>
+              <th className="py-2 px-2 md:py-5 md:px-5 w-2/5">Item</th>
+              <th className="py-2 px-2 md:py-5 md:px-5 w-1/5 hidden sm:table-cell">Brand</th>
+              <th className="py-2 px-2 md:py-5 md:px-5 w-1/5 text-center">QTY</th>
+              <th className="py-2 px-2 md:py-5 md:px-5 w-1/5 text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -104,21 +104,21 @@ export default function InventoryTable({ inventory, setInventory, setHistory }) 
                   key={item.id} 
                   className="hover:bg-slate-50 transition-colors group bg-white"
                 >
-                  <td className="p-5">
-                    <span className="font-bold text-slate-800 tracking-tight block">{item.name}</span>
+                  <td className="py-2 px-2 md:py-5 md:px-5">
+                    <span className="font-bold text-slate-800 tracking-tight block text-xs md:text-sm">{item.name}</span>
                     {item.serialNo && <span className="text-[10px] text-slate-400 font-medium tracking-wide mt-0.5 block">SN: {item.serialNo}</span>}
                   </td>
-                  <td className="p-5">
+                  <td className="py-2 px-2 md:py-5 md:px-5 hidden sm:table-cell">
                     <span className="text-sm font-semibold text-slate-600">{item.brand}</span>
                   </td>
-                  <td className="p-5 text-center">
+                  <td className="py-2 px-2 md:py-5 md:px-5 text-center">
                     <div className="flex justify-center">
                        <span className={`inline-flex items-center text-xs font-black tracking-widest px-3 py-1.5 rounded-lg border ${qtyColor}`}>
                           {item.qty}
                        </span>
                     </div>
                   </td>
-                  <td className="p-5 text-right">
+                  <td className="py-2 px-2 md:py-5 md:px-5 text-right">
                     <button 
                        onClick={() => setIssuingItem(item)}
                        disabled={item.qty === 0}

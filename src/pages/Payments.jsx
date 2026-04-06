@@ -150,18 +150,18 @@ export default function Payments() {
     <div className="flex flex-col h-full animate-in fade-in duration-200">
 
       {/* --- HEADER --- */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Operational Driver Battha</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Operational Driver Battha</h1>
           <p className="text-slate-500 text-sm mt-1">Manage driver settlements, trips, and payments.</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
             <input
               type="text"
               placeholder="Search drivers, trucks..."
-              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-64 shadow-sm"
+              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-48 sm:w-64 shadow-sm"
             />
           </div>
 
@@ -170,12 +170,12 @@ export default function Payments() {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
           </button>
 
-          <button className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-slate-50 hover:text-indigo-600 transition-colors">
-            <FiDownload className="w-4 h-4" /> Export Data
+          <button className="hidden sm:flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-slate-50 hover:text-indigo-600 transition-colors">
+            <FiDownload className="w-4 h-4" /> Export
           </button>
 
           <button className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-md hover:bg-indigo-700 transition-colors">
-            <FiPlus className="w-4 h-4 stroke-[3]" /> Generate New Trip
+            <FiPlus className="w-4 h-4 stroke-[3]" /> <span className="hidden sm:inline">Generate New Trip</span><span className="sm:hidden">New Trip</span>
           </button>
         </div>
       </div>
@@ -216,8 +216,6 @@ export default function Payments() {
             ========================================= */}
         {activeTab === '1. Prepare Battha' && (
           <div className="flex flex-col lg:flex-row gap-6">
-
-            {/* Left Column (Forms & Tables) */}
             <div className="flex-1 space-y-6">
 
               {/* Header Box */}
@@ -343,32 +341,32 @@ export default function Payments() {
                   </h3>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
+                  <table className="w-full text-xs md:text-sm text-left">
                     <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       <tr>
-                        <th className="px-5 py-3">Date</th>
-                        <th className="px-5 py-3">Station</th>
-                        <th className="px-5 py-3 text-right">Odo</th>
-                        <th className="px-5 py-3 text-right">Litres</th>
-                        <th className="px-5 py-3 text-right">Amount</th>
+                        <th className="py-2 px-2 md:px-5 md:py-3">Date</th>
+                        <th className="py-2 px-2 md:px-5 md:py-3 hidden sm:table-cell">Station</th>
+                        <th className="py-2 px-2 md:px-5 md:py-3 hidden md:table-cell text-right">Odo</th>
+                        <th className="py-2 px-2 md:px-5 md:py-3 text-right">Litres</th>
+                        <th className="py-2 px-2 md:px-5 md:py-3 text-right">Amount</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {MOCK_DIESEL.map((d, i) => (
                         <tr key={i} className="hover:bg-slate-50/50">
-                          <td className="px-5 py-3 font-medium text-slate-600">{d.date}</td>
-                          <td className="px-5 py-3 text-slate-500">{d.station}</td>
-                          <td className="px-5 py-3 text-right font-medium text-slate-600">{d.odo}</td>
-                          <td className="px-5 py-3 text-right font-bold text-slate-800">{d.litres}</td>
-                          <td className="px-5 py-3 text-right font-medium text-slate-600">₹ {d.amount.toFixed(2)}</td>
+                          <td className="py-2 md:py-3 px-2 md:px-5 font-medium text-slate-600 text-xs md:text-sm">{d.date}</td>
+                          <td className="py-2 md:py-3 px-2 md:px-5 hidden sm:table-cell text-slate-500">{d.station}</td>
+                          <td className="py-2 md:py-3 px-2 md:px-5 hidden md:table-cell text-right font-medium text-slate-600">{d.odo}</td>
+                          <td className="py-2 md:py-3 px-2 md:px-5 text-right font-bold text-slate-800">{d.litres}</td>
+                          <td className="py-2 md:py-3 px-2 md:px-5 text-right font-medium text-slate-600">₹ {d.amount.toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot className="bg-orange-50/50">
                       <tr>
-                        <td colSpan="3" className="px-5 py-3 text-right font-bold text-orange-800 text-xs uppercase tracking-wider">Total Fuel:</td>
-                        <td className="px-5 py-3 text-right font-bold text-orange-600">{totalDieselLitres} L</td>
-                        <td className="px-5 py-3 text-right font-bold text-orange-600">₹ {totalDieselAmount.toFixed(2)}</td>
+                        <td colSpan="3" className="py-2 md:py-3 px-2 md:px-5 text-right font-bold text-orange-800 text-xs uppercase tracking-wider">Total Fuel:</td>
+                        <td className="py-2 md:py-3 px-2 md:px-5 text-right font-bold text-orange-600">{totalDieselLitres} L</td>
+                        <td className="py-2 md:py-3 px-2 md:px-5 text-right font-bold text-orange-600">₹ {totalDieselAmount.toFixed(2)}</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -386,32 +384,32 @@ export default function Payments() {
                   </button>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
+                  <table className="w-full text-xs md:text-sm text-left">
                     <thead className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       <tr>
-                        <th className="px-5 py-3">Date</th>
-                        <th className="px-5 py-3">Route</th>
-                        <th className="px-5 py-3 text-right">KM</th>
-                        <th className="px-5 py-3 text-right text-red-600">Advance (₹)</th>
-                        <th className="px-5 py-3"></th>
+                        <th className="py-2 px-2 md:px-5 md:py-3">Date</th>
+                        <th className="py-2 px-2 md:px-5 md:py-3 hidden sm:table-cell">Route</th>
+                        <th className="py-2 px-2 md:px-5 md:py-3 text-right">KM</th>
+                        <th className="py-2 px-2 md:px-5 md:py-3 text-right text-red-600">Advance (₹)</th>
+                        <th className="py-2 px-2 md:px-5 md:py-3 hidden md:table-cell"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {MOCK_TRIPS.map((t, i) => (
                         <tr key={i} className="hover:bg-slate-50/50 group">
-                          <td className="px-5 py-3">
-                            <input type="text" value={t.date} readOnly className="w-full bg-transparent font-medium text-slate-600 focus:outline-none" />
+                          <td className="py-2 md:py-3 px-2 md:px-5">
+                            <input type="text" value={t.date} readOnly className="w-full bg-transparent font-medium text-slate-600 text-xs md:text-sm focus:outline-none" />
                           </td>
-                          <td className="px-5 py-3">
+                          <td className="py-2 md:py-3 px-2 md:px-5 hidden sm:table-cell">
                             <input type="text" value={t.route} readOnly className="w-full bg-transparent font-medium text-slate-800 focus:outline-none" />
                           </td>
-                          <td className="px-5 py-3">
+                          <td className="py-2 md:py-3 px-2 md:px-5">
                             <input type="number" value={t.km} readOnly className="w-full text-right bg-transparent text-slate-600 focus:outline-none" />
                           </td>
-                          <td className="px-5 py-3">
+                          <td className="py-2 md:py-3 px-2 md:px-5">
                             <input type="text" value={t.advance} readOnly className="w-full text-right bg-red-50/50 border border-red-100 py-1 rounded text-red-600 font-bold focus:outline-none" />
                           </td>
-                          <td className="px-5 py-3 text-center">
+                          <td className="py-2 md:py-3 px-2 md:px-5 hidden md:table-cell text-center">
                             <FiTrash2 className="w-4 h-4 text-slate-300 group-hover:text-red-500 cursor-pointer mx-auto transition-colors" />
                           </td>
                         </tr>
@@ -419,9 +417,9 @@ export default function Payments() {
                     </tbody>
                     <tfoot className="bg-slate-50 border-t border-slate-200">
                       <tr>
-                        <td colSpan="2" className="px-5 py-3 text-right font-bold text-slate-600 text-xs uppercase tracking-wider">Totals:</td>
-                        <td className="px-5 py-3 text-right font-bold text-slate-800">{totalTripKm} KM</td>
-                        <td className="px-5 py-3 text-right font-bold text-red-600">₹ {totalAdvances.toFixed(2)}</td>
+                        <td colSpan="2" className="py-2 md:py-3 px-2 md:px-5 text-right font-bold text-slate-600 text-xs uppercase tracking-wider">Totals:</td>
+                        <td className="py-2 md:py-3 px-2 md:px-5 text-right font-bold text-slate-800">{totalTripKm} KM</td>
+                        <td className="py-2 md:py-3 px-2 md:px-5 text-right font-bold text-red-600">₹ {totalAdvances.toFixed(2)}</td>
                         <td></td>
                       </tr>
                     </tfoot>
@@ -611,42 +609,42 @@ export default function Payments() {
               </button>
             </div>
 
-            <table className="w-full text-sm text-left whitespace-nowrap">
-              <thead className="bg-white border-b-2 border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+            <table className="w-full text-xs md:text-sm text-left whitespace-nowrap">
+              <thead className="bg-white border-b-2 border-slate-100 text-[10px] md:text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <tr>
-                  <th className="px-5 py-4">ID</th>
-                  <th className="px-5 py-4">Date Paid</th>
-                  <th className="px-5 py-4">Truck / Driver</th>
-                  <th className="px-5 py-4 text-center">Month/Trips</th>
-                  <th className="px-5 py-4 text-right">Amount</th>
-                  <th className="px-5 py-4 text-center">Mode</th>
-                  <th className="px-5 py-4 text-center">Status</th>
-                  <th className="px-5 py-4 text-center">Receipt</th>
+                  <th className="py-2 px-2 md:px-5 md:py-4">ID</th>
+                  <th className="py-2 px-2 md:px-5 md:py-4 hidden sm:table-cell">Date Paid</th>
+                  <th className="py-2 px-2 md:px-5 md:py-4">Truck / Driver</th>
+                  <th className="py-2 px-2 md:px-5 md:py-4 text-center">Month/Trips</th>
+                  <th className="py-2 px-2 md:px-5 md:py-4 text-right">Amount</th>
+                  <th className="py-2 px-2 md:px-5 md:py-4 text-center hidden md:table-cell">Mode</th>
+                  <th className="py-2 px-2 md:px-5 md:py-4 text-center">Status</th>
+                  <th className="py-2 px-2 md:px-5 md:py-4 text-center hidden lg:table-cell">Receipt</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {historyList.map(item => (
                   <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-4 font-bold text-indigo-600 text-xs">{item.id}</td>
-                    <td className="px-5 py-4 text-slate-600 font-medium">{item.paidOn}</td>
-                    <td className="px-5 py-4">
-                      <div className="font-bold text-slate-800">{item.truckNo}</div>
+                    <td className="py-2 md:py-4 px-2 md:px-5 font-bold text-indigo-600 text-xs">{item.id}</td>
+                    <td className="py-2 md:py-4 px-2 md:px-5 hidden sm:table-cell text-slate-600 font-medium">{item.paidOn}</td>
+                    <td className="py-2 md:py-4 px-2 md:px-5">
+                      <div className="font-bold text-slate-800 text-xs md:text-sm">{item.truckNo}</div>
                       <div className="text-xs text-slate-500">{item.driver}</div>
                     </td>
-                    <td className="px-5 py-4 text-center text-slate-600 font-medium border-l border-r border-slate-50">
+                    <td className="py-2 md:py-4 px-2 md:px-5 text-center text-slate-600 font-medium border-l border-r border-slate-50">
                       {item.month} <span className="text-slate-300 mx-1">|</span> {item.trips} Trips
                     </td>
-                    <td className="px-5 py-4 text-right font-bold text-slate-800 text-base">₹ {item.netPayable.toFixed(2)}</td>
-                    <td className="px-5 py-4 text-center text-slate-500 text-xs font-medium">
+                    <td className="py-2 md:py-4 px-2 md:px-5 text-right font-bold text-slate-800 text-sm md:text-base">₹ {item.netPayable.toFixed(2)}</td>
+                    <td className="py-2 md:py-4 px-2 md:px-5 text-center text-slate-500 text-xs font-medium hidden md:table-cell">
                       {item.mode}
                       <div className="text-[10px] text-slate-400 mt-0.5">{item.ref}</div>
                     </td>
-                    <td className="px-5 py-4 text-center">
-                      <span className="bg-green-100 text-green-700 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                    <td className="py-2 md:py-4 px-2 md:px-5 text-center">
+                      <span className="bg-green-100 text-green-700 px-1.5 md:px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider">
                         <FiCheck className="inline mr-1 w-3 h-3 mb-[2px]" />{item.status}
                       </span>
                     </td>
-                    <td className="px-5 py-4 text-center">
+                    <td className="py-2 md:py-4 px-2 md:px-5 text-center hidden lg:table-cell">
                       <button onClick={() => openVoucher('history', item)} className="p-2 bg-slate-100 text-slate-500 hover:text-indigo-600 hover:bg-slate-200 rounded-lg transition-colors tooltip" title="Download">
                         <FiDownload className="w-4 h-4" />
                       </button>
@@ -849,26 +847,26 @@ export default function Payments() {
                     <div>
                       <h4 className="font-bold text-[10px] text-slate-500 uppercase tracking-wider mb-2 border-b border-slate-200 pb-1">Diesel Consumption</h4>
                       <table className="w-full text-left">
-                        <thead><tr className="text-slate-500"><th className="pb-1">Date</th><th className="pb-1">Station</th><th className="pb-1 text-right">Odometer</th><th className="pb-1 text-right">Litres</th><th className="pb-1 text-right">Amount</th></tr></thead>
+                        <thead><tr className="text-slate-500 text-[10px] font-bold uppercase tracking-wider"><th className="pb-1">Date</th><th className="pb-1 hidden sm:table-cell">Station</th><th className="pb-1 hidden md:table-cell text-right">Odometer</th><th className="pb-1 text-right">Litres</th><th className="pb-1 text-right">Amount</th></tr></thead>
                         <tbody className="text-slate-700 divide-y divide-slate-100">
                           {selectedVoucherData.dieselTable.map(d => (
-                            <tr key={d.id}><td className="py-1.5">{d.date}</td><td>{d.station}</td><td className="text-right">{d.odo}</td><td className="text-right">{d.litres}</td><td className="text-right text-slate-800">₹ {d.amount.toFixed(2)}</td></tr>
+                            <tr key={d.id}><td className="py-1.5 text-xs md:text-sm">{d.date}</td><td className="hidden sm:table-cell text-xs md:text-sm">{d.station}</td><td className="hidden md:table-cell text-right text-xs md:text-sm">{d.odo}</td><td className="text-right text-xs md:text-sm">{d.litres}</td><td className="text-right text-slate-800 text-xs md:text-sm">₹ {d.amount.toFixed(2)}</td></tr>
                           ))}
                         </tbody>
-                        <tfoot><tr><td colSpan="3" className="text-right font-bold py-2">Totals:</td><td className="text-right font-bold py-2">{selectedVoucherData.dieselTable.reduce((s, d) => s + d.litres, 0)} L</td><td className="text-right font-bold py-2">₹ {selectedVoucherData.dieselTable.reduce((s, d) => s + d.amount, 0).toFixed(2)}</td></tr></tfoot>
+                        <tfoot><tr><td colSpan="3" className="text-right font-bold py-2 text-xs md:text-sm">Totals:</td><td className="text-right font-bold py-2 text-xs md:text-sm">{selectedVoucherData.dieselTable.reduce((s, d) => s + d.litres, 0)} L</td><td className="text-right font-bold py-2 text-xs md:text-sm">₹ {selectedVoucherData.dieselTable.reduce((s, d) => s + d.amount, 0).toFixed(2)}</td></tr></tfoot>
                       </table>
                     </div>
 
                     <div>
                       <h4 className="font-bold text-[10px] text-slate-500 uppercase tracking-wider mb-2 border-b border-slate-200 pb-1">Trip Summary</h4>
                       <table className="w-full text-left">
-                        <thead><tr className="text-slate-500"><th className="pb-1">Date</th><th className="pb-1">Route</th><th className="pb-1 text-right">KM</th><th className="pb-1 text-right">Advance</th></tr></thead>
+                        <thead><tr className="text-slate-500 text-[10px] font-bold uppercase tracking-wider"><th className="pb-1">Date</th><th className="pb-1 hidden sm:table-cell">Route</th><th className="pb-1 text-right">KM</th><th className="pb-1 text-right">Advance</th></tr></thead>
                         <tbody className="text-slate-700 divide-y divide-slate-100">
                           {selectedVoucherData.tripTable.map(t => (
-                            <tr key={t.id}><td className="py-1.5">{t.date}</td><td>{t.route}</td><td className="text-right">{t.km}</td><td className="text-right text-slate-800">₹ {t.advance.toFixed(2)}</td></tr>
+                            <tr key={t.id}><td className="py-1.5 text-xs md:text-sm">{t.date}</td><td className="hidden sm:table-cell text-xs md:text-sm">{t.route}</td><td className="text-right text-xs md:text-sm">{t.km}</td><td className="text-right text-slate-800 text-xs md:text-sm">₹ {t.advance.toFixed(2)}</td></tr>
                           ))}
                         </tbody>
-                        <tfoot><tr><td colSpan="2" className="text-right font-bold py-2">Totals:</td><td className="text-right font-bold py-2">{selectedVoucherData.tripTable.reduce((s, t) => s + t.km, 0)}</td><td className="text-right font-bold py-2">₹ {selectedVoucherData.tripTable.reduce((s, t) => s + t.advance, 0).toFixed(2)}</td></tr></tfoot>
+                        <tfoot><tr><td colSpan="2" className="text-right font-bold py-2 text-xs md:text-sm">Totals:</td><td className="text-right font-bold py-2 text-xs md:text-sm">{selectedVoucherData.tripTable.reduce((s, t) => s + t.km, 0)}</td><td className="text-right font-bold py-2 text-xs md:text-sm">₹ {selectedVoucherData.tripTable.reduce((s, t) => s + t.advance, 0).toFixed(2)}</td></tr></tfoot>
                       </table>
                     </div>
                   </div>
