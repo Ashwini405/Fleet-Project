@@ -17,9 +17,37 @@ export default function VehicleMaster() {
   const [filterType, setFilterType] = useState("All");
   const [filterSupervisor, setFilterSupervisor] = useState("All");
   const [openDropdown, setOpenDropdown] = useState(null);
+  
+  // Real backend data exclusively!
+  const [vehiclesData, setVehiclesData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  React.useEffect(() => {
+    fetch('http://localhost:5000/api/vehicles')
+      .then(res => res.json())
+      .then(result => {
+        if (result.success) {
+          // Map backend DB fields to frontend table format
+          const formattedData = result.data.map(v => ({
+            id: v.id,
+            truckNo: v.vehicle_no,
+            status: "Active", // Temporarily default
+            type: v.type,
+            plant: "Newly Assigned",
+            makeYear: "(Backend Data)", 
+            km: "0",
+            supervisor: "Pending"
+          }));
+          
+          setVehiclesData(formattedData); 
+        }
+      })
+      .catch(err => console.error(err))
+      .finally(() => setLoading(false));
+  }, []);
 
   const filteredData = useMemo(() => {
-    return dummyData.filter(vehicle => {
+    return vehiclesData.filter(vehicle => {
       const matchesSearch = vehicle.truckNo.toLowerCase().includes(searchTerm.toLowerCase()) || 
                             vehicle.makeYear.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = filterStatus === "All" || vehicle.status === filterStatus;
@@ -28,10 +56,10 @@ export default function VehicleMaster() {
       
       return matchesSearch && matchesStatus && matchesType && matchesSupervisor;
     });
-  }, [searchTerm, filterStatus, filterType, filterSupervisor]);
+  }, [vehiclesData, searchTerm, filterStatus, filterType, filterSupervisor]);
 
-  const uniqueTypes = ["All", ...new Set(dummyData.map(item => item.type))];
-  const uniqueSupervisors = ["All", ...new Set(dummyData.map(item => item.supervisor))];
+  const uniqueTypes = ["All", ...new Set(vehiclesData.map(item => item.type))];
+  const uniqueSupervisors = ["All", ...new Set(vehiclesData.map(item => item.supervisor))];
   const uniqueStatuses = ["All", "Active", "Inactive", "Maintenance"];
 
   return (

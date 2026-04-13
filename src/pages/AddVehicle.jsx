@@ -40,12 +40,39 @@ export default function AddVehicle() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    console.log("Saved Vehicle Data:", formData);
-    // In a real app we would make an API call here.
-    // For now, simply navigate back to the list.
-    navigate('/vehicles');
+    
+    // Basic validation
+    if (!formData.registrationNumber) {
+      alert("Registration Number is required!");
+      return;
+    }
+
+    try {
+      const response = await fetch('http://localhost:5000/api/vehicles', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          vehicle_no: formData.registrationNumber,
+          type: formData.vehicleType || 'Truck' 
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        console.log("Vehicle saved successfully to Database:", data);
+        navigate('/vehicles');
+      } else {
+        alert("Failed to save: " + data.message);
+      }
+    } catch (error) {
+      console.error("Error saving vehicle:", error);
+      alert("Could not connect to the backend server. Is it running?");
+    }
   };
 
   // Reusable Form Group components for clean structure
