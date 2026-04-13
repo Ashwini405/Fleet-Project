@@ -21,6 +21,24 @@ export default function VehicleMaster() {
   // Real backend data exclusively!
   const [vehiclesData, setVehiclesData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+
+  const handleDelete = async (vehicleId) => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/vehicles/${vehicleId}`, { method: 'DELETE' });
+      const result = await res.json();
+      if (result.success) {
+        setVehiclesData(prev => prev.filter(v => v.id !== vehicleId));
+      } else {
+        alert('Failed to delete vehicle.');
+      }
+    } catch (err) {
+      alert('Error deleting vehicle.');
+    } finally {
+      setDeleteConfirm(null);
+      setOpenDropdown(null);
+    }
+  };
 
   React.useEffect(() => {
     fetch('http://localhost:5000/api/vehicles')
@@ -217,7 +235,8 @@ export default function VehicleMaster() {
                               <button 
                                 onClick={(e) => { 
                                   e.stopPropagation(); 
-                                  setOpenDropdown(null); 
+                                  setDeleteConfirm(vehicle.id);
+                                  setOpenDropdown(null);
                                 }}
                                 className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium"
                               >
@@ -279,6 +298,28 @@ export default function VehicleMaster() {
           </div>
         </div>
       </div>
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-80">
+            <h2 className="text-base font-semibold text-slate-900 mb-2">Delete Vehicle</h2>
+            <p className="text-sm text-slate-500 mb-5">Are you sure you want to delete this vehicle? This action cannot be undone.</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(deleteConfirm)}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
