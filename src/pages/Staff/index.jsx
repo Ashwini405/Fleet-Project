@@ -4,7 +4,9 @@ import { LayoutDashboard, Building2, UsersRound, Truck, Briefcase, BookOpen } fr
 import { userRoles } from './data/dummyData';
 import DashboardTab from './components/DashboardTab';
 import StationsTab from './components/StationsTab';
-import StaffTab from './components/StaffTab';
+import SupervisorsTab from './components/SupervisorsTab';
+import DriversTab from './components/DriversTab';
+import EmployeesTab from './components/EmployeesTab';
 import LedgersTab from './components/LedgersTab';
 
 const iconMap = {
@@ -23,10 +25,9 @@ export default function Staff() {
     switch (activeTab) {
       case "dashboard": return <DashboardTab />;
       case "stations": return <StationsTab />;
-      case "supervisors":
-      case "drivers":
-      case "employees":
-        return <StaffTab role={activeTab} />;
+      case "supervisors": return <SupervisorsTab />;
+      case "drivers": return <DriversTab />;
+      case "employees": return <EmployeesTab />;
       case "ledgers": return <LedgersTab />;
       default: return null;
     }
