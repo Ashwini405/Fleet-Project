@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 
 const vehicleRoutes = require('./routes/vehicleRoutes');
+const stationRoutes = require('./routes/stationRoutes'); // ✅ ADD THIS
 
 const app = express();
 
@@ -12,6 +13,7 @@ app.use(express.json());
 
 // Routes
 app.use('/api/vehicles', vehicleRoutes);
+app.use('/api/stations', stationRoutes);
 
 // Default Route
 app.get('/', (req, res) => {
