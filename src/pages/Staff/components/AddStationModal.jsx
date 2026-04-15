@@ -1,9 +1,47 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 
 export default function AddStationModal({ isOpen, onClose }) {
+
+  const [formData, setFormData] = useState({
+    station_name: '',
+    station_code: '',
+    location: '',
+    manager_name: '',
+    contact_number: ''
+  });
+
   if (!isOpen) return null;
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      const res = await fetch('http://localhost:5001/api/stations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert("Station added successfully");
+        onClose();
+      } else {
+        alert("Failed to add station");
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert("Server error");
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -25,38 +63,88 @@ export default function AddStationModal({ isOpen, onClose }) {
           </div>
           
           <div className="p-6">
-             <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); onClose(); }}>
+             <form className="space-y-4" onSubmit={handleSubmit}>
                <div className="grid grid-cols-2 gap-4">
+
                  <div className="col-span-2">
                     <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Station Name</label>
-                    <input type="text" placeholder="e.g. Central Hub" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm transition-all" required />
+                    <input 
+                      type="text"
+                      name="station_name"
+                      placeholder="e.g. Central Hub"
+                      onChange={handleChange}
+                      className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm transition-all"
+                      required 
+                    />
                  </div>
+
                  <div>
                     <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Station ID/Code</label>
-                    <input type="text" placeholder="e.g. STN-001" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm transition-all" required />
+                    <input 
+                      type="text"
+                      name="station_code"
+                      placeholder="e.g. STN-001"
+                      onChange={handleChange}
+                      className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm transition-all"
+                      required 
+                    />
                  </div>
+
                  <div>
                     <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Location</label>
-                    <input type="text" placeholder="City/Area" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm transition-all" required />
+                    <input 
+                      type="text"
+                      name="location"
+                      placeholder="City/Area"
+                      onChange={handleChange}
+                      className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm transition-all"
+                      required 
+                    />
                  </div>
+
                  <div>
                     <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Manager Name</label>
-                    <input type="text" placeholder="Full Name" className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm transition-all" required />
+                    <input 
+                      type="text"
+                      name="manager_name"
+                      placeholder="Full Name"
+                      onChange={handleChange}
+                      className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm transition-all"
+                      required 
+                    />
                  </div>
+
                  <div>
                     <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Contact Number</label>
-                    <input type="text" placeholder="+91..." className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm transition-all" required />
+                    <input 
+                      type="text"
+                      name="contact_number"
+                      placeholder="+91..."
+                      onChange={handleChange}
+                      className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm transition-all"
+                      required 
+                    />
                  </div>
+
                </div>
 
                <div className="pt-4 flex gap-3">
-                  <button type="button" onClick={onClose} className="flex-1 py-3 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors">
+                  <button 
+                    type="button" 
+                    onClick={onClose} 
+                    className="flex-1 py-3 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                  >
                     Cancel
                   </button>
-                  <button type="submit" className="flex-1 py-3 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-colors shadow-sm shadow-teal-600/20">
+
+                  <button 
+                    type="submit" 
+                    className="flex-1 py-3 text-sm font-bold text-white bg-teal-600 hover:bg-teal-700 rounded-xl transition-colors shadow-sm shadow-teal-600/20"
+                  >
                     Save Station
                   </button>
                </div>
+
              </form>
           </div>
         </motion.div>
