@@ -1,14 +1,6 @@
-import React, { useState, useMemo } from 'react';
-import { FiSearch, FiPlus, FiFilter, FiEye, FiMoreHorizontal } from 'react-icons/fi';
+import React, { useState, useEffect, useMemo } from 'react';
+import { FiSearch, FiPlus, FiFilter, FiMoreHorizontal } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
-
-const dummyData = [
-  { id: 1, truckNo: "AP39 AB 1234", status: "Active", type: "Trailer", plant: "Hyderabad", makeYear: "Tata (2022)", km: "120,000", supervisor: "Ravi Kumar" },
-  { id: 2, truckNo: "TS09 XY 5678", status: "Maintenance", type: "Tanker", plant: "Vizag", makeYear: "Ashok Leyland (2021)", km: "98,000", supervisor: "Suresh Das" },
-  { id: 3, truckNo: "MH12 CD 9012", status: "Active", type: "Tipper", plant: "Pune", makeYear: "BharatBenz (2023)", km: "45,000", supervisor: "Amit Patel" },
-  { id: 4, truckNo: "KA01 EF 3456", status: "Inactive", type: "Trailer", plant: "Bangalore", makeYear: "Tata (2020)", km: "210,000", supervisor: "Ravi Kumar" },
-  { id: 5, truckNo: "DL04 GH 7890", status: "Active", type: "Tanker", plant: "Delhi", makeYear: "Volvo (2022)", km: "85,000", supervisor: "Vikram Singh" },
-];
 
 export default function VehicleMaster() {
   const navigate = useNavigate();
@@ -18,14 +10,64 @@ export default function VehicleMaster() {
   const [filterSupervisor, setFilterSupervisor] = useState("All");
   const [openDropdown, setOpenDropdown] = useState(null);
   
-  // Real backend data exclusively!
   const [vehiclesData, setVehiclesData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
 
+  // Helper: Compute vehicle status based on validity dates
+  const computeStatus = (vehicle) => {
+    // If backend already provides a 'status' field, use it
+    if (vehicle.status) return vehicle.status;
+
+    const today = new Date().toISOString().slice(0,10);
+    const validities = [
+      vehicle.insurance_validity,
+      vehicle.fc_validity,
+      vehicle.permit_validity,
+      vehicle.tax_validity,
+      vehicle.pollution_validity,
+      vehicle.cll_validity
+    ].filter(Boolean);
+    
+    if (validities.length === 0) return "Active"; // default
+    const isAnyExpired = validities.some(date => date < today);
+    return isAnyExpired ? "Inactive" : "Active";
+  };
+
+  // Fetch vehicles from backend
+  useEffect(() => {
+    fetch('http://localhost:5001/api/vehicles')
+      .then(res => res.json())
+      .then(result => {
+        if (result.success) {
+          const formattedData = result.data.map(v => ({
+            id: v.id,
+            truckNo: v.vehicle_no || '',
+            status: computeStatus(v),
+            type: v.type || '',
+            plant: v.assigned_plant || 'Not Assigned',
+            makeYear: v.make_brand && v.model_year ? `${v.make_brand} (${v.model_year})` : (v.make_brand || v.model_year || '—'),
+            km: v.initial_odometer ? Number(v.initial_odometer).toLocaleString() : '0',
+            supervisor: v.supervisor || 'Unassigned',
+            // keep raw data for potential edits
+            raw: v
+          }));
+          setVehiclesData(formattedData);
+        } else {
+          console.error("Failed to fetch vehicles:", result.message);
+          alert("Could not load vehicles. Please check backend.");
+        }
+      })
+      .catch(err => {
+        console.error("Fetch error:", err);
+        alert("Error connecting to backend. Is the server running?");
+      })
+      .finally(() => setLoading(false));
+  }, []);
+
   const handleDelete = async (vehicleId) => {
     try {
-      const res = await fetch(`http://localhost:5000/api/vehicles/${vehicleId}`, { method: 'DELETE' });
+      const res = await fetch(`http://localhost:5001/api/vehicles/${vehicleId}`, { method: 'DELETE' });
       const result = await res.json();
       if (result.success) {
         setVehiclesData(prev => prev.filter(v => v.id !== vehicleId));
@@ -40,45 +82,32 @@ export default function VehicleMaster() {
     }
   };
 
-  React.useEffect(() => {
-    fetch('http://localhost:5000/api/vehicles')
-      .then(res => res.json())
-      .then(result => {
-        if (result.success) {
-          // Map backend DB fields to frontend table format
-          const formattedData = result.data.map(v => ({
-            id: v.id,
-            truckNo: v.vehicle_no,
-            status: "Active", // Temporarily default
-            type: v.type,
-            plant: "Newly Assigned",
-            makeYear: "(Backend Data)", 
-            km: "0",
-            supervisor: "Pending"
-          }));
-          
-          setVehiclesData(formattedData); 
-        }
-      })
-      .catch(err => console.error(err))
-      .finally(() => setLoading(false));
-  }, []);
-
+  // Filtering logic
   const filteredData = useMemo(() => {
     return vehiclesData.filter(vehicle => {
-      const matchesSearch = vehicle.truckNo.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            vehicle.makeYear.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = 
+        vehicle.truckNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        vehicle.makeYear.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        vehicle.supervisor.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = filterStatus === "All" || vehicle.status === filterStatus;
       const matchesType = filterType === "All" || vehicle.type === filterType;
       const matchesSupervisor = filterSupervisor === "All" || vehicle.supervisor === filterSupervisor;
-      
       return matchesSearch && matchesStatus && matchesType && matchesSupervisor;
     });
   }, [vehiclesData, searchTerm, filterStatus, filterType, filterSupervisor]);
 
-  const uniqueTypes = ["All", ...new Set(vehiclesData.map(item => item.type))];
-  const uniqueSupervisors = ["All", ...new Set(vehiclesData.map(item => item.supervisor))];
-  const uniqueStatuses = ["All", "Active", "Inactive", "Maintenance"];
+  // Dynamic filter options from actual data
+  const uniqueTypes = useMemo(() => ["All", ...new Set(vehiclesData.map(v => v.type).filter(Boolean))], [vehiclesData]);
+  const uniqueSupervisors = useMemo(() => ["All", ...new Set(vehiclesData.map(v => v.supervisor).filter(Boolean))], [vehiclesData]);
+  const uniqueStatuses = useMemo(() => ["All", ...new Set(vehiclesData.map(v => v.status).filter(Boolean))], [vehiclesData]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-slate-500">Loading vehicles...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="font-sans text-slate-800">
@@ -114,7 +143,7 @@ export default function VehicleMaster() {
       <div className="bg-white p-3 md:p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-wrap gap-3 md:gap-4 items-center">
         <div className="flex items-center gap-2 text-slate-700 font-semibold text-sm mr-2 border-r border-slate-200 pr-4">
           <FiFilter className="w-4 h-4 text-slate-400" />
-          <span>All Trucks ({dummyData.length})</span>
+          <span>All Trucks ({vehiclesData.length})</span>
         </div>
         
         <div className="flex flex-wrap gap-2 md:gap-3 flex-1">
@@ -123,7 +152,6 @@ export default function VehicleMaster() {
             onChange={(e) => setFilterStatus(e.target.value)}
             className="bg-slate-50 border border-slate-200 text-slate-700 text-xs md:text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block px-2 md:px-3 py-2 cursor-pointer hover:bg-slate-100 transition-colors outline-none"
           >
-            <option disabled value="">Status</option>
             {uniqueStatuses.map(status => (
               <option key={status} value={status}>{status === "All" ? "All Status" : status}</option>
             ))}
@@ -134,7 +162,6 @@ export default function VehicleMaster() {
             onChange={(e) => setFilterType(e.target.value)}
             className="bg-slate-50 border border-slate-200 text-slate-700 text-xs md:text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block px-2 md:px-3 py-2 cursor-pointer hover:bg-slate-100 transition-colors outline-none"
           >
-            <option disabled value="">Type</option>
             {uniqueTypes.map(type => (
               <option key={type} value={type}>{type === "All" ? "All Types" : type}</option>
             ))}
@@ -145,7 +172,6 @@ export default function VehicleMaster() {
             onChange={(e) => setFilterSupervisor(e.target.value)}
             className="bg-slate-50 border border-slate-200 text-slate-700 text-xs md:text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block px-2 md:px-3 py-2 cursor-pointer hover:bg-slate-100 transition-colors outline-none"
           >
-            <option disabled value="">Supervisor</option>
             {uniqueSupervisors.map(sup => (
               <option key={sup} value={sup}>{sup === "All" ? "All Supervisors" : sup}</option>
             ))}
@@ -214,35 +240,36 @@ export default function VehicleMaster() {
                                 onClick={(e) => { e.stopPropagation(); setOpenDropdown(null); }} 
                               />
                               <div className="absolute right-0 top-full mt-1 w-36 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-20 flex flex-col items-stretch">
-                              <button 
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  navigate(`/vehicles/${vehicle.id}`); 
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium"
-                              >
-                                View Details
-                              </button>
-                              <button 
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  setOpenDropdown(null); 
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium"
-                              >
-                                Edit Vehicle
-                              </button>
-                              <button 
-                                onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  setDeleteConfirm(vehicle.id);
-                                  setOpenDropdown(null);
-                                }}
-                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium"
-                              >
-                                Delete
-                              </button>
-                            </div>
+                                <button 
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    navigate(`/vehicles/${vehicle.id}`); 
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium"
+                                >
+                                  View Details
+                                </button>
+                                <button 
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    // Navigate to edit page (you may implement it)
+                                    navigate(`/vehicles/edit/${vehicle.id}`);
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors font-medium"
+                                >
+                                  Edit Vehicle
+                                </button>
+                                <button 
+                                  onClick={(e) => { 
+                                    e.stopPropagation(); 
+                                    setDeleteConfirm(vehicle.id);
+                                    setOpenDropdown(null);
+                                  }}
+                                  className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors font-medium"
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </>
                           )}
                         </div>
@@ -289,7 +316,7 @@ export default function VehicleMaster() {
         {/* Pagination / Footer Info Card */}
         <div className="px-3 md:px-6 py-3 md:py-4 border-t border-slate-200 bg-slate-50 transition-colors flex flex-col sm:flex-row items-center justify-between gap-2">
           <span className="text-xs md:text-sm text-slate-500 font-medium">
-            Showing <strong className="text-slate-900">{filteredData.length}</strong> of <strong className="text-slate-900">{dummyData.length}</strong> vehicles
+            Showing <strong className="text-slate-900">{filteredData.length}</strong> of <strong className="text-slate-900">{vehiclesData.length}</strong> vehicles
           </span>
 
           <div className="flex gap-2">
@@ -298,6 +325,8 @@ export default function VehicleMaster() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-xl p-6 w-80">
