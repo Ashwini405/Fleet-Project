@@ -31,14 +31,58 @@ const getVehicleById = async (req, res) => {
 // @route   POST /api/vehicles
 const createVehicle = async (req, res) => {
   try {
-    const { vehicle_no, type } = req.body;
+    const {
+      vehicle_no,
+      type,
+      registration_date,
+      rta_name,
+      owner_name,
+      make_brand,
+      model_year,
+      tire_size,
+      gvw,
+      ulw,
+      engine_number,
+      chassis_number,
+      initial_odometer,
+      insurance_validity,
+      fc_validity,
+      permit_validity,
+      tax_validity,
+      pollution_validity,
+      cll_validity,
+      supervisor,
+      assigned_plant
+    } = req.body;
     
     // Basic validation
     if (!vehicle_no || !type) {
       return res.status(400).json({ success: false, message: 'Please provide vehicle_no and type' });
     }
 
-    const newVehicle = await Vehicle.create({ vehicle_no, type });
+    const newVehicle = await Vehicle.create({
+      vehicle_no,
+      type,
+      registration_date,
+      rta_name,
+      owner_name,
+      make_brand,
+      model_year,
+      tire_size,
+      gvw,
+      ulw,
+      engine_number,
+      chassis_number,
+      initial_odometer,
+      insurance_validity,
+      fc_validity,
+      permit_validity,
+      tax_validity,
+      pollution_validity,
+      cll_validity,
+      supervisor,
+      assigned_plant
+    });
     res.status(201).json({ 
       success: true, 
       message: 'Vehicle created successfully',
