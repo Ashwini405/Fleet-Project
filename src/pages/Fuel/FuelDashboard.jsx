@@ -13,26 +13,49 @@ const dummyFuelLogs = [
   { id: 2, date: "27-11-2025", vehicle: "TS-08-UA-1122", tyreCount: "12 Tyres", qty: "125", rate: "96.50", cost: "₹12,062", mileage: "3.04 KMPL", vendor: "BPCL", mileageStatus: "bad" },
 ];
 
+// Vehicle master data (in real app, fetched from API)
+const VEHICLE_DATA = {
+  'AP-21-TA-1234': { driver: 'Ramesh Kumar', prevOdo: 85800 },
+  'TS-08-UA-1122': { driver: 'Suresh Babu',  prevOdo: 62400 },
+};
+
 export default function FuelDashboard() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [addForm, setAddForm] = useState({
-    date: '2025-11-29', vehicle: '', distance: '', qty: '', rate: '', vendor: ''
+    date: '2025-11-29',
+    vehicle: '',
+    fuelType: 'Diesel',
+    stationName: '',
+    paymentMethod: 'Cash',
+    tripId: '',
+    currentOdo: '',
+    qty: '',
+    rate: '',
+    fullTank: false,
+    billNumber: '',
+    vendor: '',
+    vendorType: 'Petrol Pump',
+    remarks: '',
+    location: '',
+    filledBy: 'Driver',
   });
 
+  const vehicleInfo = VEHICLE_DATA[addForm.vehicle] || null;
+  const prevOdo = vehicleInfo ? vehicleInfo.prevOdo : 0;
+  const distance = addForm.currentOdo && prevOdo ? Math.max(0, parseFloat(addForm.currentOdo) - prevOdo) : 0;
+  const calculatedCost = (parseFloat(addForm.qty) || 0) * (parseFloat(addForm.rate) || 0);
+  const calculatedMileage = distance > 0 && parseFloat(addForm.qty) > 0
+    ? (distance / parseFloat(addForm.qty)).toFixed(2)
+    : '0.00';
+
   const handleFormChange = (e) => {
-    setAddForm({ ...addForm, [e.target.name]: e.target.value });
+    const { name, value, type, checked } = e.target;
+    setAddForm(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const getMileageStatus = (mileageStr) => {
-    // Dummy logic based on status string provided in array
     return mileageStr === 'good' ? 'text-green-700 bg-green-100' : 'text-red-700 bg-red-100';
   };
-
-  // Auto Calculations
-  const calculatedCost = (parseFloat(addForm.qty) || 0) * (parseFloat(addForm.rate) || 0);
-  const calculatedMileage = (parseFloat(addForm.distance) || 0) > 0 && (parseFloat(addForm.qty) || 0) > 0 
-    ? ((parseFloat(addForm.distance) || 0) / (parseFloat(addForm.qty) || 0)).toFixed(2) 
-    : '0.00';
 
   return (
     <div className="flex flex-col space-y-6">
@@ -142,102 +165,215 @@ export default function FuelDashboard() {
 
       {/* Add Fuel Entry Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)}></div>
-          
-          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
-              <h2 className="text-xl font-bold text-slate-800 tracking-tight flex items-center gap-2">
-                Add Fuel Entry
-              </h2>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)} />
+
+          <div className="relative bg-white w-full sm:rounded-2xl shadow-2xl sm:max-w-2xl max-h-[95vh] flex flex-col animate-in zoom-in-95 duration-200 rounded-t-2xl">
+
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">⛽</span>
+                <div>
+                  <h2 className="text-base font-bold text-slate-800">New Fuel Entry</h2>
+                  <p className="text-xs text-slate-400">Fill all details to log a fuel transaction</p>
+                </div>
+              </div>
               <button onClick={() => setIsAddModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
                 <FiX className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 bg-slate-50/50 space-y-6">
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div>
-                  <label className="block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5">Date</label>
-                  <input type="date" name="date" value={addForm.date} onChange={handleFormChange} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5">Select Vehicle</label>
-                  <select name="vehicle" value={addForm.vehicle} onChange={handleFormChange} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 appearance-none">
-                    <option value="">Select...</option>
-                    <option value="AP-21-TA-1234">AP-21-TA-1234</option>
-                  </select>
+            {/* Scrollable Body */}
+            <div className="overflow-y-auto flex-1 p-5 space-y-4">
+
+              {/* ── SECTION 1: Basic Info ── */}
+              <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">🚛 Basic Info</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Date</label>
+                    <input type="date" name="date" value={addForm.date} onChange={handleFormChange} className="input" />
+                  </div>
+                  <div>
+                    <label className="label">Select Vehicle</label>
+                    <select name="vehicle" value={addForm.vehicle} onChange={handleFormChange} className="input">
+                      <option value="">Choose vehicle...</option>
+                      {Object.keys(VEHICLE_DATA).map(v => <option key={v} value={v}>{v}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Fuel Type</label>
+                    <select name="fuelType" value={addForm.fuelType} onChange={handleFormChange} className="input">
+                      <option>Diesel</option>
+                      <option>Petrol</option>
+                      <option>CNG</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Fuel Station Name</label>
+                    <input type="text" name="stationName" value={addForm.stationName} onChange={handleFormChange} placeholder="e.g. HP Petrol Pump" className="input" />
+                  </div>
+                  <div>
+                    <label className="label">Payment Method</label>
+                    <select name="paymentMethod" value={addForm.paymentMethod} onChange={handleFormChange} className="input">
+                      <option>Cash</option>
+                      <option>Card</option>
+                      <option>UPI</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Trip ID (Optional)</label>
+                    <select name="tripId" value={addForm.tripId} onChange={handleFormChange} className="input">
+                      <option value="">Select trip...</option>
+                      <option value="TRIP-1001">TRIP-1001</option>
+                      <option value="TRIP-1002">TRIP-1002</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Auto Fetched */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
-                <div>
-                  <label className="block text-[11px] font-bold tracking-wide text-indigo-400 uppercase mb-1.5">Auto-Fetched Driver</label>
-                  <input type="text" value={addForm.vehicle === 'AP-21-TA-1234' ? 'Ramesh Kumar' : ''} readOnly className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 cursor-not-allowed shadow-inner" />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold tracking-wide text-indigo-400 uppercase mb-1.5">Current Odometer</label>
-                  <input type="text" value={addForm.vehicle === 'AP-21-TA-1234' ? '86,220' : ''} readOnly className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 cursor-not-allowed shadow-inner" />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-                <div>
-                  <label className="block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5">Distance Travelled (KM)</label>
-                  <input type="number" name="distance" value={addForm.distance} onChange={handleFormChange} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5">Quantity (L)</label>
-                  <input type="number" name="qty" value={addForm.qty} onChange={handleFormChange} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5">Rate (₹)</label>
-                  <input type="number" name="rate" value={addForm.rate} onChange={handleFormChange} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500" />
+              {/* ── SECTION 2: Auto Data ── */}
+              <div className="bg-indigo-50/60 rounded-xl p-4 border border-indigo-100 space-y-3">
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">⚡ Auto-Fetched Data</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="label text-indigo-500">Driver (Auto)</label>
+                    <input readOnly value={vehicleInfo?.driver || ''} placeholder="Select vehicle first" className="input-auto" />
+                  </div>
+                  <div>
+                    <label className="label text-indigo-500">Previous Odometer (Auto)</label>
+                    <input readOnly value={vehicleInfo ? prevOdo.toLocaleString() + ' km' : ''} placeholder="—" className="input-auto" />
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                 <div>
-                    <label className="block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5">Total Cost (₹)</label>
-                    <input type="text" value={calculatedCost.toFixed(2)} readOnly className="w-full px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm font-bold text-indigo-700 cursor-not-allowed shadow-inner" />
-                 </div>
-                 <div>
-                    <label className="block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5">Mileage (KMPL)</label>
-                    <input type="text" value={calculatedMileage} readOnly className="w-full px-3 py-2 bg-indigo-50 border border-indigo-200 rounded-lg text-sm font-bold text-indigo-700 cursor-not-allowed shadow-inner" />
-                 </div>
+              {/* ── SECTION 3: Odometer & Distance ── */}
+              <div className="bg-white rounded-xl p-4 border border-slate-200 space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">📍 Odometer Reading</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="label text-indigo-500">Previous ODO</label>
+                    <input readOnly value={vehicleInfo ? prevOdo.toLocaleString() : ''} placeholder="—" className="input-auto" />
+                  </div>
+                  <div>
+                    <label className="label">Current ODO ✏️</label>
+                    <input type="number" name="currentOdo" value={addForm.currentOdo} onChange={handleFormChange} placeholder="Enter reading" className="input" />
+                  </div>
+                  <div>
+                    <label className="label text-emerald-600">Distance (Auto)</label>
+                    <div className="input-calc">{distance > 0 ? `${distance.toLocaleString()} km` : '—'}</div>
+                  </div>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 border-t border-slate-200 pt-5">
-                <div>
-                  <label className="block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5">Fuel Vendor</label>
-                  <select name="vendor" value={addForm.vendor} onChange={handleFormChange} className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 appearance-none">
-                    <option value="">Select Vendor...</option>
-                    <option value="Indian Oil">Indian Oil</option>
-                    <option value="BPCL">BPCL</option>
-                  </select>
+              {/* ── SECTION 4: Fuel Details ── */}
+              <div className="bg-white rounded-xl p-4 border border-slate-200 space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">⛽ Fuel Details</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Quantity (L)</label>
+                    <input type="number" name="qty" value={addForm.qty} onChange={handleFormChange} placeholder="e.g. 120" className="input" />
+                  </div>
+                  <div>
+                    <label className="label">Rate per Litre (₹)</label>
+                    <input type="number" name="rate" value={addForm.rate} onChange={handleFormChange} placeholder="e.g. 96.50" className="input" />
+                  </div>
+                  <div>
+                    <label className="label">Fuel Bill Number</label>
+                    <input type="text" name="billNumber" value={addForm.billNumber} onChange={handleFormChange} placeholder="e.g. BILL-2025-001" className="input" />
+                  </div>
+                  <div className="flex items-center gap-3 pt-5">
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" name="fullTank" checked={addForm.fullTank} onChange={handleFormChange} className="sr-only peer" />
+                      <div className="w-10 h-5 bg-slate-200 peer-checked:bg-indigo-600 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
+                    </label>
+                    <span className="text-sm font-semibold text-slate-700">Full Tank Fill</span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5">Fuel Receipt</label>
-                   <div className="w-full flex items-center justify-center px-3 py-2 border border-slate-300 border-dashed rounded-lg bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors text-indigo-600 text-sm font-bold shadow-sm">
-                     <span className="flex items-center gap-2"><FiDownload className="w-4 h-4" /> Upload File</span>
-                   </div>
+              </div>
+
+              {/* ── SECTION 5: Cost & Performance (Auto) ── */}
+              <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200 space-y-3">
+                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">📊 Cost & Performance (Auto-Calculated)</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="label text-emerald-700">Total Cost (₹)</label>
+                    <div className="input-calc text-emerald-700">{calculatedCost > 0 ? `₹ ${calculatedCost.toFixed(2)}` : '—'}</div>
+                  </div>
+                  <div>
+                    <label className="label text-emerald-700">Mileage (KMPL)</label>
+                    <div className="input-calc text-emerald-700">{calculatedMileage !== '0.00' ? `${calculatedMileage} km/L` : '—'}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── SECTION 6: Vendor & Upload ── */}
+              <div className="bg-white rounded-xl p-4 border border-slate-200 space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">🏪 Vendor & Receipt</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Vendor Type</label>
+                    <select name="vendorType" value={addForm.vendorType} onChange={handleFormChange} className="input">
+                      <option>Petrol Pump</option>
+                      <option>Internal</option>
+                      <option>Other</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Fuel Vendor</label>
+                    <select name="vendor" value={addForm.vendor} onChange={handleFormChange} className="input">
+                      <option value="">Select vendor...</option>
+                      <option>Indian Oil</option>
+                      <option>BPCL</option>
+                      <option>HPCL</option>
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="label">Upload Receipt</label>
+                    <label className="flex items-center justify-center gap-2 w-full px-3 py-3 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors text-indigo-600 text-sm font-bold">
+                      <FiDownload className="w-4 h-4" /> Click to upload bill / photo
+                      <input type="file" className="hidden" />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              {/* ── SECTION 7: Extra Info ── */}
+              <div className="bg-white rounded-xl p-4 border border-slate-200 space-y-3">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">📝 Extra Info</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="label">Location</label>
+                    <input type="text" name="location" value={addForm.location} onChange={handleFormChange} placeholder="e.g. NH-44, Kurnool" className="input" />
+                  </div>
+                  <div>
+                    <label className="label">Fuel Filled By</label>
+                    <select name="filledBy" value={addForm.filledBy} onChange={handleFormChange} className="input">
+                      <option>Driver</option>
+                      <option>Supervisor</option>
+                    </select>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="label">Remarks / Notes</label>
+                    <textarea name="remarks" value={addForm.remarks} onChange={handleFormChange} rows={2} placeholder="Any additional notes..." className="input resize-none" />
+                  </div>
                 </div>
               </div>
 
             </div>
 
-            <div className="p-5 border-t border-slate-100 bg-white flex justify-end gap-3">
+            {/* Footer */}
+            <div className="px-5 py-4 border-t border-slate-100 bg-white flex justify-end gap-3 shrink-0">
               <button onClick={() => setIsAddModalOpen(false)} className="px-5 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50">Cancel</button>
-              <button 
-                onClick={() => { console.log(addForm); setIsAddModalOpen(false); }} 
-                className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm"
+              <button
+                onClick={() => { console.log(addForm); setIsAddModalOpen(false); }}
+                className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700 shadow-sm flex items-center gap-2"
               >
-                Save Entry
+                ⛽ Save Fuel Entry
               </button>
             </div>
-            
+
           </div>
         </div>
       )}

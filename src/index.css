@@ -1,1 +1,16 @@
 @import "tailwindcss";
+
+@layer components {
+  .label {
+    @apply block text-[11px] font-bold tracking-wide text-slate-500 uppercase mb-1.5;
+  }
+  .input {
+    @apply w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 outline-none;
+  }
+  .input-auto {
+    @apply w-full px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-lg text-sm font-bold text-indigo-700 cursor-not-allowed select-none;
+  }
+  .input-calc {
+    @apply w-full px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-sm font-bold text-emerald-700 cursor-not-allowed select-none min-h-[38px] flex items-center;
+  }
+}
