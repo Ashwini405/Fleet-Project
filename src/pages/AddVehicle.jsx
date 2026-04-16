@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiSave, FiX, FiCheckCircle, FiUpload } from 'react-icons/fi';
+import { FiArrowLeft, FiSave, FiX, FiCheckCircle } from 'react-icons/fi';
 
 const InputGroup = ({ label, name, type = "text", placeholder, formData, handleChange }) => (
   <div>
@@ -37,31 +37,6 @@ const SelectGroup = ({ label, name, options, formData, handleChange }) => (
   </div>
 );
 
-const FileUploadGroup = ({ label, name, handleFileChange }) => (
-  <div>
-    <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
-    <label className="flex items-center gap-2 w-full px-4 py-2.5 bg-slate-50 border border-slate-200 border-dashed rounded-lg text-sm text-slate-500 cursor-pointer hover:bg-slate-100 transition-colors">
-      <FiUpload className="w-4 h-4 text-indigo-500 shrink-0" />
-      <span>Click to upload</span>
-      <input type="file" name={name} onChange={handleFileChange} className="hidden" accept=".pdf,.jpg,.jpeg,.png" />
-    </label>
-  </div>
-);
-
-const TextareaGroup = ({ label, name, placeholder, formData, handleChange }) => (
-  <div className="md:col-span-2">
-    <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
-    <textarea
-      name={name}
-      placeholder={placeholder}
-      value={formData[name]}
-      onChange={handleChange}
-      rows={3}
-      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors placeholder:text-slate-400 resize-none"
-    />
-  </div>
-);
-
 export default function AddVehicle() {
   const navigate = useNavigate();
   
@@ -93,76 +68,10 @@ export default function AddVehicle() {
     
     // Operations
     supervisor: '',
-    assignedDriver: '',
-    assignedPlant: '',
-    defaultRoute: '',
-
-    // Status
-    vehicleStatus: 'Active',
-
-    // Category & Fuel
-    vehicleCategory: '',
-    fuelType: '',
-
-    // Financial
-    financierName: '',
-    loanAccountNumber: '',
-    emiAmount: '',
-    emiDate: '',
-    loanTenure: '',
-
-    // Tracking
-    gpsDeviceId: '',
-    fastagId: '',
-
-    // Alert Settings
-    reminderDays: '',
-
-    // Additional
-    vehicleColor: '',
-    bodyType: '',
-    remarks: ''
+    assignedPlant: ''
   });
 
-  const [files, setFiles] = useState({ insuranceDoc: null, rcDoc: null, permitDoc: null });
-  
-  // State for dynamic dropdowns
-  const [supervisors, setSupervisors] = useState([]);
-  const [drivers, setDrivers] = useState([]);
-  const [stations, setStations] = useState([]);
-
-  // Fetch supervisors, drivers, and stations from backend
-  useEffect(() => {
-    // Supervisors
-    fetch('http://localhost:5001/api/supervisors')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) setSupervisors(data.data || []);
-      })
-      .catch(err => console.error('Error fetching supervisors:', err));
-
-    // Drivers
-    fetch('http://localhost:5001/api/drivers')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) setDrivers(data.data || []);
-      })
-      .catch(err => console.error('Error fetching drivers:', err));
-
-    // Stations
-    fetch('http://localhost:5001/api/stations')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) setStations(data.data || []);
-      })
-      .catch(err => console.error('Error fetching stations:', err));
-  }, []);
-
-  const handleFileChange = useCallback((e) => {
-    const { name, files: f } = e.target;
-    setFiles(prev => ({ ...prev, [name]: f[0] || null }));
-  }, []);
-
+  // ✅ FIXED: functional update to avoid stale closure
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -183,17 +92,12 @@ export default function AddVehicle() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          // Identification
           vehicle_no: formData.registrationNumber,
+          type: formData.vehicleType,
           registration_date: formData.registrationDate,
           rta_name: formData.rtaName,
           owner_name: formData.ownerName,
-
-          // Specifications
-          type: formData.vehicleType,
-          vehicle_category: formData.vehicleCategory,
           make_brand: formData.makeBrand,
-          fuel_type: formData.fuelType,
           model_year: formData.modelYear,
           tire_size: formData.tireSize,
           gvw: formData.gvw,
@@ -201,43 +105,14 @@ export default function AddVehicle() {
           engine_number: formData.engineNumber,
           chassis_number: formData.chassisNumber,
           initial_odometer: formData.initialOdometer,
-
-          // Compliance
           insurance_validity: formData.insuranceValidity,
-          insurance_document: files.insuranceDoc ? files.insuranceDoc.name : null,
           fc_validity: formData.fcValidity,
           permit_validity: formData.permitValidity,
-          permit_document: files.permitDoc ? files.permitDoc.name : null,
           tax_validity: formData.taxValidity,
           pollution_validity: formData.pollutionValidity,
           cll_validity: formData.cllValidity,
-          rc_document: files.rcDoc ? files.rcDoc.name : null,
-
-          // Operations (foreign keys) – now sending IDs from dropdowns
-          supervisor_id: formData.supervisor,
-          assigned_driver: formData.assignedDriver,
-          station_id: formData.assignedPlant,
-          default_route: formData.defaultRoute,
-
-          // Financial
-          financier_name: formData.financierName,
-          loan_account_number: formData.loanAccountNumber,
-          emi_amount: formData.emiAmount,
-          emi_date: formData.emiDate,
-          loan_tenure: formData.loanTenure,
-
-          // Tracking
-          gps_device_id: formData.gpsDeviceId,
-          fastag_id: formData.fastagId,
-
-          // Status & Alerts
-          vehicle_status: formData.vehicleStatus,
-          reminder_days: formData.reminderDays,
-
-          // Additional
-          vehicle_color: formData.vehicleColor,
-          body_type: formData.bodyType,
-          remarks: formData.remarks
+          supervisor: formData.supervisor,
+          assigned_plant: formData.assignedPlant
         }),
       });
 
@@ -317,9 +192,7 @@ export default function AddVehicle() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <SelectGroup label="Vehicle Type" name="vehicleType" options={['Trailer', 'Tanker', 'Tipper', 'Flatbed', 'Box Truck']} formData={formData} handleChange={handleChange} />
-            <SelectGroup label="Vehicle Category" name="vehicleCategory" options={['Owned', 'Rented', 'Lease']} formData={formData} handleChange={handleChange} />
             <InputGroup label="Make / Brand" name="makeBrand" placeholder="e.g. Tata, Ashok Leyland" formData={formData} handleChange={handleChange} />
-            <SelectGroup label="Fuel Type" name="fuelType" options={['Diesel', 'Petrol', 'CNG', 'EV']} formData={formData} handleChange={handleChange} />
             
             <InputGroup label="Model Year" name="modelYear" type="number" placeholder="YYYY" formData={formData} handleChange={handleChange} />
             <InputGroup label="Tire Size" name="tireSize" placeholder="e.g. 295/80R22.5" formData={formData} handleChange={handleChange} />
@@ -334,116 +207,31 @@ export default function AddVehicle() {
           </div>
         </section>
 
-        {/* 3. Compliance Validity & Documents */}
+        {/* 3. Compliance Validity */}
         <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
           <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
             <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">3</div>
-            Compliance Validity & Documents
+            Compliance Validity
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <InputGroup label="Insurance Validity" name="insuranceValidity" type="date" formData={formData} handleChange={handleChange} />
-            <FileUploadGroup label="Insurance Document" name="insuranceDoc" handleFileChange={handleFileChange} />
             <InputGroup label="FC Validity (Fitness)" name="fcValidity" type="date" formData={formData} handleChange={handleChange} />
             <InputGroup label="Permit Validity" name="permitValidity" type="date" formData={formData} handleChange={handleChange} />
-            <FileUploadGroup label="Permit Document" name="permitDoc" handleFileChange={handleFileChange} />
             <InputGroup label="Tax Validity" name="taxValidity" type="date" formData={formData} handleChange={handleChange} />
             <InputGroup label="Pollution Validity" name="pollutionValidity" type="date" formData={formData} handleChange={handleChange} />
             <InputGroup label="CLL Validity" name="cllValidity" type="date" formData={formData} handleChange={handleChange} />
-            <FileUploadGroup label="RC Document" name="rcDoc" handleFileChange={handleFileChange} />
           </div>
         </section>
 
-        {/* 4. Operations Assignment - DYNAMIC DROPDOWNS */}
+        {/* 4. Operations Assignment */}
         <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
           <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
             <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">4</div>
             Operations Assignment
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SelectGroup 
-              label="Assign Supervisor" 
-              name="supervisor" 
-              options={supervisors.map(s => ({ label: s.full_name, value: s.id }))} 
-              formData={formData} 
-              handleChange={handleChange} 
-            />
-            <SelectGroup 
-              label="Assign Driver" 
-              name="assignedDriver" 
-              options={drivers.map(d => ({ label: d.full_name, value: d.id }))} 
-              formData={formData} 
-              handleChange={handleChange} 
-            />
-            <SelectGroup 
-              label="Assigned Plant" 
-              name="assignedPlant" 
-              options={stations.map(st => ({ label: st.station_name, value: st.id }))} 
-              formData={formData} 
-              handleChange={handleChange} 
-            />
-            <InputGroup label="Default Route (Optional)" name="defaultRoute" placeholder="e.g. Hyderabad → Pune" formData={formData} handleChange={handleChange} />
-          </div>
-        </section>
-
-        {/* 5. Financial Details */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">5</div>
-            Financial Details
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputGroup label="Financier Name" name="financierName" placeholder="e.g. HDFC Bank" formData={formData} handleChange={handleChange} />
-            <InputGroup label="Loan Account Number" name="loanAccountNumber" placeholder="Enter loan account no" formData={formData} handleChange={handleChange} />
-            <InputGroup label="EMI Amount (₹)" name="emiAmount" type="number" placeholder="Enter monthly EMI" formData={formData} handleChange={handleChange} />
-            <InputGroup label="EMI Date" name="emiDate" type="date" formData={formData} handleChange={handleChange} />
-            <InputGroup label="Loan Tenure (months)" name="loanTenure" type="number" placeholder="e.g. 60" formData={formData} handleChange={handleChange} />
-          </div>
-        </section>
-
-        {/* 6. Tracking Details */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">6</div>
-            Tracking Details
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputGroup label="GPS Device ID" name="gpsDeviceId" placeholder="Enter GPS device ID" formData={formData} handleChange={handleChange} />
-            <InputGroup label="FASTag ID" name="fastagId" placeholder="Enter FASTag ID" formData={formData} handleChange={handleChange} />
-          </div>
-        </section>
-
-        {/* 7. Vehicle Status */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">7</div>
-            Vehicle Status
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SelectGroup label="Status" name="vehicleStatus" options={['Active', 'Inactive', 'Under Maintenance']} formData={formData} handleChange={handleChange} />
-          </div>
-        </section>
-
-        {/* 8. Alert Settings */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">8</div>
-            Alert Settings
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputGroup label="Reminder Days Before Expiry" name="reminderDays" type="number" placeholder="e.g. 7" formData={formData} handleChange={handleChange} />
-          </div>
-        </section>
-
-        {/* 9. Additional Details */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">9</div>
-            Additional Details
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputGroup label="Vehicle Color" name="vehicleColor" placeholder="e.g. White, Red" formData={formData} handleChange={handleChange} />
-            <SelectGroup label="Body Type" name="bodyType" options={['Truck', 'Trailer', 'Container', 'Tanker', 'Tipper']} formData={formData} handleChange={handleChange} />
-            <TextareaGroup label="Remarks / Notes" name="remarks" placeholder="Any additional notes about this vehicle..." formData={formData} handleChange={handleChange} />
+            <SelectGroup label="Assign Supervisor" name="supervisor" options={['Ravi Kumar', 'Suresh Das', 'Amit Patel', 'Vikram Singh', 'Unassigned']} formData={formData} handleChange={handleChange} />
+            <SelectGroup label="Assigned Plant" name="assignedPlant" options={['Hyderabad Hub', 'Vizag Depot', 'Pune Facility', 'Delhi Central', 'Bangalore Base']} formData={formData} handleChange={handleChange} />
           </div>
         </section>
 
