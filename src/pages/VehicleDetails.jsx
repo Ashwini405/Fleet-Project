@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiEdit2, FiMapPin, FiUser, FiActivity, FiSearch, FiPlus, FiX, FiUploadCloud, FiEye, FiDownload } from 'react-icons/fi';
 import { DUMMY_VEHICLES } from './vehicleData';
+
 
 
 const dummyServiceHistory = [
@@ -48,8 +50,19 @@ const tabs = ['Overview', 'Service History', 'Tyres', 'Documents', 'Battery Deta
 export default function VehicleDetails({ vehicles: propVehicles }) {
   const { id } = useParams();
   const navigate = useNavigate();
-  const vehicleList = propVehicles || DUMMY_VEHICLES;
-  const vehicle = vehicleList.find(v => v.id === Number(id)) || vehicleList[0];
+  const [vehicle, setVehicle] = useState(null);
+
+  useEffect(() => {
+    fetch(`http://localhost:5001/api/vehicles/${id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setVehicle(data.data);
+        }
+      })
+      .catch(err => console.error(err));
+  }, [id]);
+
   const [activeTab, setActiveTab] = useState('Overview');
   const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
 
@@ -66,17 +79,17 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
   const totalCost = (Number(serviceForm.labourCost) || 0) + (Number(serviceForm.partsCost) || 0);
 
   const handleServiceFormChange = (e) => {
-    setServiceForm({...serviceForm, [e.target.name]: e.target.value});
+    setServiceForm({ ...serviceForm, [e.target.name]: e.target.value });
   };
 
   const [isAddTyreModalOpen, setIsAddTyreModalOpen] = useState(false);
   const [selectedTyrePos, setSelectedTyrePos] = useState(null);
-  
+
   const [tyreForm, setTyreForm] = useState({
     serial: '', brand: '', model: '', position: '', date: '', life: '', vendor: '', cost: ''
   });
   const handleTyreFormChange = (e) => {
-    setTyreForm({...tyreForm, [e.target.name]: e.target.value});
+    setTyreForm({ ...tyreForm, [e.target.name]: e.target.value });
   };
 
   const totalTyres = dummyTyres.length;
@@ -96,7 +109,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
     vehicle: '', type: '', validUntil: ''
   });
   const handleDocFormChange = (e) => {
-    setDocForm({...docForm, [e.target.name]: e.target.value});
+    setDocForm({ ...docForm, [e.target.name]: e.target.value });
   };
 
   const [isAddBatteryModalOpen, setIsAddBatteryModalOpen] = useState(false);
@@ -104,7 +117,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
     serial: '', brand: '', model: '', installDate: '', expiryDate: '', vendor: '', cost: ''
   });
   const handleBatteryFormChange = (e) => {
-    setBatteryForm({...batteryForm, [e.target.name]: e.target.value});
+    setBatteryForm({ ...batteryForm, [e.target.name]: e.target.value });
   };
 
   const [isAddInventoryModalOpen, setIsAddInventoryModalOpen] = useState(false);
@@ -112,7 +125,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
     itemName: '', category: '', quantity: '', assignedDate: '', condition: ''
   });
   const handleInventoryFormChange = (e) => {
-    setInventoryForm({...inventoryForm, [e.target.name]: e.target.value});
+    setInventoryForm({ ...inventoryForm, [e.target.name]: e.target.value });
   };
 
 
@@ -122,38 +135,47 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
       <span className="text-sm text-slate-800 font-medium">{value}</span>
     </div>
   );
-
+  if (!vehicle) return <div>Loading...</div>;
   return (
     <div className="font-sans text-slate-800">
-      
+
       {/* Top Header & Navigation */}
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={() => navigate('/vehicles')}
             className="p-2 border border-slate-200 rounded-lg bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
             title="Back to List"
           >
             <FiArrowLeft className="w-5 h-5" />
           </button>
-          
+
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">{vehicle.truckNo}</h1>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-              vehicle.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : 
-              vehicle.status === 'Inactive' ? 'bg-red-50 text-red-700 border-red-200' : 
-              'bg-yellow-50 text-yellow-700 border-yellow-200'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                vehicle.status === 'Active' ? 'bg-green-500' : 
-                vehicle.status === 'Inactive' ? 'bg-red-500' : 'bg-yellow-500'
-              }`}></span>
-              {vehicle.status}
+            <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+              {vehicle.vehicle_no}
+            </h1>
+
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${(vehicle.vehicle_status || '').toLowerCase() === 'active'
+                ? 'bg-green-100 text-green-700 border-green-200'
+                : (vehicle.vehicle_status || '').toLowerCase() === 'inactive'
+                  ? 'bg-red-100 text-red-700 border-red-200'
+                  : 'bg-yellow-100 text-yellow-700 border-yellow-200'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${(vehicle.vehicle_status || '').toLowerCase() === 'active'
+                  ? 'bg-green-500'
+                  : (vehicle.vehicle_status || '').toLowerCase() === 'inactive'
+                    ? 'bg-red-500'
+                    : 'bg-yellow-500'
+                }`}
+              ></span>
+
+              {vehicle.vehicle_status || 'Active'}
             </span>
           </div>
         </div>
 
-        <button 
+        <button
           onClick={() => navigate(`/vehicles/edit/${vehicle.id}`)}
           className="px-4 py-2 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
         >
@@ -169,11 +191,10 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${
-                activeTab === tab 
-                  ? 'border-indigo-600 text-indigo-600' 
-                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-              }`}
+              className={`px-3 md:px-6 py-3 md:py-4 text-xs md:text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${activeTab === tab
+                ? 'border-indigo-600 text-indigo-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                }`}
             >
               {tab}
             </button>
@@ -183,67 +204,81 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
 
       {/* Tab Content */}
       <div className="bg-white p-6 md:p-8 rounded-b-xl shadow-sm border border-slate-200 min-h-[500px]">
-        
+
         {activeTab === 'Overview' && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
-            
+
             {/* Basic Information */}
             <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
               <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200 flex items-center gap-2">
                 <FiActivity className="text-slate-400" /> Basic Information
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 md:gap-y-6 gap-x-4">
-                <InfoItem label="Registration No" value={vehicle.truckNo} />
-                <InfoItem label="Make / Model" value={vehicle.makeModel} />
-                <InfoItem label="Chassis Number" value={vehicle.chassisNo} />
-                <InfoItem label="Engine Number" value={vehicle.engineNo} />
-                <InfoItem label="Mfg Year" value={vehicle.mfgYear} />
-                <InfoItem label="Body Type" value={vehicle.bodyType} />
-                <InfoItem label="Fuel Type" value={vehicle.fuelType} />
-                <InfoItem label="Gross Weight" value={vehicle.grossWeight} />
+                <InfoItem label="Registration No" value={vehicle.vehicle_no} />
+                <InfoItem label="Make / Model" value={vehicle.make_brand} />
+                <InfoItem label="Chassis Number" value={vehicle.chassis_number} />
+                <InfoItem label="Engine Number" value={vehicle.engine_number} />
+                <InfoItem label="Mfg Year" value={vehicle.model_year} />
+                <InfoItem label="Body Type" value={vehicle.body_type} />
+                <InfoItem label="Fuel Type" value={vehicle.fuel_type} />
+                <InfoItem label="Gross Weight" value={vehicle.gvw} />
               </div>
             </div>
 
             {/* Finance Details */}
             <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
-              <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200">Finance Details</h3>
+              <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200">
+                Finance Details
+              </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 md:gap-y-6 gap-x-4">
-                <InfoItem label="Financier Name" value={vehicle.financier} />
-                <InfoItem label="Loan Account No" value={vehicle.loanAcc} />
-                <InfoItem label="EMI Amount" value={vehicle.emi} />
-                <InfoItem label="EMI Date" value={vehicle.emiDate} />
-                <InfoItem label="Loan Tenure" value={vehicle.loanTenure ? `${vehicle.loanTenure} Months` : '—'} />
-                <InfoItem label="Pending EMIs" value={vehicle.pendingEmis} />
+                <InfoItem label="Financier Name" value={vehicle.financier_name} />
+                <InfoItem label="Loan Account No" value={vehicle.loan_account_number} />
+                <InfoItem label="EMI Amount" value={vehicle.emi_amount} />
+                <InfoItem label="EMI Date" value={vehicle.emi_date} />
+                <InfoItem label="Loan Tenure" value={vehicle.loan_tenure ? `${vehicle.loan_tenure} Months` : '—'} />
+                <InfoItem label="Pending EMIs" value={'—'} /> {/* not in DB */}
               </div>
             </div>
 
             {/* Operational Details */}
             <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
-              <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200">Operational Details</h3>
+              <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200">
+                Operational Details
+              </h3>
               <div className="grid grid-cols-1 gap-y-6">
+
+                {/* Supervisor */}
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
                     <FiUser className="w-5 h-5" />
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wider font-semibold text-slate-500">Current Supervisor</p>
-                    <p className="text-sm font-medium text-slate-900">{vehicle.supervisor}</p>
-                  </div>                </div>
+                    <p className="text-sm font-medium text-slate-900">
+                      {vehicle.supervisor_name}
+                    </p>
+                  </div>
+                </div>
 
+                {/* Station */}
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
                     <FiMapPin className="w-5 h-5" />
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wider font-semibold text-slate-500">Assigned Plant</p>
-                    <p className="text-sm font-medium text-slate-900">{vehicle.plant}</p>
+                    <p className="text-sm font-medium text-slate-900">
+                      {vehicle.station_name}
+                    </p>
                   </div>
                 </div>
-                
+
+                {/* Tracking */}
                 <div className="mt-2 grid grid-cols-2 gap-4">
-                  <InfoItem label="FASTag ID" value={vehicle.fastagId} />
-                  <InfoItem label="GPS Device ID" value={vehicle.gpsId} />
+                  <InfoItem label="FASTag ID" value={vehicle.fastag_id} />
+                  <InfoItem label="GPS Device ID" value={vehicle.gps_device_id} />
                 </div>
+
               </div>
             </div>
 
@@ -256,13 +291,13 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
               <div className="relative w-full md:w-72">
                 <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Search records..." 
+                <input
+                  type="text"
+                  placeholder="Search records..."
                   className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-slate-50 focus:bg-white transition-colors"
                 />
               </div>
-              <button 
+              <button
                 onClick={() => setIsAddServiceModalOpen(true)}
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 shadow-sm"
               >
@@ -288,10 +323,9 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                       <tr key={record.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-6 py-4 font-medium text-slate-900">{record.date}</td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex px-2.5 py-1 rounded-md text-xs font-medium border ${
-                            record.type === 'Service' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                          <span className={`inline-flex px-2.5 py-1 rounded-md text-xs font-medium border ${record.type === 'Service' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                             'bg-amber-50 text-amber-700 border-amber-200'
-                          }`}>
+                            }`}>
                             {record.type}
                           </span>
                         </td>
@@ -312,7 +346,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
           <div className="flex flex-col h-full animate-in fade-in duration-200">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-slate-800 tracking-tight">Tyre Management</h2>
-              <button 
+              <button
                 onClick={() => setIsAddTyreModalOpen(true)}
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center shadow-sm sticky top-4"
               >
@@ -322,7 +356,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              
+
               {/* Visual Layout */}
               <div className="col-span-1 border border-slate-200 rounded-xl p-6 bg-slate-50 flex flex-col items-center justify-center shadow-sm">
                 <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-8 w-full text-center">Axle Layout</h3>
@@ -330,35 +364,35 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                   {/* Front Axle */}
                   <div className="flex items-center gap-16 relative">
                     <div className="absolute top-1/2 left-0 right-0 h-2 bg-slate-300 -z-10 translate-y-[-50%] rounded-full"></div>
-                    <div 
+                    <div
                       onClick={() => setSelectedTyrePos(selectedTyrePos === 'FL' ? null : 'FL')}
                       className={`w-14 h-24 rounded-md border-2 flex items-center justify-center text-xs font-bold transition-all cursor-pointer hover:-translate-y-1 shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_16px_rgba(0,0,0,0.12)] ${selectedTyrePos === 'FL' ? 'bg-indigo-600 border-indigo-400 text-white outline outline-2 outline-indigo-200 outline-offset-2' : 'bg-slate-800 border-slate-600 text-white'}`}
                     >FL</div>
-                    <div 
+                    <div
                       onClick={() => setSelectedTyrePos(selectedTyrePos === 'FR' ? null : 'FR')}
                       className={`w-14 h-24 rounded-md border-2 flex items-center justify-center text-xs font-bold transition-all cursor-pointer hover:-translate-y-1 shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_16px_rgba(0,0,0,0.12)] ${selectedTyrePos === 'FR' ? 'bg-indigo-600 border-indigo-400 text-white outline outline-2 outline-indigo-200 outline-offset-2' : 'bg-slate-800 border-slate-600 text-white'}`}
                     >FR</div>
                   </div>
-                  
+
                   {/* Rear Axle */}
                   <div className="flex items-center gap-12 relative">
                     <div className="absolute top-1/2 left-0 right-0 h-2 bg-slate-300 -z-10 translate-y-[-50%] rounded-full"></div>
                     <div className="flex gap-1">
-                      <div 
+                      <div
                         onClick={() => setSelectedTyrePos(selectedTyrePos === 'RL1' ? null : 'RL1')}
                         className={`w-12 h-24 rounded-md border-2 flex items-center justify-center text-[10px] font-bold transition-all cursor-pointer hover:-translate-y-1 shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_16px_rgba(0,0,0,0.12)] ${selectedTyrePos === 'RL1' ? 'bg-indigo-600 border-indigo-400 text-white outline outline-2 outline-indigo-200 outline-offset-2' : 'bg-slate-800 border-slate-600 text-white'}`}
                       >RL1</div>
-                      <div 
+                      <div
                         onClick={() => setSelectedTyrePos(selectedTyrePos === 'RL2' ? null : 'RL2')}
                         className={`w-12 h-24 rounded-md border-2 flex items-center justify-center text-[10px] font-bold transition-all cursor-pointer hover:-translate-y-1 shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_16px_rgba(0,0,0,0.12)] ${selectedTyrePos === 'RL2' ? 'bg-indigo-600 border-indigo-400 text-white outline outline-2 outline-indigo-200 outline-offset-2' : 'bg-slate-800 border-slate-600 text-white'}`}
                       >RL2</div>
                     </div>
                     <div className="flex gap-1">
-                      <div 
+                      <div
                         onClick={() => setSelectedTyrePos(selectedTyrePos === 'RR1' ? null : 'RR1')}
                         className={`w-12 h-24 rounded-md border-2 flex items-center justify-center text-[10px] font-bold transition-all cursor-pointer hover:-translate-y-1 shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_16px_rgba(0,0,0,0.12)] ${selectedTyrePos === 'RR1' ? 'bg-indigo-600 border-indigo-400 text-white outline outline-2 outline-indigo-200 outline-offset-2' : 'bg-slate-800 border-slate-600 text-white'}`}
                       >RR1</div>
-                      <div 
+                      <div
                         onClick={() => setSelectedTyrePos(selectedTyrePos === 'RR2' ? null : 'RR2')}
                         className={`w-12 h-24 rounded-md border-2 flex items-center justify-center text-[10px] font-bold transition-all cursor-pointer hover:-translate-y-1 shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_16px_rgba(0,0,0,0.12)] ${selectedTyrePos === 'RR2' ? 'bg-indigo-600 border-indigo-400 text-white outline outline-2 outline-indigo-200 outline-offset-2' : 'bg-slate-800 border-slate-600 text-white'}`}
                       >RR2</div>
@@ -369,7 +403,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
 
               {/* Data Table Container */}
               <div className="col-span-1 xl:col-span-2 flex flex-col gap-4">
-                
+
                 {/* Header Info Banner */}
                 <div className="flex flex-wrap items-center gap-3 md:gap-6 px-4 md:px-5 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-xs md:text-sm">
                   <div className="flex items-center gap-2">
@@ -407,32 +441,33 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                         {dummyTyres.map((tyre) => {
                           const colors = getTreadColor(tyre.tread);
                           return (
-                          <tr 
-                            key={tyre.id} 
-                            onClick={() => setSelectedTyrePos(tyre.position === selectedTyrePos ? null : tyre.position)}
-                            className={`transition-colors cursor-pointer ${selectedTyrePos === tyre.position ? 'bg-indigo-50/70 highlight-row' : 'hover:bg-slate-50/50'}`}
-                          >
-                            <td className="px-5 py-4">
-                              <span className={`inline-flex items-center justify-center px-2 py-1 border rounded font-bold text-[11px] shadow-sm transition-colors ${selectedTyrePos === tyre.position ? 'bg-indigo-100 border-indigo-200 text-indigo-700' : 'bg-slate-100 border-slate-300 text-slate-700'}`}>
-                                {tyre.position}
-                              </span>
-                            </td>
-                            <td className={`px-5 py-4 font-medium transition-colors ${selectedTyrePos === tyre.position ? 'text-indigo-900' : 'text-slate-900'}`}>{tyre.serial}</td>
-                            <td className="px-5 py-4">
-                              <div className={`font-medium transition-colors ${selectedTyrePos === tyre.position ? 'text-indigo-800' : 'text-slate-800'}`}>{tyre.brand}</div>
-                              <div className={`text-[11px] transition-colors ${selectedTyrePos === tyre.position ? 'text-indigo-500' : 'text-slate-500'}`}>{tyre.model}</div>
-                            </td>
-                            <td className="px-5 py-4 text-center">
-                              <div className="flex flex-col items-center gap-1 w-16 mx-auto">
-                                <span className={`font-semibold text-xs ${colors.text}`}>{tyre.tread}</span>
-                                <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden relative">
-                                  <div className={`absolute left-0 top-0 bottom-0 ${colors.bg}`} style={{width: tyre.tread}}></div>
+                            <tr
+                              key={tyre.id}
+                              onClick={() => setSelectedTyrePos(tyre.position === selectedTyrePos ? null : tyre.position)}
+                              className={`transition-colors cursor-pointer ${selectedTyrePos === tyre.position ? 'bg-indigo-50/70 highlight-row' : 'hover:bg-slate-50/50'}`}
+                            >
+                              <td className="px-5 py-4">
+                                <span className={`inline-flex items-center justify-center px-2 py-1 border rounded font-bold text-[11px] shadow-sm transition-colors ${selectedTyrePos === tyre.position ? 'bg-indigo-100 border-indigo-200 text-indigo-700' : 'bg-slate-100 border-slate-300 text-slate-700'}`}>
+                                  {tyre.position}
+                                </span>
+                              </td>
+                              <td className={`px-5 py-4 font-medium transition-colors ${selectedTyrePos === tyre.position ? 'text-indigo-900' : 'text-slate-900'}`}>{tyre.serial}</td>
+                              <td className="px-5 py-4">
+                                <div className={`font-medium transition-colors ${selectedTyrePos === tyre.position ? 'text-indigo-800' : 'text-slate-800'}`}>{tyre.brand}</div>
+                                <div className={`text-[11px] transition-colors ${selectedTyrePos === tyre.position ? 'text-indigo-500' : 'text-slate-500'}`}>{tyre.model}</div>
+                              </td>
+                              <td className="px-5 py-4 text-center">
+                                <div className="flex flex-col items-center gap-1 w-16 mx-auto">
+                                  <span className={`font-semibold text-xs ${colors.text}`}>{tyre.tread}</span>
+                                  <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden relative">
+                                    <div className={`absolute left-0 top-0 bottom-0 ${colors.bg}`} style={{ width: tyre.tread }}></div>
+                                  </div>
                                 </div>
-                              </div>
-                            </td>
-                            <td className={`px-5 py-4 text-right transition-colors ${selectedTyrePos === tyre.position ? 'text-indigo-600 font-medium' : 'text-slate-600'}`}>{tyre.km}</td>
-                          </tr>
-                        )})}
+                              </td>
+                              <td className={`px-5 py-4 text-right transition-colors ${selectedTyrePos === tyre.position ? 'text-indigo-600 font-medium' : 'text-slate-600'}`}>{tyre.km}</td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
@@ -448,7 +483,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
           <div className="flex flex-col h-full animate-in fade-in duration-200">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-slate-800 tracking-tight">Vehicle Documents</h2>
-              <button 
+              <button
                 onClick={() => setIsUploadDocModalOpen(true)}
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center shadow-sm sticky top-4"
               >
@@ -474,16 +509,14 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                         <td className="px-6 py-4 font-medium text-slate-900">{doc.type}</td>
                         <td className="px-6 py-4 text-slate-700">{doc.expiry}</td>
                         <td className="px-6 py-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${
-                            doc.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' :
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${doc.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' :
                             doc.status === 'Expiring' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                            'bg-red-50 text-red-700 border-red-200'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${
-                              doc.status === 'Active' ? 'bg-green-500' :
+                              'bg-red-50 text-red-700 border-red-200'
+                            }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${doc.status === 'Active' ? 'bg-green-500' :
                               doc.status === 'Expiring' ? 'bg-amber-500' :
-                              'bg-red-500'
-                            }`}></span>
+                                'bg-red-500'
+                              }`}></span>
                             {doc.status}
                           </span>
                         </td>
@@ -511,7 +544,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
           <div className="flex flex-col h-full animate-in fade-in duration-200">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-slate-800 tracking-tight">Battery Tracking</h2>
-              <button 
+              <button
                 onClick={() => setIsAddBatteryModalOpen(true)}
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center shadow-sm sticky top-4"
               >
@@ -543,16 +576,14 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                         <td className="px-6 py-4 text-slate-700">{battery.installDate}</td>
                         <td className="px-6 py-4 text-slate-700">{battery.expiryDate}</td>
                         <td className="px-6 py-4 text-right">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${
-                            battery.status === 'Good' ? 'bg-green-50 text-green-700 border-green-200' :
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${battery.status === 'Good' ? 'bg-green-50 text-green-700 border-green-200' :
                             battery.status === 'Expiring' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                            'bg-red-50 text-red-700 border-red-200'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${
-                              battery.status === 'Good' ? 'bg-green-500' :
+                              'bg-red-50 text-red-700 border-red-200'
+                            }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${battery.status === 'Good' ? 'bg-green-500' :
                               battery.status === 'Expiring' ? 'bg-amber-500' :
-                              'bg-red-500'
-                            }`}></span>
+                                'bg-red-500'
+                              }`}></span>
                             {battery.status}
                           </span>
                         </td>
@@ -569,7 +600,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
           <div className="flex flex-col h-full animate-in fade-in duration-200">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-slate-800 tracking-tight">Truck Inventory</h2>
-              <button 
+              <button
                 onClick={() => setIsAddInventoryModalOpen(true)}
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center shadow-sm sticky top-4"
               >
@@ -602,16 +633,14 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                         <td className="px-6 py-4 text-center font-medium text-slate-900">{item.quantity}</td>
                         <td className="px-6 py-4 text-slate-700">{item.assignedDate}</td>
                         <td className="px-6 py-4 text-right">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${
-                            item.condition === 'Good' ? 'bg-green-50 text-green-700 border-green-200' :
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${item.condition === 'Good' ? 'bg-green-50 text-green-700 border-green-200' :
                             item.condition === 'Average' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                            'bg-red-50 text-red-700 border-red-200'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${
-                              item.condition === 'Good' ? 'bg-green-500' :
+                              'bg-red-50 text-red-700 border-red-200'
+                            }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${item.condition === 'Good' ? 'bg-green-500' :
                               item.condition === 'Average' ? 'bg-amber-500' :
-                              'bg-red-500'
-                            }`}></span>
+                                'bg-red-500'
+                              }`}></span>
                             {item.condition}
                           </span>
                         </td>
@@ -631,10 +660,10 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsAddServiceModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            
+
             <div className="flex items-center justify-between p-5 md:p-6 border-b border-slate-100">
               <h2 className="text-xl font-bold text-slate-800 tracking-tight">Add Service Record</h2>
-              <button 
+              <button
                 onClick={() => setIsAddServiceModalOpen(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
               >
@@ -706,15 +735,15 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                 </div>
               </div>
             </div>
-            
+
             <div className="p-5 md:p-6 border-t border-slate-100 bg-slate-50/80 flex justify-end gap-3 mt-auto rounded-b-xl">
-              <button 
+              <button
                 onClick={() => setIsAddServiceModalOpen(false)}
                 className="px-5 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={() => { console.log("Saved Service Record:", serviceForm); setIsAddServiceModalOpen(false); }}
                 className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
               >
@@ -731,10 +760,10 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsAddTyreModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            
+
             <div className="flex items-center justify-between p-5 md:p-6 border-b border-slate-100">
               <h2 className="text-xl font-bold text-slate-800 tracking-tight">Add New Tyre</h2>
-              <button 
+              <button
                 onClick={() => setIsAddTyreModalOpen(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
               >
@@ -795,15 +824,15 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
               </div>
 
             </div>
-            
+
             <div className="p-5 md:p-6 border-t border-slate-100 bg-slate-50/80 flex justify-end gap-3 mt-auto rounded-b-xl">
-              <button 
+              <button
                 onClick={() => setIsAddTyreModalOpen(false)}
                 className="px-5 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={() => { console.log("Added Tyre:", tyreForm); setIsAddTyreModalOpen(false); }}
                 className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
               >
@@ -819,10 +848,10 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsUploadDocModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            
+
             <div className="flex items-center justify-between p-5 md:p-6 border-b border-slate-100">
               <h2 className="text-xl font-bold text-slate-800 tracking-tight">Upload Document</h2>
-              <button 
+              <button
                 onClick={() => setIsUploadDocModalOpen(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
               >
@@ -864,15 +893,15 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                 </div>
               </div>
             </div>
-            
+
             <div className="p-5 md:p-6 border-t border-slate-100 bg-slate-50/80 flex justify-end gap-3 mt-auto rounded-b-xl">
-              <button 
+              <button
                 onClick={() => setIsUploadDocModalOpen(false)}
                 className="px-5 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={() => { console.log("Uploaded Doc:", docForm); setIsUploadDocModalOpen(false); }}
                 className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
               >
@@ -889,10 +918,10 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsAddBatteryModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            
+
             <div className="flex items-center justify-between p-5 md:p-6 border-b border-slate-100">
               <h2 className="text-xl font-bold text-slate-800 tracking-tight">Add Battery</h2>
-              <button 
+              <button
                 onClick={() => setIsAddBatteryModalOpen(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
               >
@@ -927,7 +956,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                   <input type="date" name="expiryDate" value={batteryForm.expiryDate} onChange={handleBatteryFormChange} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Vendor (Optional)</label>
@@ -939,15 +968,15 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                 </div>
               </div>
             </div>
-            
+
             <div className="p-5 md:p-6 border-t border-slate-100 bg-slate-50/80 flex justify-end gap-3 mt-auto rounded-b-xl">
-              <button 
+              <button
                 onClick={() => setIsAddBatteryModalOpen(false)}
                 className="px-5 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={() => { console.log("Added Battery:", batteryForm); setIsAddBatteryModalOpen(false); }}
                 className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
               >
@@ -963,10 +992,10 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsAddInventoryModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            
+
             <div className="flex items-center justify-between p-5 md:p-6 border-b border-slate-100">
               <h2 className="text-xl font-bold text-slate-800 tracking-tight">Add Inventory Item</h2>
-              <button 
+              <button
                 onClick={() => setIsAddInventoryModalOpen(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
               >
@@ -1013,15 +1042,15 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                 </div>
               </div>
             </div>
-            
+
             <div className="p-5 md:p-6 border-t border-slate-100 bg-slate-50/80 flex justify-end gap-3 mt-auto rounded-b-xl">
-              <button 
+              <button
                 onClick={() => setIsAddInventoryModalOpen(false)}
                 className="px-5 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={() => { console.log("Added Item:", inventoryForm); setIsAddInventoryModalOpen(false); }}
                 className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
               >

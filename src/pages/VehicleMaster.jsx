@@ -1,21 +1,21 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { FiSearch, FiPlus, FiFilter, FiSettings, FiLayers } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiFilter, FiSettings, FiLayers, FiX } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 
 // ─── Column Definitions ───────────────────────────────────────────────────────
 const ALL_COLUMNS = [
-  { key: 'truckNo',          label: 'Truck Number',      defaultOn: true },
-  { key: 'status',           label: 'Status',            defaultOn: true },
-  { key: 'driver',           label: 'Driver',            defaultOn: true },
-  { key: 'plant',            label: 'Plant',             defaultOn: true },
-  { key: 'type',             label: 'Type',              defaultOn: true },
-  { key: 'odometer',         label: 'Odometer',          defaultOn: true },
-  { key: 'supervisor',       label: 'Supervisor',        defaultOn: true },
-  { key: 'fuelType',         label: 'Fuel Type',         defaultOn: false },
-  { key: 'vehicleCategory',  label: 'Vehicle Category',  defaultOn: false },
-  { key: 'gpsId',            label: 'GPS ID',            defaultOn: false },
-  { key: 'fastagId',         label: 'FASTag ID',         defaultOn: false },
-  { key: 'emi',              label: 'EMI',               defaultOn: false },
+  { key: 'truckNo', label: 'Truck Number', defaultOn: true },
+  { key: 'status', label: 'Status', defaultOn: true },
+  { key: 'driver', label: 'Driver', defaultOn: true },
+  { key: 'plant', label: 'Plant', defaultOn: true },
+  { key: 'type', label: 'Type', defaultOn: true },
+  { key: 'odometer', label: 'Odometer', defaultOn: true },
+  { key: 'supervisor', label: 'Supervisor', defaultOn: true },
+  { key: 'fuelType', label: 'Fuel Type', defaultOn: false },
+  { key: 'vehicleCategory', label: 'Vehicle Category', defaultOn: false },
+  { key: 'gpsId', label: 'GPS ID', defaultOn: false },
+  { key: 'fastagId', label: 'FASTag ID', defaultOn: false },
+  { key: 'emi', label: 'EMI', defaultOn: false },
   { key: 'complianceStatus', label: 'Compliance Status', defaultOn: false },
 ];
 
@@ -24,8 +24,8 @@ const defaultVisible = Object.fromEntries(ALL_COLUMNS.map(c => [c.key, c.default
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 const StatusBadge = ({ status }) => {
   const styles = {
-    'Active':            'bg-green-50 text-green-700 border-green-200',
-    'Inactive':          'bg-red-50 text-red-700 border-red-200',
+    'Active': 'bg-green-50 text-green-700 border-green-200',
+    'Inactive': 'bg-red-50 text-red-700 border-red-200',
     'Under Maintenance': 'bg-yellow-50 text-yellow-700 border-yellow-200',
   };
   const dots = {
@@ -43,9 +43,9 @@ const StatusBadge = ({ status }) => {
 
 const ComplianceBadge = ({ value }) => {
   const styles = {
-    'Valid':          'bg-green-50 text-green-700 border-green-200',
-    'Expiring Soon':  'bg-yellow-50 text-yellow-700 border-yellow-200',
-    'Expired':        'bg-red-50 text-red-700 border-red-200',
+    'Valid': 'bg-green-50 text-green-700 border-green-200',
+    'Expiring Soon': 'bg-yellow-50 text-yellow-700 border-yellow-200',
+    'Expired': 'bg-red-50 text-red-700 border-red-200',
   };
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${styles[value] || 'bg-slate-50 text-slate-600 border-slate-200'}`}>
@@ -137,7 +137,7 @@ function ColumnSettings({ visible, onChange, onClose, anchorRef }) {
   useEffect(() => {
     const handler = (e) => {
       if (panelRef.current && !panelRef.current.contains(e.target) &&
-          anchorRef.current && !anchorRef.current.contains(e.target)) {
+        anchorRef.current && !anchorRef.current.contains(e.target)) {
         onClose();
       }
     };
@@ -167,16 +167,56 @@ function ColumnSettings({ visible, onChange, onClose, anchorRef }) {
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
-export default function VehicleMaster({ vehicles = [], setVehicles }) {
+export default function VehicleMaster() {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm]         = useState('');
-  const [filterStatus, setFilterStatus]     = useState('All');
-  const [filterType, setFilterType]         = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [filterType, setFilterType] = useState('All');
   const [filterSupervisor, setFilterSupervisor] = useState('All');
-  const [visibleCols, setVisibleCols]       = useState(defaultVisible);
+  const [visibleCols, setVisibleCols] = useState(defaultVisible);
   const [showColSettings, setShowColSettings] = useState(false);
-
+  const [vehicles, setVehicles] = useState([]);
   const colSettingsBtnRef = useRef(null);
+
+  // Fetch vehicles from backend
+  useEffect(() => {
+    fetch('http://localhost:5001/api/vehicles')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const formatted = data.data.map(v => ({
+            id: v.id,
+            truckNo: v.vehicle_no || '—',
+            status: v.vehicle_status || 'Active',
+            driver: v.assigned_driver_name || v.driver_name || '—',
+            plant: v.station_name || '—',
+            type: v.type || '—',
+            odometer: v.initial_odometer || 0,
+            supervisor: v.supervisor_name || '—',
+            fuelType: v.fuel_type || '—',
+            vehicleCategory: v.vehicle_category || '—',
+            gpsId: v.gps_device_id || '—',
+            fastagId: v.fastag_id || '—',
+            emi: v.emi_amount ? `₹${v.emi_amount.toLocaleString()}` : '—',
+            complianceStatus: 'Valid', // compute based on validity dates if needed
+            // Additional fields for details panel
+            bodyType: v.body_type || '—',
+            color: v.vehicle_color || '—',
+            financier: v.financier_name || '—',
+            loanAcc: v.loan_account_number || '—',
+            loanTenure: v.loan_tenure || '—',
+            truckNo: v.vehicle_no,
+            status: v.vehicle_status || 'Active',
+            driver: v.driver_name,
+            plant: v.station_name
+          }));
+          setVehicles(formatted);
+        } else {
+          console.error("Failed to fetch vehicles:", data.message);
+        }
+      })
+      .catch(err => console.error("Error fetching vehicles:", err));
+  }, []);
 
   const toggleCol = (key) => setVisibleCols(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -192,8 +232,8 @@ export default function VehicleMaster({ vehicles = [], setVehicles }) {
       && (filterSupervisor === 'All' || v.supervisor === filterSupervisor);
   }), [vehicles, searchTerm, filterStatus, filterType, filterSupervisor]);
 
-  const uniqueStatuses    = useMemo(() => ['All', ...new Set(vehicles.map(v => v.status))], [vehicles]);
-  const uniqueTypes       = useMemo(() => ['All', ...new Set(vehicles.map(v => v.type))], [vehicles]);
+  const uniqueStatuses = useMemo(() => ['All', ...new Set(vehicles.map(v => v.status))], [vehicles]);
+  const uniqueTypes = useMemo(() => ['All', ...new Set(vehicles.map(v => v.type))], [vehicles]);
   const uniqueSupervisors = useMemo(() => ['All', ...new Set(vehicles.map(v => v.supervisor))], [vehicles]);
 
   const activeColumns = ALL_COLUMNS.filter(c => visibleCols[c.key]);
@@ -239,7 +279,7 @@ export default function VehicleMaster({ vehicles = [], setVehicles }) {
             )}
           </div>
           <button
-            onClick={() => navigate('/vehicles/add')}
+            onClick={() => navigate(`/vehicles/${vehicle.id}`, { state: vehicle })}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
           >
             <FiPlus className="w-4 h-4" />
@@ -289,29 +329,31 @@ export default function VehicleMaster({ vehicles = [], setVehicles }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredData.length > 0 ? filteredData.map(vehicle => (
-                <tr
-                  key={vehicle.id}
-                  onClick={() => navigate(`/vehicles/${vehicle.id}`)}
-                  className="hover:bg-indigo-50/40 transition-colors cursor-pointer"
-                >
-                  {activeColumns.map(col => (
-                    <td key={col.key} className="px-5 py-3.5">
-                      {col.key === 'truckNo' && (
-                        <span className="font-semibold text-slate-900 group-hover:text-indigo-700">{vehicle.truckNo}</span>
-                      )}
-                      {col.key === 'status' && <StatusBadge status={vehicle.status} />}
-                      {col.key === 'complianceStatus' && <ComplianceBadge value={vehicle.complianceStatus} />}
-                      {col.key === 'odometer' && (
-                        <span className="font-mono text-slate-600 text-xs">{vehicle.odometer.toLocaleString()} km</span>
-                      )}
-                      {!['truckNo', 'status', 'complianceStatus', 'odometer'].includes(col.key) && (
-                        <span className="text-slate-600">{vehicle[col.key] || '—'}</span>
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              )) : (
+              {filteredData.length > 0 ? (
+                filteredData.map(vehicle => (
+                  <tr
+                    key={vehicle.id}
+                    onClick={() => navigate(`/vehicles/${vehicle.id}`)}
+                    className="hover:bg-indigo-50/40 transition-colors cursor-pointer"
+                  >
+                    {activeColumns.map(col => (
+                      <td key={col.key} className="px-5 py-3.5">
+                        {col.key === 'truckNo' && (
+                          <span className="font-semibold text-slate-900 group-hover:text-indigo-700">{vehicle.truckNo}</span>
+                        )}
+                        {col.key === 'status' && <StatusBadge status={vehicle.status} />}
+                        {col.key === 'complianceStatus' && <ComplianceBadge value={vehicle.complianceStatus} />}
+                        {col.key === 'odometer' && (
+                          <span className="font-mono text-slate-600 text-xs">{vehicle.odometer.toLocaleString()} km</span>
+                        )}
+                        {!['truckNo', 'status', 'complianceStatus', 'odometer'].includes(col.key) && (
+                          <span className="text-slate-600">{vehicle[col.key] || '—'}</span>
+                        )}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              ) : (
                 <tr>
                   <td colSpan={activeColumns.length} className="px-6 py-14 text-center">
                     <div className="flex flex-col items-center gap-2 text-slate-400">
@@ -337,7 +379,6 @@ export default function VehicleMaster({ vehicles = [], setVehicles }) {
           </div>
         </div>
       </div>
-
     </div>
   );
 }
