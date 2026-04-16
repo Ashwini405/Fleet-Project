@@ -1,9 +1,59 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Briefcase, Building2, CreditCard, FileUp } from 'lucide-react';
 
 export default function AddSupervisorModal({ isOpen, onClose }) {
   const [activeTab, setActiveTab] = useState('personal');
+  const [stations, setStations] = useState([]);
+  const [formData, setFormData] = useState({
+    full_name: '',
+    mobile: '',
+    id_card_number: '',
+    status: 'active',
+    address: '',
+    station_id: '',
+    bank_name: '',
+    account_number: '',
+    ifsc_code: ''
+  });
+
+  // Fetch stations from backend
+  useEffect(() => {
+    fetch('http://localhost:5001/api/stations')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setStations(data.data);
+        }
+      })
+      .catch(err => console.error('Error fetching stations:', err));
+  }, []);
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('http://localhost:5001/api/supervisors', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      const result = await response.json();
+      if (result.success) {
+        alert('Supervisor saved successfully!');
+        onClose();
+        window.location.reload(); // refresh the list (optional)
+      } else {
+        alert('Failed to save: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error saving supervisor:', error);
+      alert('Could not connect to backend.');
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -51,31 +101,67 @@ export default function AddSupervisorModal({ isOpen, onClose }) {
           </div>
 
           <div className="p-6 overflow-y-auto min-h-[300px]">
-            <form id="add-supervisor-form" className="space-y-6" onSubmit={(e) => { e.preventDefault(); onClose(); }}>
+            <form id="add-supervisor-form" className="space-y-6" onSubmit={handleSubmit}>
               {activeTab === 'personal' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-2 gap-5">
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Full Name</label>
-                    <input type="text" placeholder="John Doe" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all" required />
+                    <input 
+                      type="text" 
+                      name="full_name"
+                      placeholder="John Doe" 
+                      value={formData.full_name}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all" 
+                      required 
+                    />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Mobile Number</label>
-                    <input type="text" placeholder="+91..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all" required />
+                    <input 
+                      type="text" 
+                      name="mobile"
+                      placeholder="+91..." 
+                      value={formData.mobile}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all" 
+                      required 
+                    />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">ID Card Number</label>
-                    <input type="text" placeholder="ID/License No." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all" required />
+                    <input 
+                      type="text" 
+                      name="id_card_number"
+                      placeholder="ID/License No." 
+                      value={formData.id_card_number}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all" 
+                      required 
+                    />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Status</label>
-                    <select className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all text-gray-700">
+                    <select 
+                      name="status"
+                      value={formData.status}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all text-gray-700"
+                    >
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
                     </select>
                   </div>
                   <div className="col-span-2">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Full Address</label>
-                    <textarea rows="2" placeholder="Street, City, State, ZIP..." className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all resize-none"></textarea>
+                    <textarea 
+                      name="address"
+                      rows="2" 
+                      placeholder="Street, City, State, ZIP..." 
+                      value={formData.address}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all resize-none"
+                    ></textarea>
                   </div>
                 </motion.div>
               )}
@@ -84,18 +170,18 @@ export default function AddSupervisorModal({ isOpen, onClose }) {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-2 gap-5">
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Allotted Station</label>
-                    <select className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all">
+                    <select 
+                      name="station_id"
+                      value={formData.station_id}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
+                    >
                       <option value="">-- Select Station --</option>
-                      <option value="1">Central Hub</option>
-                      <option value="2">North Station</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2 sm:col-span-1">
-                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Primary Truck Allocation</label>
-                    <select className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all">
-                      <option value="">-- None / Select Truck --</option>
-                      <option value="t1">MH 12 AB 1234</option>
-                      <option value="t2">MH 12 CD 5678</option>
+                      {stations.map(st => (
+                        <option key={st.id} value={st.id}>
+                          {st.station_name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </motion.div>
@@ -105,15 +191,36 @@ export default function AddSupervisorModal({ isOpen, onClose }) {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-2 gap-5">
                   <div className="col-span-2">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Bank Name</label>
-                    <input type="text" placeholder="e.g. HDFC Bank" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all" />
+                    <input 
+                      type="text" 
+                      name="bank_name"
+                      placeholder="e.g. HDFC Bank" 
+                      value={formData.bank_name}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all" 
+                    />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Account Number</label>
-                    <input type="password" placeholder="••••••••••••" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all" />
+                    <input 
+                      type="password" 
+                      name="account_number"
+                      placeholder="••••••••••••" 
+                      value={formData.account_number}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all" 
+                    />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">IFSC Code</label>
-                    <input type="text" placeholder="e.g. HDFC0001234" className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all uppercase" />
+                    <input 
+                      type="text" 
+                      name="ifsc_code"
+                      placeholder="e.g. HDFC0001234" 
+                      value={formData.ifsc_code}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all uppercase" 
+                    />
                   </div>
                 </motion.div>
               )}

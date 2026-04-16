@@ -4,6 +4,8 @@ const cors = require('cors');
 
 const vehicleRoutes = require('./routes/vehicleRoutes');
 const stationRoutes = require('./routes/stationRoutes'); // ✅ ADD THIS
+const supervisorRoutes = require('./routes/supervisorRoutes');
+const driverRoutes = require('./routes/driverRoutes');
 
 const app = express();
 
@@ -14,6 +16,8 @@ app.use(express.json());
 // Routes
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/stations', stationRoutes);
+app.use('/api/supervisors', supervisorRoutes);
+app.use('/api/drivers', driverRoutes);
 
 // Default Route
 app.get('/', (req, res) => {
