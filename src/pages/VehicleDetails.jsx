@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiEdit2, FiMapPin, FiUser, FiActivity, FiSearch, FiPlus, FiX, FiUploadCloud, FiEye, FiDownload } from 'react-icons/fi';
+import { DUMMY_VEHICLES } from './vehicleData';
+
 
 const dummyServiceHistory = [
   { id: 1, date: "15 Aug 2024", type: "Service", vendor: "ABC Garage", cost: "₹5,000", odometer: "80,000 KM" },
@@ -39,40 +41,15 @@ const dummyInventory = [
   { id: 3, itemName: "Warning Triangle", category: "Tools", quantity: 2, assignedDate: "22 May 2021", condition: "Damaged" }
 ];
 
-const dummyVehicle = {
-  id: 1,
-  truckNo: "AP39 AB 1234",
-  status: "Active",
-  
-  // Basic Info
-  chassisNo: "CHB98273918237",
-  engineNo: "ENG293847923",
-  makeModel: "Tata Prima 4028",
-  mfgYear: "2022",
-  bodyType: "Trailer",
-  fuelType: "Diesel",
-  grossWeight: "40,000 kg",
-  
-  // Finance Details
-  financierName: "HDFC Bank",
-  loanAccountNo: "LAL9827391",
-  emiAmount: "₹45,000",
-  emiDate: "5th of every month",
-  loanTenure: "60 Months",
-  pendingEmis: "42 Months",
-  
-  // Operational Details
-  supervisor: "Ravi Kumar",
-  assignedPlant: "Hyderabad Hub",
-  fastagId: "FAS98273",
-  gpsDeviceId: "GPS-TRK-992"
-};
+
 
 const tabs = ['Overview', 'Service History', 'Tyres', 'Documents', 'Battery Details', 'Truck Inventory'];
 
-export default function VehicleDetails() {
+export default function VehicleDetails({ vehicles: propVehicles }) {
   const { id } = useParams();
   const navigate = useNavigate();
+  const vehicleList = propVehicles || DUMMY_VEHICLES;
+  const vehicle = vehicleList.find(v => v.id === Number(id)) || vehicleList[0];
   const [activeTab, setActiveTab] = useState('Overview');
   const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
 
@@ -116,7 +93,7 @@ export default function VehicleDetails() {
 
   const [isUploadDocModalOpen, setIsUploadDocModalOpen] = useState(false);
   const [docForm, setDocForm] = useState({
-    vehicle: dummyVehicle.truckNo, type: '', validUntil: ''
+    vehicle: '', type: '', validUntil: ''
   });
   const handleDocFormChange = (e) => {
     setDocForm({...docForm, [e.target.name]: e.target.value});
@@ -138,8 +115,6 @@ export default function VehicleDetails() {
     setInventoryForm({...inventoryForm, [e.target.name]: e.target.value});
   };
 
-  // In a real app we'd fetch the vehicle based on ID. We'll use the dummy one.
-  const vehicle = dummyVehicle;
 
   const InfoItem = ({ label, value }) => (
     <div className="flex flex-col">
@@ -179,6 +154,7 @@ export default function VehicleDetails() {
         </div>
 
         <button 
+          onClick={() => navigate(`/vehicles/edit/${vehicle.id}`)}
           className="px-4 py-2 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-2 shadow-sm"
         >
           <FiEdit2 className="w-4 h-4" />
@@ -216,7 +192,7 @@ export default function VehicleDetails() {
               <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200 flex items-center gap-2">
                 <FiActivity className="text-slate-400" /> Basic Information
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 md:gap-y-6 gap-x-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 md:gap-y-6 gap-x-4">
                 <InfoItem label="Registration No" value={vehicle.truckNo} />
                 <InfoItem label="Make / Model" value={vehicle.makeModel} />
                 <InfoItem label="Chassis Number" value={vehicle.chassisNo} />
@@ -232,11 +208,11 @@ export default function VehicleDetails() {
             <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
               <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200">Finance Details</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 md:gap-y-6 gap-x-4">
-                <InfoItem label="Financier Name" value={vehicle.financierName} />
-                <InfoItem label="Loan Account No" value={vehicle.loanAccountNo} />
-                <InfoItem label="EMI Amount" value={vehicle.emiAmount} />
+                <InfoItem label="Financier Name" value={vehicle.financier} />
+                <InfoItem label="Loan Account No" value={vehicle.loanAcc} />
+                <InfoItem label="EMI Amount" value={vehicle.emi} />
                 <InfoItem label="EMI Date" value={vehicle.emiDate} />
-                <InfoItem label="Loan Tenure" value={vehicle.loanTenure} />
+                <InfoItem label="Loan Tenure" value={vehicle.loanTenure ? `${vehicle.loanTenure} Months` : '—'} />
                 <InfoItem label="Pending EMIs" value={vehicle.pendingEmis} />
               </div>
             </div>
@@ -252,8 +228,7 @@ export default function VehicleDetails() {
                   <div>
                     <p className="text-xs uppercase tracking-wider font-semibold text-slate-500">Current Supervisor</p>
                     <p className="text-sm font-medium text-slate-900">{vehicle.supervisor}</p>
-                  </div>
-                </div>
+                  </div>                </div>
 
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
@@ -261,13 +236,13 @@ export default function VehicleDetails() {
                   </div>
                   <div>
                     <p className="text-xs uppercase tracking-wider font-semibold text-slate-500">Assigned Plant</p>
-                    <p className="text-sm font-medium text-slate-900">{vehicle.assignedPlant}</p>
+                    <p className="text-sm font-medium text-slate-900">{vehicle.plant}</p>
                   </div>
                 </div>
                 
                 <div className="mt-2 grid grid-cols-2 gap-4">
                   <InfoItem label="FASTag ID" value={vehicle.fastagId} />
-                  <InfoItem label="GPS Device ID" value={vehicle.gpsDeviceId} />
+                  <InfoItem label="GPS Device ID" value={vehicle.gpsId} />
                 </div>
               </div>
             </div>
@@ -858,7 +833,7 @@ export default function VehicleDetails() {
             <div className="p-5 md:p-6 overflow-y-auto space-y-5">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Select Vehicle</label>
-                <input type="text" readOnly value={docForm.vehicle} className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-500 cursor-not-allowed font-medium" />
+                <input type="text" readOnly value={vehicle.truckNo} className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-500 cursor-not-allowed font-medium" />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">

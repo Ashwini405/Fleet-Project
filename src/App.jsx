@@ -3,11 +3,14 @@ import React, { useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Menu } from "lucide-react";
 import Sidebar from "./layout/Sidebar";
+import { DUMMY_VEHICLES } from "./pages/vehicleData";
 
 // Pages
 import Dashboard from "./pages/Dashboard";
 import VehicleMaster from "./pages/VehicleMaster";
 import AddVehicle from "./pages/AddVehicle";
+import EditVehicle from "./pages/EditVehicle";
+import BulkUploadVehicles from "./pages/BulkUploadVehicles";
 import VehicleDetails from "./pages/VehicleDetails";
 import TripMaster from "./pages/TripMaster";
 import TripDetails from "./pages/TripDetails";
@@ -30,6 +33,7 @@ import AuditLogs from "./pages/AuditLogs/index";
 
 export default function App() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [vehicles, setVehicles] = useState(DUMMY_VEHICLES);
 
   return (
     <BrowserRouter>
@@ -60,9 +64,11 @@ export default function App() {
           <div className="flex-1 p-4 md:p-6">
             <Routes>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/vehicles" element={<VehicleMaster />} />
-              <Route path="/vehicles/add" element={<AddVehicle />} />
-              <Route path="/vehicles/:id" element={<VehicleDetails />} />
+              <Route path="/vehicles" element={<VehicleMaster vehicles={vehicles} setVehicles={setVehicles} />} />
+              <Route path="/vehicles/add" element={<AddVehicle vehicles={vehicles} setVehicles={setVehicles} />} />
+              <Route path="/vehicles/bulk-upload" element={<BulkUploadVehicles vehicles={vehicles} setVehicles={setVehicles} />} />
+              <Route path="/vehicles/edit/:id" element={<EditVehicle vehicles={vehicles} setVehicles={setVehicles} />} />
+              <Route path="/vehicles/:id" element={<VehicleDetails vehicles={vehicles} />} />
               <Route path="/trips" element={<TripMaster />} />
               <Route path="/trips/:id" element={<TripDetails />} />
               <Route path="/fuel/*" element={<Fuel />} />
