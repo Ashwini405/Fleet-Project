@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { UsersRound, Plus, Search, MapPin, Eye } from 'lucide-react';
-import { dummyStaff } from '../data/dummyData';
 import AddSupervisorModal from './AddSupervisorModal';
 import ViewSupervisorModal from './ViewSupervisorModal';
 
@@ -9,12 +8,24 @@ export default function SupervisorsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [viewStaff, setViewStaff] = useState(null);
+  const [staffData, setStaffData] = useState([]);
 
-  const filteredStaff = dummyStaff.filter(s => 
-    s.role === 'supervisors' && 
-    (s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-     s.contact.includes(searchTerm) ||
-     s.id.toLowerCase().includes(searchTerm.toLowerCase()))
+  useEffect(() => {
+    fetch('http://localhost:5001/api/supervisors')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setStaffData(data.data);
+        } else {
+          console.error("Failed to fetch supervisors:", data.message);
+        }
+      })
+      .catch(err => console.error("Error fetching supervisors:", err));
+  }, []);
+
+  const filteredStaff = staffData.filter(s => 
+    s.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    s.mobile?.includes(searchTerm)
   );
 
   return (
@@ -68,38 +79,40 @@ export default function SupervisorsTab() {
             <tbody className="divide-y divide-gray-50">
               {filteredStaff.map((person, idx) => (
                 <motion.tr 
-                   initial={{ opacity: 0, y: 5 }}
-                   animate={{ opacity: 1, y: 0 }}
-                   transition={{ delay: idx * 0.05 }}
-                   key={person.id} 
-                   className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  key={person.id} 
+                  className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
                 >
                   <td className="py-2 px-2 md:py-4 md:px-4">
                     <div className="w-10 h-10 rounded-full border border-gray-200 bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500 shrink-0">
-                       {person.name.split(' ').map(n=>n[0]).join('')}
+                      {person.full_name?.split(' ').map(n => n[0]).join('') || '?'}
                     </div>
                   </td>
                   <td className="py-2 px-2 md:py-4 md:px-4">
-                    <span className="font-bold text-gray-800 text-sm tracking-tight">{person.name}</span>
+                    <span className="font-bold text-gray-800 text-sm tracking-tight">{person.full_name}</span>
                   </td>
                   <td className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">
                     <span className="text-[11px] font-bold text-slate-500 tracking-wider">
-                      {person.id}
+                      {person.id_card_number || '—'}
                     </span>
                   </td>
                   <td className="py-2 px-2 md:py-4 md:px-4">
-                    <span className="text-[13px] font-medium text-slate-500">{person.contact}</span>
+                    <span className="text-[13px] font-medium text-slate-500">{person.mobile}</span>
                   </td>
                   <td className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell">
                     <span className="flex items-center gap-1.5 text-[13px] font-medium text-slate-600">
-                       <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {person.allotment}
+                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" /> {person.station_name || 'Unassigned'}
                     </span>
                   </td>
                   <td className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">
-                    <span className="font-bold text-green-600 tracking-tight">₹{person.wallet?.toLocaleString()}</span>
+                    <span className="font-bold text-green-600 tracking-tight">
+                      ₹{person.wallet_balance?.toLocaleString() ?? '0'}
+                    </span>
                   </td>
                   <td className="py-2 px-2 md:py-4 md:px-4">
-                    {person.status === 'Active' ? (
+                    {person.status === 'active' ? (
                       <span className="text-[10px] font-bold uppercase tracking-widest text-green-600 bg-green-50 px-2 py-1 rounded">Active</span>
                     ) : (
                       <span className="text-[10px] font-bold uppercase tracking-widest text-red-500 bg-red-50 px-2 py-1 rounded">Inactive</span>
@@ -110,15 +123,15 @@ export default function SupervisorsTab() {
                       onClick={(e) => { e.stopPropagation(); setViewStaff(person); }}
                       className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors"
                     >
-                       <Eye className="w-3.5 h-3.5" /> View
+                      <Eye className="w-3.5 h-3.5" /> View
                     </button>
                   </td>
                 </motion.tr>
               ))}
               {filteredStaff.length === 0 && (
-                 <tr>
-                   <td colSpan="8" className="p-8 text-center text-gray-500 text-sm">No records found.</td>
-                 </tr>
+                <tr>
+                  <td colSpan="8" className="p-8 text-center text-gray-500 text-sm">No records found.</td>
+                </tr>
               )}
             </tbody>
           </table>
