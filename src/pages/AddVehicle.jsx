@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiSave, FiX, FiCheckCircle, FiUpload } from 'react-icons/fi';
 
@@ -125,13 +125,44 @@ export default function AddVehicle() {
   });
 
   const [files, setFiles] = useState({ insuranceDoc: null, rcDoc: null, permitDoc: null });
+  
+  // State for dynamic dropdowns
+  const [supervisors, setSupervisors] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [stations, setStations] = useState([]);
+
+  // Fetch supervisors, drivers, and stations from backend
+  useEffect(() => {
+    // Supervisors
+    fetch('http://localhost:5001/api/supervisors')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setSupervisors(data.data || []);
+      })
+      .catch(err => console.error('Error fetching supervisors:', err));
+
+    // Drivers
+    fetch('http://localhost:5001/api/drivers')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setDrivers(data.data || []);
+      })
+      .catch(err => console.error('Error fetching drivers:', err));
+
+    // Stations
+    fetch('http://localhost:5001/api/stations')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setStations(data.data || []);
+      })
+      .catch(err => console.error('Error fetching stations:', err));
+  }, []);
 
   const handleFileChange = useCallback((e) => {
     const { name, files: f } = e.target;
     setFiles(prev => ({ ...prev, [name]: f[0] || null }));
   }, []);
 
-  // ✅ FIXED: functional update to avoid stale closure
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
@@ -152,12 +183,17 @@ export default function AddVehicle() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          // Identification
           vehicle_no: formData.registrationNumber,
-          type: formData.vehicleType,
           registration_date: formData.registrationDate,
           rta_name: formData.rtaName,
           owner_name: formData.ownerName,
+
+          // Specifications
+          type: formData.vehicleType,
+          vehicle_category: formData.vehicleCategory,
           make_brand: formData.makeBrand,
+          fuel_type: formData.fuelType,
           model_year: formData.modelYear,
           tire_size: formData.tireSize,
           gvw: formData.gvw,
@@ -165,27 +201,40 @@ export default function AddVehicle() {
           engine_number: formData.engineNumber,
           chassis_number: formData.chassisNumber,
           initial_odometer: formData.initialOdometer,
+
+          // Compliance
           insurance_validity: formData.insuranceValidity,
+          insurance_document: files.insuranceDoc ? files.insuranceDoc.name : null,
           fc_validity: formData.fcValidity,
           permit_validity: formData.permitValidity,
+          permit_document: files.permitDoc ? files.permitDoc.name : null,
           tax_validity: formData.taxValidity,
           pollution_validity: formData.pollutionValidity,
           cll_validity: formData.cllValidity,
-          supervisor: formData.supervisor,
+          rc_document: files.rcDoc ? files.rcDoc.name : null,
+
+          // Operations (foreign keys) – now sending IDs from dropdowns
+          supervisor_id: formData.supervisor,
           assigned_driver: formData.assignedDriver,
-          assigned_plant: formData.assignedPlant,
+          station_id: formData.assignedPlant,
           default_route: formData.defaultRoute,
-          vehicle_status: formData.vehicleStatus,
-          vehicle_category: formData.vehicleCategory,
-          fuel_type: formData.fuelType,
+
+          // Financial
           financier_name: formData.financierName,
           loan_account_number: formData.loanAccountNumber,
           emi_amount: formData.emiAmount,
           emi_date: formData.emiDate,
           loan_tenure: formData.loanTenure,
+
+          // Tracking
           gps_device_id: formData.gpsDeviceId,
           fastag_id: formData.fastagId,
+
+          // Status & Alerts
+          vehicle_status: formData.vehicleStatus,
           reminder_days: formData.reminderDays,
+
+          // Additional
           vehicle_color: formData.vehicleColor,
           body_type: formData.bodyType,
           remarks: formData.remarks
@@ -285,7 +334,7 @@ export default function AddVehicle() {
           </div>
         </section>
 
-        {/* 3. Compliance Validity */}
+        {/* 3. Compliance Validity & Documents */}
         <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
           <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
             <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">3</div>
@@ -304,16 +353,34 @@ export default function AddVehicle() {
           </div>
         </section>
 
-        {/* 4. Operations Assignment */}
+        {/* 4. Operations Assignment - DYNAMIC DROPDOWNS */}
         <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
           <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
             <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">4</div>
             Operations Assignment
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SelectGroup label="Assign Supervisor" name="supervisor" options={['Ravi Kumar', 'Suresh Das', 'Amit Patel', 'Vikram Singh', 'Unassigned']} formData={formData} handleChange={handleChange} />
-            <SelectGroup label="Assign Driver" name="assignedDriver" options={['Rajesh Yadav (+91 98765 43210)', 'Mohan Lal (+91 91234 56789)', 'Sunil Verma (+91 87654 32109)', 'Unassigned']} formData={formData} handleChange={handleChange} />
-            <SelectGroup label="Assigned Plant" name="assignedPlant" options={['Hyderabad Hub', 'Vizag Depot', 'Pune Facility', 'Delhi Central', 'Bangalore Base']} formData={formData} handleChange={handleChange} />
+            <SelectGroup 
+              label="Assign Supervisor" 
+              name="supervisor" 
+              options={supervisors.map(s => ({ label: s.full_name, value: s.id }))} 
+              formData={formData} 
+              handleChange={handleChange} 
+            />
+            <SelectGroup 
+              label="Assign Driver" 
+              name="assignedDriver" 
+              options={drivers.map(d => ({ label: d.full_name, value: d.id }))} 
+              formData={formData} 
+              handleChange={handleChange} 
+            />
+            <SelectGroup 
+              label="Assigned Plant" 
+              name="assignedPlant" 
+              options={stations.map(st => ({ label: st.station_name, value: st.id }))} 
+              formData={formData} 
+              handleChange={handleChange} 
+            />
             <InputGroup label="Default Route (Optional)" name="defaultRoute" placeholder="e.g. Hyderabad → Pune" formData={formData} handleChange={handleChange} />
           </div>
         </section>
