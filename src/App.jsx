@@ -14,6 +14,9 @@ import BulkUploadVehicles from "./pages/BulkUploadVehicles";
 import VehicleDetails from "./pages/VehicleDetails";
 import TripMaster from "./pages/TripMaster";
 import TripDetails from "./pages/TripDetails";
+import TripEdit from "./pages/TripEdit";
+import TripAdd from "./pages/TripAdd";
+import TripReport from "./pages/TripReport";
 import Fuel from "./pages/Fuel";
 import Service from "./pages/Service";
 import Tyres from "./pages/Tyres";
@@ -70,7 +73,10 @@ export default function App() {
               <Route path="/vehicles/edit/:id" element={<EditVehicle vehicles={vehicles} setVehicles={setVehicles} />} />
               <Route path="/vehicles/:id" element={<VehicleDetails vehicles={vehicles} />} />
               <Route path="/trips" element={<TripMaster />} />
+              <Route path="/trips/new" element={<TripAdd />} />
               <Route path="/trips/:id" element={<TripDetails />} />
+              <Route path="/trips/:id/edit" element={<TripEdit />} />
+              <Route path="/trips/:id/report" element={<TripReport />} />
               <Route path="/fuel/*" element={<Fuel />} />
               <Route path="/service" element={<Service />} />
               <Route path="/renewals" element={<Renewals />} />
