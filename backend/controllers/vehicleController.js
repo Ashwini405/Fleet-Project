@@ -117,10 +117,36 @@ const deleteVehicle = async (req, res) => {
   }
 };
 
+const getVehicleByNumber = async (req, res) => {
+  try {
+    const vehicle = await Vehicle.getByNumber(req.params.vehicle_no);
+
+    if (!vehicle) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vehicle not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: vehicle
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
+};
+
 module.exports = {
   getVehicles,
   getVehicleById,
   createVehicle,
   updateVehicle,
-  deleteVehicle
+  deleteVehicle,
+  getVehicleByNumber  
 };

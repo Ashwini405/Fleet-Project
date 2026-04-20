@@ -1,42 +1,8 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiX, FiTruck, FiMapPin, FiClock, FiPackage, FiDollarSign, FiDroplet, FiUpload, FiAlertCircle } from 'react-icons/fi';
 
-// Mock truck data for autofill
-const TRUCKS = [
-  { no: 'AP-21-TA-1234', driver: 'Ramesh Kumar', contact: '+91 98765 43210', supervisor: 'P. Sharma', plant: 'Nandyala Cement Works', lastOdo: 85420, capacity: 25, fuelType: 'Diesel', status: 'available' },
-  { no: 'KA-01-AG-5566', driver: 'Mohd. Ali', contact: '+91 91234 56789', supervisor: 'S. Kumar', plant: 'Bangalore Hub', lastOdo: 72150, capacity: 20, fuelType: 'Diesel', status: 'available' },
-  { no: 'MH-12-BC-7890', driver: 'Vijay Singh', contact: '+91 87654 32109', supervisor: 'M. Patel', plant: 'Pune Facility', lastOdo: 91200, capacity: 22, fuelType: 'Diesel', status: 'maintenance' },
-];
-
-// Utility: Calculate distance between source and destination (mock)
-const calculateDistance = (source, dest) => {
-  if (!source || !dest) return '';
-  const distances = { 'Bangalore Hub': 450, 'Pune Facility': 270, 'Nandyala Cement Works': 380, 'Mumbai': 520, 'Hyderabad': 180 };
-  return Math.floor(Math.random() * 300) + 150;
-};
-
-// Utility: Calculate trip duration
-const calculateDuration = (startTime, eta) => {
-  if (!startTime || !eta) return '';
-  const start = new Date(startTime);
-  const end = new Date(eta);
-  const hours = Math.round((end - start) / (1000 * 60 * 60));
-  return hours > 0 ? `~${hours} hrs` : '';
-};
-
-// Utility: Check truck availability
-const checkTruckAvailability = (truckNo) => {
-  const truck = TRUCKS.find(t => t.no === truckNo);
-  if (!truck) return { available: true };
-  const warnings = [];
-  if (truck.status === 'maintenance') warnings.push('⚠️ Vehicle currently under maintenance');
-  if (Math.random() > 0.6) warnings.push('⚠️ Driver may already be on another trip');
-  return { available: warnings.length === 0, warnings };
-};
-
 const INITIAL = {
-  // Trip Identification
   tripId: `TRIP-${1000 + Math.floor(Math.random() * 9000)}`,
   tripType: 'Regular',
   tripStatus: 'Planned',
@@ -56,6 +22,12 @@ const INITIAL = {
   fuelType: '',
   startOdometer: '',
   lastOdometer: 0,
+  
+  // 🔥 ADDED: Foreign keys for DB
+  vehicleId: '',
+  driverId: '',
+  supervisorId: '',
+  stationId: '',
   
   // Route
   source: '',
@@ -103,19 +75,86 @@ const INITIAL = {
   lastDraftTime: null,
 };
 
+const inp = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition';
+const inpDisabled = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-100 text-slate-600 cursor-not-allowed';
+const inpCalculated = 'w-full px-3 py-2.5 border border-indigo-200 rounded-lg text-sm bg-indigo-50 text-indigo-900 font-semibold';
+const lbl = 'block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5';
+const errCls = 'text-xs text-red-500 mt-1 flex items-center gap-1';
+const hlp = 'text-xs text-slate-500 mt-1 italic';
+
+const Field = ({ label, name, type = 'text', placeholder, disabled, calculated, helper, children, form, handleChange, errors }) => (
+  <div>
+    <label className={lbl}>{label}{name && !disabled && !calculated && <span className="text-red-500">*</span>}</label>
+    {children || (
+      <input
+        type={type}
+        name={name}
+        value={form[name] || ''}
+        onChange={handleChange}
+        placeholder={placeholder}
+        disabled={disabled || calculated}
+        autoComplete="off"
+        className={calculated ? inpCalculated : (disabled ? inpDisabled : inp)}
+      />
+    )}
+    {helper && <div className={hlp}>{helper}</div>}
+    {errors[name] && (
+      <div className={errCls}>
+        <FiAlertCircle className="w-3 h-3" />
+        {errors[name]}
+      </div>
+    )}
+  </div>
+);
+
+const Sec = ({ num, icon: Icon, title, children, sectionCompletion }) => {
+  const completion = Math.round((sectionCompletion[num] || 0) * 100);
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm" data-section={num}>
+      <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-100">
+        <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">{num}</div>
+        <Icon className="w-4 h-4 text-indigo-600" />
+        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex-1">{title}</h3>
+        {completion === 100 && <span className="text-xs text-green-600 font-semibold">✓ Complete</span>}
+      </div>
+      {children}
+    </div>
+  );
+};
+
+const TruckWarningBanner = ({ warnings }) => {
+  if (!warnings?.length) return null;
+  return (
+    <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 space-y-1">
+      {warnings.map((w, i) => (
+        <div key={i} className="text-sm text-amber-800">{w}</div>
+      ))}
+    </div>
+  );
+};
+
 export default function TripAdd() {
   const navigate = useNavigate();
   const [form, setForm] = useState(() => {
-    // Load draft if exists
     const saved = localStorage.getItem('tripFormDraft');
     return saved ? JSON.parse(saved) : INITIAL;
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showDraftRestore, setShowDraftRestore] = useState(false);
   const [activeSection, setActiveSection] = useState(1);
+  const [vehicles, setVehicles] = useState([]);
 
-  // Auto-save draft every 5 seconds
+  // ─── Fetch vehicles for dropdown ─────────────────────────────────────────
+  useEffect(() => {
+    fetch('http://localhost:5001/api/vehicles')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setVehicles(data.data);
+      })
+      .catch(err => console.error('Error fetching vehicles:', err));
+  }, []);
+
+  // ─── Auto‑save draft every 5 seconds ─────────────────────────────────────
   useEffect(() => {
     const timer = setInterval(() => {
       if (Object.values(form).some(v => v && v !== INITIAL[Object.keys(INITIAL).find(k => INITIAL[k] === v)])) {
@@ -126,60 +165,90 @@ export default function TripAdd() {
     return () => clearInterval(timer);
   }, [form]);
 
-  const set = (k) => (e) => {
-    const val = k === 'proofFiles' ? Array.from(e.target.files) : e.target.value;
-    setForm(p => ({ ...p, [k]: val }));
-    if (errors[k]) setErrors(p => ({ ...p, [k]: '' }));
-  };
+  // ─── Stable change handlers ──────────────────────────────────────────────
+  const handleChange = useCallback((e) => {
+    const { name, value, files } = e.target;
+    if (name === 'proofFiles') {
+      setForm(prev => ({ ...prev, proofFiles: Array.from(files) }));
+    } else {
+      setForm(prev => ({ ...prev, [name]: value }));
+    }
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  }, [errors]);
 
-  // Remove file handler
-  const removeFile = (index) => {
-    setForm(p => ({
-      ...p,
-      proofFiles: p.proofFiles.filter((_, i) => i !== index),
+  const removeFile = useCallback((index) => {
+    setForm(prev => ({
+      ...prev,
+      proofFiles: prev.proofFiles.filter((_, i) => i !== index),
     }));
-  };
+  }, []);
 
-  // Autofill on truck selection
+  // ─── Autofill when truck is selected (including foreign keys) ────────────
   useEffect(() => {
     if (form.truckNo) {
-      const truck = TRUCKS.find(t => t.no === form.truckNo);
-      if (truck) {
-        const availability = checkTruckAvailability(form.truckNo);
-        setForm(p => ({
-          ...p,
-          driver: truck.driver,
-          driverContact: truck.contact,
-          supervisor: truck.supervisor,
-          sourcePlant: truck.plant,
-          truckCapacity: truck.capacity,
-          fuelType: truck.fuelType,
-          lastOdometer: truck.lastOdo,
-          truckWarnings: availability.warnings,
-        }));
-      }
+      fetch(`http://localhost:5001/api/vehicles/by-number/${form.truckNo}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.data) {
+            const v = data.data;
+            const warnings = [];
+            if (v.vehicle_status === 'Under Maintenance') warnings.push('⚠️ Vehicle currently under maintenance');
+            if (Math.random() > 0.7) warnings.push('⚠️ Driver may be on another trip (simulated)');
+            setForm(p => ({
+              ...p,
+              driver: v.driver_name || '',
+              driverContact: v.driver_contact || '',
+              supervisor: v.supervisor_name || '',
+              sourcePlant: v.station_name || '',
+              truckCapacity: v.gvw || '',
+              fuelType: v.fuel_type || '',
+              lastOdometer: v.initial_odometer || 0,
+              // 🔥 CRITICAL: store IDs for DB
+              vehicleId: v.id,
+              driverId: v.assigned_driver,
+              supervisorId: v.supervisor_id,
+              stationId: v.station_id,
+              truckWarnings: warnings,
+            }));
+          }
+        })
+        .catch(err => console.error('Error fetching vehicle details:', err));
     }
   }, [form.truckNo]);
 
-  // Auto-calculate distance when source/destination change
+  // ─── Auto‑calculate distance (mock) ─────────────────────────────────────
+  const calculateDistance = useCallback((source, dest) => {
+    if (!source || !dest) return '';
+    const distances = { 'Bangalore Hub': 450, 'Pune Facility': 270, 'Nandyala Cement Works': 380, 'Mumbai': 520, 'Hyderabad': 180 };
+    return distances[dest] || Math.floor(Math.random() * 300) + 150;
+  }, []);
+
   useEffect(() => {
     if (form.source && form.destination) {
       const dist = calculateDistance(form.source, form.destination);
-      if (dist) {
-        setForm(p => ({ ...p, estDistance: dist }));
-      }
+      if (dist) setForm(p => ({ ...p, estDistance: dist }));
     }
-  }, [form.source, form.destination]);
+  }, [form.source, form.destination, calculateDistance]);
 
-  // Auto-calculate trip duration
+  // ─── Auto‑calculate trip duration ────────────────────────────────────────
+  const calculateDuration = useCallback((startTime, eta) => {
+    if (!startTime || !eta) return '';
+    const start = new Date(startTime);
+    const end = new Date(eta);
+    const hours = Math.round((end - start) / (1000 * 60 * 60));
+    return hours > 0 ? `~${hours} hrs` : '';
+  }, []);
+
   useEffect(() => {
     if (form.startTime && form.eta) {
       const duration = calculateDuration(form.startTime, form.eta);
       setForm(p => ({ ...p, tripDuration: duration }));
     }
-  }, [form.startTime, form.eta]);
+  }, [form.startTime, form.eta, calculateDuration]);
 
-  // Calculations
+  // ─── Derived calculations ────────────────────────────────────────────────
   const totalAdvance = useMemo(() => {
     return (+form.driverAdvance || 0) + (+form.hamaliAdvance || 0) + (+form.otherAdvance || 0);
   }, [form.driverAdvance, form.hamaliAdvance, form.otherAdvance]);
@@ -190,7 +259,6 @@ export default function TripAdd() {
     return mileage > 0 ? (dist / mileage).toFixed(2) : 0;
   }, [form.estDistance, form.expectedMileage]);
 
-  // Auto-suggest diesel quantity if not entered
   const suggestedDieselQty = useMemo(() => {
     return form.dieselQty ? +form.dieselQty : +fuelRequired;
   }, [fuelRequired, form.dieselQty]);
@@ -208,7 +276,7 @@ export default function TripAdd() {
     return (+form.freightAmount || 0) - estimatedCost;
   }, [form.freightAmount, estimatedCost]);
 
-  // Calculate section completion
+  // ─── Section completion ──────────────────────────────────────────────────
   const sectionCompletion = useMemo(() => {
     const sections = {
       1: [form.tripPriority, form.transportType, form.tripType],
@@ -230,45 +298,30 @@ export default function TripAdd() {
     };
   }, [form]);
 
-  // Validation
-  const validate = () => {
+  // ─── Validation ──────────────────────────────────────────────────────────
+  const validate = useCallback(() => {
     const err = {};
-    
-    // Trip Identification (Required)
     if (!form.tripType) err.tripType = 'Required';
     if (!form.tripPriority) err.tripPriority = 'Required';
-    
-    // Vehicle & Driver (Required)
     if (!form.truckNo) err.truckNo = 'Required';
     if (!form.tripDate) err.tripDate = 'Required';
     if (!form.startOdometer) err.startOdometer = 'Required';
-    
-    // Route (Required)
     if (!form.source) err.source = 'Required';
     if (!form.destination) err.destination = 'Required';
     if (!form.estDistance) err.estDistance = 'Required';
-    
-    // Schedule (Required)
     if (!form.startTime) err.startTime = 'Required';
-    
-    // Load Details (Required)
     if (!form.materialType) err.materialType = 'Required';
     if (!form.loadWeight) err.loadWeight = 'Required';
     if (!form.customerName) err.customerName = 'Required';
-    
-    // Validations
+
     if (form.startOdometer && +form.startOdometer <= form.lastOdometer) {
       err.startOdometer = 'Must be > last odometer';
     }
-    
-    // Odometer warnings
     if (form.startOdometer && form.lastOdometer) {
       const diff = +form.startOdometer - form.lastOdometer;
       if (diff < 1) err.startOdometer = 'Odometer difference too small';
       if (diff > 2000) err.startOdometer = 'Odometer difference excessive (>2000 km)';
     }
-    
-    // Date/Time validations
     if (form.startTime && form.eta && form.startTime >= form.eta) {
       err.startTime = 'Start time must be before ETA';
     }
@@ -278,211 +331,127 @@ export default function TripAdd() {
     if (form.unloadingTime && form.loadingTime && form.unloadingTime < form.loadingTime) {
       err.unloadingTime = 'Unloading must be after loading';
     }
-    
     setErrors(err);
     return Object.keys(err).length === 0;
-  };
+  }, [form]);
 
-  // Check if form is valid for submission (stricter)
-  const isFormValid = () => {
+  const isFormValid = useCallback(() => {
     return form.tripType && form.tripPriority && form.truckNo && form.tripDate &&
            form.source && form.destination && form.estDistance &&
            form.startTime && form.materialType && form.loadWeight && form.customerName &&
            form.startOdometer && +form.startOdometer > form.lastOdometer &&
            (+form.startOdometer - form.lastOdometer) >= 1;
-  };
+  }, [form]);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!validate()) {
-      // Auto-scroll to first error
-      const firstErrorSection = Object.keys(errors).map(k => {
-        const sectionMap = {
-          tripType: 1, tripPriority: 1, transportType: 1,
-          truckNo: 2, tripDate: 2, startOdometer: 2,
-          source: 3, destination: 3, estDistance: 3,
-          startTime: 4, eta: 4,
-          materialType: 5, loadWeight: 5, customerName: 5,
-          freightAmount: 6, driverAdvance: 6,
-          dieselRate: 7, dieselQty: 7,
-        };
-        return sectionMap[k] || 1;
-      })[0];
-      setActiveSection(firstErrorSection);
-      setTimeout(() => {
-        document.querySelector(`[data-section="${firstErrorSection}"]`)?.scrollIntoView({ behavior: 'smooth' });
-      }, 100);
-      return;
-    }
-    
+  // ─── Submit handler (includes foreign keys) ──────────────────────────────
+  const handleSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    const isValid = validate();
+    if (!isValid) return;
+
     setIsSubmitting(true);
-    
-    // Create trip object with all fields
+
     const tripData = {
-      // Identification
-      tripId: form.tripId,
-      tripType: form.tripType,
-      tripStatus: form.tripStatus,
-      tripPriority: form.tripPriority,
-      transportType: form.transportType,
-      contractOrderId: form.contractOrderId,
-      
-      // Vehicle
-      vehicle: {
-        truckNo: form.truckNo,
-        capacity: form.truckCapacity,
-        fuelType: form.fuelType,
-        driver: form.driver,
-        driverContact: form.driverContact,
-        supervisor: form.supervisor,
-        sourcePlant: form.sourcePlant,
-        startOdometer: +form.startOdometer,
-        lastOdometer: form.lastOdometer,
-      },
-      
-      // Route
-      route: {
-        source: form.source,
-        destination: form.destination,
-        destinationState: form.destinationState,
-        viaStops: form.viaStops,
-        routeType: form.routeType,
-        estDistance: +form.estDistance,
-        duration: form.tripDuration,
-      },
-      
-      // Schedule
-      schedule: {
-        tripDate: form.tripDate,
-        startTime: form.startTime,
-        eta: form.eta,
-        loadingTime: form.loadingTime,
-        unloadingTime: form.unloadingTime,
-      },
-      
-      // Load
-      load: {
-        materialType: form.materialType,
-        loadWeight: +form.loadWeight,
-        loadType: form.loadType,
-        units: form.units,
-        customerName: form.customerName,
-        invoiceNumber: form.invoiceNumber,
-        lrNumber: form.lrNumber,
-      },
-      
-      // Financials
-      financials: {
-        freightAmount: +form.freightAmount || 0,
-        tripBudget: +form.tripBudget || 0,
-        expenseLimit: +form.expenseLimit || 0,
-        paymentMode: form.paymentMode,
-        advances: {
-          driver: +form.driverAdvance || 0,
-          hamali: +form.hamaliAdvance || 0,
-          other: +form.otherAdvance || 0,
-          total: totalAdvance,
-        },
-        estimatedCost: estimatedCost,
-        estimatedProfit: estimatedProfit,
-      },
-      
-      // Fuel
-      fuel: {
-        expectedMileage: +form.expectedMileage,
-        estDistance: +form.estDistance,
-        fuelRequired: +fuelRequired,
-        dieselRate: +form.dieselRate || 0,
-        dieselQty: suggestedDieselQty || 0,
-        dieselAmount: dieselAmount,
-        fuelVendor: form.fuelVendor,
-        proofFiles: form.proofFiles,
-      },
-      
-      // Metadata
-      createdAt: new Date().toISOString(),
+      trip_id: form.tripId,
+      trip_type: form.tripType,
+      trip_status: form.tripStatus,
+      trip_priority: form.tripPriority,
+      transport_type: form.transportType,
+      contract_order_id: form.contractOrderId,
+
+      // 🔥 CRITICAL: foreign keys for DB
+      vehicle_id: form.vehicleId,
+      driverId: v.assigned_driver,
+      supervisor_id: form.supervisorId,
+      station_id: form.stationId,
+
+      truck_no: form.truckNo,
+      trip_date: form.tripDate,
+
+      driver_name: form.driver,
+      driver_contact: form.driverContact,
+      co_driver: form.coDriver,
+      supervisor_name: form.supervisor,
+      source_plant: form.sourcePlant,
+
+      truck_capacity: form.truckCapacity,
+      fuel_type: form.fuelType,
+      start_odometer: form.startOdometer,
+      last_odometer: form.lastOdometer,
+
+      source: form.source,
+      destination: form.destination,
+      destination_state: form.destinationState,
+      via_stops: form.viaStops,
+      route_type: form.routeType,
+      est_distance: form.estDistance,
+      trip_duration: form.tripDuration,
+
+      start_time: form.startTime,
+      eta: form.eta,
+      loading_time: form.loadingTime,
+      unloading_time: form.unloadingTime,
+
+      material_type: form.materialType,
+      load_weight: form.loadWeight,
+      load_type: form.loadType,
+      units: form.units,
+      customer_name: form.customerName,
+      invoice_number: form.invoiceNumber,
+      lr_number: form.lrNumber,
+
+      trip_budget: form.tripBudget,
+      expense_limit: form.expenseLimit,
+      payment_mode: form.paymentMode,
+      freight_amount: form.freightAmount,
+      driver_advance: form.driverAdvance,
+      hamali_advance: form.hamaliAdvance,
+      other_advance: form.otherAdvance,
+
+      expected_mileage: form.expectedMileage,
+      diesel_rate: form.dieselRate,
+      diesel_qty: form.dieselQty,
+      fuel_vendor: form.fuelVendor,
+      proof_files: JSON.stringify(form.proofFiles),
+
+      truck_warnings: JSON.stringify(form.truckWarnings),
+      draft_saved: form.draftSaved,
+      last_draft_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
     };
-    
-    // Save to localStorage (or API)
-    setTimeout(() => {
-      console.log('Trip Created:', tripData);
-      
-      // Save to localStorage for demo
-      const trips = JSON.parse(localStorage.getItem('trips') || '[]');
-      trips.push(tripData);
-      localStorage.setItem('trips', JSON.stringify(trips));
-      
-      // Clear draft
-      localStorage.removeItem('tripFormDraft');
-      
+
+    try {
+      const response = await fetch('http://localhost:5001/api/trips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tripData),
+      });
+      const result = await response.json();
+      if (result.success) {
+        localStorage.removeItem('tripFormDraft');
+        navigate('/trips');
+      } else {
+        alert('Failed to create trip: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error creating trip:', error);
+      alert('Could not connect to backend. Is the server running?');
+    } finally {
       setIsSubmitting(false);
-      navigate('/trips');
-    }, 800);
+    }
   };
 
-  const inp = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition';
-  const inpDisabled = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-100 text-slate-600 cursor-not-allowed';
-  const inpCalculated = 'w-full px-3 py-2.5 border border-indigo-200 rounded-lg text-sm bg-indigo-50 text-indigo-900 font-semibold';
-  const lbl = 'block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1.5';
-  const err = 'text-xs text-red-500 mt-1 flex items-center gap-1';
-  const hlp = 'text-xs text-slate-500 mt-1 italic';
-
-  const Field = ({ label, name, type = 'text', placeholder, disabled, calculated, helper, children }) => (
-    <div>
-      <label className={lbl}>{label}{name && !disabled && !calculated && <span className="text-red-500">*</span>}</label>
-      {children || (
-        <input
-          type={type}
-          value={form[name] || ''}
-          onChange={set(name)}
-          placeholder={placeholder}
-          disabled={disabled || calculated}
-          className={calculated ? inpCalculated : (disabled ? inpDisabled : inp)}
-        />
-      )}
-      {helper && <div className={hlp}>{helper}</div>}
-      {errors[name] && (
-        <div className={err}>
-          <FiAlertCircle className="w-3 h-3" />
-          {errors[name]}
-        </div>
-      )}
-    </div>
-  );
-
-  const Sec = ({ num, icon: Icon, title, children }) => {
-    const completion = Math.round((sectionCompletion[num] || 0) * 100);
-    return (
-      <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm" data-section={num}>
-        <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-100">
-          <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">
-            {num}
-          </div>
-          <Icon className="w-4 h-4 text-indigo-600" />
-          <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex-1">{title}</h3>
-          {completion === 100 && <span className="text-xs text-green-600 font-semibold">✓ Complete</span>}
-        </div>
-        {children}
-      </div>
-    );
-  };
-
-  const TruckWarningBanner = () => {
-    if (!form.truckWarnings?.length) return null;
-    return (
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 space-y-1">
-        {form.truckWarnings.map((w, i) => (
-          <div key={i} className="text-sm text-amber-800">{w}</div>
-        ))}
-      </div>
-    );
+  // ─── Prevent Enter from submitting the whole form ────────────────────────
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+      e.preventDefault();
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative bg-slate-50 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
         
-        {/* Header (Sticky) */}
+        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 rounded-t-2xl sticky top-0 z-10">
           <div>
             <div className="flex items-center gap-3">
@@ -496,74 +465,63 @@ export default function TripAdd() {
               {form.draftSaved && <span className="ml-3 text-green-600 text-xs">✓ Draft auto-saved</span>}
             </p>
           </div>
-          <button
-            onClick={() => navigate('/trips')}
-            className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition"
-          >
+          <button onClick={() => navigate('/trips')} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition">
             <FiX className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Body (Scrollable) */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
-          {/* 1. Trip Identification */}
-          <Sec num={1} icon={FiTruck} title="Trip Identification">
+          {/* Section 1 – Trip Identification */}
+          <Sec num={1} icon={FiTruck} title="Trip Identification" sectionCompletion={sectionCompletion}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Field label="Trip ID" name="tripId" disabled />
-              <Field label="Trip Priority" name="tripPriority">
-                <select value={form.tripPriority} onChange={set('tripPriority')} className={inp}>
-                  <option>Normal</option>
-                  <option>Urgent</option>
-                  <option>VIP</option>
+              <Field label="Trip ID" name="tripId" disabled form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Trip Priority" name="tripPriority" form={form} handleChange={handleChange} errors={errors}>
+                <select name="tripPriority" value={form.tripPriority} onChange={handleChange} className={inp}>
+                  <option>Normal</option><option>Urgent</option><option>VIP</option>
                 </select>
               </Field>
-              <Field label="Transport Type" name="transportType">
-                <select value={form.transportType} onChange={set('transportType')} className={inp}>
-                  <option>Inbound</option>
-                  <option>Outbound</option>
-                  <option>Return</option>
+              <Field label="Transport Type" name="transportType" form={form} handleChange={handleChange} errors={errors}>
+                <select name="transportType" value={form.transportType} onChange={handleChange} className={inp}>
+                  <option>Inbound</option><option>Outbound</option><option>Return</option>
                 </select>
               </Field>
-              <Field label="Trip Type" name="tripType">
-                <select value={form.tripType} onChange={set('tripType')} className={inp}>
-                  <option>Regular</option>
-                  <option>Express</option>
-                  <option>Return</option>
+              <Field label="Trip Type" name="tripType" form={form} handleChange={handleChange} errors={errors}>
+                <select name="tripType" value={form.tripType} onChange={handleChange} className={inp}>
+                  <option>Regular</option><option>Express</option><option>Return</option>
                 </select>
               </Field>
-              <Field label="Contract/Order ID (optional)" name="contractOrderId" placeholder="e.g. ORD-2024-1234" />
-              <Field label="Trip Status" name="tripStatus">
-                <select value={form.tripStatus} onChange={set('tripStatus')} className={inp}>
-                  <option>Planned</option>
-                  <option>Active</option>
-                  <option>In Transit</option>
+              <Field label="Contract/Order ID (optional)" name="contractOrderId" placeholder="e.g. ORD-2024-1234" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Trip Status" name="tripStatus" form={form} handleChange={handleChange} errors={errors}>
+                <select name="tripStatus" value={form.tripStatus} onChange={handleChange} className={inp}>
+                  <option>Planned</option><option>Active</option><option>In Transit</option>
                 </select>
               </Field>
             </div>
           </Sec>
 
-          {/* 2. Vehicle & Driver */}
-          <Sec num={2} icon={FiTruck} title="Vehicle & Driver">
-            {form.truckNo && <TruckWarningBanner />}
+          {/* Section 2 – Vehicle & Driver */}
+          <Sec num={2} icon={FiTruck} title="Vehicle & Driver" sectionCompletion={sectionCompletion}>
+            {form.truckNo && <TruckWarningBanner warnings={form.truckWarnings} />}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Select Truck" name="truckNo">
-                <select value={form.truckNo} onChange={set('truckNo')} className={inp}>
+              <Field label="Select Truck" name="truckNo" form={form} handleChange={handleChange} errors={errors}>
+                <select name="truckNo" value={form.truckNo} onChange={handleChange} className={inp}>
                   <option value="">— Select Truck —</option>
-                  {TRUCKS.map(t => (
-                    <option key={t.no} value={t.no}>{t.no}</option>
+                  {vehicles.map(v => (
+                    <option key={v.id} value={v.vehicle_no}>{v.vehicle_no}</option>
                   ))}
                 </select>
               </Field>
-              <Field label="Trip Date" name="tripDate" type="date" helper="Date of trip departure" />
-              <Field label="Truck Capacity (auto)" name="truckCapacity" type="number" disabled helper="Auto-filled from truck data" />
-              <Field label="Fuel Type (auto)" name="fuelType" disabled helper="Auto-filled from truck data" />
-              <Field label="Assigned Driver (auto)" name="driver" disabled helper="Auto-filled from truck data" />
-              <Field label="Driver Contact (auto)" name="driverContact" disabled helper="Auto-filled from truck data" />
-              <Field label="Co-driver (optional)" name="coDriver" placeholder="Enter co-driver name" />
-              <Field label="Supervisor (auto)" name="supervisor" disabled helper="Auto-filled from truck data" />
-              <Field label="Source Plant (auto)" name="sourcePlant" disabled helper="Auto-filled from truck data" />
-              <Field label="Start Odometer (KM)" name="startOdometer" type="number" placeholder="Enter current reading" helper="Must be greater than last recorded KM" />
+              <Field label="Trip Date" name="tripDate" type="date" helper="Date of trip departure" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Truck Capacity (auto)" name="truckCapacity" type="number" disabled helper="Auto-filled from truck data" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Fuel Type (auto)" name="fuelType" disabled helper="Auto-filled from truck data" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Assigned Driver (auto)" name="driver" disabled helper="Auto-filled from truck data" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Driver Contact (auto)" name="driverContact" disabled helper="Auto-filled from truck data" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Co-driver (optional)" name="coDriver" placeholder="Enter co-driver name" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Supervisor (auto)" name="supervisor" disabled helper="Auto-filled from truck data" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Source Plant (auto)" name="sourcePlant" disabled helper="Auto-filled from truck data" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Start Odometer (KM)" name="startOdometer" type="number" placeholder="Enter current reading" helper="Must be greater than last recorded KM" form={form} handleChange={handleChange} errors={errors} />
               <div>
                 <label className={lbl}>Last Recorded KM</label>
                 <div className={inpDisabled + ' flex items-center'}>
@@ -578,86 +536,77 @@ export default function TripAdd() {
             </div>
           </Sec>
 
-          {/* 3. Route Details */}
-          <Sec num={3} icon={FiMapPin} title="Route Details">
+          {/* Section 3 – Route Details */}
+          <Sec num={3} icon={FiMapPin} title="Route Details" sectionCompletion={sectionCompletion}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Source Location" name="source" placeholder="e.g. Bangalore Hub" helper="Where trip begins" />
-              <Field label="Destination City" name="destination" placeholder="e.g. Mumbai" />
-              <Field label="Destination State" name="destinationState" placeholder="e.g. Maharashtra" />
-              <Field label="Via Stops (optional)" name="viaStops" placeholder="e.g. Pune, Nashik" />
-              <Field label="Route Type" name="routeType">
-                <select value={form.routeType} onChange={set('routeType')} className={inp}>
-                  <option>Highway</option>
-                  <option>City</option>
-                  <option>Mixed</option>
+              <Field label="Source Location" name="source" placeholder="e.g. Bangalore Hub" helper="Where trip begins" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Destination City" name="destination" placeholder="e.g. Mumbai" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Destination State" name="destinationState" placeholder="e.g. Maharashtra" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Via Stops (optional)" name="viaStops" placeholder="e.g. Pune, Nashik" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Route Type" name="routeType" form={form} handleChange={handleChange} errors={errors}>
+                <select name="routeType" value={form.routeType} onChange={handleChange} className={inp}>
+                  <option>Highway</option><option>City</option><option>Mixed</option>
                 </select>
               </Field>
-              <Field label="Estimated Distance (KM)" name="estDistance" type="number" placeholder="e.g. 850" helper="Auto-calculated if source+destination selected" />
+              <Field label="Estimated Distance (KM)" name="estDistance" type="number" placeholder="e.g. 850" helper="Auto-calculated if source+destination selected" form={form} handleChange={handleChange} errors={errors} />
             </div>
           </Sec>
 
-          {/* 4. Scheduling */}
-          <Sec num={4} icon={FiClock} title="Scheduling">
+          {/* Section 4 – Scheduling */}
+          <Sec num={4} icon={FiClock} title="Scheduling" sectionCompletion={sectionCompletion}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label="Trip Start Time" name="startTime" type="datetime-local" />
-              <Field label="Expected End Date (ETA)" name="eta" type="datetime-local" />
+              <Field label="Trip Start Time" name="startTime" type="datetime-local" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Expected End Date (ETA)" name="eta" type="datetime-local" form={form} handleChange={handleChange} errors={errors} />
               {form.tripDuration && (
                 <div>
                   <label className={lbl}>Trip Duration</label>
-                  <div className={inpCalculated}>
-                    {form.tripDuration}
-                  </div>
+                  <div className={inpCalculated}>{form.tripDuration}</div>
                 </div>
               )}
               <div></div>
-              <Field label="Loading Date & Time" name="loadingTime" type="datetime-local" />
-              <Field label="Unloading Date & Time" name="unloadingTime" type="datetime-local" />
+              <Field label="Loading Date & Time" name="loadingTime" type="datetime-local" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Unloading Date & Time" name="unloadingTime" type="datetime-local" form={form} handleChange={handleChange} errors={errors} />
             </div>
           </Sec>
 
-          {/* 5. Load Details */}
-          <Sec num={5} icon={FiPackage} title="Load Details">
+          {/* Section 5 – Load Details */}
+          <Sec num={5} icon={FiPackage} title="Load Details" sectionCompletion={sectionCompletion}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Field label="Material Type" name="materialType" placeholder="e.g. Cement (OPC 53)" />
-              <Field label="Load Weight (tons)" name="loadWeight" type="number" placeholder="e.g. 22" />
-              <Field label="Load Type" name="loadType">
-                <select value={form.loadType} onChange={set('loadType')} className={inp}>
-                  <option>Full</option>
-                  <option>Partial</option>
+              <Field label="Material Type" name="materialType" placeholder="e.g. Cement (OPC 53)" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Load Weight (tons)" name="loadWeight" type="number" placeholder="e.g. 22" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Load Type" name="loadType" form={form} handleChange={handleChange} errors={errors}>
+                <select name="loadType" value={form.loadType} onChange={handleChange} className={inp}>
+                  <option>Full</option><option>Partial</option>
                 </select>
               </Field>
-              <Field label="Units / Bags Count" name="units" type="number" placeholder="e.g. 880" helper="Number of bags or units" />
-              <Field label="Customer Name" name="customerName" placeholder="e.g. Shree Constructions" />
-              <Field label="Invoice Number" name="invoiceNumber" placeholder="e.g. INV-2024-5678" helper="Required for billing" />
+              <Field label="Units / Bags Count" name="units" type="number" placeholder="e.g. 880" helper="Number of bags or units" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Customer Name" name="customerName" placeholder="e.g. Shree Constructions" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Invoice Number" name="invoiceNumber" placeholder="e.g. INV-2024-5678" helper="Required for billing" form={form} handleChange={handleChange} errors={errors} />
               <div></div>
-              <Field label="LR Number (optional)" name="lrNumber" placeholder="e.g. LR-2024-1234" helper="Lorry Receipt number" />
+              <Field label="LR Number (optional)" name="lrNumber" placeholder="e.g. LR-2024-1234" helper="Lorry Receipt number" form={form} handleChange={handleChange} errors={errors} />
             </div>
           </Sec>
 
-          {/* 6. Financials */}
-          <Sec num={6} icon={FiDollarSign} title="Financials">
+          {/* Section 6 – Financials */}
+          <Sec num={6} icon={FiDollarSign} title="Financials" sectionCompletion={sectionCompletion}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-              <Field label="Freight Amount (₹)" name="freightAmount" type="number" placeholder="e.g. 45000" helper="Revenue from freight" />
-              <Field label="Trip Budget (₹)" name="tripBudget" type="number" placeholder="e.g. 50000" helper="Approved budget" />
-              <Field label="Expense Limit (₹)" name="expenseLimit" type="number" placeholder="e.g. 10000" helper="Max additional expenses" />
-              <Field label="Payment Mode" name="paymentMode">
-                <select value={form.paymentMode} onChange={set('paymentMode')} className={inp}>
-                  <option>Cash</option>
-                  <option>Bank Transfer</option>
-                  <option>Cheque</option>
+              <Field label="Freight Amount (₹)" name="freightAmount" type="number" placeholder="e.g. 45000" helper="Revenue from freight" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Trip Budget (₹)" name="tripBudget" type="number" placeholder="e.g. 50000" helper="Approved budget" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Expense Limit (₹)" name="expenseLimit" type="number" placeholder="e.g. 10000" helper="Max additional expenses" form={form} handleChange={handleChange} errors={errors} />
+              <Field label="Payment Mode" name="paymentMode" form={form} handleChange={handleChange} errors={errors}>
+                <select name="paymentMode" value={form.paymentMode} onChange={handleChange} className={inp}>
+                  <option>Cash</option><option>Bank Transfer</option><option>Cheque</option>
                 </select>
               </Field>
             </div>
-            
             <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 mb-4">
               <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Advance Breakdown</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                <Field label="Driver Advance (₹)" name="driverAdvance" type="number" placeholder="e.g. 5000" />
-                <Field label="Hamali Advance (₹)" name="hamaliAdvance" type="number" placeholder="e.g. 2000" />
-                <Field label="Other Advance (₹)" name="otherAdvance" type="number" placeholder="e.g. 1000" />
+                <Field label="Driver Advance (₹)" name="driverAdvance" type="number" placeholder="e.g. 5000" form={form} handleChange={handleChange} errors={errors} />
+                <Field label="Hamali Advance (₹)" name="hamaliAdvance" type="number" placeholder="e.g. 2000" form={form} handleChange={handleChange} errors={errors} />
+                <Field label="Other Advance (₹)" name="otherAdvance" type="number" placeholder="e.g. 1000" form={form} handleChange={handleChange} errors={errors} />
               </div>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3">
                 <div className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Total Advance</div>
@@ -670,49 +619,36 @@ export default function TripAdd() {
               </div>
               {estimatedProfit !== null && (
                 <div className={`${estimatedProfit >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} border rounded-lg px-4 py-3`}>
-                  <div className={`text-xs font-semibold ${estimatedProfit >= 0 ? 'text-green-600' : 'text-red-600'} uppercase tracking-wide`}>
-                    Estimated Profit
-                  </div>
-                  <div className={`text-2xl font-bold ${estimatedProfit >= 0 ? 'text-green-900' : 'text-red-900'} mt-1`}>
-                    ₹{estimatedProfit.toLocaleString('en-IN')}
-                  </div>
-                  <div className={`text-xs ${estimatedProfit >= 0 ? 'text-green-600' : 'text-red-600'} mt-1`}>
-                    {estimatedProfit >= 0 ? '✓ Positive' : '⚠ Negative'}
-                  </div>
+                  <div className={`text-xs font-semibold ${estimatedProfit >= 0 ? 'text-green-600' : 'text-red-600'} uppercase tracking-wide`}>Estimated Profit</div>
+                  <div className={`text-2xl font-bold ${estimatedProfit >= 0 ? 'text-green-900' : 'text-red-900'} mt-1`}>₹{estimatedProfit.toLocaleString('en-IN')}</div>
+                  <div className={`text-xs ${estimatedProfit >= 0 ? 'text-green-600' : 'text-red-600'} mt-1`}>{estimatedProfit >= 0 ? '✓ Positive' : '⚠ Negative'}</div>
                 </div>
               )}
             </div>
           </Sec>
 
-          {/* 7. Fuel Planning */}
-          <Sec num={7} icon={FiDroplet} title="Fuel Planning">
+          {/* Section 7 – Fuel Planning */}
+          <Sec num={7} icon={FiDroplet} title="Fuel Planning" sectionCompletion={sectionCompletion}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <Field label="Expected Mileage (km/l)" name="expectedMileage" type="number" placeholder="e.g. 4" helper="From truck data: 4 km/l" />
+              <Field label="Expected Mileage (km/l)" name="expectedMileage" type="number" placeholder="e.g. 4" helper="From truck data: 4 km/l" form={form} handleChange={handleChange} errors={errors} />
               <div>
                 <label className={lbl}>Estimated Fuel Required (L)</label>
-                <div className={inpCalculated}>
-                  {fuelRequired} Liters
-                </div>
+                <div className={inpCalculated}>{fuelRequired} Liters</div>
               </div>
             </div>
             <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
               <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Diesel Details</h4>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <Field label="Diesel Rate (₹/L)" name="dieselRate" type="number" placeholder="e.g. 95" />
-                <Field label="Diesel Quantity (L)" name="dieselQty" type="number" placeholder={`Auto: ${fuelRequired}L`} helper={`Auto-suggested: ${suggestedDieselQty}L`} />
+                <Field label="Diesel Rate (₹/L)" name="dieselRate" type="number" placeholder="e.g. 95" form={form} handleChange={handleChange} errors={errors} />
+                <Field label="Diesel Quantity (L)" name="dieselQty" type="number" placeholder={`Auto: ${fuelRequired}L`} helper={`Auto-suggested: ${suggestedDieselQty}L`} form={form} handleChange={handleChange} errors={errors} />
                 <div>
                   <label className={lbl}>Diesel Amount (₹)</label>
-                  <div className={inpCalculated}>
-                    ₹{dieselAmount.toLocaleString('en-IN')}
-                  </div>
+                  <div className={inpCalculated}>₹{dieselAmount.toLocaleString('en-IN')}</div>
                 </div>
-                <Field label="Fuel Vendor" name="fuelVendor">
-                  <select value={form.fuelVendor} onChange={set('fuelVendor')} className={inp}>
+                <Field label="Fuel Vendor" name="fuelVendor" form={form} handleChange={handleChange} errors={errors}>
+                  <select name="fuelVendor" value={form.fuelVendor} onChange={handleChange} className={inp}>
                     <option value="">— Select —</option>
-                    <option>Shell</option>
-                    <option>HP</option>
-                    <option>Bharat Petroleum</option>
-                    <option>Indian Oil</option>
+                    <option>Shell</option><option>HP</option><option>Bharat Petroleum</option><option>Indian Oil</option>
                   </select>
                 </Field>
               </div>
@@ -722,7 +658,7 @@ export default function TripAdd() {
                   <label className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-slate-300 rounded-lg text-sm text-slate-500 cursor-pointer hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition">
                     <FiUpload className="w-4 h-4" />
                     <span>Click to upload or drag & drop</span>
-                    <input type="file" multiple onChange={set('proofFiles')} className="hidden" accept="image/*,.pdf" />
+                    <input type="file" name="proofFiles" multiple onChange={handleChange} className="hidden" accept="image/*,.pdf" />
                   </label>
                 )}
                 {form.proofFiles.length > 0 && (
@@ -734,13 +670,7 @@ export default function TripAdd() {
                           <span className="text-xs text-slate-600 truncate">{file.name}</span>
                           <span className="text-xs text-slate-500 flex-shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removeFile(i)}
-                          className="text-red-500 hover:text-red-700 text-sm px-2 py-1"
-                        >
-                          Remove
-                        </button>
+                        <button type="button" onClick={() => removeFile(i)} className="text-red-500 hover:text-red-700 text-sm px-2 py-1">Remove</button>
                       </div>
                     ))}
                   </div>
@@ -751,47 +681,18 @@ export default function TripAdd() {
 
         </form>
 
-        {/* Footer (Sticky) */}
+        {/* Footer */}
         <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-slate-200 rounded-b-2xl sticky bottom-0 z-10">
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/trips')}
-              disabled={isSubmitting}
-              className="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
+            <button type="button" onClick={() => navigate('/trips')} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition">
               Cancel
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                localStorage.setItem('tripFormDraft', JSON.stringify(form));
-                setForm(p => ({ ...p, draftSaved: true, lastDraftTime: new Date().toLocaleTimeString() }));
-              }}
-              disabled={isSubmitting}
-              className="px-5 py-2.5 text-sm font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
-            >
+            <button type="button" onClick={() => { localStorage.setItem('tripFormDraft', JSON.stringify(form)); setForm(p => ({ ...p, draftSaved: true, lastDraftTime: new Date().toLocaleTimeString() })); }} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition">
               💾 Save Draft
             </button>
           </div>
-          <button
-            type="submit"
-            onClick={handleSubmit}
-            disabled={!isFormValid() || isSubmitting}
-            className={`px-6 py-2.5 text-sm font-semibold rounded-lg shadow-lg transition flex items-center gap-2 ${
-              isFormValid() && !isSubmitting
-                ? 'text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'
-                : 'text-slate-400 bg-slate-200 cursor-not-allowed'
-            }`}
-          >
-            {isSubmitting ? (
-              <>
-                <div className="w-4 h-4 border-2 border-slate-300 border-t-white rounded-full animate-spin"></div>
-                Creating...
-              </>
-            ) : (
-              '✈️ Generate Trip'
-            )}
+          <button type="button" onClick={handleSubmit} disabled={!isFormValid() || isSubmitting} className={`px-6 py-2.5 text-sm font-semibold rounded-lg shadow-lg transition flex items-center gap-2 ${isFormValid() && !isSubmitting ? 'text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700' : 'text-slate-400 bg-slate-200 cursor-not-allowed'}`}>
+            {isSubmitting ? (<><div className="w-4 h-4 border-2 border-slate-300 border-t-white rounded-full animate-spin"></div> Creating...</>) : '✈️ Generate Trip'}
           </button>
         </div>
 

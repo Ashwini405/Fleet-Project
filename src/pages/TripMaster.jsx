@@ -33,152 +33,7 @@ import {
 } from 'react-icons/fi';
 
 // Mock data for trips
-const mockTrips = [
-  {
-    id: 'TRIP-1001',
-    truckNumber: 'AP-21-TA-1234',
-    driverName: 'Ramesh Kumar',
-    route: { source: 'Nandyala', destination: 'Mumbai' },
-    status: 'Active',
-    progress: 62,
-    totalCost: 45000,
-    startDate: '2025-11-28',
-    eta: '2025-11-30',
-    alerts: ['delay'],
-    fuelCost: 12000,
-    expenses: 8000,
-    advance: 15000,
-    profitLoss: 10000,
-    supervisor: 'P. Sharma',
-    startTime: '2025-11-28T08:00'
-  },
-  {
-    id: 'TRIP-1002',
-    truckNumber: 'TS-08-UA-1122',
-    driverName: 'Suresh Babu',
-    route: { source: 'Kurnool', destination: 'Bangalore' },
-    status: 'In Transit',
-    progress: 85,
-    totalCost: 28000,
-    startDate: '2025-11-27',
-    eta: '2025-11-28',
-    alerts: ['low_balance'],
-    fuelCost: 8000,
-    expenses: 6000,
-    advance: 10000,
-    profitLoss: 3000,
-    supervisor: 'R. Reddy',
-    startTime: '2025-11-27T09:30'
-  },
-  {
-    id: 'TRIP-1003',
-    truckNumber: 'KA-01-AG-5566',
-    driverName: 'Mohd. Ali',
-    route: { source: 'Bangalore', destination: 'Chennai' },
-    status: 'Delayed',
-    progress: 45,
-    totalCost: 32000,
-    startDate: '2025-11-26',
-    eta: '2025-11-28',
-    alerts: ['fuel_issue', 'delay'],
-    fuelCost: 9500,
-    expenses: 7500,
-    advance: 12000,
-    profitLoss: 3000,
-    supervisor: 'S. Kumar',
-    startTime: '2025-11-26T07:15'
-  },
-  {
-    id: 'TRIP-1004',
-    truckNumber: 'MH-12-BC-7890',
-    driverName: 'Vijay Singh',
-    route: { source: 'Pune', destination: 'Delhi' },
-    status: 'Planned',
-    progress: 0,
-    totalCost: 55000,
-    startDate: '2025-12-01',
-    eta: '2025-12-03',
-    alerts: [],
-    fuelCost: 18000,
-    expenses: 12000,
-    advance: 20000,
-    profitLoss: 5000,
-    supervisor: 'M. Patel',
-    startTime: '2025-12-01T06:00'
-  },
-  {
-    id: 'TRIP-1005',
-    truckNumber: 'GJ-05-DE-3456',
-    driverName: 'Rajesh Patel',
-    route: { source: 'Ahmedabad', destination: 'Jaipur' },
-    status: 'Completed',
-    progress: 100,
-    totalCost: 38000,
-    startDate: '2025-11-20',
-    eta: '2025-11-22',
-    alerts: [],
-    fuelCost: 11000,
-    expenses: 7000,
-    advance: 15000,
-    profitLoss: 5000,
-    supervisor: 'K. Shah',
-    startTime: '2025-11-20T10:00'
-  },
-  {
-    id: 'TRIP-1006',
-    truckNumber: 'UP-14-FG-6789',
-    driverName: 'Amit Sharma',
-    route: { source: 'Lucknow', destination: 'Kanpur' },
-    status: 'Completed',
-    progress: 100,
-    totalCost: 22000,
-    startDate: '2025-11-18',
-    eta: '2025-11-19',
-    alerts: [],
-    fuelCost: 6500,
-    expenses: 4500,
-    advance: 8000,
-    profitLoss: 3000,
-    supervisor: 'V. Gupta',
-    startTime: '2025-11-18T14:30'
-  },
-  {
-    id: 'TRIP-1007',
-    truckNumber: 'TN-09-HI-4321',
-    driverName: 'Karthik Raja',
-    route: { source: 'Chennai', destination: 'Bangalore' },
-    status: 'Completed',
-    progress: 100,
-    totalCost: 29000,
-    startDate: '2025-11-15',
-    eta: '2025-11-16',
-    alerts: [],
-    fuelCost: 8500,
-    expenses: 6500,
-    advance: 11000,
-    profitLoss: 3000,
-    supervisor: 'R. Kumar',
-    startTime: '2025-11-15T11:00'
-  },
-  {
-    id: 'TRIP-1008',
-    truckNumber: 'RJ-07-JK-9876',
-    driverName: 'Sunil Verma',
-    route: { source: 'Jaipur', destination: 'Delhi' },
-    status: 'Completed',
-    progress: 100,
-    totalCost: 35000,
-    startDate: '2025-11-12',
-    eta: '2025-11-13',
-    alerts: [],
-    fuelCost: 10000,
-    expenses: 8000,
-    advance: 13000,
-    profitLoss: 4000,
-    supervisor: 'P. Singh',
-    startTime: '2025-11-12T08:45'
-  }
-];
+
 
 // Predefined system views
 const systemViews = {
@@ -240,32 +95,32 @@ const columnDefinitions = {
 const getSummaryStats = (trips, activeTab) => {
   const presentTrips = trips.filter(t => ['Active', 'In Transit', 'Planned', 'Delayed'].includes(t.status));
   const pastTrips = trips.filter(t => t.status === 'Completed');
-  
+
   const totalPresent = presentTrips.length;
   const totalPast = pastTrips.length;
   const activeCount = presentTrips.filter(t => t.status === 'Active').length;
   const delayedCount = presentTrips.filter(t => t.status === 'Delayed').length;
   const inTransitCount = presentTrips.filter(t => t.status === 'In Transit').length;
-  
+
   const averageDuration = pastTrips.length
     ? `${Math.round(pastTrips.reduce((sum, trip) => {
-        const start = new Date(trip.startDate);
-        const end = new Date(trip.eta);
-        return sum + Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)));
-      }, 0) / pastTrips.length)} days`
+      const start = new Date(trip.startDate);
+      const end = new Date(trip.eta);
+      return sum + Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+    }, 0) / pastTrips.length)} days`
     : '—';
 
   return activeTab === 'present'
     ? [
-        { label: 'Present Trips', value: totalPresent, icon: FiTrendingUp, color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
-        { label: 'Delayed Trips', value: delayedCount, icon: FiClock, color: 'text-red-600', bgColor: 'bg-red-50' },
-        { label: 'In Transit', value: inTransitCount, icon: FiTrendingUp, color: 'text-purple-600', bgColor: 'bg-purple-50' }
-      ]
+      { label: 'Present Trips', value: totalPresent, icon: FiTrendingUp, color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
+      { label: 'Delayed Trips', value: delayedCount, icon: FiClock, color: 'text-red-600', bgColor: 'bg-red-50' },
+      { label: 'In Transit', value: inTransitCount, icon: FiTrendingUp, color: 'text-purple-600', bgColor: 'bg-purple-50' }
+    ]
     : [
-        { label: 'Completed Trips', value: totalPast, icon: FiTrendingUp, color: 'text-green-600', bgColor: 'bg-green-50' },
-        { label: 'History Total', value: totalPast, icon: FiClock, color: 'text-gray-600', bgColor: 'bg-gray-100' },
-        { label: 'Avg Trip Duration', value: averageDuration, icon: FiTrendingUp, color: 'text-purple-600', bgColor: 'bg-purple-50' }
-      ];
+      { label: 'Completed Trips', value: totalPast, icon: FiTrendingUp, color: 'text-green-600', bgColor: 'bg-green-50' },
+      { label: 'History Total', value: totalPast, icon: FiClock, color: 'text-gray-600', bgColor: 'bg-gray-100' },
+      { label: 'Avg Trip Duration', value: averageDuration, icon: FiTrendingUp, color: 'text-purple-600', bgColor: 'bg-purple-50' }
+    ];
 };
 
 const statusColors = {
@@ -284,8 +139,8 @@ const alertIcons = {
 
 export default function TripMaster() {
   const navigate = useNavigate();
-  const [trips, setTrips] = useState(mockTrips);
-  const [filteredTrips, setFilteredTrips] = useState(mockTrips);
+  const [trips, setTrips] = useState([]);
+  const [filteredTrips, setFilteredTrips] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
@@ -327,23 +182,62 @@ export default function TripMaster() {
     }
   }, [activeTab, statusFilter]);
 
+
+
+  useEffect(() => {
+    fetch('http://localhost:5001/api/trips')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+
+          // 🔥 IMPORTANT: map DB fields → UI fields
+          const formatted = data.data.map(trip => ({
+            id: trip.trip_id,
+            truckNumber: trip.truck_no,
+            driverName: trip.driver_name,
+            route: {
+              source: trip.station_name,   // ✅ FIXED
+              destination: trip.destination
+            },
+            plant: trip.station_name,     // ✅ ADD THIS
+            status: trip.trip_status,
+            progress: 0, // optional (you can calculate later)
+            totalCost: trip.freight_amount || 0,
+            startDate: trip.trip_date,
+            eta: trip.eta,
+            alerts: [],
+            fuelCost: trip.diesel_qty * trip.diesel_rate || 0,
+            expenses: trip.expense_limit || 0,
+            advance: trip.driver_advance || 0,
+            profitLoss: 0,
+            supervisor: trip.supervisor_name,
+            startTime: trip.start_time
+          }));
+
+          setTrips(formatted);
+          setFilteredTrips(formatted);
+        }
+      })
+      .catch(err => console.error(err));
+  }, []);
+
   // Filter and search logic
   useEffect(() => {
     let filtered = trips.filter(trip => {
       // Tab filtering: Present vs Past trips
       const isPresentTrip = ['Active', 'In Transit', 'Planned', 'Delayed'].includes(trip.status);
       const isPastTrip = trip.status === 'Completed';
-      
+
       const matchesTab = activeTab === 'present' ? isPresentTrip : isPastTrip;
-      
+
       const matchesSearch = trip.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           trip.truckNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           trip.driverName.toLowerCase().includes(searchTerm.toLowerCase());
+        trip.truckNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        trip.driverName.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = currentView.filters.statusFilter === 'All' || trip.status === currentView.filters.statusFilter;
       const matchesDriver = currentView.filters.driverFilter === 'All' || trip.driverName === currentView.filters.driverFilter;
-      const matchesPlant = currentView.filters.plantFilter === 'All' || trip.route.source === currentView.filters.plantFilter;
+      const matchesPlant = currentView.filters.plantFilter === 'All' || trip.plant === currentView.filters.plantFilter;
       const matchesDate = (!dateRange.start || trip.startDate >= dateRange.start) &&
-                         (!dateRange.end || trip.startDate <= dateRange.end);
+        (!dateRange.end || trip.startDate <= dateRange.end);
 
       return matchesTab && matchesSearch && matchesStatus && matchesDriver && matchesPlant && matchesDate;
     });
@@ -592,8 +486,8 @@ export default function TripMaster() {
               Trip Master - {activeTab === 'present' ? 'Present Trips' : 'Past Trips'}
             </h1>
             <p className="text-gray-600 mt-1">
-              {activeTab === 'present' 
-                ? 'Monitor active, planned, and in-transit trips' 
+              {activeTab === 'present'
+                ? 'Monitor active, planned, and in-transit trips'
                 : 'View completed trip history and analytics'
               }
             </p>
@@ -631,11 +525,10 @@ export default function TripMaster() {
                           <button
                             key={view.id}
                             onClick={() => selectView(view.id)}
-                            className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-colors ${
-                              currentViewId === view.id
-                                ? 'bg-indigo-50 text-indigo-700'
-                                : 'text-gray-700 hover:bg-gray-50'
-                            }`}
+                            className={`w-full flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-colors ${currentViewId === view.id
+                              ? 'bg-indigo-50 text-indigo-700'
+                              : 'text-gray-700 hover:bg-gray-50'
+                              }`}
                           >
                             <span>{view.name}</span>
                             {currentViewId === view.id && <FiCheck className="w-4 h-4" />}
@@ -655,11 +548,10 @@ export default function TripMaster() {
                               <div key={view.id} className="flex items-center justify-between group">
                                 <button
                                   onClick={() => selectView(view.id)}
-                                  className={`flex-1 flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-colors ${
-                                    currentViewId === view.id
-                                      ? 'bg-indigo-50 text-indigo-700'
-                                      : 'text-gray-700 hover:bg-gray-50'
-                                  }`}
+                                  className={`flex-1 flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-colors ${currentViewId === view.id
+                                    ? 'bg-indigo-50 text-indigo-700'
+                                    : 'text-gray-700 hover:bg-gray-50'
+                                    }`}
                                 >
                                   <span>{view.name}</span>
                                   {currentViewId === view.id && <FiCheck className="w-4 h-4" />}
@@ -729,36 +621,32 @@ export default function TripMaster() {
           <div className="flex items-center gap-1">
             <button
               onClick={() => setActiveTab('present')}
-              className={`flex-1 px-5 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                activeTab === 'present'
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
-                  : 'text-gray-700 bg-white hover:bg-gray-50'
-              }`}
+              className={`flex-1 px-5 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === 'present'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
+                : 'text-gray-700 bg-white hover:bg-gray-50'
+                }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <FiClock className="w-4 h-4" />
                 Present Trips
-                <span className={`ml-2 inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                  activeTab === 'present' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'
-                }`}>
+                <span className={`ml-2 inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'present' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'
+                  }`}>
                   {presentTripCount}
                 </span>
               </div>
             </button>
             <button
               onClick={() => setActiveTab('past')}
-              className={`flex-1 px-5 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${
-                activeTab === 'past'
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
-                  : 'text-gray-700 bg-white hover:bg-gray-50'
-              }`}
+              className={`flex-1 px-5 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === 'past'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
+                : 'text-gray-700 bg-white hover:bg-gray-50'
+                }`}
             >
               <div className="flex items-center justify-center gap-2">
                 <FiCheck className="w-4 h-4" />
                 Past Trips
-                <span className={`ml-2 inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                  activeTab === 'past' ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'
-                }`}>
+                <span className={`ml-2 inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'past' ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'
+                  }`}>
                   {pastTripCount}
                 </span>
               </div>
@@ -833,7 +721,7 @@ export default function TripMaster() {
               className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="All">All Plants</option>
-              {[...new Set(trips.map(t => t.route.source))].map(plant => (
+              {[...new Set(trips.map(t => t.plant))].map(plant => (
                 <option key={plant} value={plant}>{plant}</option>
               ))}
             </select>
@@ -878,8 +766,8 @@ export default function TripMaster() {
                 No {activeTab === 'present' ? 'present' : 'past'} trips found
               </h3>
               <p className="text-gray-500 mb-6">
-                {activeTab === 'present' 
-                  ? 'All trips are completed or no active trips available' 
+                {activeTab === 'present'
+                  ? 'All trips are completed or no active trips available'
                   : 'No completed trips yet'
                 }
               </p>

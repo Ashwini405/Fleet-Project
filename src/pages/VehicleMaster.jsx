@@ -205,10 +205,7 @@ export default function VehicleMaster() {
             financier: v.financier_name || '—',
             loanAcc: v.loan_account_number || '—',
             loanTenure: v.loan_tenure || '—',
-            truckNo: v.vehicle_no,
-            status: v.vehicle_status || 'Active',
-            driver: v.driver_name,
-            plant: v.station_name
+            
           }));
           setVehicles(formatted);
         } else {
@@ -279,7 +276,7 @@ export default function VehicleMaster() {
             )}
           </div>
           <button
-            onClick={() => navigate(`/vehicles/${vehicle.id}`, { state: vehicle })}
+            onClick={() => navigate('/vehicles/add')}
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
           >
             <FiPlus className="w-4 h-4" />
