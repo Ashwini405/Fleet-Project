@@ -1,8 +1,8 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiSave, FiX, FiCheckCircle, FiUpload } from 'react-icons/fi';
+import { FiArrowLeft, FiSave, FiX, FiCheckCircle, FiUpload, FiFileText, FiImage } from 'react-icons/fi';
 
-const InputGroup = ({ label, name, type = "text", placeholder, formData, handleChange }) => (
+const InputGroup = ({ label, name, type = "text", placeholder, formData, handleChange, disabled = false, error }) => (
   <div>
     <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
     <input
@@ -11,10 +11,12 @@ const InputGroup = ({ label, name, type = "text", placeholder, formData, handleC
       placeholder={placeholder}
       value={formData[name]}
       onChange={handleChange}
+      disabled={disabled}
       autoComplete="off"
       maxLength="100"
-      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors placeholder:text-slate-400"
+      className={`w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors placeholder:text-slate-400 ${disabled ? 'opacity-60 cursor-not-allowed border-slate-200' : 'border-slate-200'} ${error ? 'border-red-300 focus:border-red-500' : ''}`}
     />
+    {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
   </div>
 );
 
@@ -37,16 +39,79 @@ const SelectGroup = ({ label, name, options, formData, handleChange }) => (
   </div>
 );
 
-const FileUploadGroup = ({ label, name, handleFileChange }) => (
-  <div>
-    <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
-    <label className="flex items-center gap-2 w-full px-4 py-2.5 bg-slate-50 border border-slate-200 border-dashed rounded-lg text-sm text-slate-500 cursor-pointer hover:bg-slate-100 transition-colors">
-      <FiUpload className="w-4 h-4 text-indigo-500 shrink-0" />
-      <span>Click to upload</span>
-      <input type="file" name={name} onChange={handleFileChange} className="hidden" accept=".pdf,.jpg,.jpeg,.png" />
-    </label>
-  </div>
-);
+const getFileTypeIcon = (file) => {
+  if (!file) return <FiUpload className="w-4 h-4 text-indigo-500 shrink-0" />;
+  if (file.type?.startsWith('image/')) return <FiImage className="w-4 h-4 text-slate-500 shrink-0" />;
+  return <FiFileText className="w-4 h-4 text-slate-500 shrink-0" />;
+};
+
+function FileUploadGroup({ label, name, selectedFile, handleFileChange, handleFileRemove, disabled = false, helperText, error, required = false }) {
+  const previewUrl = useMemo(() => {
+    if (!selectedFile) return null;
+    return selectedFile.type?.startsWith('image/') ? URL.createObjectURL(selectedFile) : null;
+  }, [selectedFile]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium text-slate-700">
+        {label}
+        {required ? <span className="text-red-500"> *</span> : null}
+      </label>
+      <label className={`group flex flex-col gap-2 w-full px-3 py-3 bg-slate-50 border border-dashed rounded-xl text-sm transition-colors ${disabled ? 'border-slate-200 bg-slate-100 opacity-60 cursor-not-allowed' : 'border-slate-300 hover:border-indigo-400 hover:bg-slate-100 cursor-pointer'}`}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-slate-700">
+            {getFileTypeIcon(selectedFile)}
+            <div className="text-sm font-medium">
+              {selectedFile ? selectedFile.name : `Choose ${label}`}
+            </div>
+          </div>
+          {selectedFile && !disabled && (
+            <button
+              type="button"
+              onClick={(e) => { e.preventDefault(); handleFileRemove(name); }}
+              className="text-slate-500 hover:text-slate-900 text-sm"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+
+        {selectedFile && previewUrl && (
+          <img src={previewUrl} alt={selectedFile.name} className="w-full h-28 object-cover rounded-lg border border-slate-200" />
+        )}
+
+        {!selectedFile && (
+          <div className="flex items-center gap-2 text-slate-500">
+            <FiUpload className="w-4 h-4" />
+            <span>PDF or image (max 2MB)</span>
+          </div>
+        )}
+
+        <input
+          type="file"
+          name={name}
+          onChange={handleFileChange}
+          disabled={disabled}
+          className="hidden"
+          accept=".pdf,.jpg,.jpeg,.png"
+        />
+      </label>
+      {selectedFile && !error && (
+        <p className="text-sm text-emerald-600 flex items-center gap-1">
+          <FiCheckCircle className="w-4 h-4" /> Document Uploaded ✔
+        </p>
+      )}
+      {helperText && !error && <p className="text-sm text-slate-500">{helperText}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
 
 const TextareaGroup = ({ label, name, placeholder, formData, handleChange }) => (
   <div className="md:col-span-2">
@@ -82,6 +147,7 @@ export default function AddVehicle() {
     engineNumber: '',
     chassisNumber: '',
     initialOdometer: '',
+    mileage: '',
     
     // Compliance
     insuranceValidity: '',
@@ -124,12 +190,42 @@ export default function AddVehicle() {
     remarks: ''
   });
 
-  const [files, setFiles] = useState({ insuranceDoc: null, rcDoc: null, permitDoc: null });
-  
+  const [files, setFiles] = useState({
+    insuranceDoc: null,
+    rcDoc: null,
+    permitDoc: null,
+    fcDoc: null,
+    taxDoc: null,
+    pollutionDoc: null,
+    cllDoc: null,
+  });
+  const [formErrors, setFormErrors] = useState({});
+  const [fileErrors, setFileErrors] = useState({});
+
   // State for dynamic dropdowns
   const [supervisors, setSupervisors] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [stations, setStations] = useState([]);
+
+  const isCLLApplicable = useMemo(
+    () => ['Tanker', 'LPG', 'Milk Transport'].includes(formData.vehicleType),
+    [formData.vehicleType]
+  );
+
+  const docWarnings = useMemo(() => ({
+    fcDoc: formData.fcValidity && !files.fcDoc ? 'FC document missing while FC validity is entered.' : undefined,
+    taxDoc: formData.taxValidity && !files.taxDoc ? 'Tax document missing while Tax validity is entered.' : undefined,
+    pollutionDoc: formData.pollutionValidity && !files.pollutionDoc ? 'Pollution document missing while Pollution validity is entered.' : undefined,
+    cllDoc: isCLLApplicable && formData.cllValidity && !files.cllDoc ? 'CLL document missing while CLL validity is entered.' : undefined,
+  }), [formData.fcValidity, formData.taxValidity, formData.pollutionValidity, formData.cllValidity, files.fcDoc, files.taxDoc, files.pollutionDoc, files.cllDoc, isCLLApplicable]);
+
+  useEffect(() => {
+    if (!isCLLApplicable && (formData.cllValidity || files.cllDoc)) {
+      setFormData(prev => ({ ...prev, cllValidity: '' }));
+      setFiles(prev => ({ ...prev, cllDoc: null }));
+      setFileErrors(prev => ({ ...prev, cllDoc: undefined }));
+    }
+  }, [isCLLApplicable, formData.cllValidity, files.cllDoc]);
 
   // Fetch supervisors, drivers, and stations from backend
   useEffect(() => {
@@ -160,7 +256,34 @@ export default function AddVehicle() {
 
   const handleFileChange = useCallback((e) => {
     const { name, files: f } = e.target;
-    setFiles(prev => ({ ...prev, [name]: f[0] || null }));
+    const selected = f[0];
+
+    if (!selected) {
+      setFiles(prev => ({ ...prev, [name]: null }));
+      setFileErrors(prev => ({ ...prev, [name]: undefined }));
+      return;
+    }
+
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (!allowedTypes.includes(selected.type)) {
+      setFileErrors(prev => ({ ...prev, [name]: 'Only PDF, JPG, PNG files are allowed.' }));
+      setFiles(prev => ({ ...prev, [name]: null }));
+      return;
+    }
+
+    if (selected.size > 2 * 1024 * 1024) {
+      setFileErrors(prev => ({ ...prev, [name]: 'File must be 2MB or smaller.' }));
+      setFiles(prev => ({ ...prev, [name]: null }));
+      return;
+    }
+
+    setFiles(prev => ({ ...prev, [name]: selected }));
+    setFileErrors(prev => ({ ...prev, [name]: undefined }));
+  }, []);
+
+  const handleFileRemove = useCallback((name) => {
+    setFiles(prev => ({ ...prev, [name]: null }));
+    setFileErrors(prev => ({ ...prev, [name]: undefined }));
   }, []);
 
   const handleChange = useCallback((e) => {
@@ -171,8 +294,44 @@ export default function AddVehicle() {
   const handleSave = async (e) => {
     e.preventDefault();
     
+    const errors = {};
+    const fileErrs = {};
+
     if (!formData.registrationNumber) {
-      alert("Registration Number is required!");
+      errors.registrationNumber = 'Registration Number is required.';
+    }
+    if (!formData.fcValidity) {
+      errors.fcValidity = 'FC validity date is required.';
+    }
+    if (!files.fcDoc) {
+      fileErrs.fcDoc = 'FC document is required.';
+    }
+    if (!formData.taxValidity) {
+      errors.taxValidity = 'Tax validity date is required.';
+    }
+    if (!files.taxDoc) {
+      fileErrs.taxDoc = 'Tax document is required.';
+    }
+    if (!formData.pollutionValidity) {
+      errors.pollutionValidity = 'Pollution validity date is required.';
+    }
+    if (!files.pollutionDoc) {
+      fileErrs.pollutionDoc = 'Pollution document is required.';
+    }
+    if (isCLLApplicable) {
+      if (!formData.cllValidity) {
+        errors.cllValidity = 'CLL validity date is required for selected vehicle type.';
+      }
+      if (!files.cllDoc) {
+        fileErrs.cllDoc = 'CLL document is required for selected vehicle type.';
+      }
+    }
+
+    setFormErrors(errors);
+    setFileErrors(prev => ({ ...prev, ...fileErrs }));
+
+    if (Object.keys(errors).length || Object.keys(fileErrs).length) {
+      alert('Please fix validation errors before saving.');
       return;
     }
 
@@ -201,16 +360,21 @@ export default function AddVehicle() {
           engine_number: formData.engineNumber,
           chassis_number: formData.chassisNumber,
           initial_odometer: formData.initialOdometer,
+          mileage: formData.mileage,
 
           // Compliance
           insurance_validity: formData.insuranceValidity,
           insurance_document: files.insuranceDoc ? files.insuranceDoc.name : null,
           fc_validity: formData.fcValidity,
+          fc_document: files.fcDoc ? files.fcDoc.name : null,
           permit_validity: formData.permitValidity,
           permit_document: files.permitDoc ? files.permitDoc.name : null,
           tax_validity: formData.taxValidity,
+          tax_document: files.taxDoc ? files.taxDoc.name : null,
           pollution_validity: formData.pollutionValidity,
+          pollution_document: files.pollutionDoc ? files.pollutionDoc.name : null,
           cll_validity: formData.cllValidity,
+          cll_document: files.cllDoc ? files.cllDoc.name : null,
           rc_document: files.rcDoc ? files.rcDoc.name : null,
 
           // Operations (foreign keys) – now sending IDs from dropdowns
@@ -316,12 +480,13 @@ export default function AddVehicle() {
             Technical Specifications
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SelectGroup label="Vehicle Type" name="vehicleType" options={['Trailer', 'Tanker', 'Tipper', 'Flatbed', 'Box Truck']} formData={formData} handleChange={handleChange} />
+            <SelectGroup label="Vehicle Type" name="vehicleType" options={['Trailer', 'Tanker', 'LPG', 'Milk Transport', 'Tipper', 'Flatbed', 'Box Truck']} formData={formData} handleChange={handleChange} />
             <SelectGroup label="Vehicle Category" name="vehicleCategory" options={['Owned', 'Rented', 'Lease']} formData={formData} handleChange={handleChange} />
             <InputGroup label="Make / Brand" name="makeBrand" placeholder="e.g. Tata, Ashok Leyland" formData={formData} handleChange={handleChange} />
             <SelectGroup label="Fuel Type" name="fuelType" options={['Diesel', 'Petrol', 'CNG', 'EV']} formData={formData} handleChange={handleChange} />
             
             <InputGroup label="Model Year" name="modelYear" type="number" placeholder="YYYY" formData={formData} handleChange={handleChange} />
+            <InputGroup label="Mileage (KM/L)" name="mileage" type="number" step="0.1" placeholder="e.g. 8.5" formData={formData} handleChange={handleChange} />
             <InputGroup label="Tire Size" name="tireSize" placeholder="e.g. 295/80R22.5" formData={formData} handleChange={handleChange} />
             
             <InputGroup label="GVW (kg)" name="gvw" type="number" placeholder="Enter GVW" formData={formData} handleChange={handleChange} />
@@ -340,16 +505,20 @@ export default function AddVehicle() {
             <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">3</div>
             Compliance Validity & Documents
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <InputGroup label="Insurance Validity" name="insuranceValidity" type="date" formData={formData} handleChange={handleChange} />
-            <FileUploadGroup label="Insurance Document" name="insuranceDoc" handleFileChange={handleFileChange} />
-            <InputGroup label="FC Validity (Fitness)" name="fcValidity" type="date" formData={formData} handleChange={handleChange} />
+            <FileUploadGroup label="Insurance Document" name="insuranceDoc" selectedFile={files.insuranceDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} error={fileErrors.insuranceDoc} />
+            <InputGroup label="FC Validity (Fitness)" name="fcValidity" type="date" formData={formData} handleChange={handleChange} error={formErrors.fcValidity} />
+            <FileUploadGroup label="FC Document" name="fcDoc" selectedFile={files.fcDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} error={fileErrors.fcDoc} helperText={docWarnings.fcDoc} required />
             <InputGroup label="Permit Validity" name="permitValidity" type="date" formData={formData} handleChange={handleChange} />
-            <FileUploadGroup label="Permit Document" name="permitDoc" handleFileChange={handleFileChange} />
-            <InputGroup label="Tax Validity" name="taxValidity" type="date" formData={formData} handleChange={handleChange} />
-            <InputGroup label="Pollution Validity" name="pollutionValidity" type="date" formData={formData} handleChange={handleChange} />
-            <InputGroup label="CLL Validity" name="cllValidity" type="date" formData={formData} handleChange={handleChange} />
-            <FileUploadGroup label="RC Document" name="rcDoc" handleFileChange={handleFileChange} />
+            <FileUploadGroup label="Permit Document" name="permitDoc" selectedFile={files.permitDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} />
+            <InputGroup label="Tax Validity" name="taxValidity" type="date" formData={formData} handleChange={handleChange} error={formErrors.taxValidity} />
+            <FileUploadGroup label="Tax Document" name="taxDoc" selectedFile={files.taxDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} error={fileErrors.taxDoc} helperText={docWarnings.taxDoc} required />
+            <InputGroup label="Pollution Validity" name="pollutionValidity" type="date" formData={formData} handleChange={handleChange} error={formErrors.pollutionValidity} />
+            <FileUploadGroup label="Pollution Document" name="pollutionDoc" selectedFile={files.pollutionDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} error={fileErrors.pollutionDoc} helperText={docWarnings.pollutionDoc} required />
+            <InputGroup label="CLL Validity" name="cllValidity" type="date" formData={formData} handleChange={handleChange} disabled={!isCLLApplicable} error={formErrors.cllValidity} />
+            <FileUploadGroup label="CLL Document" name="cllDoc" selectedFile={files.cllDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} disabled={!isCLLApplicable} error={fileErrors.cllDoc} helperText={isCLLApplicable ? docWarnings.cllDoc : 'CLL required only for tanker / LPG / milk transport vehicles.'} required={isCLLApplicable} />
+            <FileUploadGroup label="RC Document" name="rcDoc" selectedFile={files.rcDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} />
           </div>
         </section>
 
