@@ -1,0 +1,90 @@
+const db = require('../config/db');
+
+const Trip = {
+
+  // ✅ CREATE TRIP
+  create: async (tripData) => {
+    const [result] = await db.query(
+      'INSERT INTO trips SET ?',
+      [tripData]
+    );
+    return result;
+  },
+
+  // ✅ GET ALL TRIPS
+getAll: async () => {
+  const [rows] = await db.query(`
+    SELECT t.*,
+           d.full_name AS driver_name,
+           s.full_name AS supervisor_name,
+           st.station_name
+    FROM trips t
+    LEFT JOIN drivers d ON t.driver_id = d.id
+    LEFT JOIN supervisors s ON t.supervisor_id = s.id
+    LEFT JOIN stations st ON t.station_id = st.id
+    ORDER BY t.created_at DESC
+  `);
+  return rows;
+},
+  // ✅ GET SINGLE TRIP
+getById: async (tripId) => {
+  const [rows] = await db.query(`
+    SELECT t.*,
+           d.full_name AS driver_name,
+           s.full_name AS supervisor_name,
+           st.station_name
+    FROM trips t
+    LEFT JOIN drivers d ON t.driver_id = d.id
+    LEFT JOIN supervisors s ON t.supervisor_id = s.id
+    LEFT JOIN stations st ON t.station_id = st.id
+    WHERE t.trip_id = ?
+  `, [tripId]);
+
+  return rows[0];
+},
+
+addExpense: async (tripId, expenseData) => {
+  const { amount, type, notes } = expenseData;
+
+  const [result] = await db.query(
+    `INSERT INTO trip_expenses (trip_id, amount, type, notes)
+     VALUES (?, ?, ?, ?)`,
+    [tripId, amount, type, notes]
+  );
+
+  return result;
+},
+
+addFuel: async (tripId, fuelData) => {
+  const { quantity, rate, vendor } = fuelData;
+
+  const [result] = await db.query(
+    `INSERT INTO trip_fuel (trip_id, quantity, rate, vendor)
+     VALUES (?, ?, ?, ?)`,
+    [tripId, quantity, rate, vendor]
+  );
+
+  return result;
+},
+
+  // ✅ UPDATE TRIP
+  update: async (id, tripData) => {
+    const [result] = await db.query(
+      'UPDATE trips SET ? WHERE id = ?',
+      [tripData, id]
+    );
+    return result;
+  },
+
+  // ✅ DELETE TRIP
+  delete: async (id) => {
+    const [result] = await db.query(
+      'DELETE FROM trips WHERE id = ?',
+      [id]
+    );
+    return result;
+  }
+
+};
+
+module.exports = Trip;

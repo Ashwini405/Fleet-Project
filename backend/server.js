@@ -6,6 +6,8 @@ const vehicleRoutes = require('./routes/vehicleRoutes');
 const stationRoutes = require('./routes/stationRoutes'); // ✅ ADD THIS
 const supervisorRoutes = require('./routes/supervisorRoutes');
 const driverRoutes = require('./routes/driverRoutes');
+const tripRoutes = require('./routes/tripRoutes');
+
 
 const app = express();
 
@@ -18,6 +20,7 @@ app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/stations', stationRoutes);
 app.use('/api/supervisors', supervisorRoutes);
 app.use('/api/drivers', driverRoutes);
+app.use('/api/trips', tripRoutes);
 
 // Default Route
 app.get('/', (req, res) => {
