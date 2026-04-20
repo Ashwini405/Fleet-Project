@@ -9,7 +9,7 @@ const INITIAL = {
   tripPriority: 'Normal',
   transportType: 'Outbound',
   contractOrderId: '',
-  
+
   // Vehicle & Driver
   truckNo: '',
   tripDate: '',
@@ -22,13 +22,13 @@ const INITIAL = {
   fuelType: '',
   startOdometer: '',
   lastOdometer: 0,
-  
+
   // 🔥 ADDED: Foreign keys for DB
   vehicleId: '',
   driverId: '',
   supervisorId: '',
   stationId: '',
-  
+
   // Route
   source: '',
   destination: '',
@@ -37,13 +37,13 @@ const INITIAL = {
   routeType: 'Highway',
   estDistance: '',
   tripDuration: '',
-  
+
   // Schedule
   startTime: '',
   eta: '',
   loadingTime: '',
   unloadingTime: '',
-  
+
   // Load Details
   materialType: '',
   loadWeight: '',
@@ -52,7 +52,7 @@ const INITIAL = {
   customerName: '',
   invoiceNumber: '',
   lrNumber: '',
-  
+
   // Financials
   tripBudget: '',
   expenseLimit: '',
@@ -61,14 +61,14 @@ const INITIAL = {
   driverAdvance: '',
   hamaliAdvance: '',
   otherAdvance: '',
-  
+
   // Fuel
   expectedMileage: '4',
   dieselRate: '',
   dieselQty: '',
   fuelVendor: '',
   proofFiles: [],
-  
+
   // Internal
   truckWarnings: [],
   draftSaved: false,
@@ -206,10 +206,10 @@ export default function TripAdd() {
               fuelType: v.fuel_type || '',
               lastOdometer: v.initial_odometer || 0,
               // 🔥 CRITICAL: store IDs for DB
-              vehicleId: v.id,
-              driverId: v.assigned_driver,
-              supervisorId: v.supervisor_id,
-              stationId: v.station_id,
+              vehicle_id: form.vehicleId,
+              driver_id: form.driverId,
+              supervisor_id: form.supervisorId,
+              station_id: form.stationId,
               truckWarnings: warnings,
             }));
           }
@@ -337,10 +337,10 @@ export default function TripAdd() {
 
   const isFormValid = useCallback(() => {
     return form.tripType && form.tripPriority && form.truckNo && form.tripDate &&
-           form.source && form.destination && form.estDistance &&
-           form.startTime && form.materialType && form.loadWeight && form.customerName &&
-           form.startOdometer && +form.startOdometer > form.lastOdometer &&
-           (+form.startOdometer - form.lastOdometer) >= 1;
+      form.source && form.destination && form.estDistance &&
+      form.startTime && form.materialType && form.loadWeight && form.customerName &&
+      form.startOdometer && +form.startOdometer > form.lastOdometer &&
+      (+form.startOdometer - form.lastOdometer) >= 1;
   }, [form]);
 
   // ─── Submit handler (includes foreign keys) ──────────────────────────────
@@ -361,7 +361,7 @@ export default function TripAdd() {
 
       // 🔥 CRITICAL: foreign keys for DB
       vehicle_id: form.vehicleId,
-      driverId: v.assigned_driver,
+      driverId: form.assigned_driver,
       supervisor_id: form.supervisorId,
       station_id: form.stationId,
 
@@ -450,7 +450,7 @@ export default function TripAdd() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative bg-slate-50 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 rounded-t-2xl sticky top-0 z-10">
           <div>

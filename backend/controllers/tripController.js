@@ -177,6 +177,46 @@ const deleteTrip = async (req, res) => {
   }
 };
 
+const getExpenses = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+
+    const expenses = await Trip.getExpenses(tripId);
+
+    res.status(200).json({
+      success: true,
+      data: expenses
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
+};
+
+const getFuel = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+
+    const fuel = await Trip.getFuel(tripId);
+
+    res.status(200).json({
+      success: true,
+      data: fuel
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
+};
+
 
 module.exports = {
   createTrip,
@@ -185,5 +225,7 @@ module.exports = {
   updateTrip,
   deleteTrip,
   addExpense,   // ✅ ADD
-  addFuel  
+  addFuel,
+  getExpenses,   // ✅ ADD
+  getFuel
 };
