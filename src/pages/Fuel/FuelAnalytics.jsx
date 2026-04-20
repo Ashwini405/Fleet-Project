@@ -1,26 +1,87 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { FiFilter } from 'react-icons/fi';
 
-const consumptionData = [
-  { month: 'Jun', consumption: 3200 },
-  { month: 'Jul', consumption: 3800 },
-  { month: 'Aug', consumption: 4100 },
-  { month: 'Sep', consumption: 3900 },
-  { month: 'Oct', consumption: 4500 },
-  { month: 'Nov', consumption: 4520 },
-];
-
-const costTrendData = [
-  { month: 'Jun', cost: 290000, rate: 94.5 },
-  { month: 'Jul', cost: 350000, rate: 95.0 },
-  { month: 'Aug', cost: 385000, rate: 95.5 },
-  { month: 'Sep', cost: 370000, rate: 96.0 },
-  { month: 'Oct', cost: 430000, rate: 96.5 },
-  { month: 'Nov', cost: 436180, rate: 96.5 },
-];
-
 export default function FuelAnalytics() {
+  const [fuelData, setFuelData] = useState([]);
+  const [consumptionData, setConsumptionData] = useState([]);
+  const [costTrendData, setCostTrendData] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch fuel data from backend
+  useEffect(() => {
+    setLoading(true);
+    fetch('http://localhost:5001/api/fuel')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          setFuelData(data.data);
+
+          // Group by month (using short month name, e.g., 'Jan', 'Feb')
+          const monthly = {};
+
+          data.data.forEach(item => {
+            if (!item.date) return;
+            const date = new Date(item.date);
+            if (isNaN(date.getTime())) return;
+            const month = date.toLocaleString('default', { month: 'short' });
+
+            if (!monthly[month]) {
+              monthly[month] = {
+                consumption: 0,
+                cost: 0,
+                rateTotal: 0,
+                count: 0,
+                order: date.getMonth() // for sorting later
+              };
+            }
+
+            monthly[month].consumption += Number(item.quantity || 0);
+            monthly[month].cost += Number(item.total_cost || 0);
+            monthly[month].rateTotal += Number(item.rate || 0);
+            monthly[month].count += 1;
+          });
+
+          // Convert to arrays and sort by month order
+          const consumptionArr = [];
+          const costArr = [];
+
+          Object.keys(monthly).forEach(month => {
+            consumptionArr.push({
+              month,
+              consumption: monthly[month].consumption,
+              order: monthly[month].order
+            });
+            costArr.push({
+              month,
+              cost: monthly[month].cost,
+              rate: monthly[month].rateTotal / monthly[month].count,
+              order: monthly[month].order
+            });
+          });
+
+          // Sort by month order (chronological)
+          consumptionArr.sort((a, b) => a.order - b.order);
+          costArr.sort((a, b) => a.order - b.order);
+
+          setConsumptionData(consumptionArr);
+          setCostTrendData(costArr);
+        }
+      })
+      .catch(err => console.error('Error fetching fuel data:', err))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Compute summary cards dynamically
+  const totalDistance = fuelData.reduce((sum, f) => sum + (Number(f.distance) || 0), 0);
+  const totalQuantity = fuelData.reduce((sum, f) => sum + (Number(f.quantity) || 0), 0);
+  const avgMileage = totalQuantity > 0 ? (totalDistance / totalQuantity).toFixed(2) : '0.00';
+  const totalCost = fuelData.reduce((sum, f) => sum + (Number(f.total_cost) || 0), 0);
+
+  if (loading) {
+    return <div className="p-8 text-center text-slate-500">Loading analytics...</div>;
+  }
+
   return (
     <div className="flex flex-col space-y-6 animate-in fade-in duration-200">
       
@@ -45,19 +106,19 @@ export default function FuelAnalytics() {
         </div>
       </div>
 
-      {/* Summary Cards */}
+      {/* Summary Cards (dynamic) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-indigo-500">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Distance Run</p>
-          <h3 className="text-3xl font-black text-slate-800">86,540 <span className="text-base text-slate-500 font-bold">KM</span></h3>
+          <h3 className="text-3xl font-black text-slate-800">{totalDistance.toLocaleString()} <span className="text-base text-slate-500 font-bold">KM</span></h3>
         </div>
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Average Fleet Mileage</p>
-          <h3 className="text-3xl font-black text-emerald-600">3.82 <span className="text-base text-emerald-500 font-bold">KMPL</span></h3>
+          <h3 className="text-3xl font-black text-emerald-600">{avgMileage} <span className="text-base text-emerald-500 font-bold">KMPL</span></h3>
         </div>
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-rose-500">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Fuel Cost</p>
-          <h3 className="text-3xl font-black text-slate-800"><span className="text-base text-slate-500 font-bold">₹</span> 22,61,180</h3>
+          <h3 className="text-3xl font-black text-slate-800"><span className="text-base text-slate-500 font-bold">₹</span> {totalCost.toLocaleString()}</h3>
         </div>
       </div>
 
@@ -83,9 +144,9 @@ export default function FuelAnalytics() {
           </div>
         </div>
 
-        {/* Cost Trend */}
+        {/* Cost & Rate Trend */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-          <h3 className="text-sm font-bold text-slate-800 tracking-tight mb-6">Cost & Rate Tren (₹)</h3>
+          <h3 className="text-sm font-bold text-slate-800 tracking-tight mb-6">Cost & Rate Trend (₹)</h3>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={costTrendData} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
@@ -105,7 +166,6 @@ export default function FuelAnalytics() {
         </div>
 
       </div>
-
     </div>
   );
 }

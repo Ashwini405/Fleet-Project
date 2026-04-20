@@ -10,8 +10,13 @@ const {
   addExpense,
   addFuel,
   getExpenses,
-  getFuel
+  getFuel,
+  updateTripStatus,
+  getTripsByVehicle
 } = require('../controllers/tripController');
+
+// 🔥 FIX: MOVE THIS TO TOP
+router.get('/by-vehicle/:vehicleId', getTripsByVehicle);
 
 // ✅ MAIN TRIP ROUTES
 router.route('/')
@@ -22,6 +27,9 @@ router.route('/:id')
   .get(getTripById)
   .put(updateTrip)
   .delete(deleteTrip);
+
+// 🔥 STATUS UPDATE ROUTE
+router.put('/:id/status', updateTripStatus);
 
 // 🔥 EXPENSE ROUTES
 router.post('/:tripId/expense', addExpense);

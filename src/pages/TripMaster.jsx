@@ -93,8 +93,8 @@ const columnDefinitions = {
 
 // Summary stats
 const getSummaryStats = (trips, activeTab) => {
-  const presentTrips = trips.filter(t => ['Active', 'In Transit', 'Planned', 'Delayed'].includes(t.status));
-  const pastTrips = trips.filter(t => t.status === 'Completed');
+  const presentTrips = trips.filter(t => ['Active', 'In Transit', 'Planned', 'Delayed', 'Started'].includes(t.status));
+  const pastTrips = trips.filter(t => ['Completed', 'Closed'].includes(t.status));
 
   const totalPresent = presentTrips.length;
   const totalPast = pastTrips.length;
@@ -128,7 +128,9 @@ const statusColors = {
   'In Transit': 'bg-blue-100 text-blue-700',
   Planned: 'bg-gray-100 text-gray-700',
   Delayed: 'bg-red-100 text-red-700',
-  Completed: 'bg-purple-100 text-purple-700'
+  Started: 'bg-cyan-100 text-cyan-700',
+  Completed: 'bg-purple-100 text-purple-700',
+  Closed: 'bg-slate-100 text-slate-700'
 };
 
 const alertIcons = {
@@ -170,14 +172,14 @@ export default function TripMaster() {
   });
 
   const currentView = views[currentViewId] || systemViews.operations;
-  const presentTripCount = trips.filter(t => ['Active', 'In Transit', 'Planned', 'Delayed'].includes(t.status)).length;
-  const pastTripCount = trips.filter(t => t.status === 'Completed').length;
+  const presentTripCount = trips.filter(t => ['Active', 'In Transit', 'Planned', 'Delayed', 'Started'].includes(t.status)).length;
+  const pastTripCount = trips.filter(t => ['Completed', 'Closed'].includes(t.status)).length;
 
   useEffect(() => {
-    if (activeTab === 'past' && statusFilter !== 'All' && statusFilter !== 'Completed') {
+    if (activeTab === 'past' && statusFilter !== 'All' && !['Completed', 'Closed'].includes(statusFilter)) {
       setStatusFilter('All');
     }
-    if (activeTab === 'present' && statusFilter === 'Completed') {
+    if (activeTab === 'present' && ['Completed', 'Closed'].includes(statusFilter)) {
       setStatusFilter('All');
     }
   }, [activeTab, statusFilter]);
@@ -196,18 +198,18 @@ export default function TripMaster() {
             truckNumber: trip.truck_no,
             driverName: trip.driver_name,
             route: {
-              source: trip.station_name,   // ✅ FIXED
-              destination: trip.destination
+              source: trip.source_plant || trip.station_name || trip.source || '—',
+              destination: trip.destination || '—'
             },
-            plant: trip.station_name,     // ✅ ADD THIS
-            status: trip.trip_status,
-            progress: 0, // optional (you can calculate later)
+            plant: trip.source_plant || trip.station_name,
+            status: trip.trip_status || 'Planned',
+            progress: trip.progress_percent || 0,
             totalCost: trip.freight_amount || 0,
-            startDate: trip.trip_date,
+            startDate: trip.trip_date || trip.created_at,
             eta: trip.eta,
             alerts: [],
-            fuelCost: trip.diesel_qty * trip.diesel_rate || 0,
-            expenses: trip.expense_limit || 0,
+            fuelCost: (trip.diesel_qty || 0) * (trip.diesel_rate || 0),
+            expenses: trip.expense_limit || trip.other_advance || 0,
             advance: trip.driver_advance || 0,
             profitLoss: 0,
             supervisor: trip.supervisor_name,
@@ -225,8 +227,8 @@ export default function TripMaster() {
   useEffect(() => {
     let filtered = trips.filter(trip => {
       // Tab filtering: Present vs Past trips
-      const isPresentTrip = ['Active', 'In Transit', 'Planned', 'Delayed'].includes(trip.status);
-      const isPastTrip = trip.status === 'Completed';
+      const isPresentTrip = ['Active', 'In Transit', 'Planned', 'Delayed', 'Started'].includes(trip.status);
+      const isPastTrip = ['Completed', 'Closed'].includes(trip.status);
 
       const matchesTab = activeTab === 'present' ? isPresentTrip : isPastTrip;
 

@@ -307,6 +307,26 @@ export default function TripDetails() {
     setModal(null);
   };
 
+  // ─── Update Trip Status ───────────────────────────────────────────────────
+  const updateStatus = async (newStatus) => {
+    const res = await fetch(`http://localhost:5001/api/trips/${id}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ status: newStatus })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      // 🔄 Refresh trip
+      const refresh = await fetch(`http://localhost:5001/api/trips/${id}`);
+      const refreshedData = await refresh.json();
+      setTrip(refreshedData.data);
+    }
+  };
+
   const inp = "w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500";
 
   return (
@@ -606,7 +626,12 @@ export default function TripDetails() {
           <div className="flex gap-2">
             <button onClick={() => setModal(null)} className="flex-1 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">Cancel</button>
             <button
-              onClick={() => setModal(null)}
+              onClick={async () => {
+                if (modal === 'start') await updateStatus('Started');
+                if (modal === 'end') await updateStatus('Completed');
+                if (modal === 'close') await updateStatus('Closed');
+                setModal(null);
+              }}
               className={`flex-1 py-2 text-white rounded-lg text-sm font-bold ${
                 modal === 'start' ? 'bg-green-600 hover:bg-green-700'
                 : modal === 'end' ? 'bg-red-500 hover:bg-red-600'

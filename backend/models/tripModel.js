@@ -103,7 +103,7 @@ getFuel: async (tripId) => {
   // ✅ UPDATE TRIP
   update: async (id, tripData) => {
     const [result] = await db.query(
-      'UPDATE trips SET ? WHERE id = ?',
+      'UPDATE trips SET ? WHERE trip_id = ?',
       [tripData, id]
     );
     return result;
@@ -112,7 +112,7 @@ getFuel: async (tripId) => {
   // ✅ DELETE TRIP
   delete: async (id) => {
     const [result] = await db.query(
-      'DELETE FROM trips WHERE id = ?',
+      'DELETE FROM trips WHERE trip_id = ?',
       [id]
     );
     return result;
