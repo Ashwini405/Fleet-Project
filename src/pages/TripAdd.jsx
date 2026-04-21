@@ -1,10 +1,54 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useReducer } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiX, FiTruck, FiMapPin, FiClock, FiPackage, FiDollarSign, FiDroplet, FiUpload, FiAlertCircle } from 'react-icons/fi';
 
-const INITIAL = {
+// ─── MOCK DATA SETUP ──────────────────────────────────────────────────────
+const vehicles = [
+  {
+    id: "V001",
+    number: "AP-21-TA-1234",
+    driverName: "Ramesh Kumar",
+    driverPhone: "9876543210",
+    supervisor: "Raghu",
+    sourcePlant: "Central Hub",
+    lastOdometer: 298,
+    mileage: 4,
+    fuelType: "Diesel",
+    tankCapacity: 120,
+    status: "available"
+  },
+  {
+    id: "V002",
+    number: "KA-01-AB-5678",
+    driverName: "Suresh Patel",
+    driverPhone: "9123456789",
+    supervisor: "Priya",
+    sourcePlant: "Bangalore Hub",
+    lastOdometer: 450,
+    mileage: 3.8,
+    fuelType: "Diesel",
+    tankCapacity: 100,
+    status: "available"
+  },
+  {
+    id: "V003",
+    number: "MH-12-CD-9012",
+    driverName: "Amit Singh",
+    driverPhone: "9988776655",
+    supervisor: "Rajesh",
+    sourcePlant: "Pune Facility",
+    lastOdometer: 320,
+    mileage: 4.2,
+    fuelType: "Diesel",
+    tankCapacity: 110,
+    status: "available"
+  }
+];
+
+// ─── STATE MANAGEMENT WITH REDUCER ──────────────────────────────────────
+const initialForm = {
   tripId: `TRIP-${1000 + Math.floor(Math.random() * 9000)}`,
-  tripType: 'Regular',
+  tripType: '',
   tripStatus: 'Planned',
   tripPriority: 'Normal',
   transportType: 'Outbound',
@@ -22,6 +66,8 @@ const INITIAL = {
   fuelType: '',
   startOdometer: '',
   lastOdometer: 0,
+  mileage: 4,
+  tankCapacity: 120,
 
   // 🔥 ADDED: Foreign keys for DB
   vehicleId: '',
@@ -75,6 +121,58 @@ const INITIAL = {
   lastDraftTime: null,
 };
 
+const formReducer = (state, action) => {
+  switch (action.type) {
+    case 'UPDATE_FIELD':
+      return { ...state, [action.field]: action.value };
+    case 'UPDATE_MULTIPLE':
+      return { ...state, ...action.payload };
+    case 'AUTO_FILL_VEHICLE':
+      const vehicle = vehicles.find(v => v.number === action.truckNo);
+      if (!vehicle) return state;
+      const warnings = [];
+      if (vehicle.status !== 'available') warnings.push('⚠️ Vehicle not available');
+      if (Math.random() > 0.7) warnings.push('⚠️ Driver may be on another trip');
+      return {
+        ...state,
+        driver: vehicle.driverName,
+        driverContact: vehicle.driverPhone,
+        supervisor: vehicle.supervisor,
+        sourcePlant: vehicle.sourcePlant,
+        lastOdometer: vehicle.lastOdometer,
+        mileage: vehicle.mileage,
+        fuelType: vehicle.fuelType,
+        tankCapacity: vehicle.tankCapacity,
+        expectedMileage: vehicle.mileage.toString(),
+        vehicleId: vehicle.id,
+        truckWarnings: warnings,
+      };
+    case 'CALCULATE_DISTANCE':
+      if (!state.source || !state.destination) return { ...state, estDistance: '' };
+      const distances = { 
+        'Bangalore Hub': 450, 'Pune Facility': 270, 'Nandyala Cement Works': 380, 
+        'Mumbai': 520, 'Hyderabad': 180, 'Delhi': 800, 'Chennai': 350 
+      };
+      const dist = distances[state.destination] || Math.floor(Math.random() * 500) + 50;
+      return { ...state, estDistance: dist.toString() };
+    case 'CALCULATE_DURATION':
+      if (!state.startTime || !state.eta) return { ...state, tripDuration: '' };
+      const start = new Date(state.startTime);
+      const end = new Date(state.eta);
+      const hours = Math.round((end - start) / (1000 * 60 * 60));
+      return { ...state, tripDuration: hours > 0 ? `~${hours} hrs` : '' };
+    case 'ADD_FILE':
+      if ((state.proofFiles?.length || 0) >= 5) return state;
+      return { ...state, proofFiles: [...(state.proofFiles || []), action.file] };
+    case 'REMOVE_FILE':
+      return { ...state, proofFiles: (state.proofFiles || []).filter((_, i) => i !== action.index) };
+    case 'SAVE_DRAFT':
+      return { ...state, draftSaved: true, lastDraftTime: new Date().toLocaleTimeString() };
+    default:
+      return state;
+  }
+};
+
 const inp = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition';
 const inpDisabled = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-100 text-slate-600 cursor-not-allowed';
 const inpCalculated = 'w-full px-3 py-2.5 border border-indigo-200 rounded-lg text-sm bg-indigo-50 text-indigo-900 font-semibold';
@@ -82,40 +180,78 @@ const lbl = 'block text-xs font-semibold text-slate-600 uppercase tracking-wide 
 const errCls = 'text-xs text-red-500 mt-1 flex items-center gap-1';
 const hlp = 'text-xs text-slate-500 mt-1 italic';
 
-const Field = ({ label, name, type = 'text', placeholder, disabled, calculated, helper, children, form, handleChange, errors }) => (
-  <div>
-    <label className={lbl}>{label}{name && !disabled && !calculated && <span className="text-red-500">*</span>}</label>
-    {children || (
-      <input
-        type={type}
-        name={name}
-        value={form[name] || ''}
-        onChange={handleChange}
-        placeholder={placeholder}
-        disabled={disabled || calculated}
-        autoComplete="off"
-        className={calculated ? inpCalculated : (disabled ? inpDisabled : inp)}
-      />
-    )}
-    {helper && <div className={hlp}>{helper}</div>}
-    {errors[name] && (
-      <div className={errCls}>
-        <FiAlertCircle className="w-3 h-3" />
-        {errors[name]}
-      </div>
-    )}
-  </div>
-);
+const Field = ({ label, name, type = 'text', placeholder, disabled, calculated, helper, children, form, handleChange, errors }) => {
+  const hasError = errors[name];
+  const isRequired = name && !disabled && !calculated && !label?.includes('(optional)');
+  
+  const getInputClass = () => {
+    if (calculated) return inpCalculated;
+    if (disabled) return inpDisabled;
+    if (hasError) return `${inp} border-red-300 focus:border-red-500 focus:ring-red-100`;
+    return inp;
+  };
+  
+  return (
+    <div>
+      <label className={lbl}>
+        {label}
+        {isRequired && <span className="text-red-500">*</span>}
+        {calculated && <span className="ml-2 text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Auto-filled</span>}
+      </label>
+      {children || (
+        <input
+          type={type}
+          name={name}
+          value={form[name] || ''}
+          onChange={handleChange}
+          placeholder={placeholder}
+          disabled={disabled || calculated}
+          autoComplete="off"
+          className={getInputClass()}
+        />
+      )}
+      {helper && <div className={hlp}>{helper}</div>}
+      {hasError && (
+        <div className={errCls}>
+          <FiAlertCircle className="w-3 h-3" />
+          {errors[name]}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Sec = ({ num, icon: Icon, title, children, sectionCompletion }) => {
-  const completion = Math.round((sectionCompletion[num] || 0) * 100);
+  const completion = sectionCompletion[num];
+  const percentage = Math.round((completion?.percentage || 0) * 100);
+  
+  const getStatusIcon = () => {
+    if (completion?.status === 'error') return '❌';
+    if (completion?.status === 'complete') return '✅';
+    return '⚠️';
+  };
+  
+  const getStatusText = () => {
+    if (completion?.status === 'error') return 'Error';
+    if (completion?.status === 'complete') return 'Complete';
+    return 'Incomplete';
+  };
+  
+  const getStatusColor = () => {
+    if (completion?.status === 'error') return 'text-red-600';
+    if (completion?.status === 'complete') return 'text-green-600';
+    return 'text-amber-600';
+  };
+  
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm" data-section={num}>
       <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-100">
         <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">{num}</div>
         <Icon className="w-4 h-4 text-indigo-600" />
         <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wide flex-1">{title}</h3>
-        {completion === 100 && <span className="text-xs text-green-600 font-semibold">✓ Complete</span>}
+        <span className={`text-xs font-semibold ${getStatusColor()} flex items-center gap-1`}>
+          {getStatusIcon()} {getStatusText()} ({percentage}%)
+        </span>
       </div>
       {children}
     </div>
@@ -135,31 +271,33 @@ const TruckWarningBanner = ({ warnings }) => {
 
 export default function TripAdd() {
   const navigate = useNavigate();
-  const [form, setForm] = useState(() => {
+  const [form, dispatch] = useReducer(formReducer, () => {
     const saved = localStorage.getItem('tripFormDraft');
-    return saved ? JSON.parse(saved) : INITIAL;
+    const parsed = saved ? JSON.parse(saved) : {};
+    // Ensure proofFiles is always an array and lastOdometer is always a number
+    return { 
+      ...initialForm, 
+      ...parsed, 
+      proofFiles: parsed.proofFiles || [], 
+      lastOdometer: parsed.lastOdometer || 0 
+    };
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeSection, setActiveSection] = useState(1);
-  const [vehicles, setVehicles] = useState([]);
+  const [alerts, setAlerts] = useState([]);
 
-  // ─── Fetch vehicles for dropdown ─────────────────────────────────────────
+  // ─── Load mock vehicles ────────────────────────────────────────────────
   useEffect(() => {
-    fetch('http://localhost:5001/api/vehicles')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) setVehicles(data.data);
-      })
-      .catch(err => console.error('Error fetching vehicles:', err));
+    // Mock data is already available, no fetch needed
   }, []);
 
   // ─── Auto‑save draft every 5 seconds ─────────────────────────────────────
   useEffect(() => {
     const timer = setInterval(() => {
-      if (Object.values(form).some(v => v && v !== INITIAL[Object.keys(INITIAL).find(k => INITIAL[k] === v)])) {
+      if (Object.values(form).some(v => v && v !== initialForm[Object.keys(initialForm).find(k => initialForm[k] === v)])) {
         localStorage.setItem('tripFormDraft', JSON.stringify(form));
-        setForm(p => ({ ...p, draftSaved: true, lastDraftTime: new Date().toLocaleTimeString() }));
+        dispatch({ type: 'SAVE_DRAFT' });
       }
     }, 5000);
     return () => clearInterval(timer);
@@ -169,84 +307,118 @@ export default function TripAdd() {
   const handleChange = useCallback((e) => {
     const { name, value, files } = e.target;
     if (name === 'proofFiles') {
-      setForm(prev => ({ ...prev, proofFiles: Array.from(files) }));
+      const currentFiles = form.proofFiles || [];
+      if (currentFiles.length >= 5) {
+        setErrors(prev => ({ ...prev, proofFiles: 'Maximum 5 files allowed' }));
+        return;
+      }
+      
+      Array.from(files).forEach(file => {
+        if (currentFiles.length >= 5) return;
+        if (file.size > 2 * 1024 * 1024) { // 2MB limit
+          setErrors(prev => ({ ...prev, proofFiles: `${file.name} exceeds 2MB limit` }));
+          return;
+        }
+        if (!['image/jpeg', 'image/png', 'application/pdf'].includes(file.type)) {
+          setErrors(prev => ({ ...prev, proofFiles: `${file.name} must be JPG, PNG, or PDF` }));
+          return;
+        }
+        dispatch({ type: 'ADD_FILE', file });
+      });
     } else {
-      setForm(prev => ({ ...prev, [name]: value }));
+      dispatch({ type: 'UPDATE_FIELD', field: name, value });
     }
     if (errors[name]) {
       setErrors(prev => ({ ...prev, [name]: '' }));
     }
-  }, [errors]);
+  }, [errors, form.proofFiles]);
 
   const removeFile = useCallback((index) => {
-    setForm(prev => ({
-      ...prev,
-      proofFiles: prev.proofFiles.filter((_, i) => i !== index),
-    }));
+    dispatch({ type: 'REMOVE_FILE', index });
   }, []);
 
-  // ─── Autofill when truck is selected (including foreign keys) ────────────
+  // ─── Autofill when truck is selected ────────────────────────────────────
   useEffect(() => {
     if (form.truckNo) {
-      fetch(`http://localhost:5001/api/vehicles/by-number/${form.truckNo}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.data) {
-            const v = data.data;
-            const warnings = [];
-            if (v.vehicle_status === 'Under Maintenance') warnings.push('⚠️ Vehicle currently under maintenance');
-            if (Math.random() > 0.7) warnings.push('⚠️ Driver may be on another trip (simulated)');
-            setForm(p => ({
-              ...p,
-              driver: v.driver_name || '',
-              driverContact: v.driver_contact || '',
-              supervisor: v.supervisor_name || '',
-              sourcePlant: v.station_name || '',
-              truckCapacity: v.gvw || '',
-              fuelType: v.fuel_type || '',
-              lastOdometer: v.initial_odometer || 0,
-              // 🔥 CRITICAL: store IDs for DB
-              vehicle_id: form.vehicleId,
-              driver_id: form.driverId,
-              supervisor_id: form.supervisorId,
-              station_id: form.stationId,
-              truckWarnings: warnings,
-            }));
-          }
-        })
-        .catch(err => console.error('Error fetching vehicle details:', err));
+      dispatch({ type: 'AUTO_FILL_VEHICLE', truckNo: form.truckNo });
     }
   }, [form.truckNo]);
 
-  // ─── Auto‑calculate distance (mock) ─────────────────────────────────────
-  const calculateDistance = useCallback((source, dest) => {
-    if (!source || !dest) return '';
-    const distances = { 'Bangalore Hub': 450, 'Pune Facility': 270, 'Nandyala Cement Works': 380, 'Mumbai': 520, 'Hyderabad': 180 };
-    return distances[dest] || Math.floor(Math.random() * 300) + 150;
-  }, []);
-
+  // ─── Auto‑calculate distance ─────────────────────────────────────────────
   useEffect(() => {
     if (form.source && form.destination) {
-      const dist = calculateDistance(form.source, form.destination);
-      if (dist) setForm(p => ({ ...p, estDistance: dist }));
+      const randomDistance = Math.floor(Math.random() * 451) + 50; // 50-500 km
+      dispatch({ type: 'UPDATE_FIELD', field: 'estDistance', value: randomDistance.toString() });
     }
-  }, [form.source, form.destination, calculateDistance]);
+  }, [form.source, form.destination]);
 
-  // ─── Auto‑calculate trip duration ────────────────────────────────────────
-  const calculateDuration = useCallback((startTime, eta) => {
-    if (!startTime || !eta) return '';
-    const start = new Date(startTime);
-    const end = new Date(eta);
-    const hours = Math.round((end - start) / (1000 * 60 * 60));
-    return hours > 0 ? `~${hours} hrs` : '';
-  }, []);
+  // ─── Real-time validation ────────────────────────────────────────────────
+  // ─── Odometer delta calculation ──────────────────────────────────────────
+  const odometerDelta = useMemo(() => {
+    if (!form.startOdometer || !form.lastOdometer) return null;
+    const delta = +form.startOdometer - form.lastOdometer;
+    return delta;
+  }, [form.startOdometer, form.lastOdometer]);
+
+  const validate = useCallback(() => {
+    const err = {};
+    
+    // Required field validations
+    if (!form.tripType) err.tripType = 'Trip Type is required';
+    if (!form.truckNo) err.truckNo = 'Vehicle selection is required';
+    if (!form.tripDate) err.tripDate = 'Trip Date is required';
+    if (!form.source) err.source = 'Source location is required';
+    if (!form.destination) err.destination = 'Destination is required';
+    if (!form.startTime) err.startTime = 'Start time is required';
+    if (!form.materialType) err.materialType = 'Material type is required';
+    if (!form.loadWeight || +form.loadWeight <= 0) err.loadWeight = 'Load weight must be greater than 0';
+    if (!form.customerName) err.customerName = 'Customer name is required';
+    if (!form.startOdometer) err.startOdometer = 'Start odometer reading is required';
+    
+    // Odometer validation - must be >= last recorded KM
+    if (form.startOdometer && +form.startOdometer <= form.lastOdometer) {
+      err.startOdometer = `Must be greater than last recorded KM (${(form.lastOdometer || 0).toLocaleString()})`;
+    }
+    if (odometerDelta !== null && odometerDelta < 1) {
+      err.startOdometer = 'Odometer difference too small (minimum 1 km)';
+    }
+    if (odometerDelta !== null && odometerDelta > 2000) {
+      err.startOdometer = 'Odometer difference excessive (maximum 2000 km)';
+    }
+    
+    // Units/Bags validation - must be >= 0
+    if (form.units && +form.units < 0) {
+      err.units = 'Units/Bags count cannot be negative';
+    }
+    
+    // Scheduling validation
+    if (form.startTime && form.eta && form.startTime >= form.eta) {
+      err.startTime = 'Start time must be before ETA';
+    }
+    if (form.loadingTime && form.startTime && form.loadingTime > form.startTime) {
+      err.loadingTime = 'Loading must be before start time';
+    }
+    if (form.unloadingTime && form.loadingTime && form.unloadingTime < form.loadingTime) {
+      err.unloadingTime = 'Unloading must be after loading';
+    }
+    
+    // Fuel validation
+    if (form.dieselQty && +form.dieselQty <= 0) err.dieselQty = 'Diesel quantity must be greater than 0';
+    if (form.dieselRate && +form.dieselRate <= 0) err.dieselRate = 'Diesel rate must be greater than 0';
+    if (form.dieselQty && form.tankCapacity && +form.dieselQty > form.tankCapacity) {
+      err.dieselQty = `Exceeds tank capacity (${form.tankCapacity}L)`;
+    }
+
+    setErrors(err);
+    return Object.keys(err).length === 0;
+  }, [form, odometerDelta]);
 
   useEffect(() => {
-    if (form.startTime && form.eta) {
-      const duration = calculateDuration(form.startTime, form.eta);
-      setForm(p => ({ ...p, tripDuration: duration }));
-    }
-  }, [form.startTime, form.eta, calculateDuration]);
+    const timer = setTimeout(() => {
+      validate();
+    }, 300); // Debounce validation
+    return () => clearTimeout(timer);
+  }, [form, validate]);
 
   // ─── Derived calculations ────────────────────────────────────────────────
   const totalAdvance = useMemo(() => {
@@ -255,12 +427,15 @@ export default function TripAdd() {
 
   const fuelRequired = useMemo(() => {
     const dist = +form.estDistance || 0;
-    const mileage = +form.expectedMileage || 1;
-    return mileage > 0 ? (dist / mileage).toFixed(2) : 0;
+    const mileage = +form.expectedMileage || 0;
+    if (dist > 0 && mileage > 0) {
+      return (dist / mileage).toFixed(2);
+    }
+    return null; // Will show placeholder
   }, [form.estDistance, form.expectedMileage]);
 
   const suggestedDieselQty = useMemo(() => {
-    return form.dieselQty ? +form.dieselQty : +fuelRequired;
+    return form.dieselQty ? +form.dieselQty : (fuelRequired ? +fuelRequired : 0);
   }, [fuelRequired, form.dieselQty]);
 
   const dieselAmount = useMemo(() => {
@@ -276,10 +451,65 @@ export default function TripAdd() {
     return (+form.freightAmount || 0) - estimatedCost;
   }, [form.freightAmount, estimatedCost]);
 
+  // ─── Smart alerts ────────────────────────────────────────────────────────
+  const smartAlerts = useMemo(() => {
+    const alerts = [];
+    
+    // Low Mileage Alert
+    if (form.expectedMileage && +form.expectedMileage < 3.5) {
+      alerts.push({ 
+        type: 'warning', 
+        message: `⚠️ Low mileage detected (${form.expectedMileage} km/l) - Consider maintenance check` 
+      });
+    }
+    
+    // Overfuel Alert
+    if (form.dieselQty && form.tankCapacity && +form.dieselQty > form.tankCapacity) {
+      alerts.push({ 
+        type: 'error', 
+        message: `🚨 Fuel quantity (${form.dieselQty}L) exceeds tank capacity (${form.tankCapacity}L)` 
+      });
+    }
+    
+    // Driver Already Assigned Warning
+    if (form.driver && Math.random() > 0.7) { // Simulate driver conflict check
+      alerts.push({ 
+        type: 'warning', 
+        message: `⚠️ Driver ${form.driver} may be assigned to another trip - verify schedule` 
+      });
+    }
+    
+    // Fuel vendor not selected when fuel is planned
+    if (form.dieselQty && (!form.fuelVendor || form.fuelVendor === '')) {
+      alerts.push({ 
+        type: 'warning', 
+        message: '⚠️ Fuel vendor not selected - required for fuel procurement' 
+      });
+    }
+    
+    // Missing fuel proof when fuel is planned
+    if (form.dieselQty && (!form.proofFiles || form.proofFiles.length === 0)) {
+      alerts.push({ 
+        type: 'info', 
+        message: '💡 Consider uploading fuel proof documents for expense tracking' 
+      });
+    }
+    
+    // Negative profit warning
+    if (estimatedProfit !== null && estimatedProfit < 0) {
+      alerts.push({ 
+        type: 'warning', 
+        message: `⚠️ Estimated loss of ₹${Math.abs(estimatedProfit).toLocaleString('en-IN')} - review costs` 
+      });
+    }
+    
+    return alerts;
+  }, [form.expectedMileage, form.dieselQty, form.tankCapacity, form.fuelVendor, form.proofFiles, form.driver, estimatedProfit]);
+
   // ─── Section completion ──────────────────────────────────────────────────
   const sectionCompletion = useMemo(() => {
     const sections = {
-      1: [form.tripPriority, form.transportType, form.tripType],
+      1: [form.tripType, form.tripPriority, form.transportType],
       2: [form.truckNo, form.tripDate, form.startOdometer],
       3: [form.source, form.destination, form.estDistance],
       4: [form.startTime, form.eta],
@@ -287,67 +517,67 @@ export default function TripAdd() {
       6: [form.freightAmount, form.driverAdvance],
       7: [form.expectedMileage, form.dieselRate, form.dieselQty],
     };
-    return {
-      1: sections[1].filter(v => v).length / sections[1].length,
-      2: sections[2].filter(v => v).length / sections[2].length,
-      3: sections[3].filter(v => v).length / sections[3].length,
-      4: sections[4].filter(v => v).length / sections[4].length,
-      5: sections[5].filter(v => v).length / sections[5].length,
-      6: sections[6].filter(v => v).length / sections[6].length,
-      7: sections[7].filter(v => v).length / sections[7].length,
+    
+    const completion = {};
+    const sectionErrors = {
+      1: ['tripType', 'tripPriority', 'transportType'].some(field => errors[field]),
+      2: ['truckNo', 'tripDate', 'startOdometer'].some(field => errors[field]),
+      3: ['source', 'destination', 'estDistance'].some(field => errors[field]),
+      4: ['startTime', 'eta'].some(field => errors[field]),
+      5: ['materialType', 'loadWeight', 'customerName'].some(field => errors[field]),
+      6: ['freightAmount', 'driverAdvance'].some(field => errors[field]),
+      7: ['expectedMileage', 'dieselRate', 'dieselQty'].some(field => errors[field]),
     };
-  }, [form]);
+    
+    Object.keys(sections).forEach(section => {
+      const fields = sections[section];
+      const filledCount = fields.filter(v => v).length;
+      const hasErrors = sectionErrors[section];
+      
+      if (hasErrors) {
+        completion[section] = { status: 'error', percentage: Math.max(0.1, filledCount / fields.length) };
+      } else if (filledCount === fields.length) {
+        completion[section] = { status: 'complete', percentage: 1 };
+      } else {
+        completion[section] = { status: 'incomplete', percentage: filledCount / fields.length };
+      }
+    });
+    
+    return completion;
+  }, [form, errors]);
 
   // ─── Validation ──────────────────────────────────────────────────────────
-  const validate = useCallback(() => {
-    const err = {};
-    if (!form.tripType) err.tripType = 'Required';
-    if (!form.tripPriority) err.tripPriority = 'Required';
-    if (!form.truckNo) err.truckNo = 'Required';
-    if (!form.tripDate) err.tripDate = 'Required';
-    if (!form.startOdometer) err.startOdometer = 'Required';
-    if (!form.source) err.source = 'Required';
-    if (!form.destination) err.destination = 'Required';
-    if (!form.estDistance) err.estDistance = 'Required';
-    if (!form.startTime) err.startTime = 'Required';
-    if (!form.materialType) err.materialType = 'Required';
-    if (!form.loadWeight) err.loadWeight = 'Required';
-    if (!form.customerName) err.customerName = 'Required';
-
-    if (form.startOdometer && +form.startOdometer <= form.lastOdometer) {
-      err.startOdometer = 'Must be > last odometer';
-    }
-    if (form.startOdometer && form.lastOdometer) {
-      const diff = +form.startOdometer - form.lastOdometer;
-      if (diff < 1) err.startOdometer = 'Odometer difference too small';
-      if (diff > 2000) err.startOdometer = 'Odometer difference excessive (>2000 km)';
-    }
-    if (form.startTime && form.eta && form.startTime >= form.eta) {
-      err.startTime = 'Start time must be before ETA';
-    }
-    if (form.loadingTime && form.startTime && form.loadingTime > form.startTime) {
-      err.loadingTime = 'Loading must be before start time';
-    }
-    if (form.unloadingTime && form.loadingTime && form.unloadingTime < form.loadingTime) {
-      err.unloadingTime = 'Unloading must be after loading';
-    }
-    setErrors(err);
-    return Object.keys(err).length === 0;
-  }, [form]);
+  // Moved before useEffect to avoid hoisting issues
 
   const isFormValid = useCallback(() => {
-    return form.tripType && form.tripPriority && form.truckNo && form.tripDate &&
-      form.source && form.destination && form.estDistance &&
-      form.startTime && form.materialType && form.loadWeight && form.customerName &&
-      form.startOdometer && +form.startOdometer > form.lastOdometer &&
-      (+form.startOdometer - form.lastOdometer) >= 1;
-  }, [form]);
+    // Check all required fields and odometer validation
+    const hasRequiredFields = form.tripType && form.truckNo && form.tripDate && 
+                             form.source && form.destination && form.startTime && 
+                             form.materialType && form.loadWeight && form.customerName && 
+                             form.startOdometer;
+    
+    // Check odometer is valid (>= last recorded KM)
+    const isOdometerValid = form.startOdometer && +form.startOdometer > form.lastOdometer;
+    
+    // Check load weight is positive
+    const isLoadWeightValid = form.loadWeight && +form.loadWeight > 0;
+    
+    return hasRequiredFields && isOdometerValid && isLoadWeightValid && Object.keys(errors).length === 0;
+  }, [form, errors]);
 
-  // ─── Submit handler (includes foreign keys) ──────────────────────────────
+  // ─── Submit handler (mock) ───────────────────────────────────────────────
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     const isValid = validate();
-    if (!isValid) return;
+    if (!isValid) {
+      // Scroll to first error
+      const firstError = Object.keys(errors)[0];
+      if (firstError) {
+        const element = document.querySelector(`[name="${firstError}"]`);
+        if (element) element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -361,7 +591,7 @@ export default function TripAdd() {
 
       // 🔥 CRITICAL: foreign keys for DB
       vehicle_id: form.vehicleId,
-      driverId: form.assigned_driver,
+      driver_id: form.driverId,
       supervisor_id: form.supervisorId,
       station_id: form.stationId,
 
@@ -473,6 +703,21 @@ export default function TripAdd() {
         {/* Form Body */}
         <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
+          {/* ── Smart Alerts ── */}
+          {smartAlerts.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+              <h3 className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+                <FiAlertCircle className="w-4 h-4" />
+                Smart Alerts
+              </h3>
+              {smartAlerts.map((alert, i) => (
+                <div key={i} className={`text-sm ${alert.type === 'error' ? 'text-red-700' : alert.type === 'warning' ? 'text-amber-700' : 'text-blue-700'}`}>
+                  {alert.message}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Section 1 – Trip Identification */}
           <Sec num={1} icon={FiTruck} title="Trip Identification" sectionCompletion={sectionCompletion}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -509,7 +754,7 @@ export default function TripAdd() {
                 <select name="truckNo" value={form.truckNo} onChange={handleChange} className={inp}>
                   <option value="">— Select Truck —</option>
                   {vehicles.map(v => (
-                    <option key={v.id} value={v.vehicle_no}>{v.vehicle_no}</option>
+                    <option key={v.id} value={v.number}>{v.number}</option>
                   ))}
                 </select>
               </Field>
@@ -525,10 +770,10 @@ export default function TripAdd() {
               <div>
                 <label className={lbl}>Last Recorded KM</label>
                 <div className={inpDisabled + ' flex items-center'}>
-                  {form.lastOdometer.toLocaleString()} km
-                  {form.startOdometer && (
-                    <span className="ml-auto text-indigo-600 font-semibold">
-                      Δ {(+form.startOdometer - form.lastOdometer).toLocaleString()} km
+                  {(form.lastOdometer || 0).toLocaleString()} km
+                  {odometerDelta !== null && !errors.startOdometer && (
+                    <span className={`ml-auto font-semibold ${odometerDelta >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      Δ {odometerDelta >= 0 ? '+' : ''}{(odometerDelta || 0).toLocaleString()} km
                     </span>
                   )}
                 </div>
@@ -610,17 +855,17 @@ export default function TripAdd() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3">
                 <div className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">Total Advance</div>
-                <div className="text-2xl font-bold text-indigo-900 mt-1">₹{totalAdvance.toLocaleString('en-IN')}</div>
+                <div className="text-2xl font-bold text-indigo-900 mt-1">₹{(totalAdvance || 0).toLocaleString('en-IN')}</div>
               </div>
               <div className="bg-slate-100 border border-slate-200 rounded-lg px-4 py-3">
                 <div className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Estimated Cost</div>
-                <div className="text-2xl font-bold text-slate-900 mt-1">₹{estimatedCost.toLocaleString('en-IN')}</div>
+                <div className="text-2xl font-bold text-slate-900 mt-1">₹{(estimatedCost || 0).toLocaleString('en-IN')}</div>
                 <div className="text-xs text-slate-500 mt-1">Diesel + Advances</div>
               </div>
               {estimatedProfit !== null && (
                 <div className={`${estimatedProfit >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} border rounded-lg px-4 py-3`}>
                   <div className={`text-xs font-semibold ${estimatedProfit >= 0 ? 'text-green-600' : 'text-red-600'} uppercase tracking-wide`}>Estimated Profit</div>
-                  <div className={`text-2xl font-bold ${estimatedProfit >= 0 ? 'text-green-900' : 'text-red-900'} mt-1`}>₹{estimatedProfit.toLocaleString('en-IN')}</div>
+                  <div className={`text-2xl font-bold ${estimatedProfit >= 0 ? 'text-green-900' : 'text-red-900'} mt-1`}>₹{(estimatedProfit || 0).toLocaleString('en-IN')}</div>
                   <div className={`text-xs ${estimatedProfit >= 0 ? 'text-green-600' : 'text-red-600'} mt-1`}>{estimatedProfit >= 0 ? '✓ Positive' : '⚠ Negative'}</div>
                 </div>
               )}
@@ -633,7 +878,9 @@ export default function TripAdd() {
               <Field label="Expected Mileage (km/l)" name="expectedMileage" type="number" placeholder="e.g. 4" helper="From truck data: 4 km/l" form={form} handleChange={handleChange} errors={errors} />
               <div>
                 <label className={lbl}>Estimated Fuel Required (L)</label>
-                <div className={inpCalculated}>{fuelRequired} Liters</div>
+                <div className={fuelRequired ? inpCalculated : inpDisabled}>
+                  {fuelRequired ? `${fuelRequired} Liters` : '👉 Enter route to calculate fuel'}
+                </div>
               </div>
             </div>
             <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
@@ -643,7 +890,7 @@ export default function TripAdd() {
                 <Field label="Diesel Quantity (L)" name="dieselQty" type="number" placeholder={`Auto: ${fuelRequired}L`} helper={`Auto-suggested: ${suggestedDieselQty}L`} form={form} handleChange={handleChange} errors={errors} />
                 <div>
                   <label className={lbl}>Diesel Amount (₹)</label>
-                  <div className={inpCalculated}>₹{dieselAmount.toLocaleString('en-IN')}</div>
+                  <div className={inpCalculated}>₹{(dieselAmount || 0).toLocaleString('en-IN')}</div>
                 </div>
                 <Field label="Fuel Vendor" name="fuelVendor" form={form} handleChange={handleChange} errors={errors}>
                   <select name="fuelVendor" value={form.fuelVendor} onChange={handleChange} className={inp}>
@@ -653,17 +900,23 @@ export default function TripAdd() {
                 </Field>
               </div>
               <div>
-                <label className={lbl}>Upload Fuel Proof (Max 5 files)</label>
-                {form.proofFiles.length < 5 && (
+                <label className={lbl}>Upload Fuel Proof (Max 5 files, 2MB each)</label>
+                {(form.proofFiles?.length || 0) < 5 && (
                   <label className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-slate-300 rounded-lg text-sm text-slate-500 cursor-pointer hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition">
                     <FiUpload className="w-4 h-4" />
                     <span>Click to upload or drag & drop</span>
                     <input type="file" name="proofFiles" multiple onChange={handleChange} className="hidden" accept="image/*,.pdf" />
                   </label>
                 )}
-                {form.proofFiles.length > 0 && (
+                {errors.proofFiles && (
+                  <div className={errCls}>
+                    <FiAlertCircle className="w-3 h-3" />
+                    {errors.proofFiles}
+                  </div>
+                )}
+                {(form.proofFiles?.length || 0) > 0 && (
                   <div className="mt-3 space-y-2">
-                    {form.proofFiles.map((file, i) => (
+                    {form.proofFiles?.map((file, i) => (
                       <div key={i} className="flex items-center gap-2 justify-between px-3 py-2 bg-white border border-slate-200 rounded-lg">
                         <div className="flex items-center gap-2 flex-1 min-w-0">
                           <FiUpload className="w-4 h-4 text-green-500 flex-shrink-0" />
@@ -687,12 +940,29 @@ export default function TripAdd() {
             <button type="button" onClick={() => navigate('/trips')} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 transition">
               Cancel
             </button>
-            <button type="button" onClick={() => { localStorage.setItem('tripFormDraft', JSON.stringify(form)); setForm(p => ({ ...p, draftSaved: true, lastDraftTime: new Date().toLocaleTimeString() })); }} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition">
+            <button type="button" onClick={() => { localStorage.setItem('tripFormDraft', JSON.stringify(form)); dispatch({ type: 'SAVE_DRAFT' }); }} disabled={isSubmitting} className="px-5 py-2.5 text-sm font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition">
               💾 Save Draft
             </button>
           </div>
-          <button type="button" onClick={handleSubmit} disabled={!isFormValid() || isSubmitting} className={`px-6 py-2.5 text-sm font-semibold rounded-lg shadow-lg transition flex items-center gap-2 ${isFormValid() && !isSubmitting ? 'text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700' : 'text-slate-400 bg-slate-200 cursor-not-allowed'}`}>
-            {isSubmitting ? (<><div className="w-4 h-4 border-2 border-slate-300 border-t-white rounded-full animate-spin"></div> Creating...</>) : '✈️ Generate Trip'}
+          <button 
+            type="button" 
+            onClick={handleSubmit} 
+            disabled={!isFormValid() || isSubmitting}
+            title={!isFormValid() ? "Complete required fields to generate trip" : ""}
+            className={`px-6 py-2.5 text-sm font-semibold rounded-lg shadow-lg transition flex items-center gap-2 ${
+              isFormValid() && !isSubmitting 
+                ? 'text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 cursor-pointer' 
+                : 'text-slate-400 bg-slate-200 cursor-not-allowed'
+            }`}
+          >
+            {isSubmitting ? (
+              <>
+                <div className="w-4 h-4 border-2 border-slate-300 border-t-white rounded-full animate-spin"></div> 
+                Creating...
+              </>
+            ) : (
+              '✈️ Generate Trip'
+            )}
           </button>
         </div>
 
