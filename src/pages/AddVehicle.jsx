@@ -379,7 +379,7 @@ export default function AddVehicle() {
 
           // Operations (foreign keys) – now sending IDs from dropdowns
           supervisor_id: formData.supervisor,
-          assigned_driver: formData.assignedDriver,
+          assigned_driver: formData.assignedDriver || null,
           station_id: formData.assignedPlant,
           default_route: formData.defaultRoute,
 

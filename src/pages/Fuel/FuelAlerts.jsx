@@ -1,20 +1,80 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FiX, FiAlertOctagon } from 'react-icons/fi';
 
-const dummyAlerts = [
-  { id: 1, severity: "High", vehicle: "TS-08-UA-1122", date: "27 Nov 2025", issue: "Sudden Mileage Drop", measured: "3.04 KMPL", expected: "3.80 KMPL" },
-  { id: 2, severity: "High", vehicle: "KA-01-AG-9988", date: "26 Nov 2025", issue: "Excessive Fueling (Capacity Exceeded)", measured: "350 L", expected: "300 L (Max)" },
-  { id: 3, severity: "Medium", vehicle: "AP-29-V-4411", date: "20 Nov 2025", issue: "Low Mileage", measured: "3.20 KMPL", expected: "3.50 KMPL" },
-];
-
 export default function FuelAlerts() {
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [selectedAlert, setSelectedAlert] = useState(null);
   const [investigation, setInvestigation] = useState({
     cause: '', notes: '', status: 'Under Investigation'
   });
 
+  // Fetch fuel data from backend and generate alerts
+  useEffect(() => {
+    setLoading(true);
+    fetch('http://localhost:5001/api/fuel')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          // Generate alerts based on mileage deviation
+          const generatedAlerts = data.data.map(item => {
+            const mileage = Number(item.mileage || 0);
+            const expected = Number(item.expected_mileage || 0);
+            
+            let severity = 'Low';
+            let issue = 'Normal';
+            
+            if (mileage < expected - 1) {
+              severity = 'High';
+              issue = 'Sudden Mileage Drop';
+            } else if (mileage < expected) {
+              severity = 'Medium';
+              issue = 'Low Mileage';
+            }
+            
+            // Format date nicely
+            let dateStr = item.date;
+            if (dateStr) {
+              const d = new Date(dateStr);
+              if (!isNaN(d.getTime())) {
+                dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+              }
+            }
+            
+            return {
+              id: item.id,
+              severity,
+              vehicle: item.vehicle_no || '—',
+              date: dateStr || '—',
+              issue,
+              measured: `${mileage.toFixed(2)} KMPL`,
+              expected: `${expected.toFixed(2)} KMPL`
+            };
+          }).filter(alert => alert.severity !== 'Low'); // Only show alerts (Medium/High)
+          
+          console.log('📊 DEBUG - Generated Alerts:', {
+            total: data.data.length,
+            generated: generatedAlerts.length,
+            details: generatedAlerts.map(a => ({ vehicle: a.vehicle, issue: a.issue, severity: a.severity, measured: a.measured, expected: a.expected }))
+          });
+          
+          setAlerts(generatedAlerts);
+        }
+      })
+      .catch(err => console.error('Error fetching fuel data:', err))
+      .finally(() => setLoading(false));
+  }, []);
+
   const handleInvestigate = (alert) => {
     setSelectedAlert(alert);
+  };
+
+  const handleSaveReport = () => {
+    // Here you can POST investigation data to backend if needed
+    console.log('Investigation report:', { alert: selectedAlert, ...investigation });
+    setSelectedAlert(null);
+    setInvestigation({ cause: '', notes: '', status: 'Under Investigation' });
+    // Optionally refresh alerts or show success message
   };
 
   return (
@@ -28,45 +88,54 @@ export default function FuelAlerts() {
         </div>
 
         <div className="overflow-x-auto flex-1 p-5">
-          <table className="w-full text-left whitespace-nowrap text-sm">
-            <thead className="text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-100">
-              <tr>
-                <th className="py-4 px-4">Severity</th>
-                <th className="py-4 px-4">Vehicle</th>
-                <th className="py-4 px-4">Date</th>
-                <th className="py-4 px-4">Issue Detected</th>
-                <th className="py-4 px-4">Measured Value</th>
-                <th className="py-4 px-4">Expected Value</th>
-                <th className="py-4 px-4 text-center">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {dummyAlerts.map((alert) => (
-                <tr key={alert.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="py-4 px-4">
-                    <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${
-                      alert.severity === 'High' ? 'text-red-700 bg-red-100' : 'text-amber-700 bg-amber-100'
-                    }`}>
-                      {alert.severity}
-                    </span>
-                  </td>
-                  <td className="py-4 px-4 font-bold text-slate-800">{alert.vehicle}</td>
-                  <td className="py-4 px-4 font-medium text-slate-600">{alert.date}</td>
-                  <td className="py-4 px-4 font-bold text-slate-700">{alert.issue}</td>
-                  <td className="py-4 px-4 font-black tracking-tight text-red-600">{alert.measured}</td>
-                  <td className="py-4 px-4 font-bold text-green-700">{alert.expected}</td>
-                  <td className="py-4 px-4 text-center">
-                    <button 
-                      onClick={() => handleInvestigate(alert)}
-                      className="px-4 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors shadow-sm"
-                    >
-                      {alert.severity === 'High' ? 'Investigate' : 'Check'}
-                    </button>
-                  </td>
+          {loading ? (
+            <div className="text-center py-10 text-slate-500">Loading alerts...</div>
+          ) : alerts.length === 0 ? (
+            <div className="text-center py-10 text-slate-500">
+              <div className="text-4xl mb-2">✅</div>
+              <p>No active alerts. All vehicles are performing within expected range.</p>
+            </div>
+          ) : (
+            <table className="w-full text-left whitespace-nowrap text-sm">
+              <thead className="text-slate-400 font-bold uppercase tracking-wider text-[10px] border-b border-slate-100">
+                <tr>
+                  <th className="py-4 px-4">Severity</th>
+                  <th className="py-4 px-4">Vehicle</th>
+                  <th className="py-4 px-4">Date</th>
+                  <th className="py-4 px-4">Issue Detected</th>
+                  <th className="py-4 px-4">Measured Value</th>
+                  <th className="py-4 px-4">Expected Value</th>
+                  <th className="py-4 px-4 text-center">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {alerts.map((alert) => (
+                  <tr key={alert.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="py-4 px-4">
+                      <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${
+                        alert.severity === 'High' ? 'text-red-700 bg-red-100' : 'text-amber-700 bg-amber-100'
+                      }`}>
+                        {alert.severity}
+                      </span>
+                    </td>
+                    <td className="py-4 px-4 font-bold text-slate-800">{alert.vehicle}</td>
+                    <td className="py-4 px-4 font-medium text-slate-600">{alert.date}</td>
+                    <td className="py-4 px-4 font-bold text-slate-700">{alert.issue}</td>
+                    <td className="py-4 px-4 font-black tracking-tight text-red-600">{alert.measured}</td>
+                    <td className="py-4 px-4 font-bold text-green-700">{alert.expected}</td>
+                    <td className="py-4 px-4 text-center">
+                      <button 
+                        onClick={() => handleInvestigate(alert)}
+                        className="px-4 py-1.5 text-xs font-bold text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50 transition-colors shadow-sm"
+                      >
+                        {alert.severity === 'High' ? 'Investigate' : 'Check'}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
@@ -160,7 +229,7 @@ export default function FuelAlerts() {
                 Cancel
               </button>
               <button 
-                onClick={() => setSelectedAlert(null)}
+                onClick={handleSaveReport}
                 className="px-5 py-2 text-sm font-bold text-white bg-red-700 rounded-lg hover:bg-red-800 shadow-sm transition-colors"
               >
                 Save Report

@@ -1,4 +1,5 @@
 const Trip = require('../models/tripModel');
+const db = require('../config/db');
 
 
 // ✅ CREATE TRIP
@@ -177,6 +178,82 @@ const deleteTrip = async (req, res) => {
   }
 };
 
+const getExpenses = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+
+    const expenses = await Trip.getExpenses(tripId);
+
+    res.status(200).json({
+      success: true,
+      data: expenses
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
+};
+
+const getFuel = async (req, res) => {
+  try {
+    const { tripId } = req.params;
+
+    const fuel = await Trip.getFuel(tripId);
+
+    res.status(200).json({
+      success: true,
+      data: fuel
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
+};
+
+// ✅ UPDATE TRIP STATUS
+const updateTripStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    await Trip.update(id, { trip_status: status });
+
+    res.json({
+      success: true,
+      message: 'Status updated'
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
+  }
+};
+
+const getTripsByVehicle = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT trip_id FROM trips WHERE vehicle_id = ?',
+      [req.params.vehicleId]
+    );
+
+    res.json({
+      success: true,
+      data: rows
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false });
+  }
+};
 
 module.exports = {
   createTrip,
@@ -185,5 +262,9 @@ module.exports = {
   updateTrip,
   deleteTrip,
   addExpense,   // ✅ ADD
-  addFuel  
+  addFuel,
+  getExpenses,   // ✅ ADD
+  getFuel,
+  updateTripStatus,
+  getTripsByVehicle
 };

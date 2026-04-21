@@ -53,7 +53,7 @@ const initialForm = {
   tripPriority: 'Normal',
   transportType: 'Outbound',
   contractOrderId: '',
-  
+
   // Vehicle & Driver
   truckNo: '',
   tripDate: '',
@@ -68,13 +68,13 @@ const initialForm = {
   lastOdometer: 0,
   mileage: 4,
   tankCapacity: 120,
-  
-  // Foreign keys for DB
+
+  // 🔥 ADDED: Foreign keys for DB
   vehicleId: '',
   driverId: '',
   supervisorId: '',
   stationId: '',
-  
+
   // Route
   source: '',
   destination: '',
@@ -83,13 +83,13 @@ const initialForm = {
   routeType: 'Highway',
   estDistance: '',
   tripDuration: '',
-  
+
   // Schedule
   startTime: '',
   eta: '',
   loadingTime: '',
   unloadingTime: '',
-  
+
   // Load Details
   materialType: '',
   loadWeight: '',
@@ -98,7 +98,7 @@ const initialForm = {
   customerName: '',
   invoiceNumber: '',
   lrNumber: '',
-  
+
   // Financials
   tripBudget: '',
   expenseLimit: '',
@@ -107,14 +107,14 @@ const initialForm = {
   driverAdvance: '',
   hamaliAdvance: '',
   otherAdvance: '',
-  
+
   // Fuel
   expectedMileage: '4',
   dieselRate: '',
   dieselQty: '',
   fuelVendor: '',
   proofFiles: [],
-  
+
   // Internal
   truckWarnings: [],
   draftSaved: false,
@@ -581,12 +581,93 @@ export default function TripAdd() {
 
     setIsSubmitting(true);
 
-    // Simulate API call
-    setTimeout(() => {
-      localStorage.removeItem('tripFormDraft');
-      alert('Trip generated successfully! (Mock submission)');
-      navigate('/trips');
-    }, 2000);
+    const tripData = {
+      trip_id: form.tripId,
+      trip_type: form.tripType,
+      trip_status: form.tripStatus,
+      trip_priority: form.tripPriority,
+      transport_type: form.transportType,
+      contract_order_id: form.contractOrderId,
+
+      // 🔥 CRITICAL: foreign keys for DB
+      vehicle_id: form.vehicleId,
+      driver_id: form.driverId,
+      supervisor_id: form.supervisorId,
+      station_id: form.stationId,
+
+      truck_no: form.truckNo,
+      trip_date: form.tripDate,
+
+      driver_name: form.driver,
+      driver_contact: form.driverContact,
+      co_driver: form.coDriver,
+      supervisor_name: form.supervisor,
+      source_plant: form.sourcePlant,
+
+      truck_capacity: form.truckCapacity,
+      fuel_type: form.fuelType,
+      start_odometer: form.startOdometer,
+      last_odometer: form.lastOdometer,
+
+      source: form.source,
+      destination: form.destination,
+      destination_state: form.destinationState,
+      via_stops: form.viaStops,
+      route_type: form.routeType,
+      est_distance: form.estDistance,
+      trip_duration: form.tripDuration,
+
+      start_time: form.startTime,
+      eta: form.eta,
+      loading_time: form.loadingTime,
+      unloading_time: form.unloadingTime,
+
+      material_type: form.materialType,
+      load_weight: form.loadWeight,
+      load_type: form.loadType,
+      units: form.units,
+      customer_name: form.customerName,
+      invoice_number: form.invoiceNumber,
+      lr_number: form.lrNumber,
+
+      trip_budget: form.tripBudget,
+      expense_limit: form.expenseLimit,
+      payment_mode: form.paymentMode,
+      freight_amount: form.freightAmount,
+      driver_advance: form.driverAdvance,
+      hamali_advance: form.hamaliAdvance,
+      other_advance: form.otherAdvance,
+
+      expected_mileage: form.expectedMileage,
+      diesel_rate: form.dieselRate,
+      diesel_qty: form.dieselQty,
+      fuel_vendor: form.fuelVendor,
+      proof_files: JSON.stringify(form.proofFiles),
+
+      truck_warnings: JSON.stringify(form.truckWarnings),
+      draft_saved: form.draftSaved,
+      last_draft_time: new Date().toISOString().slice(0, 19).replace('T', ' '),
+    };
+
+    try {
+      const response = await fetch('http://localhost:5001/api/trips', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tripData),
+      });
+      const result = await response.json();
+      if (result.success) {
+        localStorage.removeItem('tripFormDraft');
+        navigate('/trips');
+      } else {
+        alert('Failed to create trip: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error creating trip:', error);
+      alert('Could not connect to backend. Is the server running?');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // ─── Prevent Enter from submitting the whole form ────────────────────────
@@ -599,7 +680,7 @@ export default function TripAdd() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative bg-slate-50 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
-        
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 rounded-t-2xl sticky top-0 z-10">
           <div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   FiEdit2, FiPrinter, FiArrowLeft, FiMapPin, FiClock, FiPackage,
@@ -6,55 +6,6 @@ import {
   FiTruck, FiPlay, FiStopCircle, FiPlusCircle, FiDroplet, FiLock,
   FiNavigation, FiRefreshCw, FiChevronRight, FiX
 } from 'react-icons/fi';
-
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-const TRIP = {
-  id: 'TRIP-1001',
-  status: 'In Transit',          // Planned | Started | In Transit | Completed | Closed
-  route: {
-    truckNo: 'AP-21-TA-1234', driver: 'Ramesh Kumar', driverPhone: '+91 98765 43210',
-    source: 'Nandyala Cement Works', destination: 'Mumbai',
-    distance: '850 KM', startOdometer: '85,420',
-  },
-  supervisor: { name: 'P. Sharma', balance: 60000 },
-  time: {
-    startTime: '2025-11-28T06:30',
-    eta: '2025-11-30T14:00',
-    actualEnd: null,
-  },
-  load: {
-    materialType: 'Cement (OPC 53)',
-    loadWeight: '22 Tons',
-    customerName: 'Shree Constructions Pvt. Ltd.',
-    invoiceNo: 'INV-2025-4821',
-  },
-  financials: {
-    totalAdvance: 15000,
-    dieselCost: 28950,
-    otherExpenses: 4200,
-  },
-  expenses: [
-    { id: 1, type: 'Toll', amount: 1800, note: 'NH-44 Toll Plaza' },
-    { id: 2, type: 'Maintenance', amount: 1200, note: 'Tyre puncture repair' },
-    { id: 3, type: 'Misc', amount: 1200, note: 'Driver food & lodging' },
-  ],
-  documents: [
-    { name: 'Invoice', file: 'invoice_4821.pdf', uploaded: true },
-    { name: 'E-Way Bill', file: 'eway_4821.pdf', uploaded: true },
-    { name: 'Delivery Proof', file: null, uploaded: false },
-  ],
-  tracking: {
-    currentLocation: 'Pune Bypass, Maharashtra',
-    lastUpdated: '2025-11-29T11:45',
-    progressPct: 62,
-  },
-  alerts: [
-    { type: 'warning', msg: 'Trip is running 2 hrs behind schedule.' },
-    { type: 'warning', msg: 'Supervisor balance below ₹10,000 threshold.' },
-  ],
-};
-
-const STEPS = ['Planned', 'Started', 'In Transit', 'Completed', 'Closed'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt(dt) {
@@ -70,7 +21,9 @@ function calcDelay(eta, actual) {
 }
 const INR = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+const STEPS = ['Planned', 'Started', 'In Transit', 'Completed', 'Closed'];
+
+// ─── Sub-components (unchanged) ───────────────────────────────────────────────
 function Card({ icon: Icon, title, iconColor = 'text-indigo-600', children }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -92,7 +45,6 @@ function Row({ label, value, valueClass = 'text-slate-800' }) {
   );
 }
 
-// ─── Trip Progress Stepper ────────────────────────────────────────────────────
 function TripStepper({ status }) {
   const cur = STEPS.indexOf(status);
   return (
@@ -126,7 +78,6 @@ function TripStepper({ status }) {
   );
 }
 
-// ─── Alerts Banner ────────────────────────────────────────────────────────────
 function AlertsBanner({ alerts }) {
   const [dismissed, setDismissed] = useState([]);
   const visible = alerts.filter((_, i) => !dismissed.includes(i));
@@ -146,7 +97,6 @@ function AlertsBanner({ alerts }) {
   );
 }
 
-// ─── Action Modal ─────────────────────────────────────────────────────────────
 function ActionModal({ title, onClose, children }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -162,25 +112,219 @@ function ActionModal({ title, onClose, children }) {
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
+function ActionBtn({ icon: Icon, label, color, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex items-center gap-2 px-4 py-2.5 ${color} text-white rounded-lg text-sm font-bold transition-colors shadow-sm`}
+    >
+      <Icon className="w-4 h-4" />
+      {label}
+    </button>
+  );
+}
+
+// ─── Main Component (now fetching from DB) ───────────────────────────────────
 export default function TripDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const trip = TRIP;
+  const [trip, setTrip] = useState(null);
 
-  const [modal, setModal] = useState(null); // 'expense' | 'fuel' | 'start' | 'end' | 'close'
-  const [expenses, setExpenses] = useState(trip.expenses);
+  // Fetch trip data from backend
+  useEffect(() => {
+    fetch(`http://localhost:5001/api/trips/${id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setTrip(data.data);
+        } else {
+          console.error('Failed to fetch trip:', data.message);
+        }
+      })
+      .catch(err => console.error('Error fetching trip:', err));
+  }, [id]);
+
+  // 🔥 FETCH EXPENSES
+  useEffect(() => {
+    fetch(`http://localhost:5001/api/trips/${id}/expense`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setExpenses(data.data);
+        }
+      })
+      .catch(err => console.error(err));
+  }, [id]);
+
+  // 🔥 FETCH FUEL
+  useEffect(() => {
+    fetch(`http://localhost:5001/api/trips/${id}/fuel`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setFuelEntries(data.data);
+        }
+      })
+      .catch(err => console.error(err));
+  }, [id]);
+
+  // State for local modals and forms (unchanged)
+  const [modal, setModal] = useState(null);
+  const [expenses, setExpenses] = useState([]);
+  const [fuelEntries, setFuelEntries] = useState([]);
   const [expForm, setExpForm] = useState({ type: 'Toll', amount: '', note: '' });
   const [fuelForm, setFuelForm] = useState({ qty: '', rate: '', vendor: '' });
 
-  const delay = calcDelay(trip.time.eta, trip.time.actualEnd);
-  const grandTotal = trip.financials.totalAdvance + trip.financials.dieselCost + trip.financials.otherExpenses;
+  if (!trip) {
+    return <div className="p-5 text-center text-slate-500">Loading trip details...</div>;
+  }
 
-  const addExpense = () => {
+  // ─── Map backend fields to UI expected structure ───────────────────────────
+  const mappedTrip = {
+    id: trip.trip_id,
+    status: trip.trip_status,
+
+    route: {
+      truckNo: trip.truck_no || '—',
+      driver: trip.driver_name || '—',
+      driverPhone: trip.driver_contact || '—',
+      source: trip.source_plant || trip.source || '—',
+      destination: trip.destination || '—',
+      distance: trip.est_distance ? `${trip.est_distance} KM` : '—',
+      startOdometer: trip.start_odometer ? trip.start_odometer.toLocaleString() : '—',
+    },
+
+    supervisor: {
+      name: trip.supervisor_name || '—',
+      balance: 0,
+    },
+
+    time: {
+      startTime: trip.start_time,
+      eta: trip.eta,
+      actualEnd: trip.unloading_time,
+    },
+
+    load: {
+      materialType: trip.material_type || '—',
+      loadWeight: trip.load_weight ? `${trip.load_weight} Tons` : '—',
+      customerName: trip.customer_name || '—',
+      invoiceNo: trip.invoice_number || '—',
+    },
+
+    financials: {
+      totalAdvance: trip.driver_advance || 0,
+      dieselCost: (trip.diesel_qty || 0) * (trip.diesel_rate || 0),
+      otherExpenses: trip.other_advance || 0,
+    },
+
+    expenses: [],
+    // 🔥 FIX: Documents section restored with real data
+    documents: [
+      {
+        name: 'Invoice',
+        file: trip.invoice_number ? `${trip.invoice_number}.pdf` : null,
+        uploaded: !!trip.invoice_number,
+      },
+      {
+        name: 'E-Way Bill',
+        file: trip.lr_number ? `${trip.lr_number}.pdf` : null,
+        uploaded: !!trip.lr_number,
+      },
+      {
+        name: 'Delivery Proof',
+        file: null,
+        uploaded: false,
+      },
+    ],
+    tracking: {
+      currentLocation: trip.current_location || 'Not available',
+      lastUpdated: trip.created_at,
+      progressPct: trip.progress_percent || 50,
+    },
+    alerts: [],
+  };
+
+  const delay = calcDelay(mappedTrip.time.eta, mappedTrip.time.actualEnd);
+  const grandTotal = mappedTrip.financials.totalAdvance + mappedTrip.financials.dieselCost + mappedTrip.financials.otherExpenses;
+
+  const addExpense = async () => {
     if (!expForm.amount) return;
-    setExpenses(p => [...p, { id: Date.now(), ...expForm, amount: +expForm.amount }]);
+
+    const res = await fetch(`http://localhost:5001/api/trips/${id}/expense`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        amount: expForm.amount,
+        type: expForm.type,
+        notes: expForm.note
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("Expense saved");
+
+      // 🔄 reload expenses
+      const refresh = await fetch(`http://localhost:5001/api/trips/${id}/expense`);
+      const refreshedData = await refresh.json();
+      setExpenses(refreshedData.data);
+    }
+
     setExpForm({ type: 'Toll', amount: '', note: '' });
     setModal(null);
+  };
+
+  const addFuel = async () => {
+    if (!fuelForm.qty || !fuelForm.rate) return;
+
+    const res = await fetch(`http://localhost:5001/api/trips/${id}/fuel`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        quantity: fuelForm.qty,
+        rate: fuelForm.rate,
+        vendor: fuelForm.vendor
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("Fuel saved");
+
+      const refresh = await fetch(`http://localhost:5001/api/trips/${id}/fuel`);
+      const refreshedData = await refresh.json();
+      setFuelEntries(refreshedData.data);
+    }
+
+    setFuelForm({ qty: '', rate: '', vendor: '' });
+    setModal(null);
+  };
+
+  // ─── Update Trip Status ───────────────────────────────────────────────────
+  const updateStatus = async (newStatus) => {
+    const res = await fetch(`http://localhost:5001/api/trips/${id}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ status: newStatus })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      // 🔄 Refresh trip
+      const refresh = await fetch(`http://localhost:5001/api/trips/${id}`);
+      const refreshedData = await refresh.json();
+      setTrip(refreshedData.data);
+    }
   };
 
   const inp = "w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500";
@@ -196,20 +340,20 @@ export default function TripDetails() {
           </button>
           <div>
             <div className="flex items-center gap-2.5">
-              <h1 className="text-lg font-bold text-slate-800">Trip Details — {trip.id}</h1>
+              <h1 className="text-lg font-bold text-slate-800">Trip Details — {mappedTrip.id}</h1>
               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                trip.status === 'In Transit' ? 'bg-blue-100 text-blue-700'
-                : trip.status === 'Completed' ? 'bg-green-100 text-green-700'
-                : trip.status === 'Closed' ? 'bg-slate-100 text-slate-500'
+                mappedTrip.status === 'In Transit' ? 'bg-blue-100 text-blue-700'
+                : mappedTrip.status === 'Completed' ? 'bg-green-100 text-green-700'
+                : mappedTrip.status === 'Closed' ? 'bg-slate-100 text-slate-500'
                 : 'bg-yellow-100 text-yellow-700'
-              }`}>{trip.status}</span>
+              }`}>{mappedTrip.status}</span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">{trip.route.truckNo} · {trip.route.driver}</p>
+            <p className="text-xs text-slate-400 mt-0.5">{mappedTrip.route.truckNo} · {mappedTrip.route.driver}</p>
           </div>
         </div>
         <div className="flex items-center gap-2 no-print">
           <button
-            onClick={() => navigate(`/trips/${trip.id}/edit`)}
+            onClick={() => navigate(`/trips/${mappedTrip.id}/edit`)}
             className="px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50 flex items-center gap-1.5"
           >
             <FiEdit2 className="w-3.5 h-3.5" /> Edit
@@ -224,10 +368,10 @@ export default function TripDetails() {
       </div>
 
       {/* ── Alerts ── */}
-      <AlertsBanner alerts={trip.alerts} />
+      <AlertsBanner alerts={mappedTrip.alerts} />
 
       {/* ── Stepper ── */}
-      <TripStepper status={trip.status} />
+      <TripStepper status={mappedTrip.status} />
 
       {/* ── Main Grid ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
@@ -235,70 +379,66 @@ export default function TripDetails() {
         {/* LEFT COLUMN */}
         <div className="space-y-5">
 
-          {/* Route & Overview */}
           <Card icon={FiTruck} title="Route & Overview">
             <table className="w-full">
               <tbody>
-                <Row label="Truck No" value={trip.route.truckNo} />
-                <Row label="Driver" value={trip.route.driver} />
-                <Row label="Source" value={trip.route.source} />
-                <Row label="Destination" value={trip.route.destination} />
-                <Row label="Distance" value={trip.route.distance} />
-                <Row label="Start Odometer" value={trip.route.startOdometer} />
-                <Row label="Supervisor" value={trip.supervisor.name} />
+                <Row label="Truck No" value={mappedTrip.route.truckNo} />
+                <Row label="Driver" value={mappedTrip.route.driver} />
+                <Row label="Source" value={mappedTrip.route.source} />
+                <Row label="Destination" value={mappedTrip.route.destination} />
+                <Row label="Distance" value={mappedTrip.route.distance} />
+                <Row label="Start Odometer" value={mappedTrip.route.startOdometer} />
+                <Row label="Supervisor" value={mappedTrip.supervisor.name} />
               </tbody>
             </table>
           </Card>
 
-          {/* Time Tracking */}
           <Card icon={FiClock} title="Time Tracking" iconColor="text-violet-600">
             <table className="w-full">
               <tbody>
-                <Row label="Start Time" value={fmt(trip.time.startTime)} />
-                <Row label="Expected Arrival (ETA)" value={fmt(trip.time.eta)} />
-                <Row label="Actual End Time" value={fmt(trip.time.actualEnd)} />
+                <Row label="Start Time" value={fmt(mappedTrip.time.startTime)} />
+                <Row label="Expected Arrival (ETA)" value={fmt(mappedTrip.time.eta)} />
+                <Row label="Actual End Time" value={fmt(mappedTrip.time.actualEnd)} />
                 <Row label="Delay" value={delay.label} valueClass={delay.color} />
               </tbody>
             </table>
           </Card>
 
-          {/* Load Details */}
           <Card icon={FiPackage} title="Load Details" iconColor="text-amber-600">
             <table className="w-full">
               <tbody>
-                <Row label="Material Type" value={trip.load.materialType} />
-                <Row label="Load Weight" value={trip.load.loadWeight} />
-                <Row label="Customer Name" value={trip.load.customerName} />
-                <Row label="Invoice Number" value={trip.load.invoiceNo} />
+                <Row label="Material Type" value={mappedTrip.load.materialType} />
+                <Row label="Load Weight" value={mappedTrip.load.loadWeight} />
+                <Row label="Customer Name" value={mappedTrip.load.customerName} />
+                <Row label="Invoice Number" value={mappedTrip.load.invoiceNo} />
               </tbody>
             </table>
           </Card>
 
-          {/* Live Tracking */}
           <Card icon={FiNavigation} title="Live Tracking" iconColor="text-emerald-600">
             <div className="flex items-center gap-3 mb-4 p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
               <FiMapPin className="w-5 h-5 text-emerald-600 shrink-0" />
               <div>
-                <p className="text-sm font-bold text-slate-800">{trip.tracking.currentLocation}</p>
+                <p className="text-sm font-bold text-slate-800">{mappedTrip.tracking.currentLocation}</p>
                 <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                  <FiRefreshCw className="w-3 h-3" /> Last updated: {fmt(trip.tracking.lastUpdated)}
+                  <FiRefreshCw className="w-3 h-3" /> Last updated: {fmt(mappedTrip.tracking.lastUpdated)}
                 </p>
               </div>
             </div>
             <div>
               <div className="flex justify-between text-xs font-semibold text-slate-600 mb-1.5">
                 <span>Trip Progress</span>
-                <span className="text-indigo-600">{trip.tracking.progressPct}%</span>
+                <span className="text-indigo-600">{mappedTrip.tracking.progressPct}%</span>
               </div>
               <div className="w-full bg-slate-100 rounded-full h-2.5">
                 <div
                   className="bg-indigo-600 h-2.5 rounded-full transition-all"
-                  style={{ width: `${trip.tracking.progressPct}%` }}
+                  style={{ width: `${mappedTrip.tracking.progressPct}%` }}
                 />
               </div>
               <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                <span>{trip.route.source}</span>
-                <span>{trip.route.destination}</span>
+                <span>{mappedTrip.route.source}</span>
+                <span>{mappedTrip.route.destination}</span>
               </div>
             </div>
           </Card>
@@ -308,7 +448,6 @@ export default function TripDetails() {
         {/* RIGHT COLUMN */}
         <div className="space-y-5">
 
-          {/* Financial Summary — highlighted */}
           <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl shadow-lg p-5 text-white">
             <div className="flex items-center gap-2 mb-4">
               <FiDollarSign className="w-4 h-4 text-indigo-200" />
@@ -316,9 +455,9 @@ export default function TripDetails() {
             </div>
             <div className="space-y-2.5">
               {[
-                { label: 'Total Advance', val: trip.financials.totalAdvance },
-                { label: 'Diesel Cost', val: trip.financials.dieselCost },
-                { label: 'Other Expenses', val: trip.financials.otherExpenses },
+                { label: 'Total Advance', val: mappedTrip.financials.totalAdvance },
+                { label: 'Diesel Cost', val: mappedTrip.financials.dieselCost },
+                { label: 'Other Expenses', val: mappedTrip.financials.otherExpenses },
               ].map(r => (
                 <div key={r.label} className="flex justify-between text-sm">
                   <span className="text-indigo-200">{r.label}</span>
@@ -331,11 +470,10 @@ export default function TripDetails() {
               </div>
             </div>
             <div className="mt-3 text-xs text-indigo-300">
-              Supervisor Balance: <span className="font-bold text-white">{INR(trip.supervisor.balance)}</span>
+              Supervisor Balance: <span className="font-bold text-white">{INR(mappedTrip.supervisor.balance)}</span>
             </div>
           </div>
 
-          {/* Expenses */}
           <Card icon={FiDollarSign} title="Expenses" iconColor="text-rose-600">
             <div className="space-y-2">
               {expenses.map(e => (
@@ -346,7 +484,7 @@ export default function TripDetails() {
                       : e.type === 'Maintenance' ? 'bg-orange-100 text-orange-700'
                       : 'bg-slate-100 text-slate-600'
                     }`}>{e.type}</span>
-                    <span className="text-xs text-slate-500">{e.note}</span>
+                    <span className="text-xs text-slate-500">{e.notes}</span>
                   </div>
                   <span className="text-sm font-bold text-slate-800">{INR(e.amount)}</span>
                 </div>
@@ -360,11 +498,11 @@ export default function TripDetails() {
             </button>
           </Card>
 
-          {/* Documents */}
+          {/* ── Documents Section (now restored) ── */}
           <div className="no-print">
             <Card icon={FiFileText} title="Documents" iconColor="text-teal-600">
               <div className="space-y-2.5">
-                {trip.documents.map((doc, i) => (
+                {mappedTrip.documents.map((doc, i) => (
                   <div key={i} className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded-lg">
                     <div className="flex items-center gap-2.5">
                       <FiFileText className={`w-4 h-4 ${doc.uploaded ? 'text-teal-600' : 'text-slate-400'}`} />
@@ -403,7 +541,7 @@ export default function TripDetails() {
         </div>
       </div>
 
-      {/* ── Modals ── */}
+      {/* ── Modals (unchanged) ── */}
       {modal === 'expense' && (
         <ActionModal title="Add Actual Expense" onClose={() => setModal(null)}>
           <div className="space-y-3">
@@ -454,10 +592,25 @@ export default function TripDetails() {
             </div>
             <div className="flex gap-2 pt-1">
               <button onClick={() => setModal(null)} className="flex-1 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">Cancel</button>
-              <button onClick={() => setModal(null)} className="flex-1 py-2 bg-amber-500 text-white rounded-lg text-sm font-bold hover:bg-amber-600">Save</button>
+              <button onClick={addFuel} className="flex-1 py-2 bg-amber-500 text-white rounded-lg text-sm font-bold hover:bg-amber-600">Save</button>
             </div>
           </div>
         </ActionModal>
+      )}
+
+      {/* ── Fuel Entries Section ── */}
+      {fuelEntries.length > 0 && (
+        <Card icon={FiDroplet} title="Fuel Entries" iconColor="text-amber-600">
+          <div className="space-y-2">
+            {fuelEntries.map(f => (
+              <div key={f.id} className="flex justify-between text-sm py-2 border-b border-slate-100 last:border-0">
+                <span className="text-slate-700 font-medium">{f.vendor}</span>
+                <span className="text-slate-600">{f.quantity}L × ₹{f.rate}</span>
+                <span className="font-bold text-slate-800">{INR(f.quantity * f.rate)}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
       )}
 
       {(modal === 'start' || modal === 'end' || modal === 'close') && (
@@ -473,7 +626,12 @@ export default function TripDetails() {
           <div className="flex gap-2">
             <button onClick={() => setModal(null)} className="flex-1 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">Cancel</button>
             <button
-              onClick={() => setModal(null)}
+              onClick={async () => {
+                if (modal === 'start') await updateStatus('Started');
+                if (modal === 'end') await updateStatus('Completed');
+                if (modal === 'close') await updateStatus('Closed');
+                setModal(null);
+              }}
               className={`flex-1 py-2 text-white rounded-lg text-sm font-bold ${
                 modal === 'start' ? 'bg-green-600 hover:bg-green-700'
                 : modal === 'end' ? 'bg-red-500 hover:bg-red-600'
@@ -487,17 +645,5 @@ export default function TripDetails() {
       )}
 
     </div>
-  );
-}
-
-function ActionBtn({ icon: Icon, label, color, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-2 px-4 py-2.5 ${color} text-white rounded-lg text-sm font-bold transition-colors shadow-sm`}
-    >
-      <Icon className="w-4 h-4" />
-      {label}
-    </button>
   );
 }

@@ -14,10 +14,11 @@ const Trip = {
   // ✅ GET ALL TRIPS
 getAll: async () => {
   const [rows] = await db.query(`
-    SELECT t.*,
-           d.full_name AS driver_name,
-           s.full_name AS supervisor_name,
-           st.station_name
+    SELECT 
+      t.*,
+      COALESCE(d.full_name, t.driver_name) AS driver_name,  -- ✅ FIX
+      s.full_name AS supervisor_name,
+      st.station_name
     FROM trips t
     LEFT JOIN drivers d ON t.driver_id = d.id
     LEFT JOIN supervisors s ON t.supervisor_id = s.id
@@ -29,10 +30,11 @@ getAll: async () => {
   // ✅ GET SINGLE TRIP
 getById: async (tripId) => {
   const [rows] = await db.query(`
-    SELECT t.*,
-           d.full_name AS driver_name,
-           s.full_name AS supervisor_name,
-           st.station_name
+    SELECT 
+      t.*,
+      COALESCE(d.full_name, t.driver_name) AS driver_name,  -- ✅ FIX
+      s.full_name AS supervisor_name,
+      st.station_name
     FROM trips t
     LEFT JOIN drivers d ON t.driver_id = d.id
     LEFT JOIN supervisors s ON t.supervisor_id = s.id
@@ -43,34 +45,65 @@ getById: async (tripId) => {
   return rows[0];
 },
 
+
+// 🔥 ADD EXPENSE
 addExpense: async (tripId, expenseData) => {
   const { amount, type, notes } = expenseData;
 
   const [result] = await db.query(
     `INSERT INTO trip_expenses (trip_id, amount, type, notes)
      VALUES (?, ?, ?, ?)`,
-    [tripId, amount, type, notes]
+    [
+      tripId,
+      amount || 0,
+      type || 'Misc',
+      notes || ''
+    ]
   );
 
   return result;
 },
 
+// 🔥 ADD FUEL
 addFuel: async (tripId, fuelData) => {
   const { quantity, rate, vendor } = fuelData;
 
   const [result] = await db.query(
     `INSERT INTO trip_fuel (trip_id, quantity, rate, vendor)
      VALUES (?, ?, ?, ?)`,
-    [tripId, quantity, rate, vendor]
+    [
+      tripId,
+      quantity || 0,
+      rate || 0,
+      vendor || ''
+    ]
   );
 
   return result;
 },
 
+// 🔥 NEW
+getExpenses: async (tripId) => {
+  const [rows] = await db.query(
+    'SELECT * FROM trip_expenses WHERE trip_id = ? ORDER BY created_at DESC',
+    [tripId]
+  );
+  return rows;
+},
+
+getFuel: async (tripId) => {
+  const [rows] = await db.query(
+    'SELECT * FROM trip_fuel WHERE trip_id = ? ORDER BY created_at DESC',
+    [tripId]
+  );
+  return rows;
+},
+
+
   // ✅ UPDATE TRIP
   update: async (id, tripData) => {
     const [result] = await db.query(
-      'UPDATE trips SET ? WHERE id = ?',
+      'UPDATE trips SET ? WHERE trip_id = ?',
       [tripData, id]
     );
     return result;
@@ -79,7 +112,7 @@ addFuel: async (tripId, fuelData) => {
   // ✅ DELETE TRIP
   delete: async (id) => {
     const [result] = await db.query(
-      'DELETE FROM trips WHERE id = ?',
+      'DELETE FROM trips WHERE trip_id = ?',
       [id]
     );
     return result;

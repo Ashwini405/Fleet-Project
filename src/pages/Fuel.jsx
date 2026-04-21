@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { FiPieChart, FiList, FiTrendingUp, FiAlertTriangle } from 'react-icons/fi';
 
@@ -9,12 +9,31 @@ import FuelAlerts from './Fuel/FuelAlerts';
 
 export default function Fuel() {
   const location = useLocation();
+  const [alertCount, setAlertCount] = useState(0);
+
+  // Fetch actual alert count from backend
+  useEffect(() => {
+    fetch('http://localhost:5001/api/fuel')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.data) {
+          // Count alerts where mileage < expected (Medium/High severity only)
+          const count = data.data.filter(item => {
+            const mileage = Number(item.mileage || 0);
+            const expected = Number(item.expected_mileage || 0);
+            return mileage < expected;
+          }).length;
+          setAlertCount(count);
+        }
+      })
+      .catch(err => console.error('Error fetching alert count:', err));
+  }, []);
 
   const tabs = [
     { name: 'Dashboard', path: '/fuel', icon: FiPieChart, exact: true },
     { name: 'Fuel Logs', path: '/fuel/logs', icon: FiList },
     { name: 'Analytics', path: '/fuel/analytics', icon: FiTrendingUp },
-    { name: 'Alerts', path: '/fuel/alerts', icon: FiAlertTriangle, badge: 3 },
+    { name: 'Alerts', path: '/fuel/alerts', icon: FiAlertTriangle, badge: alertCount },
   ];
 
   return (
@@ -40,7 +59,7 @@ export default function Fuel() {
               >
                 <Icon className={`w-4 h-4 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
                 {tab.name}
-                {tab.badge && (
+                {tab.badge > 0 && (
                   <span className="ml-1.5 inline-flex items-center justify-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-600">
                     {tab.badge}
                   </span>
