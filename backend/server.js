@@ -1,20 +1,23 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path'); // ✅ ADD THIS
 
 const vehicleRoutes = require('./routes/vehicleRoutes');
-const stationRoutes = require('./routes/stationRoutes'); // ✅ ADD THIS
+const stationRoutes = require('./routes/stationRoutes');
 const supervisorRoutes = require('./routes/supervisorRoutes');
 const driverRoutes = require('./routes/driverRoutes');
 const tripRoutes = require('./routes/tripRoutes');
 const fuelRoutes = require('./routes/fuelRoutes');
-
 
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// ✅ STATIC FILE SERVING (VERY IMPORTANT)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Routes
 app.use('/api/vehicles', vehicleRoutes);
