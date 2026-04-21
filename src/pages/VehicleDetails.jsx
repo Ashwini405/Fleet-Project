@@ -4,8 +4,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiEdit2, FiMapPin, FiUser, FiActivity, FiSearch, FiPlus, FiX, FiUploadCloud, FiEye, FiDownload } from 'react-icons/fi';
 import { DUMMY_VEHICLES } from './vehicleData';
 
-
-
 const dummyServiceHistory = [
   { id: 1, date: "15 Aug 2024", type: "Service", vendor: "ABC Garage", cost: "₹5,000", odometer: "80,000 KM" },
   { id: 2, date: "20 Sep 2024", type: "Repair", vendor: "XYZ Works", cost: "₹8,000", odometer: "95,000 KM" },
@@ -18,17 +16,7 @@ const dummyTyres = [
   { id: 3, position: "RL1", serial: "APL-54921", brand: "Apollo", model: "EnduRace", tread: "60%", km: "45,000" },
   { id: 4, position: "RL2", serial: "APL-54922", brand: "Apollo", model: "EnduRace", tread: "65%", km: "45,000" },
   { id: 5, position: "RR1", serial: "JK-99210", brand: "JK Tyre", model: "Jetway JUH5", tread: "70%", km: "30,000" },
-  { id: 5, position: "RR1", serial: "JK-99210", brand: "JK Tyre", model: "Jetway JUH5", tread: "70%", km: "30,000" },
   { id: 6, position: "RR2", serial: "JK-99211", brand: "JK Tyre", model: "Jetway JUH5", tread: "35%", km: "60,000" },
-];
-
-const dummyDocuments = [
-  { id: 1, type: "Insurance", expiry: "15 Dec 2026", status: "Active" },
-  { id: 2, type: "FC (Fitness)", expiry: "10 Oct 2024", status: "Expiring" },
-  { id: 3, type: "Road Tax", expiry: "05 Jan 2024", status: "Expired" },
-  { id: 4, type: "Permit", expiry: "22 Aug 2028", status: "Active" },
-  { id: 5, type: "Pollution", expiry: "12 May 2025", status: "Active" },
-  { id: 6, type: "CLL", expiry: "30 Nov 2025", status: "Active" }
 ];
 
 const dummyBatteries = [
@@ -42,8 +30,6 @@ const dummyInventory = [
   { id: 2, itemName: "Spare Wheel Tube", category: "Tubes", quantity: 2, assignedDate: "15 Sep 2022", condition: "Average" },
   { id: 3, itemName: "Warning Triangle", category: "Tools", quantity: 2, assignedDate: "22 May 2021", condition: "Damaged" }
 ];
-
-
 
 const tabs = ['Overview', 'Service History', 'Tyres', 'Documents', 'Battery Details', 'Truck Inventory'];
 
@@ -106,7 +92,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
 
   const [isUploadDocModalOpen, setIsUploadDocModalOpen] = useState(false);
   const [docForm, setDocForm] = useState({
-    vehicle: '', type: '', validUntil: ''
+    vehicle: '', type: '', validUntil: '', file: null
   });
   const handleDocFormChange = (e) => {
     setDocForm({ ...docForm, [e.target.name]: e.target.value });
@@ -128,14 +114,95 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
     setInventoryForm({ ...inventoryForm, [e.target.name]: e.target.value });
   };
 
-
   const InfoItem = ({ label, value }) => (
     <div className="flex flex-col">
       <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{label}</span>
       <span className="text-sm text-slate-800 font-medium">{value}</span>
     </div>
   );
+
+  // ─── Documents tab helpers (dynamic) ──────────────────────────────────────
+  const getDocStatus = (date) => {
+    if (!date) return 'Missing';
+    const today = new Date();
+    const d = new Date(date);
+    const diff = (d - today) / (1000 * 60 * 60 * 24);
+    if (diff < 0) return 'Expired';
+    if (diff <= 7) return 'Expiring';
+    return 'Active';
+  };
+
+  // Download document handler
+  const handleDocumentDownload = (fileName) => {
+    const fileUrl = `http://localhost:5001/uploads/${fileName}`;
+    fetch(fileUrl)
+      .then(res => res.blob())
+      .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName || 'document';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      })
+      .catch(err => console.error('Download failed:', err));
+  };
+
+  // Build documents array from vehicle data
+  const documents = vehicle
+    ? [
+      { type: 'Insurance', file: vehicle.insurance_document, expiry: vehicle.insurance_validity },
+      { type: 'FC (Fitness)', file: vehicle.fc_document, expiry: vehicle.fc_validity },
+      { type: 'Tax', file: vehicle.tax_document, expiry: vehicle.tax_validity },
+      { type: 'Pollution', file: vehicle.pollution_document, expiry: vehicle.pollution_validity },
+      { type: 'Permit', file: vehicle.permit_document, expiry: vehicle.permit_validity },
+      { type: 'CLL', file: vehicle.cll_document, expiry: vehicle.cll_validity },
+    ]
+    : [];
+
   if (!vehicle) return <div>Loading...</div>;
+
+  const handleUploadDocument = async () => {
+  try {
+    const formData = new FormData();
+
+    formData.append("vehicle_id", vehicle.id);
+    formData.append("type", docForm.type);
+    formData.append("validity", docForm.validUntil);
+
+    if (docForm.file) {
+      formData.append("file", docForm.file);
+    }
+
+    const res = await fetch("http://localhost:5001/api/vehicles/upload-document", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("Document uploaded successfully");
+
+      // 🔥 refresh
+      const updated = await fetch(`http://localhost:5001/api/vehicles/${vehicle.id}`);
+      const updatedData = await updated.json();
+
+      if (updatedData.success) {
+        setVehicle(updatedData.data);
+      }
+
+      setIsUploadDocModalOpen(false);
+    }
+
+  } catch (err) {
+    console.error(err);
+    alert("Upload failed");
+  }
+};
+
   return (
     <div className="font-sans text-slate-800">
 
@@ -156,17 +223,17 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
             </h1>
 
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${(vehicle.vehicle_status || '').toLowerCase() === 'active'
-                ? 'bg-green-100 text-green-700 border-green-200'
-                : (vehicle.vehicle_status || '').toLowerCase() === 'inactive'
-                  ? 'bg-red-100 text-red-700 border-red-200'
-                  : 'bg-yellow-100 text-yellow-700 border-yellow-200'
+              ? 'bg-green-100 text-green-700 border-green-200'
+              : (vehicle.vehicle_status || '').toLowerCase() === 'inactive'
+                ? 'bg-red-100 text-red-700 border-red-200'
+                : 'bg-yellow-100 text-yellow-700 border-yellow-200'
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${(vehicle.vehicle_status || '').toLowerCase() === 'active'
-                  ? 'bg-green-500'
-                  : (vehicle.vehicle_status || '').toLowerCase() === 'inactive'
-                    ? 'bg-red-500'
-                    : 'bg-yellow-500'
+                ? 'bg-green-500'
+                : (vehicle.vehicle_status || '').toLowerCase() === 'inactive'
+                  ? 'bg-red-500'
+                  : 'bg-yellow-500'
                 }`}
               ></span>
 
@@ -528,7 +595,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
           </div>
         )}
 
-        {/* Documents Tab */}
+        {/* Documents Tab (now dynamic) */}
         {activeTab === 'Documents' && (
           <div className="flex flex-col h-full animate-in fade-in duration-200">
             <div className="flex items-center justify-between mb-6">
@@ -554,34 +621,44 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {dummyDocuments.map((doc) => (
-                      <tr key={doc.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4 font-medium text-slate-900">{doc.type}</td>
-                        <td className="px-6 py-4 text-slate-700">{doc.expiry}</td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${doc.status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' :
-                            doc.status === 'Expiring' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                              'bg-red-50 text-red-700 border-red-200'
-                            }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${doc.status === 'Active' ? 'bg-green-500' :
-                              doc.status === 'Expiring' ? 'bg-amber-500' :
-                                'bg-red-500'
-                              }`}></span>
-                            {doc.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-3">
-                            <button className="text-slate-400 hover:text-indigo-600 transition-colors" title="View Document">
-                              <FiEye className="w-5 h-5" />
-                            </button>
-                            <button className="text-slate-400 hover:text-indigo-600 transition-colors" title="Download Document">
-                              <FiDownload className="w-5 h-5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                    {documents.map((doc, index) => {
+                      const status = getDocStatus(doc.expiry);
+                      return (
+                        <tr key={index} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 font-medium text-slate-900">{doc.type}</td>
+                          <td className="px-6 py-4 text-slate-700">{doc.expiry || '—'}</td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border 
+                              ${status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' :
+                                status === 'Expiring' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                  status === 'Expired' ? 'bg-red-50 text-red-700 border-red-200' :
+                                    'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                              {status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-3">
+                              <button
+                                disabled={!doc.file}
+                                onClick={() => window.open(`http://localhost:5001/uploads/${doc.file}`, '_blank')}
+                                className="text-slate-400 hover:text-indigo-600 disabled:opacity-30 transition-colors"
+                                title="View Document"
+                              >
+                                <FiEye className="w-5 h-5" />
+                              </button>
+                              <button
+                                disabled={!doc.file}
+                                onClick={() => handleDocumentDownload(doc.file)}
+                                className="text-slate-400 hover:text-indigo-600 disabled:opacity-30 transition-colors"
+                                title="Download Document"
+                              >
+                                <FiDownload className="w-5 h-5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -645,6 +722,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
             </div>
           </div>
         )}
+
         {/* Truck Inventory Tab */}
         {activeTab === 'Truck Inventory' && (
           <div className="flex flex-col h-full animate-in fade-in duration-200">
@@ -777,12 +855,41 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Upload Bill / Photos</label>
-                <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 flex flex-col items-center justify-center text-slate-500 bg-slate-50/50 hover:bg-slate-50 transition-colors cursor-pointer group">
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Upload Bill / Photos
+                </label>
+
+                <label className="border-2 border-dashed border-slate-200 rounded-xl p-6 flex flex-col items-center justify-center text-slate-500 bg-slate-50/50 hover:bg-slate-50 transition-colors cursor-pointer group">
+
+                  {/* ✅ FILE INPUT (HIDDEN) */}
+                  <input
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      setDocForm({ ...docForm, file });
+                    }}
+                  />
+
                   <FiUploadCloud className="w-8 h-8 text-slate-400 mb-2 group-hover:text-indigo-500 transition-colors" />
-                  <p className="text-sm font-medium text-slate-700">Click to upload or drag and drop</p>
-                  <p className="text-xs text-slate-500 mt-1">SVG, PNG, JPG or PDF (max. 5MB)</p>
-                </div>
+
+                  <p className="text-sm font-medium text-slate-700">
+                    Click to upload or drag and drop
+                  </p>
+
+                  <p className="text-xs text-slate-500 mt-1">
+                    SVG, PNG, JPG or PDF (max. 5MB)
+                  </p>
+
+                  {/* ✅ SHOW SELECTED FILE */}
+                  {docForm.file && (
+                    <p className="text-xs text-green-600 mt-2">
+                      Selected: {docForm.file.name}
+                    </p>
+                  )}
+
+                </label>
               </div>
             </div>
 
@@ -893,6 +1000,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
           </div>
         </div>
       )}
+
       {/* Upload Document Modal */}
       {isUploadDocModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
@@ -912,7 +1020,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
             <div className="p-5 md:p-6 overflow-y-auto space-y-5">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1.5">Select Vehicle</label>
-                <input type="text" readOnly value={vehicle.truckNo} className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-500 cursor-not-allowed font-medium" />
+                <input type="text" readOnly value={vehicle.vehicle_no} className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-500 cursor-not-allowed font-medium" />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -921,7 +1029,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                   <select name="type" value={docForm.type} onChange={handleDocFormChange} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none">
                     <option value="">Select Type</option>
                     <option value="Insurance">Insurance</option>
-                    <option value="FC">FC (Fitness)</option>
+                    <option value="FC (Fitness)">FC (Fitness)</option>
                     <option value="Tax">Road Tax</option>
                     <option value="Permit">Permit</option>
                     <option value="Pollution">Pollution</option>
@@ -935,12 +1043,37 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Upload File</label>
-                <div className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center text-slate-500 bg-slate-50/50 hover:bg-slate-50 transition-colors cursor-pointer group">
+                <label className="border-2 border-dashed border-slate-200 rounded-xl p-8 flex flex-col items-center justify-center text-slate-500 bg-slate-50/50 hover:bg-slate-50 transition-colors cursor-pointer group">
+
+                  {/* ✅ ADD THIS INPUT */}
+                  <input
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      setDocForm({ ...docForm, file });
+                    }}
+                  />
+
                   <FiUploadCloud className="w-10 h-10 text-slate-400 mb-4 group-hover:text-indigo-500 transition-colors" />
-                  <p className="text-sm font-medium text-slate-700 text-center">Click to upload document<br />or drag and drop</p>
-                  <p className="text-xs text-slate-500 mt-2">PDF, PNG, JPG (max. 10MB)</p>
-                </div>
+
+                  <p className="text-sm font-medium text-slate-700 text-center">
+                    Click to upload document<br />or drag and drop
+                  </p>
+
+                  <p className="text-xs text-slate-500 mt-2">
+                    PDF, PNG, JPG (max. 10MB)
+                  </p>
+
+                  {/* ✅ SHOW FILE NAME */}
+                  {docForm.file && (
+                    <p className="text-xs text-green-600 mt-2">
+                      Selected: {docForm.file.name}
+                    </p>
+                  )}
+
+                </label>
               </div>
             </div>
 
@@ -952,11 +1085,77 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                 Cancel
               </button>
               <button
-                onClick={() => { console.log("Uploaded Doc:", docForm); setIsUploadDocModalOpen(false); }}
-                className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
-              >
-                Upload File
-              </button>
+  onClick={async () => {
+    try {
+      // 🔒 VALIDATION FIRST
+      if (!docForm.type) {
+        alert("Please select document type");
+        return;
+      }
+
+      if (!docForm.validUntil) {
+        alert("Please select validity date");
+        return;
+      }
+
+      if (!docForm.file) {
+        alert("Please upload a file");
+        return;
+      }
+
+      const formData = new FormData();
+
+      // ✅ REQUIRED DATA
+      formData.append("vehicle_id", vehicle.id);
+      formData.append("type", docForm.type);
+      formData.append("validity", docForm.validUntil);
+      formData.append("file", docForm.file);
+
+      // 🚀 API CALL
+      const res = await fetch("http://localhost:5001/api/vehicles/upload-document", {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await res.json();
+
+      // ❌ ERROR HANDLING
+      if (!res.ok || !data.success) {
+        alert(data.message || "Upload failed");
+        return;
+      }
+
+      // ✅ SUCCESS
+      alert("Document uploaded successfully");
+
+      // 🔥 REFRESH VEHICLE DATA
+      const updated = await fetch(`http://localhost:5001/api/vehicles/${vehicle.id}`);
+      const updatedData = await updated.json();
+
+      if (updatedData.success) {
+        setVehicle(updatedData.data);
+      }
+
+      // 🔄 RESET FORM
+      setDocForm({
+        vehicle: '',
+        type: '',
+        validUntil: '',
+        file: null
+      });
+
+      // ❌ CLOSE MODAL
+      setIsUploadDocModalOpen(false);
+
+    } catch (err) {
+      console.error(err);
+      alert("Upload failed (server error)");
+    }
+  }}
+  className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+>
+  Upload File
+</button>
             </div>
 
           </div>
@@ -1037,6 +1236,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
           </div>
         </div>
       )}
+
       {/* Add Inventory Modal */}
       {isAddInventoryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">

@@ -129,14 +129,14 @@ const TextareaGroup = ({ label, name, placeholder, formData, handleChange }) => 
 
 export default function AddVehicle() {
   const navigate = useNavigate();
-  
+
   const [formData, setFormData] = useState({
     // Identification
     registrationNumber: '',
     registrationDate: '',
     rtaName: '',
     ownerName: '',
-    
+
     // Specifications
     vehicleType: '',
     makeBrand: '',
@@ -148,7 +148,7 @@ export default function AddVehicle() {
     chassisNumber: '',
     initialOdometer: '',
     mileage: '',
-    
+
     // Compliance
     insuranceValidity: '',
     fcValidity: '',
@@ -156,7 +156,7 @@ export default function AddVehicle() {
     taxValidity: '',
     pollutionValidity: '',
     cllValidity: '',
-    
+
     // Operations
     supervisor: '',
     assignedDriver: '',
@@ -293,7 +293,7 @@ export default function AddVehicle() {
 
   const handleSave = async (e) => {
     e.preventDefault();
-    
+
     const errors = {};
     const fileErrs = {};
 
@@ -336,76 +336,87 @@ export default function AddVehicle() {
     }
 
     try {
+      const formDataToSend = new FormData();
+
+      // ✅ IDENTIFICATION
+      formDataToSend.append("vehicle_no", formData.registrationNumber);
+      formDataToSend.append("registration_date", formData.registrationDate);
+      formDataToSend.append("rta_name", formData.rtaName);
+      formDataToSend.append("owner_name", formData.ownerName);
+
+      // ✅ SPECIFICATIONS
+      formDataToSend.append("type", formData.vehicleType);
+      formDataToSend.append("vehicle_category", formData.vehicleCategory);
+      formDataToSend.append("make_brand", formData.makeBrand);
+      formDataToSend.append("fuel_type", formData.fuelType);
+      formDataToSend.append("model_year", formData.modelYear);
+      formDataToSend.append("tire_size", formData.tireSize);
+      formDataToSend.append("gvw", formData.gvw);
+      formDataToSend.append("ulw", formData.ulw);
+      formDataToSend.append("engine_number", formData.engineNumber);
+      formDataToSend.append("chassis_number", formData.chassisNumber);
+      formDataToSend.append("initial_odometer", formData.initialOdometer);
+      formDataToSend.append("mileage", formData.mileage);
+
+      // ✅ COMPLIANCE
+      formDataToSend.append("insurance_validity", formData.insuranceValidity);
+      formDataToSend.append("fc_validity", formData.fcValidity);
+      formDataToSend.append("permit_validity", formData.permitValidity);
+      formDataToSend.append("tax_validity", formData.taxValidity);
+      formDataToSend.append("pollution_validity", formData.pollutionValidity);
+      formDataToSend.append("cll_validity", formData.cllValidity);
+
+      // ✅ OPERATIONS
+      formDataToSend.append("supervisor_id", formData.supervisor);
+      formDataToSend.append("assigned_driver", formData.assignedDriver);
+      formDataToSend.append("station_id", formData.assignedPlant);
+      formDataToSend.append("default_route", formData.defaultRoute);
+
+      // ✅ FINANCIAL
+      formDataToSend.append("financier_name", formData.financierName);
+      formDataToSend.append("loan_account_number", formData.loanAccountNumber);
+      formDataToSend.append("emi_amount", formData.emiAmount);
+      formDataToSend.append("emi_date", formData.emiDate);
+      formDataToSend.append("loan_tenure", formData.loanTenure);
+
+      // ✅ TRACKING
+      formDataToSend.append("gps_device_id", formData.gpsDeviceId);
+      formDataToSend.append("fastag_id", formData.fastagId);
+
+      // ✅ STATUS
+      formDataToSend.append("vehicle_status", formData.vehicleStatus);
+      formDataToSend.append("reminder_days", formData.reminderDays);
+
+      // ✅ ADDITIONAL
+      formDataToSend.append("vehicle_color", formData.vehicleColor);
+      formDataToSend.append("body_type", formData.bodyType);
+      formDataToSend.append("remarks", formData.remarks);
+
+      // 🔥 FILES (VERY IMPORTANT)
+      if (files.insuranceDoc) formDataToSend.append("insurance_document", files.insuranceDoc);
+      if (files.fcDoc) formDataToSend.append("fc_document", files.fcDoc);
+      if (files.permitDoc) formDataToSend.append("permit_document", files.permitDoc);
+      if (files.taxDoc) formDataToSend.append("tax_document", files.taxDoc);
+      if (files.pollutionDoc) formDataToSend.append("pollution_document", files.pollutionDoc);
+      if (files.cllDoc) formDataToSend.append("cll_document", files.cllDoc);
+      if (files.rcDoc) formDataToSend.append("rc_document", files.rcDoc);
+
+      // 🚀 SEND REQUEST
       const response = await fetch('http://localhost:5001/api/vehicles', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          // Identification
-          vehicle_no: formData.registrationNumber,
-          registration_date: formData.registrationDate,
-          rta_name: formData.rtaName,
-          owner_name: formData.ownerName,
-
-          // Specifications
-          type: formData.vehicleType,
-          vehicle_category: formData.vehicleCategory,
-          make_brand: formData.makeBrand,
-          fuel_type: formData.fuelType,
-          model_year: formData.modelYear,
-          tire_size: formData.tireSize,
-          gvw: formData.gvw,
-          ulw: formData.ulw,
-          engine_number: formData.engineNumber,
-          chassis_number: formData.chassisNumber,
-          initial_odometer: formData.initialOdometer,
-          mileage: formData.mileage,
-
-          // Compliance
-          insurance_validity: formData.insuranceValidity,
-          insurance_document: files.insuranceDoc ? files.insuranceDoc.name : null,
-          fc_validity: formData.fcValidity,
-          fc_document: files.fcDoc ? files.fcDoc.name : null,
-          permit_validity: formData.permitValidity,
-          permit_document: files.permitDoc ? files.permitDoc.name : null,
-          tax_validity: formData.taxValidity,
-          tax_document: files.taxDoc ? files.taxDoc.name : null,
-          pollution_validity: formData.pollutionValidity,
-          pollution_document: files.pollutionDoc ? files.pollutionDoc.name : null,
-          cll_validity: formData.cllValidity,
-          cll_document: files.cllDoc ? files.cllDoc.name : null,
-          rc_document: files.rcDoc ? files.rcDoc.name : null,
-
-          // Operations (foreign keys) – now sending IDs from dropdowns
-          supervisor_id: formData.supervisor,
-          assigned_driver: formData.assignedDriver || null,
-          station_id: formData.assignedPlant,
-          default_route: formData.defaultRoute,
-
-          // Financial
-          financier_name: formData.financierName,
-          loan_account_number: formData.loanAccountNumber,
-          emi_amount: formData.emiAmount,
-          emi_date: formData.emiDate,
-          loan_tenure: formData.loanTenure,
-
-          // Tracking
-          gps_device_id: formData.gpsDeviceId,
-          fastag_id: formData.fastagId,
-
-          // Status & Alerts
-          vehicle_status: formData.vehicleStatus,
-          reminder_days: formData.reminderDays,
-
-          // Additional
-          vehicle_color: formData.vehicleColor,
-          body_type: formData.bodyType,
-          remarks: formData.remarks
-        }),
+        body: formDataToSend
       });
 
       const data = await response.json();
+
+      if (data.success) {
+        console.log("Vehicle saved successfully:", data);
+        navigate('/vehicles');
+      } else {
+        alert("Failed to save: " + data.message);
+      }
+
+      const resData = await response.json();
 
       if (data.success) {
         console.log("Vehicle saved successfully to Database:", data);
@@ -424,7 +435,7 @@ export default function AddVehicle() {
       {/* Page Header */}
       <div className="max-w-5xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={() => navigate('/vehicles')}
             className="p-2 border border-slate-200 rounded-lg bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
             title="Back to List"
@@ -436,17 +447,17 @@ export default function AddVehicle() {
             <p className="text-sm text-slate-500 mt-1">Enter details to onboard a new fleet vehicle</p>
           </div>
         </div>
-        
+
         {/* Top Actions */}
         <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
-          <button 
+          <button
             onClick={() => navigate('/vehicles')}
             className="px-4 py-2.5 border border-slate-200 bg-white text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors flex items-center gap-2 shadow-sm"
           >
             <FiX className="w-4 h-4" />
             Cancel
           </button>
-          <button 
+          <button
             onClick={handleSave}
             className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm"
           >
@@ -457,185 +468,185 @@ export default function AddVehicle() {
       </div>
 
       <form onSubmit={handleSave}>
-      <div className="max-w-5xl mx-auto space-y-6">
-        
-        {/* 1. Identification Section */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">1</div>
-            Identification
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputGroup label="Registration Number" name="registrationNumber" placeholder="e.g. AP39 AB 1234" formData={formData} handleChange={handleChange} />
-            <InputGroup label="Registration Date" name="registrationDate" type="date" formData={formData} handleChange={handleChange} />
-            <InputGroup label="RTA Name" name="rtaName" placeholder="e.g. RTA Hyderabad" formData={formData} handleChange={handleChange} />
-            <InputGroup label="Owner Name" name="ownerName" placeholder="Enter owner's full name" formData={formData} handleChange={handleChange} />
-          </div>
-        </section>
+        <div className="max-w-5xl mx-auto space-y-6">
 
-        {/* 2. Technical Specifications */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">2</div>
-            Technical Specifications
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SelectGroup label="Vehicle Type" name="vehicleType" options={['Trailer', 'Tanker', 'LPG', 'Milk Transport', 'Tipper', 'Flatbed', 'Box Truck']} formData={formData} handleChange={handleChange} />
-            <SelectGroup label="Vehicle Category" name="vehicleCategory" options={['Owned', 'Rented', 'Lease']} formData={formData} handleChange={handleChange} />
-            <InputGroup label="Make / Brand" name="makeBrand" placeholder="e.g. Tata, Ashok Leyland" formData={formData} handleChange={handleChange} />
-            <SelectGroup label="Fuel Type" name="fuelType" options={['Diesel', 'Petrol', 'CNG', 'EV']} formData={formData} handleChange={handleChange} />
-            
-            <InputGroup label="Model Year" name="modelYear" type="number" placeholder="YYYY" formData={formData} handleChange={handleChange} />
-            <InputGroup label="Mileage (KM/L)" name="mileage" type="number" step="0.1" placeholder="e.g. 8.5" formData={formData} handleChange={handleChange} />
-            <InputGroup label="Tire Size" name="tireSize" placeholder="e.g. 295/80R22.5" formData={formData} handleChange={handleChange} />
-            
-            <InputGroup label="GVW (kg)" name="gvw" type="number" placeholder="Enter GVW" formData={formData} handleChange={handleChange} />
-            <InputGroup label="ULW (kg)" name="ulw" type="number" placeholder="Enter ULW" formData={formData} handleChange={handleChange} />
-            
-            <InputGroup label="Engine Number" name="engineNumber" placeholder="Enter engine serial no" formData={formData} handleChange={handleChange} />
-            <InputGroup label="Chassis Number" name="chassisNumber" placeholder="Enter chassis serial no" formData={formData} handleChange={handleChange} />
-            
-            <InputGroup label="Initial Odometer" name="initialOdometer" type="number" placeholder="Enter starting km" formData={formData} handleChange={handleChange} />
-          </div>
-        </section>
+          {/* 1. Identification Section */}
+          <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">1</div>
+              Identification
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <InputGroup label="Registration Number" name="registrationNumber" placeholder="e.g. AP39 AB 1234" formData={formData} handleChange={handleChange} />
+              <InputGroup label="Registration Date" name="registrationDate" type="date" formData={formData} handleChange={handleChange} />
+              <InputGroup label="RTA Name" name="rtaName" placeholder="e.g. RTA Hyderabad" formData={formData} handleChange={handleChange} />
+              <InputGroup label="Owner Name" name="ownerName" placeholder="Enter owner's full name" formData={formData} handleChange={handleChange} />
+            </div>
+          </section>
 
-        {/* 3. Compliance Validity & Documents */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">3</div>
-            Compliance Validity & Documents
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InputGroup label="Insurance Validity" name="insuranceValidity" type="date" formData={formData} handleChange={handleChange} />
-            <FileUploadGroup label="Insurance Document" name="insuranceDoc" selectedFile={files.insuranceDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} error={fileErrors.insuranceDoc} />
-            <InputGroup label="FC Validity (Fitness)" name="fcValidity" type="date" formData={formData} handleChange={handleChange} error={formErrors.fcValidity} />
-            <FileUploadGroup label="FC Document" name="fcDoc" selectedFile={files.fcDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} error={fileErrors.fcDoc} helperText={docWarnings.fcDoc} required />
-            <InputGroup label="Permit Validity" name="permitValidity" type="date" formData={formData} handleChange={handleChange} />
-            <FileUploadGroup label="Permit Document" name="permitDoc" selectedFile={files.permitDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} />
-            <InputGroup label="Tax Validity" name="taxValidity" type="date" formData={formData} handleChange={handleChange} error={formErrors.taxValidity} />
-            <FileUploadGroup label="Tax Document" name="taxDoc" selectedFile={files.taxDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} error={fileErrors.taxDoc} helperText={docWarnings.taxDoc} required />
-            <InputGroup label="Pollution Validity" name="pollutionValidity" type="date" formData={formData} handleChange={handleChange} error={formErrors.pollutionValidity} />
-            <FileUploadGroup label="Pollution Document" name="pollutionDoc" selectedFile={files.pollutionDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} error={fileErrors.pollutionDoc} helperText={docWarnings.pollutionDoc} required />
-            <InputGroup label="CLL Validity" name="cllValidity" type="date" formData={formData} handleChange={handleChange} disabled={!isCLLApplicable} error={formErrors.cllValidity} />
-            <FileUploadGroup label="CLL Document" name="cllDoc" selectedFile={files.cllDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} disabled={!isCLLApplicable} error={fileErrors.cllDoc} helperText={isCLLApplicable ? docWarnings.cllDoc : 'CLL required only for tanker / LPG / milk transport vehicles.'} required={isCLLApplicable} />
-            <FileUploadGroup label="RC Document" name="rcDoc" selectedFile={files.rcDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} />
-          </div>
-        </section>
+          {/* 2. Technical Specifications */}
+          <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">2</div>
+              Technical Specifications
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <SelectGroup label="Vehicle Type" name="vehicleType" options={['Trailer', 'Tanker', 'LPG', 'Milk Transport', 'Tipper', 'Flatbed', 'Box Truck']} formData={formData} handleChange={handleChange} />
+              <SelectGroup label="Vehicle Category" name="vehicleCategory" options={['Owned', 'Rented', 'Lease']} formData={formData} handleChange={handleChange} />
+              <InputGroup label="Make / Brand" name="makeBrand" placeholder="e.g. Tata, Ashok Leyland" formData={formData} handleChange={handleChange} />
+              <SelectGroup label="Fuel Type" name="fuelType" options={['Diesel', 'Petrol', 'CNG', 'EV']} formData={formData} handleChange={handleChange} />
 
-        {/* 4. Operations Assignment - DYNAMIC DROPDOWNS */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">4</div>
-            Operations Assignment
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SelectGroup 
-              label="Assign Supervisor" 
-              name="supervisor" 
-              options={supervisors.map(s => ({ label: s.full_name, value: s.id }))} 
-              formData={formData} 
-              handleChange={handleChange} 
-            />
-            <SelectGroup 
-              label="Assign Driver" 
-              name="assignedDriver" 
-              options={drivers.map(d => ({ label: d.full_name, value: d.id }))} 
-              formData={formData} 
-              handleChange={handleChange} 
-            />
-            <SelectGroup 
-              label="Assigned Plant" 
-              name="assignedPlant" 
-              options={stations.map(st => ({ label: st.station_name, value: st.id }))} 
-              formData={formData} 
-              handleChange={handleChange} 
-            />
-            <InputGroup label="Default Route (Optional)" name="defaultRoute" placeholder="e.g. Hyderabad → Pune" formData={formData} handleChange={handleChange} />
-          </div>
-        </section>
+              <InputGroup label="Model Year" name="modelYear" type="number" placeholder="YYYY" formData={formData} handleChange={handleChange} />
+              <InputGroup label="Mileage (KM/L)" name="mileage" type="number" step="0.1" placeholder="e.g. 8.5" formData={formData} handleChange={handleChange} />
+              <InputGroup label="Tire Size" name="tireSize" placeholder="e.g. 295/80R22.5" formData={formData} handleChange={handleChange} />
 
-        {/* 5. Financial Details */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">5</div>
-            Financial Details
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputGroup label="Financier Name" name="financierName" placeholder="e.g. HDFC Bank" formData={formData} handleChange={handleChange} />
-            <InputGroup label="Loan Account Number" name="loanAccountNumber" placeholder="Enter loan account no" formData={formData} handleChange={handleChange} />
-            <InputGroup label="EMI Amount (₹)" name="emiAmount" type="number" placeholder="Enter monthly EMI" formData={formData} handleChange={handleChange} />
-            <InputGroup label="EMI Date" name="emiDate" type="date" formData={formData} handleChange={handleChange} />
-            <InputGroup label="Loan Tenure (months)" name="loanTenure" type="number" placeholder="e.g. 60" formData={formData} handleChange={handleChange} />
-          </div>
-        </section>
+              <InputGroup label="GVW (kg)" name="gvw" type="number" placeholder="Enter GVW" formData={formData} handleChange={handleChange} />
+              <InputGroup label="ULW (kg)" name="ulw" type="number" placeholder="Enter ULW" formData={formData} handleChange={handleChange} />
 
-        {/* 6. Tracking Details */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">6</div>
-            Tracking Details
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputGroup label="GPS Device ID" name="gpsDeviceId" placeholder="Enter GPS device ID" formData={formData} handleChange={handleChange} />
-            <InputGroup label="FASTag ID" name="fastagId" placeholder="Enter FASTag ID" formData={formData} handleChange={handleChange} />
-          </div>
-        </section>
+              <InputGroup label="Engine Number" name="engineNumber" placeholder="Enter engine serial no" formData={formData} handleChange={handleChange} />
+              <InputGroup label="Chassis Number" name="chassisNumber" placeholder="Enter chassis serial no" formData={formData} handleChange={handleChange} />
 
-        {/* 7. Vehicle Status */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">7</div>
-            Vehicle Status
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <SelectGroup label="Status" name="vehicleStatus" options={['Active', 'Inactive', 'Under Maintenance']} formData={formData} handleChange={handleChange} />
-          </div>
-        </section>
+              <InputGroup label="Initial Odometer" name="initialOdometer" type="number" placeholder="Enter starting km" formData={formData} handleChange={handleChange} />
+            </div>
+          </section>
 
-        {/* 8. Alert Settings */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">8</div>
-            Alert Settings
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputGroup label="Reminder Days Before Expiry" name="reminderDays" type="number" placeholder="e.g. 7" formData={formData} handleChange={handleChange} />
-          </div>
-        </section>
+          {/* 3. Compliance Validity & Documents */}
+          <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">3</div>
+              Compliance Validity & Documents
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <InputGroup label="Insurance Validity" name="insuranceValidity" type="date" formData={formData} handleChange={handleChange} />
+              <FileUploadGroup label="Insurance Document" name="insuranceDoc" selectedFile={files.insuranceDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} error={fileErrors.insuranceDoc} />
+              <InputGroup label="FC Validity (Fitness)" name="fcValidity" type="date" formData={formData} handleChange={handleChange} error={formErrors.fcValidity} />
+              <FileUploadGroup label="FC Document" name="fcDoc" selectedFile={files.fcDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} error={fileErrors.fcDoc} helperText={docWarnings.fcDoc} required />
+              <InputGroup label="Permit Validity" name="permitValidity" type="date" formData={formData} handleChange={handleChange} />
+              <FileUploadGroup label="Permit Document" name="permitDoc" selectedFile={files.permitDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} />
+              <InputGroup label="Tax Validity" name="taxValidity" type="date" formData={formData} handleChange={handleChange} error={formErrors.taxValidity} />
+              <FileUploadGroup label="Tax Document" name="taxDoc" selectedFile={files.taxDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} error={fileErrors.taxDoc} helperText={docWarnings.taxDoc} required />
+              <InputGroup label="Pollution Validity" name="pollutionValidity" type="date" formData={formData} handleChange={handleChange} error={formErrors.pollutionValidity} />
+              <FileUploadGroup label="Pollution Document" name="pollutionDoc" selectedFile={files.pollutionDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} error={fileErrors.pollutionDoc} helperText={docWarnings.pollutionDoc} required />
+              <InputGroup label="CLL Validity" name="cllValidity" type="date" formData={formData} handleChange={handleChange} disabled={!isCLLApplicable} error={formErrors.cllValidity} />
+              <FileUploadGroup label="CLL Document" name="cllDoc" selectedFile={files.cllDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} disabled={!isCLLApplicable} error={fileErrors.cllDoc} helperText={isCLLApplicable ? docWarnings.cllDoc : 'CLL required only for tanker / LPG / milk transport vehicles.'} required={isCLLApplicable} />
+              <FileUploadGroup label="RC Document" name="rcDoc" selectedFile={files.rcDoc} handleFileChange={handleFileChange} handleFileRemove={handleFileRemove} />
+            </div>
+          </section>
 
-        {/* 9. Additional Details */}
-        <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-            <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">9</div>
-            Additional Details
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputGroup label="Vehicle Color" name="vehicleColor" placeholder="e.g. White, Red" formData={formData} handleChange={handleChange} />
-            <SelectGroup label="Body Type" name="bodyType" options={['Truck', 'Trailer', 'Container', 'Tanker', 'Tipper']} formData={formData} handleChange={handleChange} />
-            <TextareaGroup label="Remarks / Notes" name="remarks" placeholder="Any additional notes about this vehicle..." formData={formData} handleChange={handleChange} />
-          </div>
-        </section>
+          {/* 4. Operations Assignment - DYNAMIC DROPDOWNS */}
+          <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">4</div>
+              Operations Assignment
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <SelectGroup
+                label="Assign Supervisor"
+                name="supervisor"
+                options={supervisors.map(s => ({ label: s.full_name, value: s.id }))}
+                formData={formData}
+                handleChange={handleChange}
+              />
+              <SelectGroup
+                label="Assign Driver"
+                name="assignedDriver"
+                options={drivers.map(d => ({ label: d.full_name, value: d.id }))}
+                formData={formData}
+                handleChange={handleChange}
+              />
+              <SelectGroup
+                label="Assigned Plant"
+                name="assignedPlant"
+                options={stations.map(st => ({ label: st.station_name, value: st.id }))}
+                formData={formData}
+                handleChange={handleChange}
+              />
+              <InputGroup label="Default Route (Optional)" name="defaultRoute" placeholder="e.g. Hyderabad → Pune" formData={formData} handleChange={handleChange} />
+            </div>
+          </section>
 
-        {/* Bottom Floating Action Bar */}
-        <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10 flex justify-end gap-3 px-4 md:px-8">
-          <div className="max-w-5xl w-full mx-auto flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
-            <button 
-              onClick={() => navigate('/vehicles')}
-              className="px-6 py-2.5 border border-slate-200 bg-white text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button 
-              type="submit"
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow"
-            >
-              <FiCheckCircle className="w-4 h-4" />
-              Save Vehicle Details
-            </button>
+          {/* 5. Financial Details */}
+          <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">5</div>
+              Financial Details
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <InputGroup label="Financier Name" name="financierName" placeholder="e.g. HDFC Bank" formData={formData} handleChange={handleChange} />
+              <InputGroup label="Loan Account Number" name="loanAccountNumber" placeholder="Enter loan account no" formData={formData} handleChange={handleChange} />
+              <InputGroup label="EMI Amount (₹)" name="emiAmount" type="number" placeholder="Enter monthly EMI" formData={formData} handleChange={handleChange} />
+              <InputGroup label="EMI Date" name="emiDate" type="date" formData={formData} handleChange={handleChange} />
+              <InputGroup label="Loan Tenure (months)" name="loanTenure" type="number" placeholder="e.g. 60" formData={formData} handleChange={handleChange} />
+            </div>
+          </section>
+
+          {/* 6. Tracking Details */}
+          <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">6</div>
+              Tracking Details
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <InputGroup label="GPS Device ID" name="gpsDeviceId" placeholder="Enter GPS device ID" formData={formData} handleChange={handleChange} />
+              <InputGroup label="FASTag ID" name="fastagId" placeholder="Enter FASTag ID" formData={formData} handleChange={handleChange} />
+            </div>
+          </section>
+
+          {/* 7. Vehicle Status */}
+          <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">7</div>
+              Vehicle Status
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <SelectGroup label="Status" name="vehicleStatus" options={['Active', 'Inactive', 'Under Maintenance']} formData={formData} handleChange={handleChange} />
+            </div>
+          </section>
+
+          {/* 8. Alert Settings */}
+          <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">8</div>
+              Alert Settings
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <InputGroup label="Reminder Days Before Expiry" name="reminderDays" type="number" placeholder="e.g. 7" formData={formData} handleChange={handleChange} />
+            </div>
+          </section>
+
+          {/* 9. Additional Details */}
+          <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">9</div>
+              Additional Details
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <InputGroup label="Vehicle Color" name="vehicleColor" placeholder="e.g. White, Red" formData={formData} handleChange={handleChange} />
+              <SelectGroup label="Body Type" name="bodyType" options={['Truck', 'Trailer', 'Container', 'Tanker', 'Tipper']} formData={formData} handleChange={handleChange} />
+              <TextareaGroup label="Remarks / Notes" name="remarks" placeholder="Any additional notes about this vehicle..." formData={formData} handleChange={handleChange} />
+            </div>
+          </section>
+
+          {/* Bottom Floating Action Bar */}
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10 flex justify-end gap-3 px-4 md:px-8">
+            <div className="max-w-5xl w-full mx-auto flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+              <button
+                onClick={() => navigate('/vehicles')}
+                className="px-6 py-2.5 border border-slate-200 bg-white text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow"
+              >
+                <FiCheckCircle className="w-4 h-4" />
+                Save Vehicle Details
+              </button>
+            </div>
           </div>
+
         </div>
-
-      </div>
       </form>
     </div>
   );
