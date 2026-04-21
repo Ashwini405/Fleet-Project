@@ -247,6 +247,19 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
               </h3>
               <div className="grid grid-cols-1 gap-y-6">
 
+                {/* Driver */}
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center">
+                    <FiUser className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wider font-semibold text-slate-500">Assigned Driver</p>
+                    <p className="text-sm font-medium text-slate-900">
+                      {vehicle.driver_name || '—'}
+                    </p>
+                  </div>
+                </div>
+
                 {/* Supervisor */}
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
@@ -279,6 +292,43 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                   <InfoItem label="GPS Device ID" value={vehicle.gps_device_id} />
                 </div>
 
+              </div>
+            </div>
+
+            {/* Technical Specifications */}
+            <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
+              <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200">
+                Technical Specifications
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 md:gap-y-6 gap-x-4">
+                <InfoItem label="Vehicle Type" value={vehicle.type} />
+                <InfoItem label="Vehicle Category" value={vehicle.vehicle_category} />
+                <InfoItem label="Model Year" value={vehicle.model_year} />
+                <InfoItem label="Mileage (KM/L)" value={vehicle.mileage} />
+                <InfoItem label="Body Type" value={vehicle.body_type} />
+                <InfoItem label="Fuel Type" value={vehicle.fuel_type} />
+                <InfoItem label="Tire Size" value={vehicle.tire_size} />
+                <InfoItem label="GVW" value={vehicle.gvw} />
+                <InfoItem label="ULW" value={vehicle.ulw} />
+              </div>
+            </div>
+
+            {/* Compliance Summary */}
+            <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
+              <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200">
+                Compliance Summary
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 md:gap-y-6 gap-x-4">
+                <InfoItem label="Insurance Validity" value={vehicle.insurance_validity || '—'} />
+                <InfoItem label="FC Validity" value={vehicle.fc_validity || '—'} />
+                <InfoItem label="Tax Validity" value={vehicle.tax_validity || '—'} />
+                <InfoItem label="Pollution Validity" value={vehicle.pollution_validity || '—'} />
+                <InfoItem label="Permit Validity" value={vehicle.permit_validity || '—'} />
+                <InfoItem label="CLL Validity" value={vehicle.cll_validity || '—'} />
+                <InfoItem label="Insurance Doc" value={vehicle.insurance_document ? 'Uploaded' : 'Missing'} />
+                <InfoItem label="FC Doc" value={vehicle.fc_document ? 'Uploaded' : 'Missing'} />
+                <InfoItem label="Tax Doc" value={vehicle.tax_document ? 'Uploaded' : 'Missing'} />
+                <InfoItem label="Pollution Doc" value={vehicle.pollution_document ? 'Uploaded' : 'Missing'} />
               </div>
             </div>
 
