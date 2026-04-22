@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiSearch,
@@ -130,7 +130,9 @@ const statusColors = {
   Delayed: 'bg-red-100 text-red-700',
   Started: 'bg-cyan-100 text-cyan-700',
   Completed: 'bg-purple-100 text-purple-700',
-  Closed: 'bg-slate-100 text-slate-700'
+  Closed: 'bg-slate-100 text-slate-700',
+  Cancelled: 'bg-red-100 text-red-600',
+  Draft: 'bg-amber-100 text-amber-700',
 };
 
 const alertIcons = {
@@ -141,6 +143,7 @@ const alertIcons = {
 
 export default function TripMaster() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [trips, setTrips] = useState([]);
   const [filteredTrips, setFilteredTrips] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -151,7 +154,10 @@ export default function TripMaster() {
   const [sortConfig, setSortConfig] = useState({ key: 'startDate', direction: 'desc' });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  const [activeTab, setActiveTab] = useState('present'); // 'present' or 'past'
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tab') === 'drafts' ? 'drafts' : 'present';
+  });
 
   // Saved Views state
   const [views, setViews] = useState(() => {
@@ -174,6 +180,25 @@ export default function TripMaster() {
   const currentView = views[currentViewId] || systemViews.operations;
   const presentTripCount = trips.filter(t => ['Active', 'In Transit', 'Planned', 'Delayed', 'Started'].includes(t.status)).length;
   const pastTripCount = trips.filter(t => ['Completed', 'Closed'].includes(t.status)).length;
+  const draftTripCount = trips.filter(t => t.status === 'Draft').length;
+
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // trip id pending deletion
+
+  const handleDeleteTrip = async (tripId) => {
+    try {
+      const res = await fetch(`http://localhost:5001/api/trips/${tripId}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setTrips(prev => prev.filter(t => t.id !== tripId));
+      } else {
+        alert(data.message);
+      }
+    } catch {
+      alert('Error deleting trip');
+    } finally {
+      setDeleteConfirm(null);
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'past' && statusFilter !== 'All' && !['Completed', 'Closed'].includes(statusFilter)) {
@@ -182,6 +207,7 @@ export default function TripMaster() {
     if (activeTab === 'present' && ['Completed', 'Closed'].includes(statusFilter)) {
       setStatusFilter('All');
     }
+    if (activeTab === 'drafts') setStatusFilter('All');
   }, [activeTab, statusFilter]);
 
 
@@ -206,6 +232,7 @@ export default function TripMaster() {
             progress: trip.progress_percent || 0,
             totalCost: trip.freight_amount || 0,
             startDate: trip.trip_date || trip.created_at,
+            lastUpdated: trip.last_draft_time || trip.created_at,
             eta: trip.eta,
             alerts: [],
             fuelCost: (trip.diesel_qty || 0) * (trip.diesel_rate || 0),
@@ -226,11 +253,12 @@ export default function TripMaster() {
   // Filter and search logic
   useEffect(() => {
     let filtered = trips.filter(trip => {
-      // Tab filtering: Present vs Past trips
+      // Tab filtering
       const isPresentTrip = ['Active', 'In Transit', 'Planned', 'Delayed', 'Started'].includes(trip.status);
       const isPastTrip = ['Completed', 'Closed'].includes(trip.status);
+      const isDraft = trip.status === 'Draft';
 
-      const matchesTab = activeTab === 'present' ? isPresentTrip : isPastTrip;
+      const matchesTab = activeTab === 'present' ? isPresentTrip : activeTab === 'past' ? isPastTrip : isDraft;
 
       const matchesSearch =
         (trip.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -490,7 +518,8 @@ export default function TripMaster() {
         >
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              Trip Master - {activeTab === 'present' ? 'Present Trips' : 'Past Trips'}
+              Trip Master 
+              {/* {activeTab === 'present' ? 'Present Trips' : 'Past Trips'} */}
             </h1>
             <p className="text-gray-600 mt-1">
               {activeTab === 'present'
@@ -636,8 +665,7 @@ export default function TripMaster() {
               <div className="flex items-center justify-center gap-2">
                 <FiClock className="w-4 h-4" />
                 Present Trips
-                <span className={`ml-2 inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'present' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'
-                  }`}>
+                <span className={`ml-2 inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'present' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
                   {presentTripCount}
                 </span>
               </div>
@@ -652,9 +680,23 @@ export default function TripMaster() {
               <div className="flex items-center justify-center gap-2">
                 <FiCheck className="w-4 h-4" />
                 Past Trips
-                <span className={`ml-2 inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'past' ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'
-                  }`}>
+                <span className={`ml-2 inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'past' ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'}`}>
                   {pastTripCount}
+                </span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('drafts')}
+              className={`flex-1 px-5 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === 'drafts'
+                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
+                : 'text-gray-700 bg-white hover:bg-gray-50'
+                }`}
+            >
+              <div className="flex items-center justify-center gap-2">
+                <FiSave className="w-4 h-4" />
+                Drafts
+                <span className={`ml-2 inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'drafts' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'}`}>
+                  {draftTripCount}
                 </span>
               </div>
             </button>
@@ -770,13 +812,12 @@ export default function TripMaster() {
                 <FiTruck className="w-8 h-8 text-gray-400" />
               </div>
               <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No {activeTab === 'present' ? 'present' : 'past'} trips found
+                No {activeTab === 'present' ? 'present' : activeTab === 'past' ? 'past' : 'draft'} trips found
               </h3>
               <p className="text-gray-500 mb-6">
-                {activeTab === 'present'
-                  ? 'All trips are completed or no active trips available'
-                  : 'No completed trips yet'
-                }
+                {activeTab === 'drafts' ? 'Save a draft from the New Trip form to see it here' :
+                  activeTab === 'present' ? 'All trips are completed or no active trips available' :
+                  'No completed trips yet'}
               </p>
               {activeTab === 'present' && (
                 <button onClick={() => navigate('/trips/new')} className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 shadow-sm transition-all duration-200 flex items-center gap-2 font-medium">
@@ -784,6 +825,55 @@ export default function TripMaster() {
                   Create New Trip
                 </button>
               )}
+            </div>
+          ) : activeTab === 'drafts' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Trip ID</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Vehicle</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Route</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Last Updated</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {paginatedTrips.map((trip) => (
+                    <tr key={trip.id} className="hover:bg-amber-50/40 transition-colors">
+                      <td className="px-6 py-4 text-sm font-semibold text-indigo-600">{trip.id || '—'}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <FiTruck className="w-4 h-4 text-gray-400" />
+                          <span className="text-sm text-gray-900">{trip.truckNumber || '—'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">
+                        {trip.route?.source && trip.route?.destination
+                          ? `${trip.route.source} → ${trip.route.destination}`
+                          : '—'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {trip.lastUpdated ? new Date(trip.lastUpdated).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
+                          <FiSave className="w-3 h-3" /> Draft
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => navigate(`/trips/draft/${trip.id}`)}
+                          className="px-3 py-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition"
+                        >
+                          Resume Editing
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           ) : (
             <>
@@ -794,7 +884,6 @@ export default function TripMaster() {
                       {currentView.columnOrder.map(columnKey => {
                         const column = columnDefinitions[columnKey];
                         if (!column) return null;
-
                         return (
                           <th
                             key={columnKey}
@@ -810,6 +899,7 @@ export default function TripMaster() {
                           </th>
                         );
                       })}
+                      <th className="px-4 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -819,18 +909,29 @@ export default function TripMaster() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="hover:bg-gray-50 cursor-pointer transition-colors"
-                        onClick={() => navigate(`/trips/${trip.id}`)}
+                        className="hover:bg-gray-50 transition-colors"
                       >
                         {currentView.columnOrder.map(columnKey => {
                           if (!currentView.columns.includes(columnKey)) return null;
-
                           return (
-                            <td key={columnKey} className="px-6 py-4 whitespace-nowrap">
+                            <td key={columnKey} className="px-6 py-4 whitespace-nowrap cursor-pointer" onClick={() => navigate(`/trips/${trip.id}`)}>
                               {renderCellContent(trip, columnKey)}
                             </td>
                           );
                         })}
+                        {/* Cancel Trip — hidden for active/in-transit trips */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          {!['Started', 'In Transit'].includes(trip.status) ? (
+                            <button
+                              onClick={e => { e.stopPropagation(); setDeleteConfirm(trip.id); }}
+                              className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition"
+                            >
+                              Cancel Trip
+                            </button>
+                          ) : (
+                            <span className="text-xs text-gray-300 px-3 italic">Active</span>
+                          )}
+                        </td>
                       </motion.tr>
                     ))}
                   </tbody>
@@ -840,7 +941,7 @@ export default function TripMaster() {
               {/* Pagination */}
               <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                 <div className="text-sm text-gray-700">
-                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredTrips.length)} of {filteredTrips.length} {activeTab === 'present' ? 'present' : 'past'} trips
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredTrips.length)} of {filteredTrips.length} {activeTab === 'present' ? 'present' : activeTab === 'past' ? 'past' : 'draft'} trips
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -1014,6 +1115,30 @@ export default function TripMaster() {
           </motion.div>
         )}
       </AnimatePresence>
+      {/* Cancel Trip Confirmation Modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-base font-bold text-slate-900 mb-2">Cancel Trip</h3>
+            <p className="text-sm text-slate-500 mb-1">Are you sure you want to cancel this trip?</p>
+            <p className="text-xs text-slate-400 mb-6">The trip will be soft-deleted and hidden from all lists. Fuel and expense records are preserved.</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                Keep Trip
+              </button>
+              <button
+                onClick={() => handleDeleteTrip(deleteConfirm)}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Yes, Cancel Trip
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

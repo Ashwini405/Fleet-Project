@@ -74,6 +74,7 @@ export default function App() {
               <Route path="/vehicles/:id" element={<VehicleDetails vehicles={vehicles} />} />
               <Route path="/trips" element={<TripMaster />} />
               <Route path="/trips/new" element={<TripAdd />} />
+              <Route path="/trips/draft/:id" element={<TripAdd />} />
               <Route path="/trips/:id" element={<TripDetails />} />
               <Route path="/trips/:id/edit" element={<TripEdit />} />
               <Route path="/trips/:id/report" element={<TripReport />} />
