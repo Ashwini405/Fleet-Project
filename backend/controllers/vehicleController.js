@@ -50,12 +50,27 @@ const createVehicle = async (req, res) => {
       });
     }
 
+    // Duplicate check
+    const existing = await Vehicle.getByNumber(req.body.vehicle_no);
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: `Vehicle "${req.body.vehicle_no}" already exists in the fleet.`
+      });
+    }
+
     const files = req.files || {};
 
-    const data = {
-      ...req.body,
+    // Strip empty strings to avoid inserting '' into integer/date columns
+    const cleanBody = {};
+    Object.entries(req.body).forEach(([key, val]) => {
+      if (val !== '' && val !== null && val !== undefined) {
+        cleanBody[key] = val;
+      }
+    });
 
-      // 🔥 DOCUMENTS
+    const data = {
+      ...cleanBody,
       insurance_document: files.insurance_document?.[0]?.filename || null,
       fc_document: files.fc_document?.[0]?.filename || null,
       permit_document: files.permit_document?.[0]?.filename || null,
@@ -70,14 +85,12 @@ const createVehicle = async (req, res) => {
     res.status(201).json({
       success: true,
       message: 'Vehicle created successfully',
-      data: {
-        id: result.insertId
-      }
+      data: { id: result.insertId }
     });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Server Error' });
+    console.error('createVehicle error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server Error' });
   }
 };
 
@@ -96,10 +109,16 @@ const updateVehicle = async (req, res) => {
 
     const files = req.files || {};
 
-    const data = {
-      ...req.body,
+    // Strip empty strings so FK integer columns don't get '' which causes SQL errors
+    const cleanBody = {};
+    Object.entries(req.body).forEach(([key, val]) => {
+      if (val !== '' && val !== null && val !== undefined) {
+        cleanBody[key] = val;
+      }
+    });
 
-      // 🔥 KEEP OLD IF NEW NOT UPLOADED
+    const data = {
+      ...cleanBody,
       insurance_document: files.insurance_document?.[0]?.filename || existingVehicle.insurance_document,
       fc_document: files.fc_document?.[0]?.filename || existingVehicle.fc_document,
       permit_document: files.permit_document?.[0]?.filename || existingVehicle.permit_document,
@@ -117,8 +136,8 @@ const updateVehicle = async (req, res) => {
     });
 
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Server Error' });
+    console.error('updateVehicle error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Server Error' });
   }
 };
 

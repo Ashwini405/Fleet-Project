@@ -354,21 +354,13 @@ export default function EditVehicle() {
       if (files.rcDoc) formDataToSend.append("rc_document", files.rcDoc);
 
       // 🚀 SEND REQUEST
-      const response = await fetch('http://localhost:5001/api/vehicles', {
-        method: 'POST',
+      const response = await fetch(`http://localhost:5001/api/vehicles/${id}`, {
+        method: 'PUT',
         body: formDataToSend
       });
 
       const data = await response.json();
 
-      if (data.success) {
-        console.log("Vehicle saved successfully:", data);
-        navigate('/vehicles');
-      } else {
-        alert("Failed to save: " + data.message);
-      }
-
-      const resData = await response.json();
       if (data.success) {
         navigate(`/vehicles/${id}`);
       } else {

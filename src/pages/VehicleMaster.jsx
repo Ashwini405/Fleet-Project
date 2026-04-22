@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { FiSearch, FiPlus, FiFilter, FiSettings, FiLayers, FiX } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiFilter, FiSettings, FiLayers, FiX, FiTrash2 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 
 // ─── Column Definitions ───────────────────────────────────────────────────────
@@ -17,6 +17,7 @@ const ALL_COLUMNS = [
   { key: 'fastagId', label: 'FASTag ID', defaultOn: false },
   { key: 'emi', label: 'EMI', defaultOn: false },
   { key: 'complianceStatus', label: 'Compliance Status', defaultOn: false },
+  { key: 'actions', label: 'Actions', defaultOn: true },
 ];
 
 const defaultVisible = Object.fromEntries(ALL_COLUMNS.map(c => [c.key, c.defaultOn]));
@@ -176,7 +177,24 @@ export default function VehicleMaster() {
   const [visibleCols, setVisibleCols] = useState(defaultVisible);
   const [showColSettings, setShowColSettings] = useState(false);
   const [vehicles, setVehicles] = useState([]);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const colSettingsBtnRef = useRef(null);
+
+  const handleDelete = async (id) => {
+    try {
+      const res = await fetch(`http://localhost:5001/api/vehicles/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        setVehicles(prev => prev.filter(v => v.id !== id));
+      } else {
+        alert('Failed to delete: ' + data.message);
+      }
+    } catch {
+      alert('Error deleting vehicle');
+    } finally {
+      setDeleteConfirm(null);
+    }
+  };
 
   // Fetch vehicles from backend
   useEffect(() => {
@@ -335,6 +353,15 @@ export default function VehicleMaster() {
                   >
                     {activeColumns.map(col => (
                       <td key={col.key} className="px-5 py-3.5">
+                        {col.key === 'actions' && (
+                          <button
+                            onClick={e => { e.stopPropagation(); setDeleteConfirm(vehicle.id); }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                            title="Delete vehicle"
+                          >
+                            <FiTrash2 className="w-4 h-4" />
+                          </button>
+                        )}
                         {col.key === 'truckNo' && (
                           <span className="font-semibold text-slate-900 group-hover:text-indigo-700">{vehicle.truckNo}</span>
                         )}
@@ -343,7 +370,7 @@ export default function VehicleMaster() {
                         {col.key === 'odometer' && (
                           <span className="font-mono text-slate-600 text-xs">{vehicle.odometer.toLocaleString()} km</span>
                         )}
-                        {!['truckNo', 'status', 'complianceStatus', 'odometer'].includes(col.key) && (
+                        {!['actions', 'truckNo', 'status', 'complianceStatus', 'odometer'].includes(col.key) && (
                           <span className="text-slate-600">{vehicle[col.key] || '—'}</span>
                         )}
                       </td>
@@ -367,6 +394,7 @@ export default function VehicleMaster() {
 
         {/* Table Footer */}
         <div className="px-5 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+
           <span className="text-xs text-slate-500">
             Showing <strong className="text-slate-800">{filteredData.length}</strong> of <strong className="text-slate-800">{vehicles.length}</strong> vehicles
           </span>
@@ -376,6 +404,30 @@ export default function VehicleMaster() {
           </div>
         </div>
       </div>
+
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-base font-bold text-slate-900 mb-2">Delete Vehicle</h3>
+            <p className="text-sm text-slate-500 mb-6">Are you sure you want to delete this vehicle? This action cannot be undone.</p>
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteConfirm(null)}
+                className="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDelete(deleteConfirm)}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

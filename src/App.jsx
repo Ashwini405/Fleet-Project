@@ -69,7 +69,7 @@ export default function App() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/vehicles" element={<VehicleMaster vehicles={vehicles} setVehicles={setVehicles} />} />
               <Route path="/vehicles/add" element={<AddVehicle vehicles={vehicles} setVehicles={setVehicles} />} />
-              <Route path="/vehicles/bulk-upload" element={<BulkUploadVehicles vehicles={vehicles} setVehicles={setVehicles} />} />
+              <Route path="/vehicles/bulk-upload" element={<BulkUploadVehicles />} />
               <Route path="/vehicles/edit/:id" element={<EditVehicle vehicles={vehicles} setVehicles={setVehicles} />} />
               <Route path="/vehicles/:id" element={<VehicleDetails vehicles={vehicles} />} />
               <Route path="/trips" element={<TripMaster />} />

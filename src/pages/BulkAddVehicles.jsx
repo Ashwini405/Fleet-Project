@@ -3,25 +3,35 @@ import { useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiPlus, FiTrash2, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
 
 const COLS = [
-  { key: 'truckNo',    label: 'Truck Number *', type: 'text',   placeholder: 'e.g. AP39 AB 1234', width: 'w-44' },
-  { key: 'driver',     label: 'Driver',          type: 'text',   placeholder: 'Driver name',        width: 'w-36' },
-  { key: 'plant',      label: 'Plant',           type: 'select', placeholder: 'Select plant',       width: 'w-40',
-    options: ['Hyderabad Hub', 'Vizag Depot', 'Pune Facility', 'Delhi Central', 'Bangalore Base'] },
-  { key: 'type',       label: 'Type',            type: 'select', placeholder: 'Select type',        width: 'w-36',
+  { key: 'vehicle_no',       label: 'Truck Number *',  type: 'text',   placeholder: 'e.g. AP39 AB 1234', width: 'w-44' },
+  { key: 'type',             label: 'Type',             type: 'select', placeholder: 'Select type',       width: 'w-36',
     options: ['Trailer', 'Tanker', 'Tipper', 'Flatbed', 'Box Truck'] },
-  { key: 'odometer',   label: 'Odometer (km)',   type: 'number', placeholder: '0',                  width: 'w-32' },
-  { key: 'supervisor', label: 'Supervisor',      type: 'select', placeholder: 'Select supervisor',  width: 'w-36',
-    options: ['Ravi Kumar', 'Suresh Das', 'Amit Patel', 'Vikram Singh', 'Unassigned'] },
+  { key: 'fuel_type',        label: 'Fuel Type',        type: 'select', placeholder: 'Select fuel',       width: 'w-32',
+    options: ['Diesel', 'Petrol', 'CNG', 'Electric'] },
+  { key: 'vehicle_category', label: 'Category',         type: 'select', placeholder: 'Select category',   width: 'w-32',
+    options: ['Heavy', 'Medium', 'Light'] },
+  { key: 'body_type',        label: 'Body Type',        type: 'text',   placeholder: 'e.g. Flatbed',      width: 'w-32' },
+  { key: 'vehicle_color',    label: 'Color',            type: 'text',   placeholder: 'e.g. White',        width: 'w-28' },
+  { key: 'initial_odometer', label: 'Odometer (km)',    type: 'number', placeholder: '0',                 width: 'w-32' },
+  { key: 'chassis_no',       label: 'Chassis No',       type: 'text',   placeholder: 'Chassis number',    width: 'w-36' },
+  { key: 'engine_no',        label: 'Engine No',        type: 'text',   placeholder: 'Engine number',     width: 'w-36' },
+  { key: 'mfg_year',         label: 'Mfg Year',         type: 'number', placeholder: '2020',              width: 'w-24' },
 ];
 
-const emptyRow = () => ({ _id: Math.random(), truckNo: '', driver: '', plant: '', type: '', odometer: '', supervisor: '' });
+const emptyRow = () => ({
+  _id: Math.random(),
+  vehicle_no: '', type: '', fuel_type: '', vehicle_category: '',
+  body_type: '', vehicle_color: '', initial_odometer: '',
+  chassis_no: '', engine_no: '', mfg_year: '',
+});
 
-export default function BulkAddVehicles({ vehicles = [], setVehicles }) {
+export default function BulkAddVehicles() {
   const navigate = useNavigate();
   const [rows, setRows] = useState([emptyRow(), emptyRow(), emptyRow()]);
   const [errors, setErrors] = useState({});
   const [activeRow, setActiveRow] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const inputRefs = useRef({});
 
   const setRef = (rowIdx, colKey, el) => {
@@ -35,7 +45,6 @@ export default function BulkAddVehicles({ vehicles = [], setVehicles }) {
     if (nextCol) {
       inputRefs.current[rowIdx]?.[nextCol.key]?.focus();
     } else {
-      // last col — move to next row's first col, or add row
       if (rowIdx === rows.length - 1) {
         setRows(prev => [...prev, emptyRow()]);
         setTimeout(() => inputRefs.current[rowIdx + 1]?.[COLS[0].key]?.focus(), 50);
@@ -70,12 +79,10 @@ export default function BulkAddVehicles({ vehicles = [], setVehicles }) {
     });
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const newErrors = {};
-    const existingNos = new Set(vehicles.map(v => v.truckNo.trim().toLowerCase()));
     const seenInBatch = new Set();
-
-    const validRows = rows.filter(r => r.truckNo.trim() !== '');
+    const validRows = rows.filter(r => r.vehicle_no.trim() !== '');
 
     if (validRows.length === 0) {
       alert('Please enter at least one Truck Number.');
@@ -83,10 +90,9 @@ export default function BulkAddVehicles({ vehicles = [], setVehicles }) {
     }
 
     rows.forEach((row, i) => {
-      if (!row.truckNo.trim()) return; // skip empty rows
-      const key = row.truckNo.trim().toLowerCase();
-      if (existingNos.has(key)) newErrors[`${i}-truckNo`] = 'Already exists';
-      else if (seenInBatch.has(key)) newErrors[`${i}-truckNo`] = 'Duplicate in batch';
+      if (!row.vehicle_no.trim()) return;
+      const key = row.vehicle_no.trim().toLowerCase();
+      if (seenInBatch.has(key)) newErrors[`${i}-vehicle_no`] = 'Duplicate in batch';
       else seenInBatch.add(key);
     });
 
@@ -95,29 +101,44 @@ export default function BulkAddVehicles({ vehicles = [], setVehicles }) {
       return;
     }
 
-    const maxId = vehicles.reduce((m, v) => Math.max(m, v.id), 0);
-    const newVehicles = validRows.map((row, i) => ({
-      id:         maxId + i + 1,
-      truckNo:    row.truckNo.trim(),
-      driver:     row.driver.trim() || 'Unassigned',
-      plant:      row.plant || '—',
-      type:       row.type || '—',
-      odometer:   Number(row.odometer) || 0,
-      supervisor: row.supervisor || 'Unassigned',
-      status:     'Active',
-      fuelType:   '—', vehicleCategory: '—', gpsId: '—', fastagId: '—',
-      emi: '—', emiDate: '—', complianceStatus: 'Valid',
-      color: '—', bodyType: '—', financier: '—', loanAcc: '—', loanTenure: 0,
-      makeModel: '—', chassisNo: '—', engineNo: '—', mfgYear: '—',
-      grossWeight: '—', pendingEmis: '—',
-    }));
+    setSaving(true);
+    try {
+      const results = await Promise.all(
+        validRows.map(row => {
+          const body = {
+            vehicle_no:       row.vehicle_no.trim(),
+            type:             row.type || null,
+            fuel_type:        row.fuel_type || null,
+            vehicle_category: row.vehicle_category || null,
+            body_type:        row.body_type || null,
+            vehicle_color:    row.vehicle_color || null,
+            initial_odometer: Number(row.initial_odometer) || 0,
+            chassis_no:       row.chassis_no || null,
+            engine_no:        row.engine_no || null,
+            mfg_year:         row.mfg_year || null,
+            vehicle_status:   'Active',
+          };
+          return fetch('http://localhost:5001/api/vehicles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          }).then(r => r.json());
+        })
+      );
 
-    setVehicles(prev => [...prev, ...newVehicles]);
-    setSaved(true);
-    setTimeout(() => navigate('/vehicles'), 1200);
+      const failed = results.filter(r => !r.success);
+      if (failed.length > 0) alert(`${failed.length} vehicle(s) failed to save.`);
+
+      setSaved(true);
+      setTimeout(() => navigate('/vehicles'), 1200);
+    } catch {
+      alert('Error saving vehicles to backend.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const filledCount = rows.filter(r => r.truckNo.trim()).length;
+  const filledCount = rows.filter(r => r.vehicle_no.trim()).length;
 
   return (
     <div className="font-sans text-slate-800 pb-24">
@@ -141,11 +162,11 @@ export default function BulkAddVehicles({ vehicles = [], setVehicles }) {
           </button>
           <button
             onClick={handleSave}
-            disabled={saved}
+            disabled={saved || saving}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm ${saved ? 'bg-green-600 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
           >
             <FiCheckCircle className="w-4 h-4" />
-            {saved ? 'Saved!' : 'Save Vehicles'}
+            {saved ? 'Saved!' : saving ? 'Saving...' : 'Save Vehicles'}
           </button>
         </div>
       </div>
@@ -212,9 +233,7 @@ export default function BulkAddVehicles({ vehicles = [], setVehicles }) {
                             className={cellCls}
                           />
                         )}
-                        {hasErr && (
-                          <p className="text-[10px] text-red-500 mt-0.5 px-1">{errors[errKey]}</p>
-                        )}
+                        {hasErr && <p className="text-[10px] text-red-500 mt-0.5 px-1">{errors[errKey]}</p>}
                       </td>
                     );
                   })}
@@ -234,12 +253,8 @@ export default function BulkAddVehicles({ vehicles = [], setVehicles }) {
           </table>
         </div>
 
-        {/* Add Row */}
         <div className="px-4 py-3 border-t border-slate-100">
-          <button
-            onClick={addRow}
-            className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors"
-          >
+          <button onClick={addRow} className="flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium transition-colors">
             <FiPlus className="w-4 h-4" />
             Add Row
           </button>
@@ -258,11 +273,11 @@ export default function BulkAddVehicles({ vehicles = [], setVehicles }) {
             </button>
             <button
               onClick={handleSave}
-              disabled={saved}
+              disabled={saved || saving}
               className={`px-5 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow ${saved ? 'bg-green-600 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}
             >
               <FiCheckCircle className="w-4 h-4" />
-              {saved ? 'Saved! Redirecting...' : 'Save Vehicles'}
+              {saved ? 'Saved! Redirecting...' : saving ? 'Saving...' : 'Save Vehicles'}
             </button>
           </div>
         </div>

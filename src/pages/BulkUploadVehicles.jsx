@@ -5,22 +5,31 @@ import { FiUploadCloud, FiArrowLeft, FiCheckCircle, FiAlertCircle, FiX, FiDownlo
 
 // Expected column header aliases → internal key
 const COL_MAP = {
-  'truck number': 'truckNo', 'truck no': 'truckNo', 'truckno': 'truckNo', 'vehicle no': 'truckNo',
-  'driver': 'driver',
-  'plant': 'plant',
+  'truck number': 'vehicle_no', 'truck no': 'vehicle_no', 'truckno': 'vehicle_no', 'vehicle no': 'vehicle_no', 'vehicle_no': 'vehicle_no',
   'type': 'type', 'vehicle type': 'type',
-  'odometer': 'odometer', 'odometer (km)': 'odometer', 'km': 'odometer',
-  'supervisor': 'supervisor',
+  'fuel type': 'fuel_type', 'fuel_type': 'fuel_type',
+  'vehicle category': 'vehicle_category', 'vehicle_category': 'vehicle_category', 'category': 'vehicle_category',
+  'body type': 'body_type', 'body_type': 'body_type',
+  'color': 'vehicle_color', 'vehicle color': 'vehicle_color',
+  'odometer': 'initial_odometer', 'odometer (km)': 'initial_odometer', 'initial odometer': 'initial_odometer',
+  'chassis no': 'chassis_no', 'chassis_no': 'chassis_no',
+  'engine no': 'engine_no', 'engine_no': 'engine_no',
+  'mfg year': 'mfg_year', 'mfg_year': 'mfg_year', 'year': 'mfg_year',
+  'gps id': 'gps_device_id', 'gps_device_id': 'gps_device_id',
+  'fastag id': 'fastag_id', 'fastag_id': 'fastag_id',
 };
 
-const REQUIRED = ['truckNo'];
 const DISPLAY_COLS = [
-  { key: 'truckNo',    label: 'Truck Number' },
-  { key: 'driver',     label: 'Driver' },
-  { key: 'plant',      label: 'Plant' },
-  { key: 'type',       label: 'Type' },
-  { key: 'odometer',   label: 'Odometer' },
-  { key: 'supervisor', label: 'Supervisor' },
+  { key: 'vehicle_no',        label: 'Truck Number' },
+  { key: 'type',              label: 'Type' },
+  { key: 'fuel_type',         label: 'Fuel Type' },
+  { key: 'vehicle_category',  label: 'Category' },
+  { key: 'body_type',         label: 'Body Type' },
+  { key: 'vehicle_color',     label: 'Color' },
+  { key: 'initial_odometer',  label: 'Odometer (km)' },
+  { key: 'chassis_no',        label: 'Chassis No' },
+  { key: 'engine_no',         label: 'Engine No' },
+  { key: 'mfg_year',          label: 'Mfg Year' },
 ];
 
 function parseSheet(workbook) {
@@ -32,7 +41,7 @@ function parseSheet(workbook) {
   const keyMap = {};
   headers.forEach((h, i) => { if (COL_MAP[h]) keyMap[i] = COL_MAP[h]; });
 
-  if (!Object.values(keyMap).includes('truckNo')) {
+  if (!Object.values(keyMap).includes('vehicle_no')) {
     return { rows: [], headerErrors: ['Could not find a "Truck Number" column. Check your file headers.'] };
   }
 
@@ -47,28 +56,27 @@ function parseSheet(workbook) {
   return { rows, headerErrors: [] };
 }
 
-function validateRows(rows, existingTruckNos) {
+function validateRows(rows, existingNos) {
   const seen = new Set();
   return rows.map(row => {
     const errors = [];
-    if (!row.truckNo) errors.push('Truck Number is required');
-    else if (existingTruckNos.has(row.truckNo.toLowerCase())) errors.push('Already exists in fleet');
-    else if (seen.has(row.truckNo.toLowerCase())) errors.push('Duplicate in file');
-    else seen.add(row.truckNo.toLowerCase());
+    if (!row.vehicle_no) errors.push('Truck Number is required');
+    else if (existingNos.has(row.vehicle_no.toLowerCase())) errors.push('Already exists in fleet');
+    else if (seen.has(row.vehicle_no.toLowerCase())) errors.push('Duplicate in file');
+    else seen.add(row.vehicle_no.toLowerCase());
     return { ...row, _errors: errors };
   });
 }
 
-export default function BulkUploadVehicles({ vehicles = [], setVehicles }) {
+export default function BulkUploadVehicles() {
   const navigate = useNavigate();
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState('');
   const [headerErrors, setHeaderErrors] = useState([]);
-  const [preview, setPreview] = useState(null); // null | validated rows array
+  const [preview, setPreview] = useState(null);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const inputRef = useRef();
-
-  const existingNos = new Set(vehicles.map(v => v.truckNo.toLowerCase()));
 
   const processFile = useCallback((file) => {
     if (!file) return;
@@ -85,41 +93,43 @@ export default function BulkUploadVehicles({ vehicles = [], setVehicles }) {
       const wb = XLSX.read(data, { type: 'array' });
       const { rows, headerErrors: he } = parseSheet(wb);
       setHeaderErrors(he);
-      if (he.length === 0) setPreview(validateRows(rows, existingNos));
+      if (he.length === 0) setPreview(validateRows(rows, new Set()));
     };
     reader.readAsArrayBuffer(file);
-  }, [existingNos]);
+  }, []);
 
-  const onDrop = (e) => {
-    e.preventDefault();
-    setDragging(false);
-    processFile(e.dataTransfer.files[0]);
-  };
-
+  const onDrop = (e) => { e.preventDefault(); setDragging(false); processFile(e.dataTransfer.files[0]); };
   const onFileInput = (e) => processFile(e.target.files[0]);
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     const valid = preview.filter(r => r._errors.length === 0);
     if (valid.length === 0) return;
-    const maxId = vehicles.reduce((m, v) => Math.max(m, v.id), 0);
-    const newVehicles = valid.map((row, i) => ({
-      id: maxId + i + 1,
-      truckNo:    row.truckNo,
-      driver:     row.driver || 'Unassigned',
-      plant:      row.plant  || '—',
-      type:       row.type   || '—',
-      odometer:   Number(row.odometer) || 0,
-      supervisor: row.supervisor || 'Unassigned',
-      status: 'Active', fuelType: '—', vehicleCategory: '—',
-      gpsId: '—', fastagId: '—', emi: '—', emiDate: '—',
-      complianceStatus: 'Valid', color: '—', bodyType: '—',
-      financier: '—', loanAcc: '—', loanTenure: 0,
-      makeModel: '—', chassisNo: '—', engineNo: '—',
-      mfgYear: '—', grossWeight: '—', pendingEmis: '—',
-    }));
-    setVehicles(prev => [...prev, ...newVehicles]);
-    setSaved(true);
-    setTimeout(() => navigate('/vehicles'), 1200);
+    setSaving(true);
+    try {
+      const results = await Promise.all(
+        valid.map(row => {
+          const body = { ...row };
+          delete body._rowIdx;
+          delete body._errors;
+          body.vehicle_status = 'Active';
+          return fetch('http://localhost:5001/api/vehicles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          }).then(r => r.json());
+        })
+      );
+      const failed = results.filter(r => !r.success);
+      if (failed.length > 0) {
+        alert(`${failed.length} vehicle(s) failed to save.`);
+      }
+      setSaved(true);
+      setTimeout(() => navigate('/vehicles'), 1200);
+    } catch {
+      alert('Error saving vehicles to backend.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const reset = () => { setPreview(null); setFileName(''); setHeaderErrors([]); setSaved(false); };
@@ -127,14 +137,11 @@ export default function BulkUploadVehicles({ vehicles = [], setVehicles }) {
   const validCount   = preview ? preview.filter(r => r._errors.length === 0).length : 0;
   const invalidCount = preview ? preview.filter(r => r._errors.length > 0).length : 0;
 
-  // Download sample CSV
   const downloadSample = () => {
     const ws = XLSX.utils.aoa_to_sheet([
-      ['Truck Number', 'Driver', 'Plant', 'Type', 'Odometer'],
-      ['MH 12 AB 1234', 'Rajesh Yadav', 'Pune Facility', 'Trailer', '45000'],
-      ['DL 01 XY 5678', 'Mohan Lal', 'Delhi Central', 'Tanker', '82000'],
-      ['KA 05 GH 3456', 'Arjun Nair', 'Bangalore Base', 'Flatbed', '33100'],
-      ['TN 22 IJ 7890', 'Karthik Rajan', 'Vizag Depot', 'Box Truck', '97800'],
+      ['Truck Number', 'Type', 'Fuel Type', 'Vehicle Category', 'Body Type', 'Color', 'Odometer (km)', 'Chassis No', 'Engine No', 'Mfg Year'],
+      ['MH 12 AB 1234', 'Trailer', 'Diesel', 'Heavy', 'Flatbed', 'White', '45000', 'CH123456', 'EN123456', '2021'],
+      ['DL 01 XY 5678', 'Tanker',  'Diesel', 'Heavy', 'Tanker',  'Blue',  '82000', 'CH654321', 'EN654321', '2020'],
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Vehicles');
@@ -174,9 +181,7 @@ export default function BulkUploadVehicles({ vehicles = [], setVehicles }) {
           <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-4 transition-colors ${dragging ? 'bg-indigo-100' : 'bg-slate-100'}`}>
             <FiUploadCloud className={`w-8 h-8 ${dragging ? 'text-indigo-500' : 'text-slate-400'}`} />
           </div>
-          <p className="text-base font-semibold text-slate-700 mb-1">
-            {dragging ? 'Drop your file here' : 'Drag & drop your file here'}
-          </p>
+          <p className="text-base font-semibold text-slate-700 mb-1">{dragging ? 'Drop your file here' : 'Drag & drop your file here'}</p>
           <p className="text-sm text-slate-400 mb-4">or click to browse</p>
           <span className="px-4 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg">Choose File</span>
           <p className="text-xs text-slate-400 mt-4">Supports .csv, .xlsx, .xls</p>
@@ -198,7 +203,6 @@ export default function BulkUploadVehicles({ vehicles = [], setVehicles }) {
       {/* Preview */}
       {preview && (
         <div className="space-y-4">
-          {/* Stats bar */}
           <div className="flex flex-wrap items-center gap-3 p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
             <div className="flex items-center gap-2 text-sm">
               <FiUploadCloud className="w-4 h-4 text-slate-400" />
@@ -214,7 +218,6 @@ export default function BulkUploadVehicles({ vehicles = [], setVehicles }) {
             </div>
           </div>
 
-          {/* Preview Table */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm whitespace-nowrap">
@@ -232,20 +235,18 @@ export default function BulkUploadVehicles({ vehicles = [], setVehicles }) {
                       <tr key={i} className={hasErr ? 'bg-red-50/60' : 'hover:bg-slate-50/50'}>
                         <td className="px-4 py-2.5 text-xs text-slate-400">{row._rowIdx}</td>
                         {DISPLAY_COLS.map(c => (
-                          <td key={c.key} className={`px-4 py-2.5 ${hasErr && c.key === 'truckNo' ? 'text-red-700 font-medium' : 'text-slate-700'}`}>
+                          <td key={c.key} className={`px-4 py-2.5 ${hasErr && c.key === 'vehicle_no' ? 'text-red-700 font-medium' : 'text-slate-700'}`}>
                             {row[c.key] || <span className="text-slate-300">—</span>}
                           </td>
                         ))}
                         <td className="px-4 py-2.5">
                           {hasErr ? (
                             <span className="inline-flex items-center gap-1.5 text-xs text-red-600 font-medium">
-                              <FiAlertCircle className="w-3.5 h-3.5" />
-                              {row._errors[0]}
+                              <FiAlertCircle className="w-3.5 h-3.5" />{row._errors[0]}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1.5 text-xs text-green-600 font-medium">
-                              <FiCheckCircle className="w-3.5 h-3.5" />
-                              Ready
+                              <FiCheckCircle className="w-3.5 h-3.5" />Ready
                             </span>
                           )}
                         </td>
@@ -257,7 +258,6 @@ export default function BulkUploadVehicles({ vehicles = [], setVehicles }) {
             </div>
           </div>
 
-          {/* Confirm Bar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-white border border-slate-200 rounded-xl shadow-sm">
             <p className="text-sm text-slate-600">
               <strong className="text-slate-900">{validCount}</strong> vehicle{validCount !== 1 ? 's' : ''} will be imported.
@@ -265,7 +265,7 @@ export default function BulkUploadVehicles({ vehicles = [], setVehicles }) {
             </p>
             <button
               onClick={handleConfirm}
-              disabled={validCount === 0 || saved}
+              disabled={validCount === 0 || saved || saving}
               className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm ${
                 saved ? 'bg-green-600 text-white' :
                 validCount === 0 ? 'bg-slate-200 text-slate-400 cursor-not-allowed' :
@@ -273,7 +273,7 @@ export default function BulkUploadVehicles({ vehicles = [], setVehicles }) {
               }`}
             >
               <FiCheckCircle className="w-4 h-4" />
-              {saved ? 'Imported! Redirecting...' : `Import ${validCount} Vehicle${validCount !== 1 ? 's' : ''}`}
+              {saved ? 'Imported! Redirecting...' : saving ? 'Saving...' : `Import ${validCount} Vehicle${validCount !== 1 ? 's' : ''}`}
             </button>
           </div>
         </div>
