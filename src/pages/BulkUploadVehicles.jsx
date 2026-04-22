@@ -3,22 +3,31 @@ import { useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { FiUploadCloud, FiArrowLeft, FiCheckCircle, FiAlertCircle, FiX, FiDownload } from 'react-icons/fi';
 
-// Expected column header aliases → internal key
+// ─── Column mapping (Excel header → database column) ─────────────────────
 const COL_MAP = {
-  'truck number': 'vehicle_no', 'truck no': 'vehicle_no', 'truckno': 'vehicle_no', 'vehicle no': 'vehicle_no', 'vehicle_no': 'vehicle_no',
+  'truck number': 'vehicle_no', 'truck no': 'vehicle_no', 'truckno': 'vehicle_no',
+  'vehicle no': 'vehicle_no', 'vehicle_no': 'vehicle_no',
   'type': 'type', 'vehicle type': 'type',
   'fuel type': 'fuel_type', 'fuel_type': 'fuel_type',
   'vehicle category': 'vehicle_category', 'vehicle_category': 'vehicle_category', 'category': 'vehicle_category',
   'body type': 'body_type', 'body_type': 'body_type',
   'color': 'vehicle_color', 'vehicle color': 'vehicle_color',
   'odometer': 'initial_odometer', 'odometer (km)': 'initial_odometer', 'initial odometer': 'initial_odometer',
-  'chassis no': 'chassis_no', 'chassis_no': 'chassis_no',
-  'engine no': 'engine_no', 'engine_no': 'engine_no',
-  'mfg year': 'mfg_year', 'mfg_year': 'mfg_year', 'year': 'mfg_year',
+  
+  // 🔥 FIXED: chassis number → chassis_number
+  'chassis no': 'chassis_number', 'chassis_no': 'chassis_number',
+  
+  // 🔥 FIXED: engine number → engine_number
+  'engine no': 'engine_number', 'engine_no': 'engine_number',
+  
+  // 🔥 FIXED: manufacturing year → model_year
+  'mfg year': 'model_year', 'mfg_year': 'model_year', 'year': 'model_year',
+  
   'gps id': 'gps_device_id', 'gps_device_id': 'gps_device_id',
   'fastag id': 'fastag_id', 'fastag_id': 'fastag_id',
 };
 
+// ─── Columns to display in preview table ─────────────────────────────────
 const DISPLAY_COLS = [
   { key: 'vehicle_no',        label: 'Truck Number' },
   { key: 'type',              label: 'Type' },
@@ -27,11 +36,12 @@ const DISPLAY_COLS = [
   { key: 'body_type',         label: 'Body Type' },
   { key: 'vehicle_color',     label: 'Color' },
   { key: 'initial_odometer',  label: 'Odometer (km)' },
-  { key: 'chassis_no',        label: 'Chassis No' },
-  { key: 'engine_no',         label: 'Engine No' },
-  { key: 'mfg_year',          label: 'Mfg Year' },
+  { key: 'chassis_number',    label: 'Chassis No' },    // ✅ fixed
+  { key: 'engine_number',     label: 'Engine No' },     // ✅ fixed
+  { key: 'model_year',        label: 'Mfg Year' },      // ✅ fixed
 ];
 
+// ─── Parse Excel/CSV and map headers ─────────────────────────────────────
 function parseSheet(workbook) {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
@@ -56,6 +66,7 @@ function parseSheet(workbook) {
   return { rows, headerErrors: [] };
 }
 
+// ─── Validate rows (duplicate + existence check) ─────────────────────────
 function validateRows(rows, existingNos) {
   const seen = new Set();
   return rows.map(row => {
@@ -64,6 +75,14 @@ function validateRows(rows, existingNos) {
     else if (existingNos.has(row.vehicle_no.toLowerCase())) errors.push('Already exists in fleet');
     else if (seen.has(row.vehicle_no.toLowerCase())) errors.push('Duplicate in file');
     else seen.add(row.vehicle_no.toLowerCase());
+
+    // Optional: additional validation for chassis/engine length can be added here
+    if (row.chassis_number && row.chassis_number.length !== 17) {
+      errors.push('Chassis number must be exactly 17 characters');
+    }
+    if (row.engine_number && row.engine_number.length > 20) {
+      errors.push('Engine number max 20 characters');
+    }
     return { ...row, _errors: errors };
   });
 }
@@ -93,7 +112,7 @@ export default function BulkUploadVehicles() {
       const wb = XLSX.read(data, { type: 'array' });
       const { rows, headerErrors: he } = parseSheet(wb);
       setHeaderErrors(he);
-      if (he.length === 0) setPreview(validateRows(rows, new Set()));
+      if (he.length === 0) setPreview(validateRows(rows, new Set())); // existingNos can be fetched from API if needed
     };
     reader.readAsArrayBuffer(file);
   }, []);
@@ -140,8 +159,8 @@ export default function BulkUploadVehicles() {
   const downloadSample = () => {
     const ws = XLSX.utils.aoa_to_sheet([
       ['Truck Number', 'Type', 'Fuel Type', 'Vehicle Category', 'Body Type', 'Color', 'Odometer (km)', 'Chassis No', 'Engine No', 'Mfg Year'],
-      ['MH 12 AB 1234', 'Trailer', 'Diesel', 'Heavy', 'Flatbed', 'White', '45000', 'CH123456', 'EN123456', '2021'],
-      ['DL 01 XY 5678', 'Tanker',  'Diesel', 'Heavy', 'Tanker',  'Blue',  '82000', 'CH654321', 'EN654321', '2020'],
+      ['MH 12 AB 1234', 'Trailer', 'Diesel', 'Heavy', 'Flatbed', 'White', '45000', 'CH123456789012345', 'EN12345678901234567890', '2021'],
+      ['DL 01 XY 5678', 'Tanker',  'Diesel', 'Heavy', 'Tanker',  'Blue',  '82000', 'CH654321098765432', 'EN6543210987654321', '2020'],
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Vehicles');
