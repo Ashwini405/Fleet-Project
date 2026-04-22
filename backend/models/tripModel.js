@@ -11,37 +11,37 @@ const Trip = {
     return result;
   },
 
-  // ✅ GET ALL TRIPS
+  // ✅ GET ALL TRIPS (exclude soft-deleted)
 getAll: async () => {
   const [rows] = await db.query(`
     SELECT 
       t.*,
-      COALESCE(d.full_name, t.driver_name) AS driver_name,  -- ✅ FIX
+      COALESCE(d.full_name, t.driver_name) AS driver_name,
       s.full_name AS supervisor_name,
       st.station_name
     FROM trips t
     LEFT JOIN drivers d ON t.driver_id = d.id
     LEFT JOIN supervisors s ON t.supervisor_id = s.id
     LEFT JOIN stations st ON t.station_id = st.id
+    WHERE t.is_deleted = 0
     ORDER BY t.created_at DESC
   `);
   return rows;
 },
-  // ✅ GET SINGLE TRIP
+  // ✅ GET SINGLE TRIP (exclude soft-deleted)
 getById: async (tripId) => {
   const [rows] = await db.query(`
     SELECT 
       t.*,
-      COALESCE(d.full_name, t.driver_name) AS driver_name,  -- ✅ FIX
+      COALESCE(d.full_name, t.driver_name) AS driver_name,
       s.full_name AS supervisor_name,
       st.station_name
     FROM trips t
     LEFT JOIN drivers d ON t.driver_id = d.id
     LEFT JOIN supervisors s ON t.supervisor_id = s.id
     LEFT JOIN stations st ON t.station_id = st.id
-    WHERE t.trip_id = ?
+    WHERE t.trip_id = ? AND t.is_deleted = 0
   `, [tripId]);
-
   return rows[0];
 },
 
@@ -109,14 +109,29 @@ getFuel: async (tripId) => {
     return result;
   },
 
-  // ✅ DELETE TRIP
-  delete: async (id) => {
+  // ✅ SOFT DELETE TRIP
+  softDelete: async (id) => {
     const [result] = await db.query(
-      'DELETE FROM trips WHERE trip_id = ?',
+      `UPDATE trips SET is_deleted = 1, deleted_at = NOW() WHERE trip_id = ?`,
       [id]
     );
     return result;
-  }
+  },
+
+  // ✅ GET BY ID (including soft-deleted, for internal use)
+  getByIdAny: async (tripId) => {
+    const [rows] = await db.query(
+      `SELECT t.*, COALESCE(d.full_name, t.driver_name) AS driver_name,
+              s.full_name AS supervisor_name, st.station_name
+       FROM trips t
+       LEFT JOIN drivers d ON t.driver_id = d.id
+       LEFT JOIN supervisors s ON t.supervisor_id = s.id
+       LEFT JOIN stations st ON t.station_id = st.id
+       WHERE t.trip_id = ?`,
+      [tripId]
+    );
+    return rows[0];
+  },
 
 };
 

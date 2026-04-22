@@ -4,7 +4,7 @@ import {
   FiEdit2, FiPrinter, FiArrowLeft, FiMapPin, FiClock, FiPackage,
   FiDollarSign, FiFileText, FiUpload, FiAlertTriangle, FiCheckCircle,
   FiTruck, FiPlay, FiStopCircle, FiPlusCircle, FiDroplet, FiLock,
-  FiNavigation, FiRefreshCw, FiChevronRight, FiX
+  FiNavigation, FiRefreshCw, FiChevronRight, FiX, FiTrash2
 } from 'react-icons/fi';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -538,6 +538,9 @@ export default function TripDetails() {
           <ActionBtn icon={FiPlusCircle} label="Add Actual Expense" color="bg-indigo-600 hover:bg-indigo-700" onClick={() => setModal('expense')} />
           <ActionBtn icon={FiDroplet} label="Add Actual Fuel Entry" color="bg-amber-500 hover:bg-amber-600" onClick={() => setModal('fuel')} />
           <ActionBtn icon={FiLock} label="Close Trip" color="bg-slate-700 hover:bg-slate-800" onClick={() => setModal('close')} />
+          {['Planned', 'Draft', 'Cancelled'].includes(mappedTrip.status) && (
+            <ActionBtn icon={FiTrash2} label="Cancel Trip" color="bg-red-600 hover:bg-red-700" onClick={() => setModal('cancel')} />
+          )}
         </div>
       </div>
 
@@ -613,15 +616,16 @@ export default function TripDetails() {
         </Card>
       )}
 
-      {(modal === 'start' || modal === 'end' || modal === 'close') && (
+      {(modal === 'start' || modal === 'end' || modal === 'close' || modal === 'cancel') && (
         <ActionModal
-          title={modal === 'start' ? 'Start Trip' : modal === 'end' ? 'End Trip' : 'Close Trip'}
+          title={modal === 'start' ? 'Start Trip' : modal === 'end' ? 'End Trip' : modal === 'close' ? 'Close Trip' : 'Cancel Trip'}
           onClose={() => setModal(null)}
         >
           <p className="text-sm text-slate-600 mb-4">
             {modal === 'start' && 'Confirm starting this trip. The trip status will change to "Started".'}
             {modal === 'end' && 'Confirm ending this trip. Please ensure all expenses are recorded.'}
             {modal === 'close' && 'Closing the trip will lock all records. This action cannot be undone.'}
+            {modal === 'cancel' && 'This trip will be soft-deleted and hidden from all lists. Fuel and expense records are preserved for audit.'}
           </p>
           <div className="flex gap-2">
             <button onClick={() => setModal(null)} className="flex-1 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">Cancel</button>
@@ -630,11 +634,18 @@ export default function TripDetails() {
                 if (modal === 'start') await updateStatus('Started');
                 if (modal === 'end') await updateStatus('Completed');
                 if (modal === 'close') await updateStatus('Closed');
+                if (modal === 'cancel') {
+                  const res = await fetch(`http://localhost:5001/api/trips/${id}`, { method: 'DELETE' });
+                  const data = await res.json();
+                  if (data.success) navigate('/trips');
+                  else alert(data.message);
+                }
                 setModal(null);
               }}
               className={`flex-1 py-2 text-white rounded-lg text-sm font-bold ${
                 modal === 'start' ? 'bg-green-600 hover:bg-green-700'
                 : modal === 'end' ? 'bg-red-500 hover:bg-red-600'
+                : modal === 'cancel' ? 'bg-red-600 hover:bg-red-700'
                 : 'bg-slate-700 hover:bg-slate-800'
               }`}
             >

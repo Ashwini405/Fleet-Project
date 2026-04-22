@@ -148,33 +148,29 @@ const updateTrip = async (req, res) => {
 };
 
 
-// ✅ DELETE
+// ✅ SOFT DELETE — blocks active trips, keeps fuel/expense records intact
 const deleteTrip = async (req, res) => {
   try {
     const id = req.params.id;
-
-    const existing = await Trip.getById(id);
+    const existing = await Trip.getByIdAny(id);
 
     if (!existing) {
-      return res.status(404).json({
+      return res.status(404).json({ success: false, message: 'Trip not found' });
+    }
+
+    if (['Started', 'In Transit'].includes(existing.trip_status)) {
+      return res.status(400).json({
         success: false,
-        message: 'Trip not found'
+        message: `Cannot delete an active trip (status: ${existing.trip_status}). End the trip first.`
       });
     }
 
-    await Trip.delete(id);
+    await Trip.softDelete(id);
 
-    res.status(200).json({
-      success: true,
-      message: 'Trip deleted successfully'
-    });
-
+    res.status(200).json({ success: true, message: 'Trip deleted successfully' });
   } catch (error) {
     console.error(error);
-    res.status(500).json({
-      success: false,
-      message: 'Server Error'
-    });
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
 
@@ -240,7 +236,7 @@ const updateTripStatus = async (req, res) => {
 const getTripsByVehicle = async (req, res) => {
   try {
     const [rows] = await db.query(
-      'SELECT trip_id FROM trips WHERE vehicle_id = ?',
+      'SELECT trip_id FROM trips WHERE vehicle_id = ? AND is_deleted = 0',
       [req.params.vehicleId]
     );
 

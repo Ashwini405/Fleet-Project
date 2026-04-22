@@ -193,6 +193,38 @@ const getVehicleByNumber = async (req, res) => {
     });
   }
 };
+// @desc  Check if vehicle is available (no active trip)
+const checkAvailability = async (req, res) => {
+  try {
+    const db = require('../config/db');
+    const vehicle_no = req.params.vehicle_no;
+
+    const vehicle = await Vehicle.getByNumber(vehicle_no);
+    if (!vehicle) {
+      return res.status(404).json({ success: false, message: 'Vehicle not found' });
+    }
+
+    const [activeTrips] = await db.query(
+      `SELECT trip_id, trip_status, destination FROM trips
+       WHERE vehicle_id = ? AND trip_status IN ('Active', 'In Transit', 'Planned', 'Started')
+       LIMIT 1`,
+      [vehicle.id]
+    );
+
+    const isAvailable = activeTrips.length === 0;
+
+    res.json({
+      success: true,
+      available: isAvailable,
+      activeTrip: activeTrips[0] || null,
+      vehicleStatus: vehicle.vehicle_status
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
 const uploadDocument = async (req, res) => {
   try {
     const { vehicle_id, type, validity } = req.body;
@@ -273,5 +305,6 @@ module.exports = {
   updateVehicle,
   deleteVehicle,
   getVehicleByNumber,
-  uploadDocument // ✅ ADD THIS
+  uploadDocument,
+  checkAvailability
 };
