@@ -2,53 +2,13 @@ import React, { useState, useMemo, useEffect, useCallback, useReducer } from 're
 import { useNavigate } from 'react-router-dom';
 import { FiX, FiTruck, FiMapPin, FiClock, FiPackage, FiDollarSign, FiDroplet, FiUpload, FiAlertCircle } from 'react-icons/fi';
 
-// ─── MOCK DATA SETUP ──────────────────────────────────────────────────────
-const vehicles = [
-  {
-    id: "V001",
-    number: "AP-21-TA-1234",
-    driverName: "Ramesh Kumar",
-    driverPhone: "9876543210",
-    supervisor: "Raghu",
-    sourcePlant: "Central Hub",
-    lastOdometer: 298,
-    mileage: 4,
-    fuelType: "Diesel",
-    tankCapacity: 120,
-    status: "available"
-  },
-  {
-    id: "V002",
-    number: "KA-01-AB-5678",
-    driverName: "Suresh Patel",
-    driverPhone: "9123456789",
-    supervisor: "Priya",
-    sourcePlant: "Bangalore Hub",
-    lastOdometer: 450,
-    mileage: 3.8,
-    fuelType: "Diesel",
-    tankCapacity: 100,
-    status: "available"
-  },
-  {
-    id: "V003",
-    number: "MH-12-CD-9012",
-    driverName: "Amit Singh",
-    driverPhone: "9988776655",
-    supervisor: "Rajesh",
-    sourcePlant: "Pune Facility",
-    lastOdometer: 320,
-    mileage: 4.2,
-    fuelType: "Diesel",
-    tankCapacity: 110,
-    status: "available"
-  }
-];
+// ─── INITIAL STATE ──────────────────────────────────────────────────────────
+// Generate fresh Trip ID for each form instance
+const generateTripId = () => `TRIP-${1000 + Math.floor(Math.random() * 9000)}`;
 
-// ─── STATE MANAGEMENT WITH REDUCER ──────────────────────────────────────
 const initialForm = {
-  tripId: `TRIP-${1000 + Math.floor(Math.random() * 9000)}`,
-  tripType: '',
+  tripId: generateTripId(),
+  tripType: 'Regular',
   tripStatus: 'Planned',
   tripPriority: 'Normal',
   transportType: 'Outbound',
@@ -69,7 +29,7 @@ const initialForm = {
   mileage: 4,
   tankCapacity: 120,
 
-  // 🔥 ADDED: Foreign keys for DB
+  // Foreign keys for DB
   vehicleId: '',
   driverId: '',
   supervisorId: '',
@@ -128,39 +88,33 @@ const formReducer = (state, action) => {
     case 'UPDATE_MULTIPLE':
       return { ...state, ...action.payload };
     case 'AUTO_FILL_VEHICLE':
-      const vehicle = vehicles.find(v => v.number === action.truckNo);
+      const vehicle = action.vehicle;
       if (!vehicle) return state;
       const warnings = [];
-      if (vehicle.status !== 'available') warnings.push('⚠️ Vehicle not available');
+      if (vehicle.vehicle_status !== 'Active') warnings.push('⚠️ Vehicle not available');
       if (Math.random() > 0.7) warnings.push('⚠️ Driver may be on another trip');
       return {
-        ...state,
-        driver: vehicle.driverName,
-        driverContact: vehicle.driverPhone,
-        supervisor: vehicle.supervisor,
-        sourcePlant: vehicle.sourcePlant,
-        lastOdometer: vehicle.lastOdometer,
-        mileage: vehicle.mileage,
-        fuelType: vehicle.fuelType,
-        tankCapacity: vehicle.tankCapacity,
-        expectedMileage: vehicle.mileage.toString(),
-        vehicleId: vehicle.id,
-        truckWarnings: warnings,
-      };
-    case 'CALCULATE_DISTANCE':
-      if (!state.source || !state.destination) return { ...state, estDistance: '' };
-      const distances = { 
-        'Bangalore Hub': 450, 'Pune Facility': 270, 'Nandyala Cement Works': 380, 
-        'Mumbai': 520, 'Hyderabad': 180, 'Delhi': 800, 'Chennai': 350 
-      };
-      const dist = distances[state.destination] || Math.floor(Math.random() * 500) + 50;
-      return { ...state, estDistance: dist.toString() };
-    case 'CALCULATE_DURATION':
-      if (!state.startTime || !state.eta) return { ...state, tripDuration: '' };
-      const start = new Date(state.startTime);
-      const end = new Date(state.eta);
-      const hours = Math.round((end - start) / (1000 * 60 * 60));
-      return { ...state, tripDuration: hours > 0 ? `~${hours} hrs` : '' };
+  ...state,
+
+  driver: vehicle.driver_name || '',
+  driverContact: vehicle.driver_contact || '',
+  supervisor: vehicle.supervisor_name || '',
+  sourcePlant: vehicle.source_plant || '',
+
+  lastOdometer: vehicle.initial_odometer || 0,
+  fuelType: vehicle.fuel_type || '',
+ truckCapacity: vehicle.gvw || 0,
+tankCapacity: vehicle.gvw || 0,
+  mileage: vehicle.mileage || 0,
+  expectedMileage: vehicle.mileage ? vehicle.mileage.toString() : '',
+
+  vehicleId: vehicle.id,
+  driverId: vehicle.assigned_driver || '',
+  supervisorId: vehicle.supervisor_id || '',
+  stationId: vehicle.station_id || '',
+
+  truckWarnings: warnings,
+};
     case 'ADD_FILE':
       if ((state.proofFiles?.length || 0) >= 5) return state;
       return { ...state, proofFiles: [...(state.proofFiles || []), action.file] };
@@ -173,6 +127,7 @@ const formReducer = (state, action) => {
   }
 };
 
+// ─── UI Helpers (unchanged) ─────────────────────────────────────────────────
 const inp = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition';
 const inpDisabled = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-100 text-slate-600 cursor-not-allowed';
 const inpCalculated = 'w-full px-3 py-2.5 border border-indigo-200 rounded-lg text-sm bg-indigo-50 text-indigo-900 font-semibold';
@@ -183,14 +138,14 @@ const hlp = 'text-xs text-slate-500 mt-1 italic';
 const Field = ({ label, name, type = 'text', placeholder, disabled, calculated, helper, children, form, handleChange, errors }) => {
   const hasError = errors[name];
   const isRequired = name && !disabled && !calculated && !label?.includes('(optional)');
-  
+
   const getInputClass = () => {
     if (calculated) return inpCalculated;
     if (disabled) return inpDisabled;
     if (hasError) return `${inp} border-red-300 focus:border-red-500 focus:ring-red-100`;
     return inp;
   };
-  
+
   return (
     <div>
       <label className={lbl}>
@@ -224,25 +179,25 @@ const Field = ({ label, name, type = 'text', placeholder, disabled, calculated, 
 const Sec = ({ num, icon: Icon, title, children, sectionCompletion }) => {
   const completion = sectionCompletion[num];
   const percentage = Math.round((completion?.percentage || 0) * 100);
-  
+
   const getStatusIcon = () => {
     if (completion?.status === 'error') return '❌';
     if (completion?.status === 'complete') return '✅';
     return '⚠️';
   };
-  
+
   const getStatusText = () => {
     if (completion?.status === 'error') return 'Error';
     if (completion?.status === 'complete') return 'Complete';
     return 'Incomplete';
   };
-  
+
   const getStatusColor = () => {
     if (completion?.status === 'error') return 'text-red-600';
     if (completion?.status === 'complete') return 'text-green-600';
     return 'text-amber-600';
   };
-  
+
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm" data-section={num}>
       <div className="flex items-center gap-3 mb-4 pb-3 border-b border-slate-100">
@@ -269,29 +224,82 @@ const TruckWarningBanner = ({ warnings }) => {
   );
 };
 
+// ─── Main Component ─────────────────────────────────────────────────────────
 export default function TripAdd() {
   const navigate = useNavigate();
   const [form, dispatch] = useReducer(formReducer, () => {
     const saved = localStorage.getItem('tripFormDraft');
     const parsed = saved ? JSON.parse(saved) : {};
-    // Ensure proofFiles is always an array and lastOdometer is always a number
-    return { 
-      ...initialForm, 
-      ...parsed, 
-      proofFiles: parsed.proofFiles || [], 
-      lastOdometer: parsed.lastOdometer || 0 
+    return {
+      ...initialForm,
+      ...parsed,
+      tripId: generateTripId(), // Always generate fresh Trip ID for each form instance
+      proofFiles: parsed.proofFiles || [],
+      lastOdometer: parsed.lastOdometer || 0
     };
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeSection, setActiveSection] = useState(1);
   const [alerts, setAlerts] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
 
-  // ─── Load mock vehicles ────────────────────────────────────────────────
+  // ─── Fetch vehicles from backend API ─────────────────────────────────────
   useEffect(() => {
-    // Mock data is already available, no fetch needed
+    const fetchVehicles = async () => {
+      try {
+        const res = await fetch('http://localhost:5001/api/vehicles');
+        const data = await res.json();
+        if (data.success) {
+          setVehicles(data.data);
+        }
+      } catch (err) {
+        console.error('Error fetching vehicles:', err);
+      }
+    };
+    fetchVehicles();
   }, []);
 
+  useEffect(() => {
+  if (!form.truckNo) return;
+
+  const fetchVehicleDetails = async () => {
+    try {
+      const res = await fetch(`http://localhost:5001/api/vehicles/by-number/${form.truckNo}`);
+      const data = await res.json();
+
+      console.log("Vehicle API Response:", data); // DEBUG
+
+      if (data.success && data.data) {
+        const v = data.data;
+
+        dispatch({
+          type: 'AUTO_FILL_VEHICLE',
+          vehicle: {
+            id: v.id,
+            driver_name: v.driver_name,
+            driver_contact: v.driver_contact,
+            supervisor_name: v.supervisor_name,
+            source_plant: v.source_plant,
+            initial_odometer: v.initial_odometer,
+            fuel_type: v.fuel_type,
+            gvw: v.gvw,
+            mileage: v.mileage,
+            assigned_driver: v.assigned_driver,
+            supervisor_id: v.supervisor_id,
+            station_id: v.station_id
+          }
+        });
+      }
+
+    } catch (err) {
+      console.error("Auto-fetch error:", err);
+    }
+  };
+
+  fetchVehicleDetails();
+
+}, [form.truckNo]);
   // ─── Auto‑save draft every 5 seconds ─────────────────────────────────────
   useEffect(() => {
     const timer = setInterval(() => {
@@ -312,10 +320,10 @@ export default function TripAdd() {
         setErrors(prev => ({ ...prev, proofFiles: 'Maximum 5 files allowed' }));
         return;
       }
-      
+
       Array.from(files).forEach(file => {
         if (currentFiles.length >= 5) return;
-        if (file.size > 2 * 1024 * 1024) { // 2MB limit
+        if (file.size > 2 * 1024 * 1024) {
           setErrors(prev => ({ ...prev, proofFiles: `${file.name} exceeds 2MB limit` }));
           return;
         }
@@ -338,13 +346,9 @@ export default function TripAdd() {
   }, []);
 
   // ─── Autofill when truck is selected ────────────────────────────────────
-  useEffect(() => {
-    if (form.truckNo) {
-      dispatch({ type: 'AUTO_FILL_VEHICLE', truckNo: form.truckNo });
-    }
-  }, [form.truckNo]);
 
-  // ─── Auto‑calculate distance ─────────────────────────────────────────────
+
+  // ─── Auto‑calculate distance (mock – replace with real API if needed) ────
   useEffect(() => {
     if (form.source && form.destination) {
       const randomDistance = Math.floor(Math.random() * 451) + 50; // 50-500 km
@@ -352,18 +356,17 @@ export default function TripAdd() {
     }
   }, [form.source, form.destination]);
 
-  // ─── Real-time validation ────────────────────────────────────────────────
-  // ─── Odometer delta calculation ──────────────────────────────────────────
+  // ─── Odometer delta ─────────────────────────────────────────────────────
   const odometerDelta = useMemo(() => {
     if (!form.startOdometer || !form.lastOdometer) return null;
     const delta = +form.startOdometer - form.lastOdometer;
     return delta;
   }, [form.startOdometer, form.lastOdometer]);
 
+  // ─── Real‑time validation ───────────────────────────────────────────────
   const validate = useCallback(() => {
     const err = {};
-    
-    // Required field validations
+
     if (!form.tripType) err.tripType = 'Trip Type is required';
     if (!form.truckNo) err.truckNo = 'Vehicle selection is required';
     if (!form.tripDate) err.tripDate = 'Trip Date is required';
@@ -374,8 +377,7 @@ export default function TripAdd() {
     if (!form.loadWeight || +form.loadWeight <= 0) err.loadWeight = 'Load weight must be greater than 0';
     if (!form.customerName) err.customerName = 'Customer name is required';
     if (!form.startOdometer) err.startOdometer = 'Start odometer reading is required';
-    
-    // Odometer validation - must be >= last recorded KM
+
     if (form.startOdometer && +form.startOdometer <= form.lastOdometer) {
       err.startOdometer = `Must be greater than last recorded KM (${(form.lastOdometer || 0).toLocaleString()})`;
     }
@@ -385,13 +387,9 @@ export default function TripAdd() {
     if (odometerDelta !== null && odometerDelta > 2000) {
       err.startOdometer = 'Odometer difference excessive (maximum 2000 km)';
     }
-    
-    // Units/Bags validation - must be >= 0
     if (form.units && +form.units < 0) {
       err.units = 'Units/Bags count cannot be negative';
     }
-    
-    // Scheduling validation
     if (form.startTime && form.eta && form.startTime >= form.eta) {
       err.startTime = 'Start time must be before ETA';
     }
@@ -401,8 +399,6 @@ export default function TripAdd() {
     if (form.unloadingTime && form.loadingTime && form.unloadingTime < form.loadingTime) {
       err.unloadingTime = 'Unloading must be after loading';
     }
-    
-    // Fuel validation
     if (form.dieselQty && +form.dieselQty <= 0) err.dieselQty = 'Diesel quantity must be greater than 0';
     if (form.dieselRate && +form.dieselRate <= 0) err.dieselRate = 'Diesel rate must be greater than 0';
     if (form.dieselQty && form.tankCapacity && +form.dieselQty > form.tankCapacity) {
@@ -416,7 +412,7 @@ export default function TripAdd() {
   useEffect(() => {
     const timer = setTimeout(() => {
       validate();
-    }, 300); // Debounce validation
+    }, 300);
     return () => clearTimeout(timer);
   }, [form, validate]);
 
@@ -431,7 +427,7 @@ export default function TripAdd() {
     if (dist > 0 && mileage > 0) {
       return (dist / mileage).toFixed(2);
     }
-    return null; // Will show placeholder
+    return null;
   }, [form.estDistance, form.expectedMileage]);
 
   const suggestedDieselQty = useMemo(() => {
@@ -451,58 +447,45 @@ export default function TripAdd() {
     return (+form.freightAmount || 0) - estimatedCost;
   }, [form.freightAmount, estimatedCost]);
 
-  // ─── Smart alerts ────────────────────────────────────────────────────────
+  // ─── Smart alerts (unchanged) ───────────────────────────────────────────
   const smartAlerts = useMemo(() => {
     const alerts = [];
-    
-    // Low Mileage Alert
     if (form.expectedMileage && +form.expectedMileage < 3.5) {
-      alerts.push({ 
-        type: 'warning', 
-        message: `⚠️ Low mileage detected (${form.expectedMileage} km/l) - Consider maintenance check` 
+      alerts.push({
+        type: 'warning',
+        message: `⚠️ Low mileage detected (${form.expectedMileage} km/l) - Consider maintenance check`
       });
     }
-    
-    // Overfuel Alert
     if (form.dieselQty && form.tankCapacity && +form.dieselQty > form.tankCapacity) {
-      alerts.push({ 
-        type: 'error', 
-        message: `🚨 Fuel quantity (${form.dieselQty}L) exceeds tank capacity (${form.tankCapacity}L)` 
+      alerts.push({
+        type: 'error',
+        message: `🚨 Fuel quantity (${form.dieselQty}L) exceeds tank capacity (${form.tankCapacity}L)`
       });
     }
-    
-    // Driver Already Assigned Warning
-    if (form.driver && Math.random() > 0.7) { // Simulate driver conflict check
-      alerts.push({ 
-        type: 'warning', 
-        message: `⚠️ Driver ${form.driver} may be assigned to another trip - verify schedule` 
+    if (form.driver && Math.random() > 0.7) {
+      alerts.push({
+        type: 'warning',
+        message: `⚠️ Driver ${form.driver} may be assigned to another trip - verify schedule`
       });
     }
-    
-    // Fuel vendor not selected when fuel is planned
     if (form.dieselQty && (!form.fuelVendor || form.fuelVendor === '')) {
-      alerts.push({ 
-        type: 'warning', 
-        message: '⚠️ Fuel vendor not selected - required for fuel procurement' 
+      alerts.push({
+        type: 'warning',
+        message: '⚠️ Fuel vendor not selected - required for fuel procurement'
       });
     }
-    
-    // Missing fuel proof when fuel is planned
     if (form.dieselQty && (!form.proofFiles || form.proofFiles.length === 0)) {
-      alerts.push({ 
-        type: 'info', 
-        message: '💡 Consider uploading fuel proof documents for expense tracking' 
+      alerts.push({
+        type: 'info',
+        message: '💡 Consider uploading fuel proof documents for expense tracking'
       });
     }
-    
-    // Negative profit warning
     if (estimatedProfit !== null && estimatedProfit < 0) {
-      alerts.push({ 
-        type: 'warning', 
-        message: `⚠️ Estimated loss of ₹${Math.abs(estimatedProfit).toLocaleString('en-IN')} - review costs` 
+      alerts.push({
+        type: 'warning',
+        message: `⚠️ Estimated loss of ₹${Math.abs(estimatedProfit).toLocaleString('en-IN')} - review costs`
       });
     }
-    
     return alerts;
   }, [form.expectedMileage, form.dieselQty, form.tankCapacity, form.fuelVendor, form.proofFiles, form.driver, estimatedProfit]);
 
@@ -517,7 +500,7 @@ export default function TripAdd() {
       6: [form.freightAmount, form.driverAdvance],
       7: [form.expectedMileage, form.dieselRate, form.dieselQty],
     };
-    
+
     const completion = {};
     const sectionErrors = {
       1: ['tripType', 'tripPriority', 'transportType'].some(field => errors[field]),
@@ -528,12 +511,11 @@ export default function TripAdd() {
       6: ['freightAmount', 'driverAdvance'].some(field => errors[field]),
       7: ['expectedMileage', 'dieselRate', 'dieselQty'].some(field => errors[field]),
     };
-    
+
     Object.keys(sections).forEach(section => {
       const fields = sections[section];
       const filledCount = fields.filter(v => v).length;
       const hasErrors = sectionErrors[section];
-      
       if (hasErrors) {
         completion[section] = { status: 'error', percentage: Math.max(0.1, filledCount / fields.length) };
       } else if (filledCount === fields.length) {
@@ -542,35 +524,26 @@ export default function TripAdd() {
         completion[section] = { status: 'incomplete', percentage: filledCount / fields.length };
       }
     });
-    
     return completion;
   }, [form, errors]);
 
-  // ─── Validation ──────────────────────────────────────────────────────────
-  // Moved before useEffect to avoid hoisting issues
-
+  // ─── Form validity ───────────────────────────────────────────────────────
   const isFormValid = useCallback(() => {
-    // Check all required fields and odometer validation
-    const hasRequiredFields = form.tripType && form.truckNo && form.tripDate && 
-                             form.source && form.destination && form.startTime && 
-                             form.materialType && form.loadWeight && form.customerName && 
-                             form.startOdometer;
-    
-    // Check odometer is valid (>= last recorded KM)
+    const hasRequiredFields = form.tripType && form.truckNo && form.tripDate &&
+      form.source && form.destination && form.startTime &&
+      form.materialType && form.loadWeight && form.customerName &&
+      form.startOdometer;
+
     const isOdometerValid = form.startOdometer && +form.startOdometer > form.lastOdometer;
-    
-    // Check load weight is positive
     const isLoadWeightValid = form.loadWeight && +form.loadWeight > 0;
-    
     return hasRequiredFields && isOdometerValid && isLoadWeightValid && Object.keys(errors).length === 0;
   }, [form, errors]);
 
-  // ─── Submit handler (mock) ───────────────────────────────────────────────
+  // ─── Submit handler (POST to backend) ────────────────────────────────────
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     const isValid = validate();
     if (!isValid) {
-      // Scroll to first error
       const firstError = Object.keys(errors)[0];
       if (firstError) {
         const element = document.querySelector(`[name="${firstError}"]`);
@@ -582,14 +555,13 @@ export default function TripAdd() {
     setIsSubmitting(true);
 
     const tripData = {
-      trip_id: form.tripId,
-      trip_type: form.tripType,
-      trip_status: form.tripStatus,
-      trip_priority: form.tripPriority,
-      transport_type: form.transportType,
+      trip_id: form.tripId || `TRIP-${1000 + Math.floor(Math.random() * 9000)}`,
+      trip_type: form.tripType || 'Regular',
+      trip_status: form.tripStatus || 'Planned',
+      trip_priority: form.tripPriority || 'Normal',
+      transport_type: form.transportType || 'Outbound',
       contract_order_id: form.contractOrderId,
 
-      // 🔥 CRITICAL: foreign keys for DB
       vehicle_id: form.vehicleId,
       driver_id: form.driverId,
       supervisor_id: form.supervisorId,
@@ -617,32 +589,32 @@ export default function TripAdd() {
       est_distance: form.estDistance,
       trip_duration: form.tripDuration,
 
-      start_time: form.startTime,
-      eta: form.eta,
-      loading_time: form.loadingTime,
-      unloading_time: form.unloadingTime,
+      start_time: form.startTime ? new Date(form.startTime).toISOString().slice(0, 19).replace('T', ' ') : null,
+      eta: form.eta ? new Date(form.eta).toISOString().slice(0, 19).replace('T', ' ') : null,
+      loading_time: form.loadingTime ? new Date(form.loadingTime).toISOString().slice(0, 19).replace('T', ' ') : null,
+      unloading_time: form.unloadingTime ? new Date(form.unloadingTime).toISOString().slice(0, 19).replace('T', ' ') : null,
 
       material_type: form.materialType,
-      load_weight: form.loadWeight,
-      load_type: form.loadType,
-      units: form.units,
+      load_weight: +form.loadWeight || 0,
+      load_type: form.loadType || 'Full',
+      units: +form.units || 0,
       customer_name: form.customerName,
       invoice_number: form.invoiceNumber,
       lr_number: form.lrNumber,
 
-      trip_budget: form.tripBudget,
-      expense_limit: form.expenseLimit,
-      payment_mode: form.paymentMode,
-      freight_amount: form.freightAmount,
-      driver_advance: form.driverAdvance,
-      hamali_advance: form.hamaliAdvance,
-      other_advance: form.otherAdvance,
+      trip_budget: +form.tripBudget || 0,
+      expense_limit: +form.expenseLimit || 0,
+      payment_mode: form.paymentMode || 'Cash',
+      freight_amount: +form.freightAmount || 0,
+      driver_advance: +form.driverAdvance || 0,
+      hamali_advance: +form.hamaliAdvance || 0,
+      other_advance: +form.otherAdvance || 0,
 
-      expected_mileage: form.expectedMileage,
-      diesel_rate: form.dieselRate,
-      diesel_qty: form.dieselQty,
+      expected_mileage: +form.expectedMileage || 0,
+      diesel_rate: +form.dieselRate || 0,
+      diesel_qty: +form.dieselQty || 0,
       fuel_vendor: form.fuelVendor,
-      proof_files: JSON.stringify(form.proofFiles),
+      proof_files: form.proofFiles.map(f => f.name).join(','),
 
       truck_warnings: JSON.stringify(form.truckWarnings),
       draft_saved: form.draftSaved,
@@ -677,6 +649,7 @@ export default function TripAdd() {
     }
   };
 
+  // ─── Render (UI unchanged, only data source changed) ─────────────────────
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative bg-slate-50 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
@@ -703,7 +676,7 @@ export default function TripAdd() {
         {/* Form Body */}
         <form onSubmit={handleSubmit} onKeyDown={handleKeyDown} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
 
-          {/* ── Smart Alerts ── */}
+          {/* Smart Alerts */}
           {smartAlerts.length > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
               <h3 className="text-sm font-semibold text-amber-800 flex items-center gap-2">
@@ -720,8 +693,14 @@ export default function TripAdd() {
 
           {/* Section 1 – Trip Identification */}
           <Sec num={1} icon={FiTruck} title="Trip Identification" sectionCompletion={sectionCompletion}>
+            {/* Trip ID Reference */}
+            <div className="mb-6 bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+              <div className="text-xs font-semibold text-indigo-600 uppercase tracking-wider mb-2">Trip ID (auto-generated)</div>
+              <div className="text-3xl font-bold text-indigo-700">{form.tripId}</div>
+              <div className="text-xs text-indigo-500 mt-1">Use this ID to reference this trip</div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Field label="Trip ID" name="tripId" disabled form={form} handleChange={handleChange} errors={errors} />
               <Field label="Trip Priority" name="tripPriority" form={form} handleChange={handleChange} errors={errors}>
                 <select name="tripPriority" value={form.tripPriority} onChange={handleChange} className={inp}>
                   <option>Normal</option><option>Urgent</option><option>VIP</option>
@@ -754,7 +733,7 @@ export default function TripAdd() {
                 <select name="truckNo" value={form.truckNo} onChange={handleChange} className={inp}>
                   <option value="">— Select Truck —</option>
                   {vehicles.map(v => (
-                    <option key={v.id} value={v.number}>{v.number}</option>
+                    <option key={v.id} value={v.vehicle_no}>{v.vehicle_no}</option>
                   ))}
                 </select>
               </Field>
@@ -944,20 +923,20 @@ export default function TripAdd() {
               💾 Save Draft
             </button>
           </div>
-          <button 
-            type="button" 
-            onClick={handleSubmit} 
+          <button
+            type="button"
+            onClick={handleSubmit}
             disabled={!isFormValid() || isSubmitting}
             title={!isFormValid() ? "Complete required fields to generate trip" : ""}
             className={`px-6 py-2.5 text-sm font-semibold rounded-lg shadow-lg transition flex items-center gap-2 ${
-              isFormValid() && !isSubmitting 
-                ? 'text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 cursor-pointer' 
+              isFormValid() && !isSubmitting
+                ? 'text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 cursor-pointer'
                 : 'text-slate-400 bg-slate-200 cursor-not-allowed'
             }`}
           >
             {isSubmitting ? (
               <>
-                <div className="w-4 h-4 border-2 border-slate-300 border-t-white rounded-full animate-spin"></div> 
+                <div className="w-4 h-4 border-2 border-slate-300 border-t-white rounded-full animate-spin"></div>
                 Creating...
               </>
             ) : (

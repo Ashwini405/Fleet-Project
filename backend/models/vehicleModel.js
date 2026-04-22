@@ -6,16 +6,17 @@ const Vehicle = {
   getAll: async () => {
     try {
       const [rows] = await db.query(`
-        SELECT v.*,
-               s.full_name AS supervisor_name,
-               d.full_name AS driver_name,
-               st.station_name
-        FROM vehicles v
-        LEFT JOIN supervisors s ON v.supervisor_id = s.id
-        LEFT JOIN drivers d ON v.assigned_driver = d.id
-        LEFT JOIN stations st ON v.station_id = st.id
-        ORDER BY v.created_at DESC
-      `);
+  SELECT v.*,
+         s.full_name AS supervisor_name,
+         d.full_name AS driver_name,
+         d.mobile AS driver_contact,
+         st.station_name AS source_plant
+  FROM vehicles v
+  LEFT JOIN supervisors s ON v.supervisor_id = s.id
+  LEFT JOIN drivers d ON v.assigned_driver = d.id
+  LEFT JOIN stations st ON v.station_id = st.id
+  ORDER BY v.created_at DESC
+`);
       return rows;
     } catch (error) {
       console.error("Error in getAll:", error);
@@ -29,7 +30,8 @@ const Vehicle = {
     SELECT v.*,
            s.full_name AS supervisor_name,
            d.full_name AS driver_name,
-           st.station_name
+           d.mobile AS driver_contact,
+           st.station_name AS source_plant
     FROM vehicles v
     LEFT JOIN supervisors s ON v.supervisor_id = s.id
     LEFT JOIN drivers d ON v.assigned_driver = d.id
@@ -81,13 +83,13 @@ const Vehicle = {
       throw error;
     }
   },
-  getByNumber: async (vehicle_no) => {
+ getByNumber: async (vehicle_no) => {
   const [rows] = await db.query(`
     SELECT v.*,
            d.full_name AS driver_name,
            d.mobile AS driver_contact,
            s.full_name AS supervisor_name,
-           st.station_name
+           st.station_name AS source_plant
     FROM vehicles v
     LEFT JOIN drivers d ON v.assigned_driver = d.id
     LEFT JOIN supervisors s ON v.supervisor_id = s.id

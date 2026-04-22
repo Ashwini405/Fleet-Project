@@ -232,12 +232,17 @@ export default function TripMaster() {
 
       const matchesTab = activeTab === 'present' ? isPresentTrip : isPastTrip;
 
-      const matchesSearch = trip.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trip.truckNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        trip.driverName.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch =
+        (trip.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (trip.truckNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (trip.driverName || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = currentView.filters.statusFilter === 'All' || trip.status === currentView.filters.statusFilter;
-      const matchesDriver = currentView.filters.driverFilter === 'All' || trip.driverName === currentView.filters.driverFilter;
-      const matchesPlant = currentView.filters.plantFilter === 'All' || trip.plant === currentView.filters.plantFilter;
+      const matchesDriver =
+        currentView.filters.driverFilter === 'All' ||
+        (trip.driverName || '') === currentView.filters.driverFilter;
+      const matchesPlant =
+  currentView.filters.plantFilter === 'All' ||
+  (trip.plant || '') === currentView.filters.plantFilter;
       const matchesDate = (!dateRange.start || trip.startDate >= dateRange.start) &&
         (!dateRange.end || trip.startDate <= dateRange.end);
 
