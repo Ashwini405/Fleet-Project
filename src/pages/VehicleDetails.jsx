@@ -171,43 +171,43 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
   if (!vehicle) return <div>Loading...</div>;
 
   const handleUploadDocument = async () => {
-  try {
-    const formData = new FormData();
+    try {
+      const formData = new FormData();
 
-    formData.append("vehicle_id", vehicle.id);
-    formData.append("type", docForm.type);
-    formData.append("validity", docForm.validUntil);
+      formData.append("vehicle_id", vehicle.id);
+      formData.append("type", docForm.type);
+      formData.append("validity", docForm.validUntil);
 
-    if (docForm.file) {
-      formData.append("file", docForm.file);
-    }
-
-    const res = await fetch("http://localhost:5001/api/vehicles/upload-document", {
-      method: "POST",
-      body: formData
-    });
-
-    const data = await res.json();
-
-    if (data.success) {
-      alert("Document uploaded successfully");
-
-      // 🔥 refresh
-      const updated = await fetch(`http://localhost:5001/api/vehicles/${vehicle.id}`);
-      const updatedData = await updated.json();
-
-      if (updatedData.success) {
-        setVehicle(updatedData.data);
+      if (docForm.file) {
+        formData.append("file", docForm.file);
       }
 
-      setIsUploadDocModalOpen(false);
-    }
+      const res = await fetch("http://localhost:5001/api/vehicles/upload-document", {
+        method: "POST",
+        body: formData
+      });
 
-  } catch (err) {
-    console.error(err);
-    alert("Upload failed");
-  }
-};
+      const data = await res.json();
+
+      if (data.success) {
+        alert("Document uploaded successfully");
+
+        // 🔥 refresh
+        const updated = await fetch(`http://localhost:5001/api/vehicles/${vehicle.id}`);
+        const updatedData = await updated.json();
+
+        if (updatedData.success) {
+          setVehicle(updatedData.data);
+        }
+
+        setIsUploadDocModalOpen(false);
+      }
+
+    } catch (err) {
+      console.error(err);
+      alert("Upload failed");
+    }
+  };
 
   return (
     <div className="font-sans text-slate-800">
@@ -354,7 +354,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                   <div>
                     <p className="text-xs uppercase tracking-wider font-semibold text-slate-500">Assigned Plant</p>
                     <p className="text-sm font-medium text-slate-900">
-                      {vehicle.station_name}
+                      {vehicle.source_plant || '—'}
                     </p>
                   </div>
                 </div>
@@ -1091,77 +1091,77 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                 Cancel
               </button>
               <button
-  onClick={async () => {
-    try {
-      // 🔒 VALIDATION FIRST
-      if (!docForm.type) {
-        alert("Please select document type");
-        return;
-      }
+                onClick={async () => {
+                  try {
+                    // 🔒 VALIDATION FIRST
+                    if (!docForm.type) {
+                      alert("Please select document type");
+                      return;
+                    }
 
-      if (!docForm.validUntil) {
-        alert("Please select validity date");
-        return;
-      }
+                    if (!docForm.validUntil) {
+                      alert("Please select validity date");
+                      return;
+                    }
 
-      if (!docForm.file) {
-        alert("Please upload a file");
-        return;
-      }
+                    if (!docForm.file) {
+                      alert("Please upload a file");
+                      return;
+                    }
 
-      const formData = new FormData();
+                    const formData = new FormData();
 
-      // ✅ REQUIRED DATA
-      formData.append("vehicle_id", vehicle.id);
-      formData.append("type", docForm.type);
-      formData.append("validity", docForm.validUntil);
-      formData.append("file", docForm.file);
+                    // ✅ REQUIRED DATA
+                    formData.append("vehicle_id", vehicle.id);
+                    formData.append("type", docForm.type);
+                    formData.append("validity", docForm.validUntil);
+                    formData.append("file", docForm.file);
 
-      // 🚀 API CALL
-      const res = await fetch("http://localhost:5001/api/vehicles/upload-document", {
-        method: "POST",
-        body: formData
-      });
+                    // 🚀 API CALL
+                    const res = await fetch("http://localhost:5001/api/vehicles/upload-document", {
+                      method: "POST",
+                      body: formData
+                    });
 
-      const data = await res.json();
+                    const data = await res.json();
 
-      // ❌ ERROR HANDLING
-      if (!res.ok || !data.success) {
-        alert(data.message || "Upload failed");
-        return;
-      }
+                    // ❌ ERROR HANDLING
+                    if (!res.ok || !data.success) {
+                      alert(data.message || "Upload failed");
+                      return;
+                    }
 
-      // ✅ SUCCESS
-      alert("Document uploaded successfully");
+                    // ✅ SUCCESS
+                    alert("Document uploaded successfully");
 
-      // 🔥 REFRESH VEHICLE DATA
-      const updated = await fetch(`http://localhost:5001/api/vehicles/${vehicle.id}`);
-      const updatedData = await updated.json();
+                    // 🔥 REFRESH VEHICLE DATA
+                    const updated = await fetch(`http://localhost:5001/api/vehicles/${vehicle.id}`);
+                    const updatedData = await updated.json();
 
-      if (updatedData.success) {
-        setVehicle(updatedData.data);
-      }
+                    if (updatedData.success) {
+                      setVehicle(updatedData.data);
+                    }
 
-      // 🔄 RESET FORM
-      setDocForm({
-        vehicle: '',
-        type: '',
-        validUntil: '',
-        file: null
-      });
+                    // 🔄 RESET FORM
+                    setDocForm({
+                      vehicle: '',
+                      type: '',
+                      validUntil: '',
+                      file: null
+                    });
 
-      // ❌ CLOSE MODAL
-      setIsUploadDocModalOpen(false);
+                    // ❌ CLOSE MODAL
+                    setIsUploadDocModalOpen(false);
 
-    } catch (err) {
-      console.error(err);
-      alert("Upload failed (server error)");
-    }
-  }}
-  className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
->
-  Upload File
-</button>
+                  } catch (err) {
+                    console.error(err);
+                    alert("Upload failed (server error)");
+                  }
+                }}
+                className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+              >
+                Upload File
+              </button>
             </div>
 
           </div>
