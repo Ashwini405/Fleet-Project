@@ -125,11 +125,17 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
   const getDocStatus = (date) => {
     if (!date) return 'Missing';
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     const d = new Date(date);
     const diff = (d - today) / (1000 * 60 * 60 * 24);
     if (diff < 0) return 'Expired';
-    if (diff <= 7) return 'Expiring';
+    if (diff <= 30) return 'Expiring Soon';
     return 'Active';
+  };
+
+  const formatDate = (date) => {
+    if (!date) return '—';
+    return new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
   };
 
   // Download document handler
@@ -626,11 +632,11 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                       return (
                         <tr key={index} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-6 py-4 font-medium text-slate-900">{doc.type}</td>
-                          <td className="px-6 py-4 text-slate-700">{doc.expiry || '—'}</td>
+                          <td className="px-6 py-4 text-slate-700">{formatDate(doc.expiry)}</td>
                           <td className="px-6 py-4">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border 
                               ${status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' :
-                                status === 'Expiring' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                status === 'Expiring Soon' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                                   status === 'Expired' ? 'bg-red-50 text-red-700 border-red-200' :
                                     'bg-slate-100 text-slate-500 border-slate-200'}`}>
                               {status}

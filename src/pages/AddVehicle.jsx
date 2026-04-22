@@ -289,7 +289,8 @@ export default function AddVehicle() {
   const handleChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-  }, []);
+    if (formErrors[name]) setFormErrors(prev => ({ ...prev, [name]: undefined }));
+  }, [formErrors]);
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -410,23 +411,14 @@ export default function AddVehicle() {
       const data = await response.json();
 
       if (data.success) {
-        console.log("Vehicle saved successfully:", data);
         navigate('/vehicles');
       } else {
-        alert("Failed to save: " + data.message);
-      }
-
-      const resData = await response.json();
-
-      if (data.success) {
-        console.log("Vehicle saved successfully to Database:", data);
-        navigate('/vehicles');
-      } else {
-        alert("Failed to save: " + data.message);
+        setFormErrors({ registrationNumber: data.message });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch (error) {
       console.error("Error saving vehicle:", error);
-      alert("Could not connect to the backend server. Is it running?");
+      alert("Could not connect to the backend server.");
     }
   };
 
@@ -477,7 +469,7 @@ export default function AddVehicle() {
               Identification
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <InputGroup label="Registration Number" name="registrationNumber" placeholder="e.g. AP39 AB 1234" formData={formData} handleChange={handleChange} />
+              <InputGroup label="Registration Number" name="registrationNumber" placeholder="e.g. AP39 AB 1234" formData={formData} handleChange={handleChange} error={formErrors.registrationNumber} />
               <InputGroup label="Registration Date" name="registrationDate" type="date" formData={formData} handleChange={handleChange} />
               <InputGroup label="RTA Name" name="rtaName" placeholder="e.g. RTA Hyderabad" formData={formData} handleChange={handleChange} />
               <InputGroup label="Owner Name" name="ownerName" placeholder="Enter owner's full name" formData={formData} handleChange={handleChange} />
