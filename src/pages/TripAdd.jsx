@@ -1080,49 +1080,13 @@ export default function TripAdd() {
             </div>
             <div className="bg-slate-50 rounded-xl border border-slate-200 p-4">
               <h4 className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-3">Diesel Details</h4>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                 <Field label="Diesel Rate (₹/L)" name="dieselRate" type="number" placeholder="e.g. 95" form={form} handleChange={handleChange} errors={errors} />
                 <Field label="Diesel Quantity (L)" name="dieselQty" type="number" placeholder={`Auto: ${fuelRequired}L`} helper={`Auto-suggested: ${suggestedDieselQty}L`} form={form} handleChange={handleChange} errors={errors} />
                 <div>
                   <label className={lbl}>Diesel Amount (₹)</label>
                   <div className={inpCalculated}>₹{(dieselAmount || 0).toLocaleString('en-IN')}</div>
                 </div>
-                <Field label="Fuel Vendor" name="fuelVendor" form={form} handleChange={handleChange} errors={errors}>
-                  <select name="fuelVendor" value={form.fuelVendor} onChange={handleChange} className={inp}>
-                    <option value="">— Select —</option>
-                    <option>Shell</option><option>HP</option><option>Bharat Petroleum</option><option>Indian Oil</option>
-                  </select>
-                </Field>
-              </div>
-              <div>
-                <label className={lbl}>Upload Fuel Proof (Max 5 files, 2MB each)</label>
-                {(form.proofFiles?.length || 0) < 5 && (
-                  <label className="flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed border-slate-300 rounded-lg text-sm text-slate-500 cursor-pointer hover:border-indigo-500 hover:text-indigo-600 hover:bg-indigo-50 transition">
-                    <FiUpload className="w-4 h-4" />
-                    <span>Click to upload or drag & drop</span>
-                    <input type="file" name="proofFiles" multiple onChange={handleChange} className="hidden" accept="image/*,.pdf" />
-                  </label>
-                )}
-                {errors.proofFiles && (
-                  <div className={errCls}>
-                    <FiAlertCircle className="w-3 h-3" />
-                    {errors.proofFiles}
-                  </div>
-                )}
-                {(form.proofFiles?.length || 0) > 0 && (
-                  <div className="mt-3 space-y-2">
-                    {form.proofFiles?.map((file, i) => (
-                      <div key={i} className="flex items-center gap-2 justify-between px-3 py-2 bg-white border border-slate-200 rounded-lg">
-                        <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <FiUpload className="w-4 h-4 text-green-500 flex-shrink-0" />
-                          <span className="text-xs text-slate-600 truncate">{file.name}</span>
-                          <span className="text-xs text-slate-500 flex-shrink-0">({(file.size / 1024).toFixed(1)} KB)</span>
-                        </div>
-                        <button type="button" onClick={() => removeFile(i)} className="text-red-500 hover:text-red-700 text-sm px-2 py-1">Remove</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           </Sec>
