@@ -73,10 +73,10 @@ export default function Fuel() {
       {/* Main Content Area */}
       <div className="flex-1 overflow-auto rounded-xl">
         <Routes>
-          <Route path="/" element={<FuelDashboard />} />
-          <Route path="/logs" element={<FuelLogs />} />
-          <Route path="/analytics" element={<FuelAnalytics />} />
-          <Route path="/alerts" element={<FuelAlerts />} />
+          <Route index element={<FuelDashboard />} />
+          <Route path="logs" element={<FuelLogs />} />
+          <Route path="analytics" element={<FuelAnalytics />} />
+          <Route path="alerts" element={<FuelAlerts />} />
           <Route path="*" element={<Navigate to="/fuel" replace />} />
         </Routes>
       </div>

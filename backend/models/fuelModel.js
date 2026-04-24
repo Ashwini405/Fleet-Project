@@ -16,13 +16,10 @@ getAll: async () => {
   const [rows] = await db.query(`
     SELECT f.*,
            v.vehicle_no,
-           t.trip_id,
-           t.driver_name,
-           s.full_name AS supervisor_name   -- ✅ ADD THIS
+           s.full_name AS supervisor_name
     FROM fuel_entries f
     LEFT JOIN vehicles v ON f.vehicle_id = v.id
-    LEFT JOIN trips t ON f.trip_id = t.id
-    LEFT JOIN supervisors s ON v.supervisor_id = s.id  
+    LEFT JOIN supervisors s ON v.supervisor_id = s.id
     ORDER BY f.created_at DESC
   `);
   return rows;
@@ -42,18 +39,15 @@ getAll: async () => {
     return rows;
   },
 
-  // ✅ GET BY TRIP (matches on numeric trip DB id stored in fuel_entries.trip_id)
+  // ✅ GET BY TRIP (trip_id stored as string like TRIP-7585)
   getByTrip: async (tripId) => {
     const [rows] = await db.query(`
       SELECT f.*,
              v.vehicle_no,
-             t.trip_id AS trip_string_id,
-             t.driver_name,
              s.full_name AS supervisor_name
       FROM fuel_entries f
-      LEFT JOIN trips t ON f.trip_id = t.id
       LEFT JOIN vehicles v ON f.vehicle_id = v.id
-      LEFT JOIN supervisors s ON t.supervisor_id = s.id
+      LEFT JOIN supervisors s ON v.supervisor_id = s.id
       WHERE f.trip_id = ?
       ORDER BY f.created_at DESC
     `, [tripId]);

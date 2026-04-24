@@ -384,33 +384,25 @@ export default function TripDetails() {
       .catch(err => console.error(err));
   }, [id]);
 
-  // 🔥 FETCH FUEL — from both fuel table (FuelLogs) and trip_fuel table
+  // 🔥 FETCH FUEL — from fuel_entries table (FuelLogs) using string trip_id
   useEffect(() => {
     if (!trip) return;
-    Promise.all([
-      fetch(`http://localhost:5001/api/trips/${id}/fuel`).then(r => r.json()),
-      fetch(`http://localhost:5001/api/fuel/trip/${trip.id}`).then(r => r.json())
-    ]).then(([tripFuel, fuelLog]) => {
-      const fromTripFuel = tripFuel.success ? tripFuel.data.map(f => ({
-        id: f.id,
-        quantity: Number(f.quantity || 0),
-        rate: Number(f.rate || 0),
-        vendor: f.vendor || '—',
-        created_at: f.created_at,
-        location: f.location || null,
-        added_by: f.added_by || null,
-      })) : [];
-      const fromFuelLog = fuelLog.success ? fuelLog.data.map(f => ({
-        id: `fl-${f.id}`,
-        quantity: Number(f.quantity || 0),
-        rate: Number(f.rate || 0),
-        vendor: f.vendor || '—',
-        created_at: f.date || f.created_at,
-        location: f.location || null,
-        added_by: f.filled_by || null,
-      })) : [];
-      setFuelEntries([...fromTripFuel, ...fromFuelLog]);
-    }).catch(err => console.error(err));
+    fetch(`http://localhost:5001/api/fuel/trip/${trip.trip_id}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success) {
+          setFuelEntries(data.data.map(f => ({
+            id: f.id,
+            quantity: Number(f.quantity || 0),
+            rate: Number(f.rate || 0),
+            vendor: f.vendor || '—',
+            created_at: f.date || f.created_at,
+            location: f.location || null,
+            added_by: f.filled_by || null,
+          })));
+        }
+      })
+      .catch(err => console.error(err));
   }, [id, trip]);
 
   // State for local modals and forms (unchanged)

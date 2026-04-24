@@ -17,7 +17,36 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setTimeout(() => { setData(mockDashboardData); setLoading(false); }, 800);
+    Promise.all([
+      fetch('http://localhost:5001/api/vehicles').then(r => r.json()),
+      fetch('http://localhost:5001/api/trips').then(r => r.json()),
+    ]).then(([vehiclesRes, tripsRes]) => {
+      const vehicles = vehiclesRes.success ? vehiclesRes.data : [];
+      const trips = tripsRes.success ? tripsRes.data : [];
+
+      const fleetStatus = {
+        totalTrucks: vehicles.length,
+        active: vehicles.filter(v => v.vehicle_status === 'Active').length,
+        outOfService: vehicles.filter(v => v.vehicle_status === 'Inactive').length,
+        inGarage: vehicles.filter(v => v.vehicle_status === 'Under Maintenance').length,
+      };
+
+      const currentTrips = trips
+        .filter(t => ['Active', 'In Transit', 'Started', 'Planned'].includes(t.trip_status))
+        .slice(0, 5)
+        .map(t => ({
+          id: t.truck_no || '—',
+          destination: t.destination || '—',
+          loadedDate: t.trip_date || t.created_at,
+          kms: t.est_distance || 0,
+          status: t.trip_status,
+        }));
+
+      setData({ ...mockDashboardData, fleetStatus, currentTrips });
+    }).catch(err => {
+      console.error('Dashboard fetch error:', err);
+      setData(mockDashboardData);
+    }).finally(() => setLoading(false));
   }, []);
 
   if (loading) {

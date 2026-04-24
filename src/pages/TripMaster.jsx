@@ -1031,7 +1031,9 @@ export default function TripMaster() {
               {/* Pagination */}
               <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex items-center justify-between">
                 <div className="text-sm text-gray-700">
-                  Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredTrips.length)} of {filteredTrips.length} {activeTab === 'present' ? 'present' : activeTab === 'past' ? 'past' : 'draft'} trips
+                  {filteredTrips.length > 0
+                    ? `Showing ${((currentPage - 1) * itemsPerPage) + 1} to ${Math.min(currentPage * itemsPerPage, filteredTrips.length)} of ${filteredTrips.length}`
+                    : 'No'} {activeTab === 'present' ? 'present' : activeTab === 'past' ? 'past' : 'draft'} trips
                 </div>
                 <div className="flex items-center gap-2">
                   <button
