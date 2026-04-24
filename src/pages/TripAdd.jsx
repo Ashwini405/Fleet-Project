@@ -93,29 +93,29 @@ const formReducer = (state, action) => {
       const warnings = [];
       if (vehicle.vehicle_status !== 'Active') warnings.push('⚠️ Vehicle not available');
       if (Math.random() > 0.7) warnings.push('⚠️ Driver may be on another trip');
-      
+
       return {
-  ...state,
+        ...state,
 
-  driver: vehicle.driver_name || '',
-  driverContact: vehicle.driver_contact || '',
-  supervisor: vehicle.supervisor_name || '',
-  sourcePlant: vehicle.source_plant || '',
+        driver: vehicle.driver_name || '',
+        driverContact: vehicle.driver_contact || '',
+        supervisor: vehicle.supervisor_name || '',
+        sourcePlant: vehicle.source_plant || '',
 
-  lastOdometer: vehicle.initial_odometer || 0,
-  fuelType: vehicle.fuel_type || '',
- truckCapacity: vehicle.gvw || 0,
-tankCapacity: vehicle.gvw || 0,
-  mileage: vehicle.mileage || 0,
-  expectedMileage: vehicle.mileage ? vehicle.mileage.toString() : '',
+        lastOdometer: vehicle.initial_odometer || 0,
+        fuelType: vehicle.fuel_type || '',
+        truckCapacity: vehicle.gvw || 0,
+        tankCapacity: vehicle.gvw || 0,
+        mileage: vehicle.mileage || 0,
+        expectedMileage: vehicle.mileage ? vehicle.mileage.toString() : '',
 
-  vehicleId: vehicle.id,
-  driverId: vehicle.assigned_driver || '',
-  supervisorId: vehicle.supervisor_id || '',
-  stationId: vehicle.station_id || '',
+        vehicleId: vehicle.id,
+        driverId: vehicle.assigned_driver || '',
+        supervisorId: vehicle.supervisor_id || '',
+        stationId: vehicle.station_id || '',
 
-  truckWarnings: warnings,
-};
+        truckWarnings: warnings,
+      };
     case 'ADD_FILE':
       if ((state.proofFiles?.length || 0) >= 5) return state;
       return { ...state, proofFiles: [...(state.proofFiles || []), action.file] };
@@ -264,55 +264,55 @@ export default function TripAdd() {
         dispatch({
           type: 'UPDATE_MULTIPLE',
           payload: {
-            tripId:          t.trip_id,
-            tripType:        t.trip_type || '',
-            tripStatus:      t.trip_status || 'Planned',
-            tripPriority:    t.trip_priority || 'Normal',
-            transportType:   t.transport_type || 'Outbound',
+            tripId: t.trip_id,
+            tripType: t.trip_type || '',
+            tripStatus: t.trip_status || 'Planned',
+            tripPriority: t.trip_priority || 'Normal',
+            transportType: t.transport_type || 'Outbound',
             contractOrderId: t.contract_order_id || '',
-            truckNo:         t.truck_no || '',
-            tripDate:        t.trip_date ? t.trip_date.split('T')[0] : '',
-            driver:          t.driver_name || '',
-            driverContact:   t.driver_contact || '',
-            coDriver:        t.co_driver || '',
-            supervisor:      t.supervisor_name || '',
-            sourcePlant:     t.source_plant || '',
-            truckCapacity:   t.truck_capacity || '',
-            fuelType:        t.fuel_type || '',
-            startOdometer:   t.start_odometer || '',
-            lastOdometer:    t.last_odometer || 0,
-            vehicleId:       t.vehicle_id || '',
-            driverId:        t.driver_id || '',
-            supervisorId:    t.supervisor_id || '',
-            stationId:       t.station_id || '',
-            source:          t.source || '',
-            destination:     t.destination || '',
+            truckNo: t.truck_no || '',
+            tripDate: t.trip_date ? t.trip_date.split('T')[0] : '',
+            driver: t.driver_name || '',
+            driverContact: t.driver_contact || '',
+            coDriver: t.co_driver || '',
+            supervisor: t.supervisor_name || '',
+            sourcePlant: t.source_plant || '',
+            truckCapacity: t.truck_capacity || '',
+            fuelType: t.fuel_type || '',
+            startOdometer: t.start_odometer || '',
+            lastOdometer: t.last_odometer || 0,
+            vehicleId: t.vehicle_id || '',
+            driverId: t.driver_id || '',
+            supervisorId: t.supervisor_id || '',
+            stationId: t.station_id || '',
+            source: t.source || '',
+            destination: t.destination || '',
             destinationState: t.destination_state || '',
-            viaStops:        t.via_stops || '',
-            routeType:       t.route_type || 'Highway',
-            estDistance:     t.est_distance || '',
-            startTime:       t.start_time ? t.start_time.replace(' ', 'T').slice(0, 16) : '',
-            eta:             t.eta ? t.eta.replace(' ', 'T').slice(0, 16) : '',
-            loadingTime:     t.loading_time ? t.loading_time.replace(' ', 'T').slice(0, 16) : '',
-            unloadingTime:   t.unloading_time ? t.unloading_time.replace(' ', 'T').slice(0, 16) : '',
-            materialType:    t.material_type || '',
-            loadWeight:      t.load_weight || '',
-            loadType:        t.load_type || 'Full',
-            units:           t.units || '',
-            customerName:    t.customer_name || '',
-            invoiceNumber:   t.invoice_number || '',
-            lrNumber:        t.lr_number || '',
-            tripBudget:      t.trip_budget || '',
-            expenseLimit:    t.expense_limit || '',
-            paymentMode:     t.payment_mode || 'Cash',
-            freightAmount:   t.freight_amount || '',
-            driverAdvance:   t.driver_advance || '',
-            hamaliAdvance:   t.hamali_advance || '',
-            otherAdvance:    t.other_advance || '',
+            viaStops: t.via_stops || '',
+            routeType: t.route_type || 'Highway',
+            estDistance: t.est_distance || '',
+            startTime: t.start_time ? t.start_time.replace(' ', 'T').slice(0, 16) : '',
+            eta: t.eta ? t.eta.replace(' ', 'T').slice(0, 16) : '',
+            loadingTime: t.loading_time ? t.loading_time.replace(' ', 'T').slice(0, 16) : '',
+            unloadingTime: t.unloading_time ? t.unloading_time.replace(' ', 'T').slice(0, 16) : '',
+            materialType: t.material_type || '',
+            loadWeight: t.load_weight || '',
+            loadType: t.load_type || 'Full',
+            units: t.units || '',
+            customerName: t.customer_name || '',
+            invoiceNumber: t.invoice_number || '',
+            lrNumber: t.lr_number || '',
+            tripBudget: t.trip_budget || '',
+            expenseLimit: t.expense_limit || '',
+            paymentMode: t.payment_mode || 'Cash',
+            freightAmount: t.freight_amount || '',
+            driverAdvance: t.driver_advance || '',
+            hamaliAdvance: t.hamali_advance || '',
+            otherAdvance: t.other_advance || '',
             expectedMileage: t.expected_mileage || '',
-            dieselRate:      t.diesel_rate || '',
-            dieselQty:       t.diesel_qty || '',
-            fuelVendor:      t.fuel_vendor || '',
+            dieselRate: t.diesel_rate || '',
+            dieselQty: t.diesel_qty || '',
+            fuelVendor: t.fuel_vendor || '',
           }
         });
       })
@@ -336,51 +336,51 @@ export default function TripAdd() {
   }, []);
 
   useEffect(() => {
-  if (!form.truckNo) {
-    setVehicleAvailability(null);
-    return;
-  }
-
-  const fetchVehicleDetails = async () => {
-    try {
-      const [detailRes, availRes] = await Promise.all([
-        fetch(`http://localhost:5001/api/vehicles/by-number/${form.truckNo}`),
-        fetch(`http://localhost:5001/api/vehicles/availability/${form.truckNo}`)
-      ]);
-      const [detail, avail] = await Promise.all([detailRes.json(), availRes.json()]);
-
-      if (detail.success && detail.data) {
-        const v = detail.data;
-        dispatch({
-          type: 'AUTO_FILL_VEHICLE',
-          vehicle: {
-            id: v.id,
-            driver_name: v.driver_name,
-            driver_contact: v.driver_contact,
-            supervisor_name: v.supervisor_name,
-            source_plant: v.source_plant,
-            initial_odometer: v.initial_odometer,
-            fuel_type: v.fuel_type,
-            gvw: v.gvw,
-            mileage: v.mileage,
-            assigned_driver: v.assigned_driver,
-            supervisor_id: v.supervisor_id,
-            station_id: v.station_id,
-            vehicle_status: v.vehicle_status
-          }
-        });
-      }
-
-      if (avail.success) {
-        setVehicleAvailability(avail);
-      }
-    } catch (err) {
-      console.error('Auto-fetch error:', err);
+    if (!form.truckNo) {
+      setVehicleAvailability(null);
+      return;
     }
-  };
 
-  fetchVehicleDetails();
-}, [form.truckNo]);
+    const fetchVehicleDetails = async () => {
+      try {
+        const [detailRes, availRes] = await Promise.all([
+          fetch(`http://localhost:5001/api/vehicles/by-number/${form.truckNo}`),
+          fetch(`http://localhost:5001/api/vehicles/availability/${form.truckNo}`)
+        ]);
+        const [detail, avail] = await Promise.all([detailRes.json(), availRes.json()]);
+
+        if (detail.success && detail.data) {
+          const v = detail.data;
+          dispatch({
+            type: 'AUTO_FILL_VEHICLE',
+            vehicle: {
+              id: v.id,
+              driver_name: v.driver_name,
+              driver_contact: v.driver_contact,
+              supervisor_name: v.supervisor_name,
+              source_plant: v.source_plant,
+              initial_odometer: v.initial_odometer,
+              fuel_type: v.fuel_type,
+              gvw: v.gvw,
+              mileage: v.mileage,
+              assigned_driver: v.assigned_driver,
+              supervisor_id: v.supervisor_id,
+              station_id: v.station_id,
+              vehicle_status: v.vehicle_status
+            }
+          });
+        }
+
+        if (avail.success) {
+          setVehicleAvailability(avail);
+        }
+      } catch (err) {
+        console.error('Auto-fetch error:', err);
+      }
+    };
+
+    fetchVehicleDetails();
+  }, [form.truckNo]);
   // ─── Auto‑save draft every 5 seconds ─────────────────────────────────────
   useEffect(() => {
     const timer = setInterval(() => {
@@ -791,7 +791,7 @@ export default function TripAdd() {
       diesel_rate: +form.dieselRate || 0,
       diesel_qty: +form.dieselQty || 0,
       fuel_vendor: form.fuelVendor,
-      proof_files: form.proofFiles.map(f => f.name).join(','),
+      proof_files: (form.proofFiles || []).map(f => f.name).join(','),
 
       truck_warnings: JSON.stringify(form.truckWarnings),
       draft_saved: form.draftSaved,
@@ -799,24 +799,36 @@ export default function TripAdd() {
     };
 
     try {
-      const response = await fetch('http://localhost:5001/api/trips', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(tripData),
-      });
-      const result = await response.json();
-      if (result.success) {
-        localStorage.removeItem('tripFormDraft');
-        navigate('/trips');
-      } else {
-        alert('Failed to create trip: ' + result.message);
-      }
-    } catch (error) {
-      console.error('Error creating trip:', error);
-      alert('Could not connect to backend. Is the server running?');
-    } finally {
-      setIsSubmitting(false);
-    }
+  const response = await fetch('http://localhost:5001/api/trips', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(tripData),
+  });
+
+  // ✅ HANDLE ERROR PROPERLY
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error("TRIP CREATE ERROR:", errText);
+    alert("Trip creation failed");
+    return;
+  }
+
+  // ✅ PARSE RESPONSE
+  const result = await response.json();
+
+  if (result.success) {
+    localStorage.removeItem('tripFormDraft');
+    navigate('/trips');
+  } else {
+    alert('Failed to create trip: ' + result.message);
+  }
+
+} catch (error) {
+  console.error('Error creating trip:', error);
+  alert('Could not connect to backend. Is the server running?');
+} finally {
+  setIsSubmitting(false);
+}
   };
 
   // ─── Prevent Enter from submitting the whole form ────────────────────────
@@ -1108,11 +1120,10 @@ export default function TripAdd() {
             onClick={handleSubmit}
             disabled={!isFormValid() || isSubmitting}
             title={!isFormValid() ? "Complete required fields to generate trip" : ""}
-            className={`px-6 py-2.5 text-sm font-semibold rounded-lg shadow-lg transition flex items-center gap-2 ${
-              isFormValid() && !isSubmitting
+            className={`px-6 py-2.5 text-sm font-semibold rounded-lg shadow-lg transition flex items-center gap-2 ${isFormValid() && !isSubmitting
                 ? 'text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 cursor-pointer'
                 : 'text-slate-400 bg-slate-200 cursor-not-allowed'
-            }`}
+              }`}
           >
             {isSubmitting ? (
               <>
