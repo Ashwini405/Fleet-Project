@@ -1,6 +1,127 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { FiSearch, FiPlus, FiFilter, FiSettings, FiLayers, FiX, FiTrash2 } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiFilter, FiSettings, FiLayers, FiX, FiTrash2, FiAlertTriangle, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
+
+const DOC_LABELS = {
+  insurance_validity: 'Insurance',
+  fc_validity: 'FC',
+  permit_validity: 'Permit',
+  tax_validity: 'Tax',
+  pollution_validity: 'Pollution',
+  cll_validity: 'CLL',
+};
+
+function getDocAlerts(vehicles) {
+  const today = new Date();
+  const alerts = [];
+  vehicles.forEach(v => {
+    Object.keys(DOC_LABELS).forEach(field => {
+      const val = v[field];
+      if (!val) return;
+      const expiry = new Date(val);
+      const daysLeft = Math.ceil((expiry - today) / (1000 * 60 * 60 * 24));
+      if (daysLeft <= 30) {
+        alerts.push({
+          truckNo: v.truckNo,
+          vehicleId: v.id,
+          doc: DOC_LABELS[field],
+          daysLeft,
+          expiry: expiry.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+        });
+      }
+    });
+  });
+  return alerts.sort((a, b) => a.daysLeft - b.daysLeft);
+}
+
+function DocExpiryAlerts({ vehicles, activeFilter, onFilter }) {
+  const [collapsed, setCollapsed] = useState(true);
+  const alerts = getDocAlerts(vehicles);
+  if (!alerts.length) return null;
+  const expired = alerts.filter(a => a.daysLeft <= 0);
+  const expiring = alerts.filter(a => a.daysLeft > 0);
+
+  const handleBadgeClick = (e, type) => {
+    e.stopPropagation();
+    setCollapsed(false);
+    onFilter(activeFilter === type ? null : type);
+  };
+
+  const renderRow = (a, i) => (
+    <div key={i} className={`flex items-center justify-between px-5 py-2.5 ${a.daysLeft <= 0 ? 'bg-red-50' : a.daysLeft <= 7 ? 'bg-orange-50' : 'bg-amber-50/40'}`}>
+      <div className="flex items-center gap-3">
+        <span className="text-sm font-bold text-slate-800">{a.truckNo}</span>
+        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-600">{a.doc}</span>
+      </div>
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-slate-500">Expires: {a.expiry}</span>
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+          a.daysLeft <= 0 ? 'bg-red-100 text-red-700' :
+          a.daysLeft <= 7 ? 'bg-orange-100 text-orange-700' :
+          'bg-amber-100 text-amber-700'
+        }`}>
+          {a.daysLeft <= 0 ? 'Expired' : `${a.daysLeft}d left`}
+        </span>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden mb-6">
+      <div className="flex items-center justify-between px-5 py-3 bg-amber-50 border-b border-amber-200">
+        <div className="flex items-center gap-2 flex-wrap">
+          <FiAlertTriangle className="w-4 h-4 text-amber-500" />
+          <span className="text-sm font-bold text-amber-800">Document Expiry Alerts</span>
+          {expired.length > 0 && (
+            <span
+              onClick={e => handleBadgeClick(e, 'expired')}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer border transition-colors ${
+                activeFilter === 'expired' ? 'bg-red-600 text-white border-red-600' : 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200'
+              }`}
+            >{expired.length} Expired</span>
+          )}
+          {expiring.length > 0 && (
+            <span
+              onClick={e => handleBadgeClick(e, 'expiring')}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer border transition-colors ${
+                activeFilter === 'expiring' ? 'bg-amber-600 text-white border-amber-600' : 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200'
+              }`}
+            >{expiring.length} Expiring Soon</span>
+          )}
+          {activeFilter && (
+            <span
+              onClick={e => { e.stopPropagation(); onFilter(null); setCollapsed(true); }}
+              className="px-2 py-0.5 rounded-full text-[10px] font-bold cursor-pointer bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200"
+            >✕ Clear</span>
+          )}
+        </div>
+        <button onClick={() => setCollapsed(p => !p)} className="p-1 rounded hover:bg-amber-100 transition-colors">
+          {collapsed ? <FiChevronDown className="w-4 h-4 text-amber-500" /> : <FiChevronUp className="w-4 h-4 text-amber-500" />}
+        </button>
+      </div>
+      {!collapsed && (
+        <div>
+          {(activeFilter === 'expired' || !activeFilter) && expired.length > 0 && (
+            <>
+              <div className="px-5 py-2 bg-red-100 border-b border-red-200">
+                <span className="text-[10px] font-black uppercase tracking-widest text-red-600">🔴 Expired</span>
+              </div>
+              <div className="divide-y divide-red-100">{expired.map(renderRow)}</div>
+            </>
+          )}
+          {(activeFilter === 'expiring' || !activeFilter) && expiring.length > 0 && (
+            <>
+              <div className="px-5 py-2 bg-amber-100 border-b border-amber-200">
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">⚠️ Expiring Soon</span>
+              </div>
+              <div className="divide-y divide-amber-100">{expiring.map(renderRow)}</div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Column Definitions ───────────────────────────────────────────────────────
 const ALL_COLUMNS = [
@@ -178,6 +299,7 @@ export default function VehicleMaster() {
   const [showColSettings, setShowColSettings] = useState(false);
   const [vehicles, setVehicles] = useState([]);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [docFilter, setDocFilter] = useState(null);
   const colSettingsBtnRef = useRef(null);
 
   const handleDelete = async (id) => {
@@ -216,7 +338,14 @@ export default function VehicleMaster() {
             gpsId: v.gps_device_id || '—',
             fastagId: v.fastag_id || '—',
             emi: v.emi_amount ? `₹${v.emi_amount.toLocaleString()}` : '—',
-            complianceStatus: 'Valid', // compute based on validity dates if needed
+            complianceStatus: 'Valid',
+            // Document expiry fields
+            insurance_validity: v.insurance_validity || null,
+            fc_validity: v.fc_validity || null,
+            permit_validity: v.permit_validity || null,
+            tax_validity: v.tax_validity || null,
+            pollution_validity: v.pollution_validity || null,
+            cll_validity: v.cll_validity || null,
             // Additional fields for details panel
             bodyType: v.body_type || '—',
             color: v.vehicle_color || '—',
@@ -235,17 +364,35 @@ export default function VehicleMaster() {
 
   const toggleCol = (key) => setVisibleCols(prev => ({ ...prev, [key]: !prev[key] }));
 
+  const docAlertVehicleIds = useMemo(() => {
+    if (!docFilter) return null;
+    const today = new Date();
+    const ids = new Set();
+    vehicles.forEach(v => {
+      Object.keys(DOC_LABELS).forEach(field => {
+        const val = v[field];
+        if (!val) return;
+        const daysLeft = Math.ceil((new Date(val) - today) / (1000 * 60 * 60 * 24));
+        if (docFilter === 'expired' && daysLeft <= 0) ids.add(v.id);
+        if (docFilter === 'expiring' && daysLeft > 0 && daysLeft <= 30) ids.add(v.id);
+      });
+    });
+    return ids;
+  }, [vehicles, docFilter]);
+
   const filteredData = useMemo(() => vehicles.filter(v => {
     const q = searchTerm.toLowerCase();
     const matchSearch = !q ||
       v.truckNo.toLowerCase().includes(q) ||
       (v.driver || '').toLowerCase().includes(q) ||
       (v.supervisor || '').toLowerCase().includes(q);
+    const matchDoc = !docAlertVehicleIds || docAlertVehicleIds.has(v.id);
     return matchSearch
+      && matchDoc
       && (filterStatus === 'All' || v.status === filterStatus)
       && (filterType === 'All' || v.type === filterType)
       && (filterSupervisor === 'All' || v.supervisor === filterSupervisor);
-  }), [vehicles, searchTerm, filterStatus, filterType, filterSupervisor]);
+  }), [vehicles, searchTerm, filterStatus, filterType, filterSupervisor, docAlertVehicleIds]);
 
   const uniqueStatuses = useMemo(() => ['All', ...new Set(vehicles.map(v => v.status))], [vehicles]);
   const uniqueTypes = useMemo(() => ['All', ...new Set(vehicles.map(v => v.type))], [vehicles]);
@@ -255,6 +402,9 @@ export default function VehicleMaster() {
 
   return (
     <div className="font-sans text-slate-800">
+
+      {/* ── Document Expiry Alerts ── */}
+      <DocExpiryAlerts vehicles={vehicles} activeFilter={docFilter} onFilter={setDocFilter} />
 
       {/* ── Header ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
