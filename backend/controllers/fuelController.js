@@ -52,8 +52,10 @@ const createFuel = async (req, res) => {
       quantity,
       rate,
       total_cost,
-      vendor
-     
+      vendor,
+      location: location || null,     // ✅ ADD
+      filled_by: filled_by || null    // ✅ ADD
+
     };
 
     const result = await Fuel.create(fuelData);

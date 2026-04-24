@@ -251,6 +251,53 @@ const getTripsByVehicle = async (req, res) => {
   }
 };
 
+const uploadDocument = async (req, res) => {
+  try {
+    const tripId = req.params.tripId;   // ✅ FIXED
+    const { type } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded'
+      });
+    }
+
+    const fileName = req.file.filename;
+
+    let column = '';
+
+    if (type === 'E-Way Bill') column = 'eway_bill_file';
+    else if (type === 'Invoice') column = 'invoice_file';
+    else if (type === 'Delivery Proof (POD)') column = 'pod_file';
+
+    if (!column) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid document type'
+      });
+    }
+
+    await db.query(
+      `UPDATE trips SET ${column} = ? WHERE trip_id = ?`,
+      [fileName, tripId]
+    );
+
+    res.json({
+      success: true,
+      message: 'File uploaded successfully',
+      file: fileName
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
+};
+
 module.exports = {
   createTrip,
   getTrips,
@@ -262,5 +309,6 @@ module.exports = {
   getExpenses,   // ✅ ADD
   getFuel,
   updateTripStatus,
-  getTripsByVehicle
+  getTripsByVehicle,
+  uploadDocument
 };
