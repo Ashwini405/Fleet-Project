@@ -49,16 +49,16 @@ const systemViews = {
     id: 'manager',
     name: 'Manager View',
     isSystem: true,
-    columns: ['tripId', 'status', 'progress', 'alerts', 'eta', 'supervisor'],
-    columnOrder: ['tripId', 'status', 'progress', 'alerts', 'eta', 'supervisor'],
+    columns: ['tripId', 'truckNumber', 'status', 'progress', 'alerts', 'eta', 'supervisor'],
+    columnOrder: ['tripId', 'truckNumber', 'status', 'progress', 'alerts', 'eta', 'supervisor'],
     filters: { statusFilter: 'All', driverFilter: 'All', plantFilter: 'All' }
   },
   finance: {
     id: 'finance',
     name: 'Finance View',
     isSystem: true,
-    columns: ['tripId', 'totalCost', 'fuelCost', 'expenses', 'advance', 'profitLoss'],
-    columnOrder: ['tripId', 'totalCost', 'fuelCost', 'expenses', 'advance', 'profitLoss'],
+    columns: ['tripId', 'status', 'totalCost', 'fuelCost', 'expenses', 'advance', 'profitLoss'],
+    columnOrder: ['tripId', 'status', 'totalCost', 'fuelCost', 'expenses', 'advance', 'profitLoss'],
     filters: { statusFilter: 'All', driverFilter: 'All', plantFilter: 'All' }
   },
   driver: {
@@ -162,7 +162,9 @@ export default function TripMaster() {
   // Saved Views state
   const [views, setViews] = useState(() => {
     const saved = localStorage.getItem('tripMasterViews');
-    return saved ? { ...systemViews, ...JSON.parse(saved) } : systemViews;
+    // Always use fresh system views, merge only custom views on top
+    const customViews = saved ? JSON.parse(saved) : {};
+    return { ...systemViews, ...customViews };
   });
   const [currentViewId, setCurrentViewId] = useState(() => {
     return localStorage.getItem('tripMasterCurrentView') || 'operations';
@@ -179,7 +181,7 @@ export default function TripMaster() {
 
   const currentView = views[currentViewId] || systemViews.operations;
   const presentTripCount = trips.filter(t => ['Active', 'In Transit', 'Planned', 'Delayed', 'Started'].includes(t.status)).length;
-  const pastTripCount = trips.filter(t => ['Completed', 'Closed'].includes(t.status)).length;
+  const pastTripCount = trips.filter(t => !['Active', 'In Transit', 'Planned', 'Delayed', 'Started', 'Draft'].includes(t.status)).length;
   const draftTripCount = trips.filter(t => t.status === 'Draft').length;
 
   const [deleteConfirm, setDeleteConfirm] = useState(null); // trip id pending deletion
@@ -255,7 +257,7 @@ export default function TripMaster() {
     let filtered = trips.filter(trip => {
       // Tab filtering
       const isPresentTrip = ['Active', 'In Transit', 'Planned', 'Delayed', 'Started'].includes(trip.status);
-      const isPastTrip = ['Completed', 'Closed'].includes(trip.status);
+      const isPastTrip = !isPresentTrip && trip.status !== 'Draft';
       const isDraft = trip.status === 'Draft';
 
       const matchesTab = activeTab === 'present' ? isPresentTrip : activeTab === 'past' ? isPastTrip : isDraft;
@@ -425,7 +427,27 @@ export default function TripMaster() {
 
       case 'status':
         return (
-          <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[trip.status]}`}>
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+            trip.status === 'Completed' ? 'bg-green-100 text-green-700 border-green-300'
+            : trip.status === 'Closed' ? 'bg-slate-100 text-slate-600 border-slate-300'
+            : trip.status === 'In Transit' ? 'bg-blue-100 text-blue-700 border-blue-300'
+            : trip.status === 'Started' ? 'bg-cyan-100 text-cyan-700 border-cyan-300'
+            : trip.status === 'Active' ? 'bg-green-100 text-green-700 border-green-300'
+            : trip.status === 'Planned' ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
+            : trip.status === 'Delayed' ? 'bg-red-100 text-red-700 border-red-300'
+            : trip.status === 'Draft' ? 'bg-amber-100 text-amber-700 border-amber-300'
+            : trip.status === 'Cancelled' ? 'bg-red-100 text-red-600 border-red-300'
+            : 'bg-gray-100 text-gray-600 border-gray-300'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${
+              trip.status === 'Completed' || trip.status === 'Active' ? 'bg-green-500'
+              : trip.status === 'Closed' ? 'bg-slate-400'
+              : trip.status === 'In Transit' ? 'bg-blue-500'
+              : trip.status === 'Started' ? 'bg-cyan-500'
+              : trip.status === 'Planned' ? 'bg-yellow-500'
+              : trip.status === 'Delayed' || trip.status === 'Cancelled' ? 'bg-red-500'
+              : 'bg-gray-400'
+            }`} />
             {trip.status}
           </span>
         );
@@ -502,8 +524,57 @@ export default function TripMaster() {
           </div>
         );
 
+      case 'fuelCost':
+        return (
+          <span className="text-sm font-medium text-gray-900">
+            ₹{Number(trip.fuelCost || 0).toLocaleString('en-IN')}
+          </span>
+        );
+
+      case 'expenses':
+        return (
+          <span className="text-sm font-medium text-gray-900">
+            ₹{Number(trip.expenses || 0).toLocaleString('en-IN')}
+          </span>
+        );
+
+      case 'advance':
+        return (
+          <span className="text-sm font-medium text-gray-900">
+            ₹{Number(trip.advance || 0).toLocaleString('en-IN')}
+          </span>
+        );
+
+      case 'profitLoss': {
+        const freight = Number(trip.totalCost || 0);
+        const cost = Number(trip.fuelCost || 0) + Number(trip.expenses || 0);
+        const pl = freight - cost;
+        return (
+          <span className={`text-sm font-bold ${
+            pl > 0 ? 'text-green-600' : pl < 0 ? 'text-red-600' : 'text-gray-400'
+          }`}>
+            {pl > 0 ? '+' : ''}₹{Math.abs(pl).toLocaleString('en-IN')}
+          </span>
+        );
+      }
+
+      case 'supervisor':
+        return (
+          <div className="flex items-center gap-2">
+            <FiUser className="w-4 h-4 text-gray-400" />
+            <span className="text-sm text-gray-900">{trip.supervisor || '—'}</span>
+          </div>
+        );
+
+      case 'startTime':
+        return (
+          <span className="text-sm text-gray-900">
+            {trip.startTime ? new Date(trip.startTime).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+          </span>
+        );
+
       default:
-        return <span className="text-sm text-gray-900">{trip[columnKey] || 'N/A'}</span>;
+        return <span className="text-sm text-gray-900">{trip[columnKey] ?? '—'}</span>;
     }
   };
 
@@ -909,13 +980,32 @@ export default function TripMaster() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="hover:bg-gray-50 transition-colors"
+                        className={`transition-colors cursor-pointer ${
+                          trip.status === 'Completed' ? 'bg-green-50/40 hover:bg-green-50/70'
+                          : trip.status === 'Closed' ? 'bg-slate-50/60 hover:bg-slate-100/60'
+                          : trip.status === 'Started' || trip.status === 'In Transit' ? 'bg-blue-50/30 hover:bg-blue-50/60'
+                          : trip.status === 'Planned' || trip.status === 'Active' ? 'bg-yellow-50/30 hover:bg-yellow-50/60'
+                          : 'hover:bg-gray-50'
+                        }`}
                       >
                         {currentView.columnOrder.map(columnKey => {
                           if (!currentView.columns.includes(columnKey)) return null;
                           return (
                             <td key={columnKey} className="px-6 py-4 whitespace-nowrap cursor-pointer" onClick={() => navigate(`/trips/${trip.id}`)}>
-                              {renderCellContent(trip, columnKey)}
+                              {columnKey === 'tripId' ? (
+                                <div className="flex items-center gap-2">
+                                  <span className={`w-1 h-8 rounded-full shrink-0 ${
+                                    trip.status === 'Completed' ? 'bg-green-500'
+                                    : trip.status === 'Closed' ? 'bg-slate-400'
+                                    : trip.status === 'In Transit' ? 'bg-blue-500'
+                                    : trip.status === 'Started' ? 'bg-cyan-500'
+                                    : trip.status === 'Active' ? 'bg-green-400'
+                                    : trip.status === 'Planned' ? 'bg-yellow-400'
+                                    : 'bg-gray-300'
+                                  }`} />
+                                  {renderCellContent(trip, columnKey)}
+                                </div>
+                              ) : renderCellContent(trip, columnKey)}
                             </td>
                           );
                         })}

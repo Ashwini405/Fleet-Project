@@ -384,17 +384,34 @@ export default function TripDetails() {
       .catch(err => console.error(err));
   }, [id]);
 
-  // 🔥 FETCH FUEL
+  // 🔥 FETCH FUEL — from both fuel table (FuelLogs) and trip_fuel table
   useEffect(() => {
-    fetch(`http://localhost:5001/api/trips/${id}/fuel`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setFuelEntries(data.data);
-        }
-      })
-      .catch(err => console.error(err));
-  }, [id]);
+    if (!trip) return;
+    Promise.all([
+      fetch(`http://localhost:5001/api/trips/${id}/fuel`).then(r => r.json()),
+      fetch(`http://localhost:5001/api/fuel/trip/${trip.id}`).then(r => r.json())
+    ]).then(([tripFuel, fuelLog]) => {
+      const fromTripFuel = tripFuel.success ? tripFuel.data.map(f => ({
+        id: f.id,
+        quantity: Number(f.quantity || 0),
+        rate: Number(f.rate || 0),
+        vendor: f.vendor || '—',
+        created_at: f.created_at,
+        location: f.location || null,
+        added_by: f.added_by || null,
+      })) : [];
+      const fromFuelLog = fuelLog.success ? fuelLog.data.map(f => ({
+        id: `fl-${f.id}`,
+        quantity: Number(f.quantity || 0),
+        rate: Number(f.rate || 0),
+        vendor: f.vendor || '—',
+        created_at: f.date || f.created_at,
+        location: f.location || null,
+        added_by: f.filled_by || null,
+      })) : [];
+      setFuelEntries([...fromTripFuel, ...fromFuelLog]);
+    }).catch(err => console.error(err));
+  }, [id, trip]);
 
   // State for local modals and forms (unchanged)
   const [modal, setModal] = useState(null);
@@ -884,14 +901,14 @@ export default function TripDetails() {
                 ))}
               </div>
             )}
-            {atLeast(mappedTrip.status, VISIBILITY.expenseSection) && !atLeast(mappedTrip.status, 'Completed') && (
+            {/* {atLeast(mappedTrip.status, VISIBILITY.expenseSection) && !atLeast(mappedTrip.status, 'Completed') && (
               <button
                 onClick={() => setModal('expense')}
                 className="mt-3 w-full py-2 border border-dashed border-slate-300 text-slate-500 text-sm rounded-lg hover:border-indigo-400 hover:text-indigo-600 transition-colors flex items-center justify-center gap-1.5"
               >
                 <FiPlusCircle className="w-4 h-4" /> Add Actual Expense
               </button>
-            )}
+            )} */}
             {atLeast(mappedTrip.status, 'Completed') && (
               <p className="mt-2 text-[10px] text-slate-400 text-center flex items-center justify-center gap-1">
                 <FiLock className="w-3 h-3" /> Expenses locked after completion
@@ -990,7 +1007,7 @@ export default function TripDetails() {
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 no-print">
         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Actions</p>
         <div className="flex flex-wrap gap-2.5">
-          {mappedTrip.status === 'Planned' && (
+          {['Planned', 'Active'].includes(mappedTrip.status) && (
             <>
               <ActionBtn icon={FiPlay} label="Start Trip" color="bg-green-600 hover:bg-green-700" onClick={() => setModal('start')} />
               <ActionBtn icon={FiTrash2} label="Cancel Trip" color="bg-red-600 hover:bg-red-700" onClick={() => setModal('cancel')} />
@@ -1028,10 +1045,16 @@ export default function TripDetails() {
       {/* ── Modals (unchanged) ── */}
       {modal === 'fuel' && (
         <ActionModal title="Add Fuel Entry" onClose={() => setModal(null)}>
-          <p className="text-sm text-slate-500 mb-3">Fuel entries are managed from the Fuel module. Navigate there to add a detailed entry for this trip.</p>
-          <button onClick={() => { setModal(null); navigate(`/fuel/add?trip_id=${id}`); }} className="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-bold hover:bg-indigo-700">
-            Go to Add Fuel Entry
-          </button>
+          <p className="text-sm text-slate-500 mb-4">You will be redirected to Fuel Logs to add a detailed fuel entry for this trip.</p>
+          <div className="flex gap-2">
+            <button onClick={() => setModal(null)} className="flex-1 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-medium hover:bg-slate-50">Cancel</button>
+            <button
+              onClick={() => { setModal(null); navigate(`/fuel/logs?trip_id=${id}&truck=${trip.truck_no || ''}`); }}
+              className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-bold"
+            >
+              Go to Fuel Logs
+            </button>
+          </div>
         </ActionModal>
       )}
 

@@ -907,11 +907,6 @@ export default function TripAdd() {
                 </select>
               </Field>
               <Field label="Contract/Order ID (optional)" name="contractOrderId" placeholder="e.g. ORD-2024-1234" form={form} handleChange={handleChange} errors={errors} />
-              <Field label="Trip Status" name="tripStatus" form={form} handleChange={handleChange} errors={errors}>
-                <select name="tripStatus" value={form.tripStatus} onChange={handleChange} className={inp}>
-                  <option>Planned</option><option>Active</option><option>In Transit</option>
-                </select>
-              </Field>
             </div>
           </Sec>
 
