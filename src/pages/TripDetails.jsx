@@ -54,22 +54,22 @@ function atLeast(current, required) {
 
 // Feature visibility rules
 const VISIBILITY = {
-  fuelSection:      'Started',    // show from Started
-  expenseSection:   'Started',    // show from Started
-  ewayBillUpload:   'Started',    // upload enabled from Started
-  invoiceUpload:    'Completed',  // upload only after Completed
-  podUpload:        'Completed',  // upload only after Completed
-  plannedVsActual:  'In Transit', // comparison from In Transit
-  finalSummary:     'Completed',  // full P&L only at Completed+
-  runningTotals:    'In Transit', // actual execution card from In Transit
+  fuelSection: 'Started',    // show from Started
+  expenseSection: 'Started',    // show from Started
+  ewayBillUpload: 'Started',    // upload enabled from Started
+  invoiceUpload: 'Completed',  // upload only after Completed
+  podUpload: 'Completed',  // upload only after Completed
+  plannedVsActual: 'In Transit', // comparison from In Transit
+  finalSummary: 'Completed',  // full P&L only at Completed+
+  runningTotals: 'In Transit', // actual execution card from In Transit
 };
 
 const STATUS_MESSAGES = {
-  Planned:     { text: 'Trip is planned. Execution not started.', color: 'bg-blue-50 border-blue-200 text-blue-700' },
-  Started:     { text: 'Trip started — add fuel and expenses as they occur.', color: 'bg-indigo-50 border-indigo-200 text-indigo-700' },
-  'In Transit':{ text: 'Trip is in transit — fuel and expenses are being tracked.', color: 'bg-amber-50 border-amber-200 text-amber-700' },
-  Completed:   { text: 'Delivery done — upload Invoice and Delivery Proof (POD) to close.', color: 'bg-green-50 border-green-200 text-green-700' },
-  Closed:      { text: 'Trip is closed. All records are locked. Use Print / Export only.', color: 'bg-slate-50 border-slate-300 text-slate-600' },
+  Planned: { text: 'Trip is planned. Execution not started.', color: 'bg-blue-50 border-blue-200 text-blue-700' },
+  Started: { text: 'Trip started — add fuel and expenses as they occur.', color: 'bg-indigo-50 border-indigo-200 text-indigo-700' },
+  'In Transit': { text: 'Trip is in transit — fuel and expenses are being tracked.', color: 'bg-amber-50 border-amber-200 text-amber-700' },
+  Completed: { text: 'Delivery done — upload Invoice and Delivery Proof (POD) to close.', color: 'bg-green-50 border-green-200 text-green-700' },
+  Closed: { text: 'Trip is closed. All records are locked. Use Print / Export only.', color: 'bg-slate-50 border-slate-300 text-slate-600' },
 };
 
 // ─── Sub-components (unchanged) ───────────────────────────────────────────────
@@ -106,16 +106,14 @@ function TripStepper({ status }) {
         {STEPS.map((step, i) => (
           <React.Fragment key={step}>
             <div className="flex flex-col items-center flex-1 min-w-0">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${
-                i < cur ? 'bg-indigo-600 border-indigo-600 text-white'
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all ${i < cur ? 'bg-indigo-600 border-indigo-600 text-white'
                 : i === cur ? 'bg-white border-indigo-600 text-indigo-600 ring-4 ring-indigo-100'
-                : 'bg-white border-slate-300 text-slate-400'
-              }`}>
+                  : 'bg-white border-slate-300 text-slate-400'
+                }`}>
                 {i < cur ? <FiCheckCircle className="w-4 h-4" /> : i + 1}
               </div>
-              <span className={`mt-1.5 text-[10px] font-semibold text-center leading-tight ${
-                i === cur ? 'text-indigo-600' : i < cur ? 'text-slate-600' : 'text-slate-400'
-              }`}>{step}</span>
+              <span className={`mt-1.5 text-[10px] font-semibold text-center leading-tight ${i === cur ? 'text-indigo-600' : i < cur ? 'text-slate-600' : 'text-slate-400'
+                }`}>{step}</span>
             </div>
             {i < STEPS.length - 1 && (
               <div className={`h-0.5 flex-1 mx-1 rounded ${i < cur ? 'bg-indigo-600' : 'bg-slate-200'}`} />
@@ -133,17 +131,15 @@ function AlertsBanner({ alerts }) {
   return (
     <div className="space-y-2">
       {alerts.map((a, i) => dismissed.includes(i) ? null : (
-        <div key={i} className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-sm ${
-          a.severity === 'Critical' ? 'bg-red-50 border-red-200 text-red-800'
+        <div key={i} className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-sm ${a.severity === 'Critical' ? 'bg-red-50 border-red-200 text-red-800'
           : 'bg-yellow-50 border-yellow-200 text-yellow-800'
-        }`}>
+          }`}>
           <FiAlertTriangle className={`w-4 h-4 mt-0.5 shrink-0 ${a.severity === 'Critical' ? 'text-red-500' : 'text-yellow-500'}`} />
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="font-bold text-sm">{a.title}</span>
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                a.severity === 'Critical' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-              }`}>{a.severity}</span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${a.severity === 'Critical' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                }`}>{a.severity}</span>
             </div>
             <p className="text-xs opacity-80">{a.reason}</p>
           </div>
@@ -172,24 +168,24 @@ function ActionModal({ title, onClose, children }) {
 }
 
 function PlannedVsActual({ trip, fuelEntries, grandTotal }) {
-  const expFuel    = Number(trip.diesel_qty) || 0;
+  const expFuel = Number(trip.diesel_qty) || 0;
   const expMileage = Number(trip.mileage) || Number(trip.expected_mileage) || 0;
-  const budget     = Number(trip.trip_budget) || 0;
-  const distance   = Number(trip.est_distance) || 0;
+  const budget = Number(trip.trip_budget) || 0;
+  const distance = Number(trip.est_distance) || 0;
 
-  const actFuel    = fuelEntries.reduce((s, f) => s + (Number(f.quantity) || 0), 0);
+  const actFuel = fuelEntries.reduce((s, f) => s + (Number(f.quantity) || 0), 0);
   const actMileage = actFuel > 0 && distance > 0 ? distance / actFuel : null;
-  const noData     = actFuel === 0;
+  const noData = actFuel === 0;
 
-  const fuelDiff    = actFuel - expFuel;
+  const fuelDiff = actFuel - expFuel;
   const mileageDiff = actMileage !== null && expMileage > 0 ? actMileage - expMileage : null;
-  const costDiff    = budget > 0 ? grandTotal - budget : null;
+  const costDiff = budget > 0 ? grandTotal - budget : null;
 
   const badge = (text, type) => {
     const cls = type === 'red' ? 'bg-red-100 text-red-700'
       : type === 'yellow' ? 'bg-yellow-100 text-yellow-700'
-      : type === 'green' ? 'bg-green-100 text-green-700'
-      : 'bg-slate-100 text-slate-500';
+        : type === 'green' ? 'bg-green-100 text-green-700'
+          : 'bg-slate-100 text-slate-500';
     return <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold ${cls}`}>{text}</span>;
   };
 
@@ -209,14 +205,14 @@ function PlannedVsActual({ trip, fuelEntries, grandTotal }) {
             {noData
               ? <span className="text-sm text-slate-400 italic">No data yet</span>
               : <>
-                  <span className={`text-sm font-bold ${fuelDiff > expFuel * 0.1 ? 'text-red-600' : fuelDiff > 0 ? 'text-yellow-600' : 'text-green-600'}`}>
-                    {actFuel.toFixed(1)} L
-                  </span>
-                  {expFuel > 0 && badge(
-                    fuelDiff > 0 ? `+${fuelDiff.toFixed(1)} L over` : `${Math.abs(fuelDiff).toFixed(1)} L under`,
-                    fuelDiff > expFuel * 0.1 ? 'red' : fuelDiff > 0 ? 'yellow' : 'green'
-                  )}
-                </>
+                <span className={`text-sm font-bold ${fuelDiff > expFuel * 0.1 ? 'text-red-600' : fuelDiff > 0 ? 'text-yellow-600' : 'text-green-600'}`}>
+                  {actFuel.toFixed(1)} L
+                </span>
+                {expFuel > 0 && badge(
+                  fuelDiff > 0 ? `+${fuelDiff.toFixed(1)} L over` : `${Math.abs(fuelDiff).toFixed(1)} L under`,
+                  fuelDiff > expFuel * 0.1 ? 'red' : fuelDiff > 0 ? 'yellow' : 'green'
+                )}
+              </>
             }
           </div>
           <span className="text-xs text-slate-400">Expected: <span className="font-semibold text-slate-600">{expFuel > 0 ? `${expFuel} L` : '—'}</span></span>
@@ -229,18 +225,17 @@ function PlannedVsActual({ trip, fuelEntries, grandTotal }) {
             {noData
               ? <span className="text-sm text-slate-400 italic">Calculated after fuel entry</span>
               : actMileage !== null
-              ? <>
-                  <span className={`text-sm font-bold ${
-                    expMileage > 0 && actMileage < expMileage * 0.75 ? 'text-red-600'
+                ? <>
+                  <span className={`text-sm font-bold ${expMileage > 0 && actMileage < expMileage * 0.75 ? 'text-red-600'
                     : expMileage > 0 && actMileage < expMileage * 0.90 ? 'text-yellow-600'
-                    : 'text-green-600'
-                  }`}>{actMileage.toFixed(2)} KMPL</span>
+                      : 'text-green-600'
+                    }`}>{actMileage.toFixed(2)} KMPL</span>
                   {expMileage > 0 && mileageDiff !== null && badge(
                     actMileage < expMileage * 0.75 ? 'Critical — Low' : actMileage < expMileage * 0.90 ? 'Low' : 'Good',
                     actMileage < expMileage * 0.75 ? 'red' : actMileage < expMileage * 0.90 ? 'yellow' : 'green'
                   )}
                 </>
-              : <span className="text-sm text-slate-400 italic">Distance not set</span>
+                : <span className="text-sm text-slate-400 italic">Distance not set</span>
             }
           </div>
           <span className="text-xs text-slate-400">Expected: <span className="font-semibold text-slate-600">{expMileage > 0 ? `${expMileage} KMPL` : '—'}</span></span>
@@ -250,11 +245,10 @@ function PlannedVsActual({ trip, fuelEntries, grandTotal }) {
         <div className="flex items-center justify-between py-3">
           <span className="text-sm text-slate-500 font-medium w-20">Cost</span>
           <div className="flex items-center flex-1 justify-center">
-            <span className={`text-sm font-bold ${
-              costDiff !== null && costDiff > budget * 0.1 ? 'text-red-600'
+            <span className={`text-sm font-bold ${costDiff !== null && costDiff > budget * 0.1 ? 'text-red-600'
               : costDiff !== null && costDiff > 0 ? 'text-yellow-600'
-              : 'text-green-600'
-            }`}>{INR(grandTotal)}</span>
+                : 'text-green-600'
+              }`}>{INR(grandTotal)}</span>
             {costDiff !== null && badge(
               costDiff > budget * 0.1 ? 'Exceeded Budget' : costDiff > 0 ? 'Slightly Over' : 'Within Budget',
               costDiff > budget * 0.1 ? 'red' : costDiff > 0 ? 'yellow' : 'green'
@@ -319,8 +313,8 @@ function FuelTable({ fuelEntries, totalFuelUsed, fuelCost }) {
                       ? <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${vendorMap[f.vendor]}`}>{f.vendor}</span>
                       : <span className="text-slate-400">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-slate-500 text-xs">{f.location || '—'}</td>
-                  <td className="px-4 py-3 text-slate-500 text-xs">{f.added_by || f.supervisor_name || '—'}</td>
+                  <td>{f.location || '—'}</td>
+                  <td>{f.supervisor_name || '—'}</td>
                 </tr>
               );
             })}
@@ -392,23 +386,33 @@ export default function TripDetails() {
       fetch(`http://localhost:5001/api/fuel/trip/${trip.id}`).then(r => r.json())
     ]).then(([tripFuel, fuelLog]) => {
       const fromTripFuel = tripFuel.success ? tripFuel.data.map(f => ({
-        id: f.id,
-        quantity: Number(f.quantity || 0),
-        rate: Number(f.rate || 0),
-        vendor: f.vendor || '—',
-        created_at: f.created_at,
-        location: f.location || null,
-        added_by: f.added_by || null,
-      })) : [];
+  id: f.id,
+  quantity: Number(f.quantity || 0),
+  rate: Number(f.rate || 0),
+  vendor: f.vendor || '—',
+  created_at: f.created_at,
+
+  // ✅ LOCATION
+  location: f.location ? f.location : '—',
+
+  // ✅ SAME KEY AS UI
+  supervisor_name: f.supervisor_name || f.added_by || '—'
+
+})) : [];
       const fromFuelLog = fuelLog.success ? fuelLog.data.map(f => ({
-        id: `fl-${f.id}`,
-        quantity: Number(f.quantity || 0),
-        rate: Number(f.rate || 0),
-        vendor: f.vendor || '—',
-        created_at: f.date || f.created_at,
-        location: f.location || null,
-        added_by: f.filled_by || null,
-      })) : [];
+  id: `fl-${f.id}`,
+  quantity: Number(f.quantity || 0),
+  rate: Number(f.rate || 0),
+  vendor: f.vendor || '—',
+  created_at: f.date || f.created_at,
+
+  // ✅ LOCATION FIX
+  location: f.location || '—',
+
+  // ✅ FINAL FIX (IMPORTANT)
+  supervisor_name: f.supervisor_name || f.filled_by || '—'
+
+})) : [];
       setFuelEntries([...fromTripFuel, ...fromFuelLog]);
     }).catch(err => console.error(err));
   }, [id, trip]);
@@ -424,11 +428,11 @@ export default function TripDetails() {
   }
 
   // ─── Aggregated values (must come first) ───────────────────────────────────────────────────────
-  const totalAdvance  = Number(trip.driver_advance) || 0;
+  const totalAdvance = Number(trip.driver_advance) || 0;
   const totalFuelUsed = fuelEntries.reduce((s, f) => s + (Number(f.quantity) || 0), 0);
-  const fuelCost      = fuelEntries.reduce((s, f) => s + ((Number(f.quantity) || 0) * (Number(f.rate) || 0)), 0);
+  const fuelCost = fuelEntries.reduce((s, f) => s + ((Number(f.quantity) || 0) * (Number(f.rate) || 0)), 0);
   const otherExpenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const grandTotal    = fuelCost + otherExpenses;
+  const grandTotal = fuelCost + otherExpenses;
   const supervisorBalance = totalAdvance - grandTotal;
 
   // ─── Map backend fields to UI expected structure ───────────────────────────
@@ -511,7 +515,7 @@ export default function TripDetails() {
   if (mappedTrip.time.eta && !mappedTrip.time.actualEnd) {
     const overdue = Math.round((new Date() - new Date(mappedTrip.time.eta)) / 60000);
     if (overdue > 60)
-      computedAlerts.push({ severity: 'Warning', title: 'Trip Delayed', reason: `ETA was ${fmt(mappedTrip.time.eta)}, now ${Math.floor(overdue/60)}h ${overdue%60}m overdue.` });
+      computedAlerts.push({ severity: 'Warning', title: 'Trip Delayed', reason: `ETA was ${fmt(mappedTrip.time.eta)}, now ${Math.floor(overdue / 60)}h ${overdue % 60}m overdue.` });
   }
 
   const delay = calcDelay(mappedTrip.time.eta, mappedTrip.time.actualEnd);
@@ -582,13 +586,12 @@ export default function TripDetails() {
             <div>
               <div className="flex items-center gap-2.5 flex-wrap">
                 <h1 className="text-lg font-bold text-slate-800">{mappedTrip.id}</h1>
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                  mappedTrip.status === 'In Transit' ? 'bg-blue-100 text-blue-700'
+                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${mappedTrip.status === 'In Transit' ? 'bg-blue-100 text-blue-700'
                   : mappedTrip.status === 'Completed' ? 'bg-green-100 text-green-700'
-                  : mappedTrip.status === 'Closed' ? 'bg-slate-100 text-slate-500'
-                  : mappedTrip.status === 'Started' ? 'bg-indigo-100 text-indigo-700'
-                  : 'bg-yellow-100 text-yellow-700'
-                }`}>{mappedTrip.status}</span>
+                    : mappedTrip.status === 'Closed' ? 'bg-slate-100 text-slate-500'
+                      : mappedTrip.status === 'Started' ? 'bg-indigo-100 text-indigo-700'
+                        : 'bg-yellow-100 text-yellow-700'
+                  }`}>{mappedTrip.status}</span>
               </div>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <span className="flex items-center gap-1 text-xs text-slate-500">
@@ -662,18 +665,18 @@ export default function TripDetails() {
             <h2 className="text-sm font-bold text-slate-800 tracking-tight">⚡ Actual Execution</h2>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-slate-100">
-          {[
-            { label: 'Total Fuel Used', value: totalFuelUsed > 0 ? `${totalFuelUsed.toFixed(1)} L` : 'No entries yet', sub: totalFuelUsed > 0 ? `${fuelEntries.length} entr${fuelEntries.length === 1 ? 'y' : 'ies'}` : '—', color: totalFuelUsed > 0 ? 'text-amber-600' : 'text-slate-400' },
-            { label: 'Fuel Cost', value: totalFuelUsed > 0 ? INR(fuelCost) : 'No entries yet', sub: totalFuelUsed > 0 ? `Avg ₹${(fuelCost / totalFuelUsed).toFixed(0)}/L` : '—', color: totalFuelUsed > 0 ? 'text-orange-600' : 'text-slate-400' },
-            { label: 'Other Expenses', value: otherExpenses > 0 ? INR(otherExpenses) : 'No entries yet', sub: otherExpenses > 0 ? `${expenses.length} entr${expenses.length === 1 ? 'y' : 'ies'}` : '—', color: otherExpenses > 0 ? 'text-rose-600' : 'text-slate-400' },
-            { label: 'Total Entries', value: fuelEntries.length + expenses.length || 'None', sub: 'fuel + expense', color: fuelEntries.length + expenses.length > 0 ? 'text-indigo-600' : 'text-slate-400' },
-          ].map(({ label, value, sub, color }) => (
-            <div key={label} className="p-4 flex flex-col gap-0.5">
-              <span className="text-xs text-slate-400 font-medium">{label}</span>
-              <span className={`text-lg font-black ${color}`}>{value}</span>
-              <span className="text-[10px] text-slate-400">{sub}</span>
-            </div>
-          ))}
+            {[
+              { label: 'Total Fuel Used', value: totalFuelUsed > 0 ? `${totalFuelUsed.toFixed(1)} L` : 'No entries yet', sub: totalFuelUsed > 0 ? `${fuelEntries.length} entr${fuelEntries.length === 1 ? 'y' : 'ies'}` : '—', color: totalFuelUsed > 0 ? 'text-amber-600' : 'text-slate-400' },
+              { label: 'Fuel Cost', value: totalFuelUsed > 0 ? INR(fuelCost) : 'No entries yet', sub: totalFuelUsed > 0 ? `Avg ₹${(fuelCost / totalFuelUsed).toFixed(0)}/L` : '—', color: totalFuelUsed > 0 ? 'text-orange-600' : 'text-slate-400' },
+              { label: 'Other Expenses', value: otherExpenses > 0 ? INR(otherExpenses) : 'No entries yet', sub: otherExpenses > 0 ? `${expenses.length} entr${expenses.length === 1 ? 'y' : 'ies'}` : '—', color: otherExpenses > 0 ? 'text-rose-600' : 'text-slate-400' },
+              { label: 'Total Entries', value: fuelEntries.length + expenses.length || 'None', sub: 'fuel + expense', color: fuelEntries.length + expenses.length > 0 ? 'text-indigo-600' : 'text-slate-400' },
+            ].map(({ label, value, sub, color }) => (
+              <div key={label} className="p-4 flex flex-col gap-0.5">
+                <span className="text-xs text-slate-400 font-medium">{label}</span>
+                <span className={`text-lg font-black ${color}`}>{value}</span>
+                <span className="text-[10px] text-slate-400">{sub}</span>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -757,16 +760,14 @@ export default function TripDetails() {
           {computedAlerts.length > 0 && (
             <div className="space-y-2">
               {computedAlerts.map((a, i) => (
-                <div key={i} className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-sm ${
-                  a.severity === 'Critical' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                }`}>
+                <div key={i} className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-sm ${a.severity === 'Critical' ? 'bg-red-50 border-red-200 text-red-800' : 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                  }`}>
                   <FiAlertTriangle className={`w-4 h-4 mt-0.5 shrink-0 ${a.severity === 'Critical' ? 'text-red-500' : 'text-yellow-500'}`} />
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-0.5">
                       <span className="font-bold text-sm">{a.title}</span>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                        a.severity === 'Critical' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                      }`}>{a.severity}</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${a.severity === 'Critical' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                        }`}>{a.severity}</span>
                     </div>
                     <p className="text-xs opacity-80">{a.reason}</p>
                   </div>
@@ -804,79 +805,78 @@ export default function TripDetails() {
           </div>
 
           {atLeast(mappedTrip.status, VISIBILITY.finalSummary) && (
-          <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl shadow-lg p-5 text-white">
-            <div className="flex items-center gap-2 mb-4">
-              <FiDollarSign className="w-4 h-4 text-indigo-200" />
-              <h2 className="text-sm font-bold tracking-tight">Financial Summary</h2>
-            </div>
-
-            {/* Revenue & Advance */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-indigo-200">Revenue (Freight)</span>
-                <span className="font-bold">{Number(trip.freight_amount) > 0 ? INR(trip.freight_amount) : <span className="text-indigo-300 font-normal text-xs">Not set</span>}</span>
+            <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl shadow-lg p-5 text-white">
+              <div className="flex items-center gap-2 mb-4">
+                <FiDollarSign className="w-4 h-4 text-indigo-200" />
+                <h2 className="text-sm font-bold tracking-tight">Financial Summary</h2>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-indigo-200">Total Advance</span>
-                <span className="font-bold">{INR(totalAdvance)}</span>
-              </div>
-            </div>
 
-            {/* Divider */}
-            <div className="border-t border-indigo-500 my-3" />
-
-            {/* Costs */}
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-indigo-200">Fuel Cost</span>
-                <span className="font-bold">{INR(fuelCost)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-indigo-200">Other Expenses</span>
-                <span className="font-bold">{INR(otherExpenses)}</span>
-              </div>
-            </div>
-
-            {/* Total Cost */}
-            <div className="border-t border-indigo-500 mt-3 pt-3 flex justify-between items-center">
-              <span className="text-sm font-bold text-indigo-100">Total Cost</span>
-              <span className="text-lg font-black">{INR(grandTotal)}</span>
-            </div>
-
-            {/* Profit / Loss */}
-            {(() => {
-              const freight = Number(trip.freight_amount) || 0;
-              const profit = freight - grandTotal;
-              if (freight === 0) return (
-                <div className="mt-2 px-3 py-2 bg-indigo-500/40 rounded-lg text-xs text-indigo-200">
-                  💡 Set freight amount to see profit/loss
+              {/* Revenue & Advance */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-indigo-200">Revenue (Freight)</span>
+                  <span className="font-bold">{Number(trip.freight_amount) > 0 ? INR(trip.freight_amount) : <span className="text-indigo-300 font-normal text-xs">Not set</span>}</span>
                 </div>
-              );
-              return (
-                <div className={`mt-2 px-3 py-2.5 rounded-lg flex justify-between items-center ${
-                  profit >= 0 ? 'bg-green-500/20 border border-green-400/30' : 'bg-red-500/20 border border-red-400/30'
-                }`}>
-                  <span className={`text-sm font-bold ${profit >= 0 ? 'text-green-300' : 'text-red-300'}`}>
-                    {profit >= 0 ? '💰 Profit' : '🔴 Loss'}
-                  </span>
-                  <span className={`text-lg font-black ${profit >= 0 ? 'text-green-300' : 'text-red-300'}`}>
-                    {profit >= 0 ? '+' : ''}{INR(profit)}
-                  </span>
+                <div className="flex justify-between text-sm">
+                  <span className="text-indigo-200">Total Advance</span>
+                  <span className="font-bold">{INR(totalAdvance)}</span>
                 </div>
-              );
-            })()}
+              </div>
 
-            {/* Supervisor Balance */}
-            <div className="border-t border-indigo-500 mt-3 pt-3 flex justify-between items-center">
-              <span className="text-sm text-indigo-200">Supervisor Balance</span>
-              <span className={`font-bold text-base ${supervisorBalance >= 0 ? 'text-green-300' : 'text-red-300'}`}>
-                {supervisorBalance >= 0 ? '' : '-'}{INR(Math.abs(supervisorBalance))}
-                <span className="ml-1.5 text-[10px] font-normal opacity-80">
-                  {supervisorBalance >= 0 ? 'remaining' : 'overspent'}
+              {/* Divider */}
+              <div className="border-t border-indigo-500 my-3" />
+
+              {/* Costs */}
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-indigo-200">Fuel Cost</span>
+                  <span className="font-bold">{INR(fuelCost)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-indigo-200">Other Expenses</span>
+                  <span className="font-bold">{INR(otherExpenses)}</span>
+                </div>
+              </div>
+
+              {/* Total Cost */}
+              <div className="border-t border-indigo-500 mt-3 pt-3 flex justify-between items-center">
+                <span className="text-sm font-bold text-indigo-100">Total Cost</span>
+                <span className="text-lg font-black">{INR(grandTotal)}</span>
+              </div>
+
+              {/* Profit / Loss */}
+              {(() => {
+                const freight = Number(trip.freight_amount) || 0;
+                const profit = freight - grandTotal;
+                if (freight === 0) return (
+                  <div className="mt-2 px-3 py-2 bg-indigo-500/40 rounded-lg text-xs text-indigo-200">
+                    💡 Set freight amount to see profit/loss
+                  </div>
+                );
+                return (
+                  <div className={`mt-2 px-3 py-2.5 rounded-lg flex justify-between items-center ${profit >= 0 ? 'bg-green-500/20 border border-green-400/30' : 'bg-red-500/20 border border-red-400/30'
+                    }`}>
+                    <span className={`text-sm font-bold ${profit >= 0 ? 'text-green-300' : 'text-red-300'}`}>
+                      {profit >= 0 ? '💰 Profit' : '🔴 Loss'}
+                    </span>
+                    <span className={`text-lg font-black ${profit >= 0 ? 'text-green-300' : 'text-red-300'}`}>
+                      {profit >= 0 ? '+' : ''}{INR(profit)}
+                    </span>
+                  </div>
+                );
+              })()}
+
+              {/* Supervisor Balance */}
+              <div className="border-t border-indigo-500 mt-3 pt-3 flex justify-between items-center">
+                <span className="text-sm text-indigo-200">Supervisor Balance</span>
+                <span className={`font-bold text-base ${supervisorBalance >= 0 ? 'text-green-300' : 'text-red-300'}`}>
+                  {supervisorBalance >= 0 ? '' : '-'}{INR(Math.abs(supervisorBalance))}
+                  <span className="ml-1.5 text-[10px] font-normal opacity-80">
+                    {supervisorBalance >= 0 ? 'remaining' : 'overspent'}
+                  </span>
                 </span>
-              </span>
+              </div>
             </div>
-          </div>
           )}
 
           <Card icon={FiDollarSign} title="Expenses" iconColor="text-rose-600">
@@ -889,11 +889,10 @@ export default function TripDetails() {
                 {expenses.map(e => (
                   <div key={e.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                     <div>
-                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold mr-2 ${
-                        e.type === 'Toll' ? 'bg-blue-100 text-blue-700'
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold mr-2 ${e.type === 'Toll' ? 'bg-blue-100 text-blue-700'
                         : e.type === 'Maintenance' ? 'bg-orange-100 text-orange-700'
-                        : 'bg-slate-100 text-slate-600'
-                      }`}>{e.type}</span>
+                          : 'bg-slate-100 text-slate-600'
+                        }`}>{e.type}</span>
                       <span className="text-xs text-slate-500">{e.notes}</span>
                     </div>
                     <span className="text-sm font-bold text-slate-800">{INR(e.amount)}</span>
@@ -1103,7 +1102,7 @@ export default function TripDetails() {
           {modal === 'close' ? (() => {
             const missingDocs = [
               !trip.invoice_file && 'Invoice',
-              !trip.pod_file    && 'Delivery Proof (POD)',
+              !trip.pod_file && 'Delivery Proof (POD)',
             ].filter(Boolean);
             return missingDocs.length > 0 ? (
               <div>
@@ -1153,11 +1152,10 @@ export default function TripDetails() {
                     }
                     setModal(null);
                   }}
-                  className={`flex-1 py-2 text-white rounded-lg text-sm font-bold ${
-                    modal === 'start' ? 'bg-green-600 hover:bg-green-700'
+                  className={`flex-1 py-2 text-white rounded-lg text-sm font-bold ${modal === 'start' ? 'bg-green-600 hover:bg-green-700'
                     : modal === 'end' ? 'bg-red-500 hover:bg-red-600'
-                    : 'bg-red-600 hover:bg-red-700'
-                  }`}
+                      : 'bg-red-600 hover:bg-red-700'
+                    }`}
                 >
                   Confirm
                 </button>
