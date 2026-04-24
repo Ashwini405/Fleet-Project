@@ -3,59 +3,76 @@ const Fuel = require('../models/fuelModel');
 // ✅ CREATE FUEL ENTRY
 const createFuel = async (req, res) => {
   try {
-    let {
+    console.log("REQ BODY:", req.body);
+
+    const {
       trip_id,
       vehicle_id,
+      vehicle_no,
       date,
+
+      fuel_type,
+      station_name,
+      payment_method,
+
+      driver_name,
+      previous_odo,
+      expected_mileage,
+      tank_capacity,
+
+      current_odo,
+      distance,
+
       quantity,
       rate,
-      total_cost,
-      vendor
+      mileage,
+
+      bill_number,
+      full_tank,
+
+      vendor,
+      vendor_type,
+
+      location,
+      filled_by,
+      remarks
     } = req.body;
 
-    // 🔥 REQUIRED VALIDATION
-    if (!trip_id) {
-      return res.status(400).json({
-        success: false,
-        message: "Trip is required"
-      });
-    }
+    const total_cost = quantity * rate;
 
-    if (!vehicle_id) {
-      return res.status(400).json({
-        success: false,
-        message: "Vehicle is required"
-      });
-    }
-
-    if (!quantity || quantity <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Quantity must be greater than 0"
-      });
-    }
-
-    if (!rate || rate <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Rate must be greater than 0"
-      });
-    }
-
-    // 🔥 AUTO CALCULATE TOTAL COST
-    total_cost = quantity * rate;
-
+    // ✅ SAFE & COMPLETE OBJECT
     const fuelData = {
-      trip_id,
-      vehicle_id,
-      date,
-      quantity,
-      rate,
-      total_cost,
-      vendor,
-      location: location || null,     // ✅ ADD
-      filled_by: filled_by || null    // ✅ ADD
+      trip_id: trip_id || null,
+      vehicle_id: vehicle_id || null,
+      vehicle_no: vehicle_no || null,
+      date: date || null,
 
+      fuel_type: fuel_type || null,
+      station_name: station_name || null,
+      payment_method: payment_method || null,
+
+      driver_name: driver_name || null,
+      previous_odo: previous_odo || null,
+      expected_mileage: expected_mileage || null,
+      tank_capacity: tank_capacity || null,
+
+      current_odo: current_odo || null,
+      distance: distance || null,
+
+      quantity: quantity || 0,
+      rate: rate || 0,
+      total_cost: total_cost || 0,
+      mileage: mileage || null,
+
+      bill_number: bill_number || null,
+      full_tank: full_tank || false,
+
+      vendor: vendor || null,
+      vendor_type: vendor_type || null,
+
+      location: location || null,
+      filled_by: filled_by || null,
+      remarks: remarks || null
     };
 
     const result = await Fuel.create(fuelData);
@@ -63,10 +80,7 @@ const createFuel = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "Fuel entry added successfully",
-      data: {
-        id: result.insertId,
-        ...fuelData
-      }
+      data: { id: result.insertId }
     });
 
   } catch (error) {
