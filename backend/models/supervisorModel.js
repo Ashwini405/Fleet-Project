@@ -7,18 +7,22 @@ const Supervisor = {
     const [result] = await db.query(
       `INSERT INTO supervisors 
       (full_name, mobile, id_card_number, status, address, station_id,
-       bank_name, account_number, ifsc_code)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       bank_name, account_number, ifsc_code,
+       profile_photo, id_document, bank_document)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.full_name,
         data.mobile,
         data.id_card_number,
         data.status,
         data.address,
-        data.station_id,
+        data.station_id || null,
         data.bank_name,
         data.account_number,
-        data.ifsc_code
+        data.ifsc_code,
+        data.profile_photo || null,
+        data.id_document   || null,
+        data.bank_document || null,
       ]
     );
     return result;

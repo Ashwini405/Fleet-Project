@@ -26,18 +26,20 @@ function mileageAlert(actualMileage, expectedMileage) {
 }
 
 // ─── FuelTable ────────────────────────────────────────────────────────────────
-function FuelTable({ entries, onAddEntry }) {
+function FuelTable({ entries, onAddEntry, locked }) {
   if (entries.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-slate-400 gap-2">
         <FiDroplet className="w-8 h-8 opacity-30" />
         <p className="text-sm font-medium">No fuel entries yet</p>
-        <button
-          onClick={onAddEntry}
-          className="mt-1 flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition"
-        >
-          <FiPlus className="w-3 h-3" /> Add First Entry
-        </button>
+        {!locked && (
+          <button
+            onClick={onAddEntry}
+            className="mt-1 flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition"
+          >
+            <FiPlus className="w-3 h-3" /> Add First Entry
+          </button>
+        )}
       </div>
     );
   }
@@ -74,6 +76,7 @@ function FuelTable({ entries, onAddEntry }) {
 // ─── TripCard ─────────────────────────────────────────────────────────────────
 function TripCard({ trip, onAddEntry }) {
   const [open, setOpen] = useState(true);
+  const locked = trip.status === 'Closed' || trip.status === 'Completed';
 
   const totalFuel = trip.entries.reduce(
     (s, e) => s + Number(e.liters || 0),
@@ -158,7 +161,7 @@ function TripCard({ trip, onAddEntry }) {
       {open && (
         <>
           <div className="border-t border-slate-100">
-            <FuelTable entries={trip.entries} onAddEntry={() => onAddEntry(trip)} />
+            <FuelTable entries={trip.entries} onAddEntry={() => onAddEntry(trip)} locked={locked} />
           </div>
           {trip.entries.length > 0 && (
             <div className="flex items-center justify-between px-5 py-3 bg-slate-50/60 border-t border-slate-100">
@@ -177,12 +180,18 @@ function TripCard({ trip, onAddEntry }) {
                   {!alert && avgMileage > 0 && <FiCheckCircle className="inline w-3 h-3 text-green-500 ml-1" />}
                 </span>
               </div>
-              <button
-                onClick={() => onAddEntry(trip)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition"
-              >
-                <FiPlus className="w-3 h-3" /> Add Fuel Entry
-              </button>
+              {locked ? (
+                <span className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-400 border border-slate-200 rounded-lg bg-slate-50 cursor-not-allowed">
+                  🔒 Locked
+                </span>
+              ) : (
+                <button
+                  onClick={() => onAddEntry(trip)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition"
+                >
+                  <FiPlus className="w-3 h-3" /> Add Fuel Entry
+                </button>
+              )}
             </div>
           )}
         </>

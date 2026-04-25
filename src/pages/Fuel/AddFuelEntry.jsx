@@ -73,7 +73,7 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
     ? (distance / parseFloat(addForm.qty)).toFixed(2)
     : '0.00';
 
-  const canSave = addForm.vehicle && addForm.vehicleId && addForm.currentOdo && addForm.qty && addForm.rate && addForm.vendor;
+  const canSave = addForm.vehicle && addForm.vehicleId && addForm.currentOdo && addForm.qty && addForm.rate && addForm.vendor && uploadedFiles.length > 0;
 
   // ─── Form change handler (generic) ──────────────────────────────────────
   const handleFormChange = (e) => {
@@ -132,6 +132,9 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
     }
     if (!addForm.vendor) {
       newErrors.vendor = 'Vendor selection required';
+    }
+    if (uploadedFiles.length === 0) {
+      newErrors.proof = 'Fuel receipt / photo proof is required';
     }
     if (distance <= 0 && addForm.currentOdo) {
       newErrors.distance = 'Invalid distance calculation';
@@ -506,11 +509,17 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
                 {errors.vendor && <p className="text-xs text-red-600 mt-1">{errors.vendor}</p>}
               </div>
               <div className="sm:col-span-2">
-                <label className={labelClass}>Upload Receipt</label>
-                <label className="flex items-center justify-center gap-2 w-full px-3 py-3 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors text-indigo-600 text-sm font-bold">
+                <label className={labelClass}>Upload Receipt / Proof Photo <span className="text-red-500">*</span></label>
+                <label className={`flex items-center justify-center gap-2 w-full px-3 py-3 border-2 border-dashed rounded-lg bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors text-sm font-bold ${
+                  errors.proof ? 'border-red-400 text-red-500' : 'border-slate-300 text-indigo-600'
+                }`}>
                   <FiDownload className="w-4 h-4" /> Click to upload bill / photo
                   <input type="file" multiple accept="image/*,.pdf" onChange={handleFileUpload} className="hidden" />
                 </label>
+                {errors.proof && <p className="text-xs text-red-600 mt-1">{errors.proof}</p>}
+                {uploadedFiles.length === 0 && !errors.proof && (
+                  <p className="text-xs text-amber-600 mt-1">⚠️ Proof is mandatory — entry cannot be saved without it</p>
+                )}
                 {uploadedFiles.length > 0 && (
                   <div className="mt-3 space-y-2">
                     {uploadedFiles.map(file => (
@@ -581,11 +590,12 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
           <button
             onClick={handleSave}
             disabled={!canSave}
+            title={uploadedFiles.length === 0 ? 'Upload proof receipt to enable save' : ''}
             className={`px-6 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition-colors ${
               canSave ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
             }`}
           >
-            ⛽ Save Fuel Entry
+            ⛽ {uploadedFiles.length === 0 ? 'Upload Proof to Save' : 'Save Fuel Entry'}
           </button>
         </div>
 

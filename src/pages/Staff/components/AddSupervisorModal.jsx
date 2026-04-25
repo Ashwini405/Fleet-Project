@@ -16,6 +16,7 @@ export default function AddSupervisorModal({ isOpen, onClose }) {
     account_number: '',
     ifsc_code: ''
   });
+  const [files, setFiles] = useState({ profile_photo: null, id_document: null, bank_document: null });
 
   // Fetch stations from backend
   useEffect(() => {
@@ -36,16 +37,19 @@ export default function AddSupervisorModal({ isOpen, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const fd = new FormData();
+      Object.entries(formData).forEach(([k, v]) => fd.append(k, v));
+      Object.entries(files).forEach(([k, v]) => { if (v) fd.append(k, v); });
+
       const response = await fetch('http://localhost:5001/api/supervisors', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: fd
       });
       const result = await response.json();
       if (result.success) {
         alert('Supervisor saved successfully!');
         onClose();
-        window.location.reload(); // refresh the list (optional)
+        window.location.reload();
       } else {
         alert('Failed to save: ' + result.message);
       }
@@ -227,20 +231,31 @@ export default function AddSupervisorModal({ isOpen, onClose }) {
 
               {activeTab === 'uploads' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                  {['Profile Photo', 'ID Card (Aadhar/Pan)', 'Bank Passbook / Cheque'].map((doc, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 border-dashed rounded-xl">
+                  {[
+                    { label: 'Profile Photo',          key: 'profile_photo' },
+                    { label: 'ID Card (Aadhar/Pan)',   key: 'id_document' },
+                    { label: 'Bank Passbook / Cheque', key: 'bank_document' },
+                  ].map((doc) => (
+                    <div key={doc.key} className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 border-dashed rounded-xl">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
                           <FileUp className="w-5 h-5" />
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-gray-800">{doc}</p>
-                          <p className="text-[11px] text-gray-500">PNG, JPG or PDF (Max. 5MB)</p>
+                          <p className="text-sm font-semibold text-gray-800">{doc.label}</p>
+                          <p className="text-[11px] text-gray-500">
+                            {files[doc.key] ? files[doc.key].name : 'PNG, JPG or PDF (Max. 5MB)'}
+                          </p>
                         </div>
                       </div>
                       <label className="cursor-pointer px-4 py-2 bg-white border border-gray-200 hover:border-blue-500 hover:text-blue-600 rounded-lg text-sm font-bold text-gray-600 transition-colors shadow-sm">
-                        Select File
-                        <input type="file" className="hidden" />
+                        {files[doc.key] ? 'Change' : 'Select File'}
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => setFiles(prev => ({ ...prev, [doc.key]: e.target.files[0] || null }))}
+                        />
                       </label>
                     </div>
                   ))}
