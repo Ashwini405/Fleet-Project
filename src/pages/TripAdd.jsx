@@ -144,7 +144,7 @@ const isFieldFilled = (value) => {
 
 const Field = ({ label, name, type = 'text', placeholder, disabled, calculated, helper, children, form, handleChange, errors }) => {
   const hasError = errors[name];
-  const isRequired = name && !disabled && !calculated && !label?.includes('(optional)');
+  const isRequired = name && !disabled && !calculated && !label?.includes('(optional)') && !label?.includes('(default)');
 
   const getInputClass = () => {
     if (calculated) return inpCalculated;
@@ -252,6 +252,12 @@ export default function TripAdd() {
   const [alerts, setAlerts] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [vehicleAvailability, setVehicleAvailability] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 2500);
+  };
 
   // ─── If resuming a draft, fetch it from backend and pre-fill ─────────────
   useEffect(() => {
@@ -574,32 +580,32 @@ export default function TripAdd() {
   const sectionCompletion = useMemo(() => {
     const sections = {
       1: {
-        fields: ['tripPriority', 'transportType', 'tripType', 'tripStatus'],
-        errorFields: ['tripPriority', 'transportType', 'tripType', 'tripStatus']
+        fields: ['tripPriority', 'transportType', 'tripType'],
+        errorFields: ['tripType']
       },
       2: {
         fields: ['truckNo', 'tripDate', 'driver', 'driverContact', 'supervisor', 'sourcePlant', 'startOdometer'],
         errorFields: ['truckNo', 'tripDate', 'startOdometer']
       },
       3: {
-        fields: ['source', 'destination', 'destinationState', 'routeType', 'estDistance'],
-        errorFields: ['source', 'destination', 'destinationState', 'estDistance']
+        fields: ['source', 'destination', 'destinationState', 'estDistance'],
+        errorFields: ['source', 'destination']
       },
       4: {
         fields: ['startTime', 'eta', 'loadingTime', 'unloadingTime'],
-        errorFields: ['startTime', 'eta', 'loadingTime', 'unloadingTime']
+        errorFields: ['startTime', 'eta']
       },
       5: {
-        fields: ['materialType', 'loadWeight', 'loadType', 'units', 'customerName', 'invoiceNumber'],
-        errorFields: ['materialType', 'loadWeight', 'units', 'customerName']
+        fields: ['materialType', 'loadWeight', 'customerName', 'invoiceNumber'],
+        errorFields: ['materialType', 'loadWeight', 'customerName']
       },
       6: {
-        fields: ['freightAmount', 'tripBudget', 'expenseLimit', 'paymentMode', 'driverAdvance', 'hamaliAdvance', 'otherAdvance'],
-        errorFields: ['freightAmount', 'tripBudget', 'expenseLimit', 'driverAdvance', 'hamaliAdvance', 'otherAdvance']
+        fields: ['freightAmount', 'tripBudget', 'driverAdvance'],
+        errorFields: ['freightAmount', 'tripBudget']
       },
       7: {
-        fields: ['expectedMileage', 'dieselRate', 'dieselQty', 'fuelVendor', 'proofFiles'],
-        errorFields: ['expectedMileage', 'dieselRate', 'dieselQty', 'fuelVendor', 'proofFiles']
+        fields: ['expectedMileage', 'dieselRate', 'dieselQty'],
+        errorFields: ['expectedMileage', 'dieselRate', 'dieselQty']
       },
     };
 
@@ -708,7 +714,8 @@ export default function TripAdd() {
       if (result.success) {
         dispatch({ type: 'SAVE_DRAFT' });
         localStorage.removeItem('tripFormDraft');
-        navigate('/trips?tab=drafts');
+        showToast('💾 Draft saved successfully!');
+        setTimeout(() => navigate('/trips?tab=drafts'), 1500);
       } else {
         alert('Failed to save draft: ' + result.message);
       }
@@ -818,7 +825,8 @@ export default function TripAdd() {
 
   if (result.success) {
     localStorage.removeItem('tripFormDraft');
-    navigate('/trips');
+    showToast('✅ Trip created successfully! Status: Planned');
+    setTimeout(() => navigate('/trips'), 1500);
   } else {
     alert('Failed to create trip: ' + result.message);
   }
@@ -842,6 +850,13 @@ export default function TripAdd() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative bg-slate-50 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
+
+        {/* Toast */}
+        {toast && (
+          <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-6 py-3.5 bg-green-600 text-white text-sm font-semibold rounded-xl shadow-xl">
+            {toast}
+          </div>
+        )}
 
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-slate-200 rounded-t-2xl sticky top-0 z-10">
@@ -893,17 +908,24 @@ export default function TripAdd() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Field label="Trip Priority" name="tripPriority" form={form} handleChange={handleChange} errors={errors}>
                 <select name="tripPriority" value={form.tripPriority} onChange={handleChange} className={inp}>
-                  <option>Normal</option><option>Urgent</option><option>VIP</option>
+                  <option value="Normal">Normal</option>
+                  <option value="Urgent">Urgent</option>
+                  <option value="VIP">VIP</option>
                 </select>
               </Field>
               <Field label="Transport Type" name="transportType" form={form} handleChange={handleChange} errors={errors}>
                 <select name="transportType" value={form.transportType} onChange={handleChange} className={inp}>
-                  <option>Inbound</option><option>Outbound</option><option>Return</option>
+                  <option value="Inbound">Inbound</option>
+                  <option value="Outbound">Outbound</option>
+                  <option value="Return">Return</option>
                 </select>
               </Field>
               <Field label="Trip Type" name="tripType" form={form} handleChange={handleChange} errors={errors}>
                 <select name="tripType" value={form.tripType} onChange={handleChange} className={inp}>
-                  <option>Regular</option><option>Express</option><option>Return</option>
+                  <option value="">— Select Trip Type —</option>
+                  <option value="Regular">Regular</option>
+                  <option value="Express">Express</option>
+                  <option value="Return">Return</option>
                 </select>
               </Field>
               <Field label="Contract/Order ID (optional)" name="contractOrderId" placeholder="e.g. ORD-2024-1234" form={form} handleChange={handleChange} errors={errors} />
@@ -981,7 +1003,9 @@ export default function TripAdd() {
               <Field label="Via Stops (optional)" name="viaStops" placeholder="e.g. Pune, Nashik" form={form} handleChange={handleChange} errors={errors} />
               <Field label="Route Type" name="routeType" form={form} handleChange={handleChange} errors={errors}>
                 <select name="routeType" value={form.routeType} onChange={handleChange} className={inp}>
-                  <option>Highway</option><option>City</option><option>Mixed</option>
+                  <option value="Highway">Highway</option>
+                  <option value="City">City</option>
+                  <option value="Mixed">Mixed</option>
                 </select>
               </Field>
               <Field label="Estimated Distance (KM)" name="estDistance" type="number" placeholder="e.g. 850" helper="Auto-calculated if source+destination selected" form={form} handleChange={handleChange} errors={errors} />
@@ -1012,7 +1036,8 @@ export default function TripAdd() {
               <Field label="Load Weight (tons)" name="loadWeight" type="number" placeholder="e.g. 22" form={form} handleChange={handleChange} errors={errors} />
               <Field label="Load Type" name="loadType" form={form} handleChange={handleChange} errors={errors}>
                 <select name="loadType" value={form.loadType} onChange={handleChange} className={inp}>
-                  <option>Full</option><option>Partial</option>
+                  <option value="Full">Full</option>
+                  <option value="Partial">Partial</option>
                 </select>
               </Field>
               <Field label="Units / Bags Count" name="units" type="number" placeholder="e.g. 880" helper="Number of bags or units" form={form} handleChange={handleChange} errors={errors} />
@@ -1029,9 +1054,11 @@ export default function TripAdd() {
               <Field label="Freight Amount (₹)" name="freightAmount" type="number" placeholder="e.g. 45000" helper="Revenue from freight" form={form} handleChange={handleChange} errors={errors} />
               <Field label="Trip Budget (₹)" name="tripBudget" type="number" placeholder="e.g. 50000" helper="Approved budget" form={form} handleChange={handleChange} errors={errors} />
               <Field label="Expense Limit (₹)" name="expenseLimit" type="number" placeholder="e.g. 10000" helper="Max additional expenses" form={form} handleChange={handleChange} errors={errors} />
-              <Field label="Payment Mode" name="paymentMode" form={form} handleChange={handleChange} errors={errors}>
+              <Field label="Payment Mode (default: Cash)" name="paymentMode" form={form} handleChange={handleChange} errors={errors}>
                 <select name="paymentMode" value={form.paymentMode} onChange={handleChange} className={inp}>
-                  <option>Cash</option><option>Bank Transfer</option><option>Cheque</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="Cheque">Cheque</option>
                 </select>
               </Field>
             </div>

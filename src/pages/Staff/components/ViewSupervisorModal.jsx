@@ -160,11 +160,44 @@ export default function ViewSupervisorModal({ isOpen, onClose, staff }) {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">Assigned Since</p>
-                    <p className="text-sm font-bold text-slate-900">{staff.assigned_since || 'N/A'}</p>
+                    <p className="text-sm font-bold text-slate-900">
+                      {staff.created_at
+                        ? new Date(staff.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+                        : '—'}
+                    </p>
                   </div>
                   <CalendarCheck className="w-5 h-5 text-blue-600" />
                 </div>
               </div>
+
+              {/* Documents */}
+              <div className="p-5 bg-white rounded-3xl border border-gray-100">
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">Documents</p>
+                <div className="space-y-2">
+                  {[
+                    { label: 'Profile Photo',           file: staff.profile_photo },
+                    { label: 'ID Card (Aadhar/Pan)',    file: staff.id_document },
+                    { label: 'Bank Passbook / Cheque',  file: staff.bank_document },
+                  ].map(doc => (
+                    <div key={doc.label} className="flex items-center justify-between">
+                      <span className="text-xs text-slate-600 font-medium">{doc.label}</span>
+                      {doc.file ? (
+                        <a
+                          href={`http://localhost:5001/uploads/${doc.file}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-bold text-blue-600 hover:text-blue-800"
+                        >
+                          View
+                        </a>
+                      ) : (
+                        <span className="text-[10px] text-slate-400">Not uploaded</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
                 <h4 className="text-sm font-bold text-slate-900 mb-3">Notes</h4>
                 <p className="text-sm text-slate-600">{staff.notes || 'No additional notes available.'}</p>

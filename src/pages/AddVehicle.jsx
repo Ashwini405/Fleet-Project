@@ -190,8 +190,14 @@ export default function AddVehicle() {
     pollutionDoc: null,
     cllDoc: null,
   });
+  const [toast, setToast] = useState(null);
   const [formErrors, setFormErrors] = useState({});
   const [fileErrors, setFileErrors] = useState({});
+
+  const showToast = (type, message) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const [supervisors, setSupervisors] = useState([]);
   const [drivers, setDrivers] = useState([]);
@@ -467,7 +473,8 @@ export default function AddVehicle() {
       });
       const data = await response.json();
       if (data.success) {
-        navigate('/vehicles');
+        showToast('success', 'Vehicle added successfully!');
+        setTimeout(() => navigate('/vehicles'), 1500);
       } else {
         setFormErrors({ registrationNumber: data.message });
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -480,7 +487,16 @@ export default function AddVehicle() {
 
   return (
     <div className="font-sans text-slate-800 pb-24">
-      {/* Header unchanged */}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-lg text-sm font-semibold transition-all ${
+          toast.type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+        }`}>
+          <FiCheckCircle className="w-5 h-5 shrink-0" />
+          {toast.message}
+        </div>
+      )}
       <div className="max-w-5xl mx-auto mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/vehicles')} className="p-2 border border-slate-200 rounded-lg bg-white text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors">
