@@ -1,34 +1,49 @@
 const Driver = require('../models/driverModel');
 
-// CREATE DRIVER
+
 exports.createDriver = async (req, res) => {
   try {
-    await Driver.create(req.body);
-    res.json({ success: true });
+    const data = {
+      ...req.body,
+      profile_photo: req.files?.profile_photo?.[0]?.filename || null,
+      id_proof: req.files?.id_proof?.[0]?.filename || null,
+      bank_document: req.files?.bank_document?.[0]?.filename || null,
+    };
+
+    await Driver.create(data);
+
+    res.json({
+      success: true,
+      message: "Driver created successfully"
+    });
+
   } catch (err) {
-    console.error(err);
-    res.json({ success: false });
+    console.error('createDriver error:', err);
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
   }
 };
 
-// GET ALL DRIVERS
+// ================= GET ALL DRIVERS =================
 exports.getDrivers = async (req, res) => {
   try {
     const data = await Driver.getAll();
     res.json({ success: true, data });
   } catch (err) {
     console.error(err);
-    res.json({ success: false });
+    res.status(500).json({ success: false });
   }
 };
 
-// DELETE DRIVER
+// ================= DELETE DRIVER =================
 exports.deleteDriver = async (req, res) => {
   try {
     await Driver.delete(req.params.id);
     res.json({ success: true });
   } catch (err) {
     console.error(err);
-    res.json({ success: false });
+    res.status(500).json({ success: false });
   }
 };

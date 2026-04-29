@@ -1,4 +1,5 @@
 const Vehicle = require('../models/vehicleModel');
+const db = require('../config/db'); // imported once for reuse
 
 // @desc    Get all vehicles
 // @route   GET /api/vehicles
@@ -40,9 +41,13 @@ const getVehicleById = async (req, res) => {
   }
 };
 
-// 🔥 CREATE VEHICLE (WITH FILE SUPPORT)
+// 🔥 CREATE VEHICLE (WITH FILE SUPPORT + DEBUG LOGS)
 const createVehicle = async (req, res) => {
   try {
+    // 🔍 DEBUG: log incoming request
+    console.log("📥 CREATE VEHICLE REQ BODY:", req.body);
+    console.log("📎 FILES:", req.files);
+
     if (!req.body.vehicle_no) {
       return res.status(400).json({
         success: false,
@@ -50,9 +55,9 @@ const createVehicle = async (req, res) => {
       });
     }
 
-    // Duplicate check
+    // Duplicate check – robust detection
     const existing = await Vehicle.getByNumber(req.body.vehicle_no);
-    if (existing) {
+    if (existing && existing.id) {   // ✅ ensure vehicle really exists
       return res.status(409).json({
         success: false,
         message: `Vehicle "${req.body.vehicle_no}" already exists in the fleet.`
@@ -81,6 +86,7 @@ const createVehicle = async (req, res) => {
     };
 
     const result = await Vehicle.create(data);
+    console.log("✅ INSERT RESULT:", result);  // 🔍 DEBUG
 
     res.status(201).json({
       success: true,
@@ -141,8 +147,7 @@ const updateVehicle = async (req, res) => {
   }
 };
 
-// @desc    Delete vehicle
-// @route   DELETE /api/vehicles/:id
+// 🔥 DELETE VEHICLE (with foreign key cleanup)
 const deleteVehicle = async (req, res) => {
   try {
     const vehicleId = req.params.id;
@@ -155,6 +160,10 @@ const deleteVehicle = async (req, res) => {
       });
     }
 
+    // 🔥 delete child records (fuel_entries) first to avoid FK constraint
+    await db.query("DELETE FROM fuel_entries WHERE vehicle_id = ?", [vehicleId]);
+
+    // then delete the vehicle
     await Vehicle.delete(vehicleId);
 
     res.status(200).json({
@@ -168,10 +177,12 @@ const deleteVehicle = async (req, res) => {
   }
 };
 
-// @desc    Get vehicle by number
+// 🔥 GET VEHICLE BY NUMBER (with URL decoding)
 const getVehicleByNumber = async (req, res) => {
   try {
-    const vehicle = await Vehicle.getByNumber(req.params.vehicle_no);
+    // Decode the vehicle number (handles spaces like "TG 12 AP 1233")
+    let vehicle_no = decodeURIComponent(req.params.vehicle_no);
+    const vehicle = await Vehicle.getByNumber(vehicle_no);
 
     if (!vehicle) {
       return res.status(404).json({
@@ -193,11 +204,12 @@ const getVehicleByNumber = async (req, res) => {
     });
   }
 };
-// @desc  Check if vehicle is available (no active trip)
+
+// 🔥 CHECK VEHICLE AVAILABILITY (with URL decoding)
 const checkAvailability = async (req, res) => {
   try {
-    const db = require('../config/db');
-    const vehicle_no = req.params.vehicle_no;
+    // Decode the vehicle number
+    let vehicle_no = decodeURIComponent(req.params.vehicle_no);
 
     const vehicle = await Vehicle.getByNumber(vehicle_no);
     if (!vehicle) {
@@ -225,6 +237,7 @@ const checkAvailability = async (req, res) => {
   }
 };
 
+// 📄 UPLOAD DOCUMENT (unchanged)
 const uploadDocument = async (req, res) => {
   try {
     const { vehicle_id, type, validity } = req.body;
@@ -276,8 +289,6 @@ const uploadDocument = async (req, res) => {
           message: "Invalid document type"
         });
     }
-
-    const db = require('../config/db');
 
     await db.query(
       `UPDATE vehicles SET ${columnDoc} = ?, ${columnDate} = ? WHERE id = ?`,

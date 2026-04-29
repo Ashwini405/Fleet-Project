@@ -698,8 +698,13 @@ export default function TripAdd() {
   });
 
   const handleSaveDraft = async () => {
+    const isValid = validate();
+    const status = isValid ? 'Planned' : 'Draft';
+    const tab = isValid ? 'present' : 'drafts';
+    const message = isValid ? '✅ Trip created successfully! Status: Planned' : '💾 Draft saved successfully!';
+
     try {
-      const payload = buildTripPayload('Draft');
+      const payload = buildTripPayload(status);
       const isUpdate = !!draftId;
       const url = isUpdate
         ? `http://localhost:5001/api/trips/${draftId}`
@@ -714,10 +719,10 @@ export default function TripAdd() {
       if (result.success) {
         dispatch({ type: 'SAVE_DRAFT' });
         localStorage.removeItem('tripFormDraft');
-        showToast('💾 Draft saved successfully!');
-        setTimeout(() => navigate('/trips?tab=drafts'), 1500);
+        showToast(message);
+        setTimeout(() => navigate(`/trips?tab=${tab}`), 1500);
       } else {
-        alert('Failed to save draft: ' + result.message);
+        alert('Failed to save: ' + result.message);
       }
     } catch {
       alert('Could not connect to backend.');

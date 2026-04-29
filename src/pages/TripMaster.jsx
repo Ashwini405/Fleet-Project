@@ -934,12 +934,20 @@ export default function TripMaster() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <button
-                          onClick={() => navigate(`/trips/draft/${trip.id}`)}
-                          className="px-3 py-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition"
-                        >
-                          Resume Editing
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => navigate(`/trips/draft/${trip.id}`)}
+                            className="px-3 py-1.5 text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition"
+                          >
+                            Resume Editing
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeleteConfirm(trip.id); }}
+                            className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition"
+                          >
+                            <FiTrash2 className="w-3 h-3 inline mr-1" /> Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

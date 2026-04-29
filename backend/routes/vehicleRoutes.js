@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 
-const upload = require('../config/multer'); // ✅ multer
+const upload = require('../config/multer');
 
 const {
   getVehicles,
@@ -15,7 +15,7 @@ const {
 } = require('../controllers/vehicleController');
 
 
-// 🔥 NEW ROUTE (DOCUMENT UPLOAD FROM MODAL)
+// ===================== DOCUMENT UPLOAD =====================
 router.post(
   '/upload-document',
   upload.single('file'),
@@ -23,54 +23,57 @@ router.post(
 );
 
 
-// ✅ CREATE VEHICLE (WITH FILE UPLOAD)
+// ===================== CREATE VEHICLE =====================
 router.post(
   '/',
   upload.fields([
-    { name: 'insurance_document' },
-    { name: 'fc_document' },
-    { name: 'permit_document' },
-    { name: 'tax_document' },
-    { name: 'pollution_document' },
-    { name: 'cll_document' },
-    { name: 'rc_document' }
+    { name: 'insurance_document', maxCount: 1 },
+    { name: 'fc_document', maxCount: 1 },
+    { name: 'permit_document', maxCount: 1 },
+    { name: 'tax_document', maxCount: 1 },
+    { name: 'pollution_document', maxCount: 1 },
+    { name: 'cll_document', maxCount: 1 },
+    { name: 'rc_document', maxCount: 1 }
   ]),
   createVehicle
 );
 
 
-// ✅ GET ALL VEHICLES
+// ===================== GET ALL VEHICLES =====================
 router.get('/', getVehicles);
 
 
-// ✅ GET BY VEHICLE NUMBER
+// ===================== GET BY VEHICLE NUMBER =====================
+// 🔥 IMPORTANT: This must come BEFORE '/:id'
 router.get('/by-number/:vehicle_no', getVehicleByNumber);
 
-// ✅ CHECK VEHICLE AVAILABILITY
+
+// ===================== CHECK AVAILABILITY =====================
 router.get('/availability/:vehicle_no', checkAvailability);
 
 
-// ✅ GET SINGLE VEHICLE
+// ===================== GET VEHICLE BY ID =====================
 router.get('/:id', getVehicleById);
 
 
-// ✅ UPDATE VEHICLE (WITH FILE UPLOAD)
+// ===================== UPDATE VEHICLE =====================
 router.put(
   '/:id',
   upload.fields([
-    { name: 'insurance_document' },
-    { name: 'fc_document' },
-    { name: 'permit_document' },
-    { name: 'tax_document' },
-    { name: 'pollution_document' },
-    { name: 'cll_document' },
-    { name: 'rc_document' }
+    { name: 'insurance_document', maxCount: 1 },
+    { name: 'fc_document', maxCount: 1 },
+    { name: 'permit_document', maxCount: 1 },
+    { name: 'tax_document', maxCount: 1 },
+    { name: 'pollution_document', maxCount: 1 },
+    { name: 'cll_document', maxCount: 1 },
+    { name: 'rc_document', maxCount: 1 }
   ]),
   updateVehicle
 );
 
 
-// ✅ DELETE VEHICLE
+// ===================== DELETE VEHICLE =====================
 router.delete('/:id', deleteVehicle);
+
 
 module.exports = router;
