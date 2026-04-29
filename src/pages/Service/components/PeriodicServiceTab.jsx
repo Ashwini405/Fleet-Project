@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Search, Calendar, Eye, Clock } from 'lucide-react';
 import { dummyPeriodicLogs, dummyTrucks } from '../data/dummyData';
-import RegisterServiceModal from './RegisterServiceModal';
+import RegisterPeriodicServiceModal from './RegisterPeriodicServiceModal';
 
 export default function PeriodicServiceTab() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -139,7 +139,7 @@ export default function PeriodicServiceTab() {
         </div>
       </div>
 
-      <RegisterServiceModal isOpen={isAddOpen || !!viewLog} onClose={() => { setIsAddOpen(false); setViewLog(null); }} logData={viewLog} />
+      <RegisterPeriodicServiceModal isOpen={isAddOpen || !!viewLog} onClose={() => { setIsAddOpen(false); setViewLog(null); }} />
     </div>
   );
 }

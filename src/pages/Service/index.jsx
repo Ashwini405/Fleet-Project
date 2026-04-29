@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wrench, Settings2, Clock, Truck } from 'lucide-react';
+import { Wrench, Settings2, Clock } from 'lucide-react';
 import PeriodicServiceTab from './components/PeriodicServiceTab';
 import RepairWorksTab from './components/RepairWorksTab';
 import ServiceHistoryTab from './components/ServiceHistoryTab';
@@ -16,51 +16,7 @@ export default function ServiceModule() {
   ];
 
   return (
-    <div className="flex flex-col md:flex-row min-h-[calc(100vh-4rem)] bg-gray-50/50">
-      
-      {/* Sidebar Overview — desktop only */}
-      <div className="w-[280px] bg-[#1e293b] text-white flex-shrink-0 flex-col hidden md:flex">
-        <div className="p-6">
-           <h2 className="text-xl font-bold tracking-tight text-white/90">SERVICE & MAINTENANCE</h2>
-           <p className="text-sm font-semibold text-teal-400 mt-1 uppercase tracking-widest">Overview</p>
-        </div>
-
-        <div className="px-4 flex-1 space-y-6">
-           
-           <div>
-              <h3 className="flex items-center gap-2 text-sm font-bold text-white/60 uppercase tracking-widest mb-3 px-2">
-                <Settings2 className="w-4 h-4" /> 1. Service
-              </h3>
-              <div className="px-2 space-y-3 relative before:absolute before:left-[15px] before:top-2 before:bottom-2 before:w-[1.5px] before:bg-white/10">
-                 <div className="relative pl-6">
-                   <div className="absolute left-[-9px] top-1.5 w-1.5 h-1.5 rounded-full bg-teal-400"></div>
-                   <p className="text-sm text-white/80"><span className="text-white font-bold">Periodic Service</span> for time interval or Kms related services</p>
-                 </div>
-                 <div className="relative pl-6">
-                   <div className="absolute left-[-9px] top-1.5 w-1.5 h-1.5 rounded-full bg-orange-400"></div>
-                   <p className="text-sm text-white/80"><span className="text-white font-bold">Repair Works</span> for all types of other work like parts, Mechanical, Electrical, Lathe, etc.</p>
-                 </div>
-                 <div className="relative pl-6">
-                   <div className="absolute left-[-9px] top-1.5 w-1.5 h-1.5 rounded-full bg-blue-400"></div>
-                   <p className="text-sm text-white/80"><span className="text-white font-bold">Service History</span> for all types of logs of trucks</p>
-                 </div>
-              </div>
-           </div>
-
-           <div className="p-4 bg-white/5 rounded-xl border border-white/10 mt-8">
-              <h4 className="text-teal-400 font-bold mb-2 flex items-center gap-2 text-sm">
-                <Truck className="w-4 h-4" /> Daily Checks
-              </h4>
-              <ul className="text-xs text-white/70 space-y-2 font-medium">
-                 <li>• Update daily odometer</li>
-                 <li>• Check pending status</li>
-                 <li>• Upload proof photos</li>
-              </ul>
-           </div>
-        </div>
-
-      </div>
-
+    <div className="flex min-h-[calc(100vh-4rem)] bg-gray-50/50">
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#f8fafc]">
         

@@ -1,8 +1,8 @@
 export const dummyTrucks = [
-  { id: 'AP21TY4455', model: 'Ashok Leyland 3518' },
-  { id: 'KA01AA0001', model: 'Tata Signa 4225.T' },
-  { id: 'TS09AB9988', model: 'Eicher Pro 6040' },
-  { id: 'MH12CD5678', model: 'BharatBenz 4228R' },
+  { id: 'AP21TY4455', model: 'Ashok Leyland 3518', driver: 'Ravi Kumar',    lastOdometer: 142500, lastServiceKm: 140000, lastServiceDate: '2024-11-15' },
+  { id: 'KA01AA0001', model: 'Tata Signa 4225.T',  driver: 'Suresh Babu',   lastOdometer: 52000,  lastServiceKm: 50000,  lastServiceDate: '2024-12-01' },
+  { id: 'TS09AB9988', model: 'Eicher Pro 6040',    driver: 'Mahesh Yadav',  lastOdometer: 91000,  lastServiceKm: 85000,  lastServiceDate: '2025-01-10' },
+  { id: 'MH12CD5678', model: 'BharatBenz 4228R',   driver: 'Arjun Singh',   lastOdometer: 115000, lastServiceKm: 110000, lastServiceDate: '2025-02-20' },
 ];
 
 export const dummyGarages = [

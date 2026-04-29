@@ -1,14 +1,24 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Wrench, Package, Plus, Upload, Trash2 } from 'lucide-react';
+import { X, Wrench, Package, Plus, Upload, Trash2, ImagePlus, Clock } from 'lucide-react';
 import { dummyGarages, dummyTrucks } from '../data/dummyData';
 
 export default function RegisterServiceModal({ isOpen, onClose, logData }) {
   const isViewMode = !!logData;
   const [odometer, setOdometer] = useState(logData?.odometer || 145000);
-  const [interval, setInterval] = useState(logData?.interval || 10000);
+  const [odometerPhotos, setOdometerPhotos] = useState([]);
   const [labourCost, setLabourCost] = useState(0); // Dummy default since it isn't in logData directly
   const [parts, setParts] = useState([]);
+  const [dragging, setDragging] = useState(false);
+  const [issueDescription, setIssueDescription] = useState(logData?.issueDescription || '');
+  const [breakdownType, setBreakdownType] = useState(logData?.breakdownType || 'Engine');
+  const [repairCategory, setRepairCategory] = useState(logData?.repairCategory || 'Engine');
+  const [reportedBy, setReportedBy] = useState(logData?.reportedBy || 'Driver');
+  const [breakdownLocation, setBreakdownLocation] = useState(logData?.breakdownLocation || '');
+  const [vehicleStatus, setVehicleStatus] = useState(logData?.vehicleStatus || 'Running');
+  const [severity, setSeverity] = useState(logData?.severity || 'Medium');
+  const [repairStartTime, setRepairStartTime] = useState(logData?.repairStartTime || '09:00');
+  const [repairEndTime, setRepairEndTime] = useState(logData?.repairEndTime || '12:00');
   
   // Temporary state for new part input
   const [newPart, setNewPart] = useState({ name: '', cost: '', qty: 1, vendor: '' });
@@ -17,13 +27,20 @@ export default function RegisterServiceModal({ isOpen, onClose, logData }) {
   React.useEffect(() => {
     if (logData) {
       setOdometer(logData.odometer);
-      setInterval(logData.interval);
+      setIssueDescription(logData.issueDescription || '');
+      setBreakdownType(logData.breakdownType || 'Engine');
+      setRepairCategory(logData.repairCategory || 'Engine');
+      setReportedBy(logData.reportedBy || 'Driver');
+      setBreakdownLocation(logData.breakdownLocation || '');
+      setVehicleStatus(logData.vehicleStatus || 'Running');
+      setSeverity(logData.severity || 'Medium');
+      setRepairStartTime(logData.repairStartTime || '09:00');
+      setRepairEndTime(logData.repairEndTime || '12:00');
     }
   }, [logData]);
 
   if (!isOpen) return null;
 
-  const nextDue = Number(odometer) + Number(interval);
   const partsTotal = parts.reduce((sum, p) => sum + (Number(p.cost) * Number(p.qty)), 0);
   const totalBill = isViewMode ? logData.totalCost : Number(labourCost) + partsTotal;
 
@@ -38,6 +55,18 @@ export default function RegisterServiceModal({ isOpen, onClose, logData }) {
     setParts(parts.filter(p => p.id !== id));
   };
 
+  const addOdometerPhotos = (files) => {
+    const valid = [...files]
+      .filter(f => ['image/jpeg', 'image/png'].includes(f.type))
+      .slice(0, 2 - odometerPhotos.length)
+      .map(f => ({ url: URL.createObjectURL(f), name: f.name, file: f }));
+    setOdometerPhotos(prev => [...prev, ...valid].slice(0, 2));
+  };
+
+  const removeOdometerPhoto = (idx) => {
+    setOdometerPhotos(prev => prev.filter((_, i) => i !== idx));
+  };
+
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -48,9 +77,9 @@ export default function RegisterServiceModal({ isOpen, onClose, logData }) {
           className="bg-white rounded-xl shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[95vh]"
         >
           {/* Header */}
-          <div className="flex justify-between items-center px-6 py-4 bg-teal-600 text-white shrink-0">
+          <div className="flex justify-between items-center px-6 py-4 bg-orange-600 text-white shrink-0">
             <h3 className="text-lg font-bold flex items-center gap-2 tracking-wide">
-              <Plus className="w-5 h-5 opacity-70" /> {isViewMode ? 'View Periodic Service' : 'Register Periodic Service'}
+              <Plus className="w-5 h-5 opacity-70" /> {isViewMode ? 'View Repair Service' : 'Register Repair Service'}
             </h3>
             <button 
               onClick={onClose}
@@ -63,10 +92,10 @@ export default function RegisterServiceModal({ isOpen, onClose, logData }) {
           {/* Two Column Layout */}
           <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row bg-gray-50/50">
              
-             {/* LEFT SIDE: Service Info */}
+             {/* LEFT SIDE: Repair Details */}
              <div className="w-full lg:w-[45%] p-6 border-r border-gray-200 bg-white">
                 <h4 className="flex items-center gap-2 text-sm font-bold text-gray-800 uppercase tracking-widest mb-6">
-                  <Wrench className="w-4 h-4 text-teal-600" /> Service Information
+                  <Wrench className="w-4 h-4 text-orange-600" /> Repair Details
                 </h4>
 
                 <form className="space-y-5">
@@ -81,56 +110,157 @@ export default function RegisterServiceModal({ isOpen, onClose, logData }) {
                    <div className="grid grid-cols-2 gap-4">
                      <div>
                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Date</label>
-                       <input disabled={isViewMode} type="date" className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100" defaultValue={logData?.date || "2025-12-08"} />
+                       <input disabled={isViewMode} type="date" className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100" defaultValue={logData?.date || "2025-12-08"} />
                      </div>
                      <div>
                        <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Odometer (KM)</label>
-                       <input disabled={isViewMode} type="number" value={odometer} onChange={(e) => setOdometer(e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm shadow-sm font-mono disabled:opacity-75 disabled:bg-gray-100" />
+                       <input disabled={isViewMode} type="number" value={odometer} onChange={(e) => setOdometer(e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm font-mono disabled:opacity-75 disabled:bg-gray-100" />
                      </div>
                    </div>
 
-                   <div className="grid grid-cols-2 gap-4">
+                   <div className="border-t border-orange-100 pt-5">
+                     <h5 className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-4">Issue Details</h5>
+                     <div className="space-y-5">
+                       <div>
+                         <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Issue Description <span className="text-red-500">*</span></label>
+                         <textarea disabled={isViewMode} rows="4" value={issueDescription} onChange={(e) => setIssueDescription(e.target.value)} placeholder="Engine overheating while driving uphill" className="w-full p-3 bg-white border border-gray-300 rounded-lg text-sm shadow-sm resize-none focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 disabled:opacity-75 disabled:bg-gray-100"></textarea>
+                       </div>
+                       <div className="grid grid-cols-2 gap-4">
+                         <div>
+                           <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Repair Category</label>
+                           <select disabled={isViewMode} value={breakdownType} onChange={(e) => setBreakdownType(e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100">
+                             <option>Engine</option>
+                             <option>Electrical</option>
+                             <option>Tyre</option>
+                             <option>Brake</option>
+                             <option>Accident</option>
+                             <option>Other</option>
+                           </select>
+                         </div>
+                         <div>
+                           <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Reported By</label>
+                           <select disabled={isViewMode} value={reportedBy} onChange={(e) => setReportedBy(e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100">
+                             <option>Driver</option>
+                             <option>Supervisor</option>
+                           </select>
+                         </div>
+                       </div>
+                       <div className="grid grid-cols-2 gap-4">
+                         <div>
+                           <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Breakdown Location</label>
+                           <input disabled={isViewMode} type="text" value={breakdownLocation} onChange={(e) => setBreakdownLocation(e.target.value)} placeholder="Near Vijayawada Highway" className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100" />
+                         </div>
+                         <div>
+                           <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Vehicle Status</label>
+                           <select disabled={isViewMode} value={vehicleStatus} onChange={(e) => setVehicleStatus(e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100">
+                             <option>Running</option>
+                             <option>Stopped</option>
+                             <option>Breakdown</option>
+                           </select>
+                         </div>
+                       </div>
+                       <div>
+                         <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Severity</label>
+                         <select disabled={isViewMode} value={severity} onChange={(e) => setSeverity(e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100">
+                           <option>Low</option>
+                           <option>Medium</option>
+                           <option>Critical</option>
+                         </select>
+                       </div>
+                     </div>
+                   </div>
+
+                   <div className="border-t border-orange-100 pt-5">
+                     <h5 className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-4">Repair Execution</h5>
+                     <div className="space-y-5">
+                       <div>
+                         <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Garage / Mechanic</label>
+                         <select disabled={isViewMode} defaultValue={dummyGarages.find(g => g.name === logData?.garage)?.id || ""} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm transition-all shadow-sm disabled:opacity-75 disabled:bg-gray-100">
+                            <option value="">Select Service Provider</option>
+                            {dummyGarages.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                         </select>
+                       </div>
+                       <div className="grid grid-cols-2 gap-4">
+                         <div>
+                           <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Repair Category</label>
+                           <select disabled={isViewMode} value={repairCategory} onChange={(e) => setRepairCategory(e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100">
+                             <option>Engine</option>
+                             <option>Electrical</option>
+                             <option>Tyre</option>
+                             <option>Brake</option>
+                             <option>Accident</option>
+                             <option>Other</option>
+                           </select>
+                         </div>
+                         <div>
+                           <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Repair Start Time</label>
+                           <input disabled={isViewMode} type="time" value={repairStartTime} onChange={(e) => setRepairStartTime(e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100" />
+                         </div>
+                       </div>
+                       <div className="grid grid-cols-2 gap-4">
+                         <div>
+                           <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Repair End Time</label>
+                           <input disabled={isViewMode} type="time" value={repairEndTime} onChange={(e) => setRepairEndTime(e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100" />
+                         </div>
+                         <div>
+                           <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Repair Notes / Diagnosis</label>
+                           <textarea disabled={isViewMode} rows="3" placeholder="Enter diagnosis or corrective actions taken..." className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm shadow-sm resize-none focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 disabled:opacity-75 disabled:bg-gray-100"></textarea>
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+
+                   <div className="border-t border-orange-100 pt-5">
+                     <h5 className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-4">Proof</h5>
                      <div>
-                       <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Interval (KM)</label>
-                       <input disabled={isViewMode} type="number" value={interval} onChange={(e) => setInterval(e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm shadow-sm font-mono disabled:opacity-75 disabled:bg-gray-100" />
-                     </div>
-                     <div>
-                       <label className="block text-[11px] font-bold text-teal-600 uppercase tracking-wider mb-1.5">Next Due (KM)</label>
-                       <input type="text" readOnly value={nextDue} className="w-full p-2.5 bg-orange-50 border border-orange-200/60 rounded-lg text-orange-700 text-sm font-bold font-mono shadow-sm" />
+                       <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Upload Odometer Photo (for verification)</label>
+                       {odometerPhotos.length < 2 && !isViewMode && (
+                         <div
+                           onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                           onDragLeave={() => setDragging(false)}
+                           onDrop={e => { e.preventDefault(); setDragging(false); addOdometerPhotos(e.dataTransfer.files); }}
+                           className={`relative flex flex-col items-center justify-center gap-1.5 border-2 border-dashed rounded-xl py-4 transition-colors ${
+                             dragging ? 'border-teal-400 bg-teal-50' : 'border-gray-300 bg-gray-50 hover:border-teal-400 hover:bg-teal-50/40'
+                           }`}
+                         >
+                           <ImagePlus className="w-6 h-6 text-gray-400" />
+                           <p className="text-xs text-gray-500">Drag & drop or <label className="text-teal-600 font-semibold cursor-pointer hover:underline">browse<input type="file" accept="image/jpeg,image/png" multiple className="hidden" onChange={e => addOdometerPhotos(e.target.files)} /></label></p>
+                           <p className="text-[10px] text-gray-400">{2 - odometerPhotos.length} slot{2 - odometerPhotos.length !== 1 ? 's' : ''} remaining</p>
+                         </div>
+                       )}
+                       {odometerPhotos.length > 0 && (
+                         <div className="flex gap-3 mt-3">
+                           {odometerPhotos.map((photo, idx) => (
+                             <div key={idx} className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200 shadow-sm group">
+                               <img src={photo.url} alt={photo.name} className="w-full h-full object-cover" />
+                               {!isViewMode && (
+                                 <button
+                                   onClick={() => removeOdometerPhoto(idx)}
+                                   className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                                 >
+                                   <Trash2 className="w-4 h-4 text-white" />
+                                 </button>
+                               )}
+                             </div>
+                           ))}
+                         </div>
+                       )}
                      </div>
                    </div>
 
-                   <div>
-                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Garage / Mechanic</label>
-                     <select disabled={isViewMode} defaultValue={dummyGarages.find(g => g.name === logData?.garage)?.id || ""} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm transition-all shadow-sm disabled:opacity-75 disabled:bg-gray-100">
-                        <option value="">Select Service Provider</option>
-                        {dummyGarages.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-                     </select>
-                   </div>
-
-                   <div className="grid grid-cols-2 gap-4">
-                     <div>
-                       <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Status</label>
-                       <select disabled={isViewMode} defaultValue={logData?.status || "Completed"} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm shadow-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 disabled:opacity-75 disabled:bg-gray-100">
-                         <option>Completed</option>
-                         <option>Pending</option>
-                         <option>In Progress</option>
-                       </select>
+                   <div className="border-t border-orange-100 pt-5">
+                     <h5 className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-4">Cost & Billing</h5>
+                     <div className="grid grid-cols-2 gap-4">
+                       <div>
+                         <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Labour Cost (₹)</label>
+                         <input disabled={isViewMode} type="number" value={labourCost} onChange={(e) => setLabourCost(e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm shadow-sm font-mono focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 disabled:opacity-75 disabled:bg-gray-100" />
+                       </div>
+                       <div />
                      </div>
-                     <div>
-                       <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Labour Cost (₹)</label>
-                       <input disabled={isViewMode} type="number" value={labourCost} onChange={(e) => setLabourCost(e.target.value)} className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm shadow-sm font-mono focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 disabled:opacity-75 disabled:bg-gray-100" />
+                     <div className="mt-4">
+                       <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Total Bill Amount (₹)</label>
+                       <input type="text" readOnly value={totalBill} className="w-full p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-lg font-black font-mono shadow-sm" />
                      </div>
-                   </div>
-
-                   <div>
-                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Total Bill Amount (₹)</label>
-                     <input type="text" readOnly value={totalBill} className="w-full p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-lg font-black font-mono shadow-sm" />
-                   </div>
-
-                   <div>
-                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Work Description / Notes</label>
-                     <textarea disabled={isViewMode} rows="3" placeholder="Enter detailed description of work done..." className="w-full p-2.5 bg-white border border-gray-300 rounded-lg text-sm shadow-sm resize-none focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 disabled:opacity-75 disabled:bg-gray-100"></textarea>
                    </div>
                 </form>
              </div>
@@ -163,7 +293,7 @@ export default function RegisterServiceModal({ isOpen, onClose, logData }) {
                 )}
 
                 {/* Parts Table */}
-                <div className="flex-1 min-h-[150px] border border-gray-200 rounded-xl overflow-hidden flex flex-col shadow-sm mb-6 bg-white">
+                <div className="flex-1 min-h-37.5 border border-gray-200 rounded-xl overflow-hidden flex flex-col shadow-sm mb-6 bg-white">
                   <div className="grid grid-cols-12 gap-2 bg-slate-100 p-2.5 border-b border-gray-200 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
                      <div className="col-span-5">Part</div>
                      <div className="col-span-1 text-center">Qty</div>
