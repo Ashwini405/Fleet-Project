@@ -223,12 +223,7 @@ export default function FuelDashboard() {
           <h1 className="text-xl font-black text-slate-800">Fuel Dashboard</h1>
           <p className="text-sm text-slate-500 mt-0.5">Trip-wise fuel summary · click any row to drill down</p>
         </div>
-        <button
-          onClick={() => setAddOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-sm transition-colors"
-        >
-          <FiPlus className="w-4 h-4" /> New Fuel Entry
-        </button>
+       
       </div>
 
       {/* ── Summary Cards ── */}
