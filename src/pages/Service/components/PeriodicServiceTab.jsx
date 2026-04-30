@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Plus, Search, Calendar, Eye, Clock } from 'lucide-react';
-import { dummyPeriodicLogs, dummyTrucks } from '../data/dummyData';
 import RegisterPeriodicServiceModal from './RegisterPeriodicServiceModal';
 
 export default function PeriodicServiceTab() {
@@ -9,10 +8,26 @@ export default function PeriodicServiceTab() {
   const [filterTruck, setFilterTruck] = useState("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [viewLog, setViewLog] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [trucks, setTrucks] = useState([]);
 
-  const filteredLogs = dummyPeriodicLogs.filter(log => {
-    const matchesSearch = log.garage.toLowerCase().includes(searchTerm.toLowerCase()) || log.truckNo.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTruck = filterTruck === 'all' || log.truckNo === filterTruck;
+  useEffect(() => {
+    fetch('http://localhost:5001/api/services')
+      .then(res => res.json())
+      .then(data => setLogs(data.data || []))
+      .catch(err => console.error('Error fetching services:', err));
+
+    fetch('http://localhost:5001/api/vehicles')
+      .then(res => res.json())
+      .then(data => setTrucks(data.data || []))
+      .catch(err => console.error('Error fetching vehicles:', err));
+  }, []);
+
+  const filteredLogs = logs.filter(log => {
+    const matchesSearch =
+      (log.vendor || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.vehicle_no || '').toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTruck = filterTruck === 'all' || log.vehicle_id == filterTruck;
     return matchesSearch && matchesTruck;
   });
 
@@ -41,7 +56,9 @@ export default function PeriodicServiceTab() {
               onChange={(e) => setFilterTruck(e.target.value)}
             >
               <option value="all">All Trucks</option>
-              {dummyTrucks.map(t => <option key={t.id} value={t.id}>{t.id}</option>)}
+              {trucks.map(t => (
+                <option key={t.id} value={t.id}>{t.vehicle_no}</option>
+              ))}
             </select>
           </div>
           <div className="w-full md:w-40">
@@ -79,59 +96,64 @@ export default function PeriodicServiceTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {filteredLogs.map((log, idx) => (
-                <motion.tr 
-                  initial={{ opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  key={log.id} 
-                  className="hover:bg-teal-50/30 transition-colors group"
-                >
-                  <td className="py-2 px-2 md:py-4 md:px-4">
-                    <span className="text-sm font-medium text-gray-600">{log.date}</span>
-                  </td>
-                  <td className="py-2 px-2 md:py-4 md:px-4">
-                    <span className="font-bold text-gray-800 tracking-tight text-sm">{log.truckNo}</span>
-                  </td>
-                  <td className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">
-                    <span className="text-sm font-semibold text-gray-700">{log.garage}</span>
-                  </td>
-                  <td className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell">
-                    <span className="text-sm text-gray-600 font-mono">{log.odometer.toLocaleString()}</span>
-                  </td>
-                  <td className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">
-                    <span className="text-sm text-gray-500 font-mono">{log.interval.toLocaleString()}</span>
-                  </td>
-                  <td className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">
-                    <span className="text-sm font-bold text-orange-600 font-mono">{log.nextDue.toLocaleString()}</span>
-                  </td>
-                  <td className="py-2 px-2 md:py-4 md:px-4 text-right">
-                    <span className="font-bold text-gray-900 tracking-tight text-sm">₹ {log.totalCost.toLocaleString()}</span>
-                  </td>
-                  <td className="py-2 px-2 md:py-4 md:px-4 text-center">
-                    {log.status === 'Completed' ? (
-                      <span className="inline-flex items-center text-[10px] uppercase font-bold tracking-widest text-green-700 bg-green-100 px-2 py-1 rounded">
-                        Completed
+              {filteredLogs.length > 0 ? (
+                filteredLogs.map((log, idx) => (
+                  <motion.tr 
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    key={log.id} 
+                    className="hover:bg-teal-50/30 transition-colors group"
+                  >
+                    <td className="py-2 px-2 md:py-4 md:px-4">
+                      <span className="text-sm font-medium text-gray-600">{log.service_date}</span>
+                    </td>
+                    <td className="py-2 px-2 md:py-4 md:px-4">
+                      <span className="font-bold text-gray-800 tracking-tight text-sm">{log.vehicle_no || '—'}</span>
+                    </td>
+                    <td className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">
+                      <span className="text-sm font-semibold text-gray-700">{log.vendor || log.mechanic || '—'}</span>
+                    </td>
+                    <td className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell">
+                      <span className="text-sm text-gray-600 font-mono">{Number(log.odometer || 0).toLocaleString()}</span>
+                    </td>
+                    <td className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">
+                      <span className="text-sm text-gray-500 font-mono">{Number(log.interval_km || 0).toLocaleString()}</span>
+                    </td>
+                    <td className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">
+                      <span className="text-sm font-bold text-orange-600 font-mono">{Number(log.next_due || 0).toLocaleString()}</span>
+                    </td>
+                    <td className="py-2 px-2 md:py-4 md:px-4 text-right">
+                      <span className="font-bold text-gray-900 tracking-tight text-sm">
+                        ₹ {Number(log.total_cost || 0).toLocaleString()}
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center text-[10px] uppercase font-bold tracking-widest text-yellow-700 bg-yellow-100 px-2 py-1 rounded">
-                        Pending
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-2 px-2 md:py-4 md:px-4 text-center">
-                    <button 
-                      onClick={() => setViewLog(log)}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-500 group-hover:text-teal-600 hover:bg-teal-50 px-2 py-1.5 rounded-lg transition-colors border border-transparent group-hover:border-teal-200"
-                    >
-                      <Eye className="w-3.5 h-3.5" /> View
-                    </button>
-                  </td>
-                </motion.tr>
-              ))}
-              {filteredLogs.length === 0 && (
+                    </td>
+                    <td className="py-2 px-2 md:py-4 md:px-4 text-center">
+                      {log.status === 'Completed' ? (
+                        <span className="inline-flex items-center text-[10px] uppercase font-bold tracking-widest text-green-700 bg-green-100 px-2 py-1 rounded">
+                          Completed
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center text-[10px] uppercase font-bold tracking-widest text-yellow-700 bg-yellow-100 px-2 py-1 rounded">
+                          Pending
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2 md:py-4 md:px-4 text-center">
+                      <button 
+                        onClick={() => setViewLog(log)}
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-500 group-hover:text-teal-600 hover:bg-teal-50 px-2 py-1.5 rounded-lg transition-colors border border-transparent group-hover:border-teal-200"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> View
+                      </button>
+                    </td>
+                  </motion.tr>
+                ))
+              ) : (
                 <tr>
-                  <td colSpan="9" className="p-8 text-center text-gray-500 text-sm">No periodic service logs found.</td>
+                  <td colSpan="9" className="p-8 text-center text-gray-500 text-sm">
+                    No periodic service logs found.
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -139,7 +161,10 @@ export default function PeriodicServiceTab() {
         </div>
       </div>
 
-      <RegisterPeriodicServiceModal isOpen={isAddOpen || !!viewLog} onClose={() => { setIsAddOpen(false); setViewLog(null); }} />
+      <RegisterPeriodicServiceModal 
+        isOpen={isAddOpen || !!viewLog} 
+        onClose={() => { setIsAddOpen(false); setViewLog(null); }} 
+      />
     </div>
   );
 }
