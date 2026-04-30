@@ -10,6 +10,7 @@ const supervisorRoutes = require('./routes/supervisorRoutes');
 const driverRoutes = require('./routes/driverRoutes');
 const tripRoutes = require('./routes/tripRoutes');
 const fuelRoutes = require('./routes/fuelRoutes');
+const serviceRoutes = require('./routes/serviceRoutes');
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use('/api/supervisors', supervisorRoutes);
 app.use('/api/drivers', driverRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/fuel', fuelRoutes);
+app.use('/api/services', serviceRoutes);
 
 
 // 🔥 TEST ROUTE

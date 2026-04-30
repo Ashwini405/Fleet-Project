@@ -4,11 +4,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiEdit2, FiMapPin, FiUser, FiActivity, FiSearch, FiPlus, FiX, FiUploadCloud, FiEye, FiDownload } from 'react-icons/fi';
 import { DUMMY_VEHICLES } from './vehicleData';
 
-const dummyServiceHistory = [
-  { id: 1, date: "15 Aug 2024", type: "Service", vendor: "ABC Garage", cost: "₹5,000", odometer: "80,000 KM" },
-  { id: 2, date: "20 Sep 2024", type: "Repair", vendor: "XYZ Works", cost: "₹8,000", odometer: "95,000 KM" },
-  { id: 3, date: "05 Nov 2024", type: "Service", vendor: "Prime Fleet Care", cost: "₹12,500", odometer: "112,000 KM" },
-];
 
 const dummyTyres = [
   { id: 1, position: "FL", serial: "MRF-10293", brand: "MRF", model: "Steel Muscle", tread: "85%", km: "15,000" },
@@ -37,6 +32,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
   const { id } = useParams();
   const navigate = useNavigate();
   const [vehicle, setVehicle] = useState(null);
+  const [serviceHistory, setServiceHistory] = useState([]);
 
   useEffect(() => {
     fetch(`http://localhost:5001/api/vehicles/${id}`)
@@ -45,9 +41,20 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
         if (data.success) {
           setVehicle(data.data);
         }
-      })
-      .catch(err => console.error(err));
+      });
   }, [id]);
+
+  useEffect(() => {
+    if (!vehicle?.id) return;
+
+    fetch(`http://localhost:5001/api/services/vehicle/${vehicle.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setServiceHistory(data.data || []);
+        }
+      });
+  }, [vehicle]);
 
   const [activeTab, setActiveTab] = useState('Overview');
   const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
@@ -441,22 +448,42 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                       <th className="px-6 py-4 text-right rounded-tr-xl whitespace-nowrap">Odometer Reading</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {dummyServiceHistory.map((record) => (
-                      <tr key={record.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4 font-medium text-slate-900">{record.date}</td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex px-2.5 py-1 rounded-md text-xs font-medium border ${record.type === 'Service' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                            'bg-amber-50 text-amber-700 border-amber-200'
-                            }`}>
-                            {record.type}
-                          </span>
+                  <tbody>
+                    {serviceHistory.length === 0 ? (
+                      <tr>
+                        <td colSpan="5" className="text-center py-6 text-slate-400">
+                          No service records found for this vehicle
                         </td>
-                        <td className="px-6 py-4 text-slate-700">{record.vendor}</td>
-                        <td className="px-6 py-4 text-right font-medium text-slate-900">{record.cost}</td>
-                        <td className="px-6 py-4 text-right text-slate-500">{record.odometer}</td>
                       </tr>
-                    ))}
+                    ) : (
+                      serviceHistory.map((record) => (
+                        <tr key={record.id} className="hover:bg-slate-50/50">
+
+                          <td className="px-6 py-4 font-medium">
+                            {new Date(record.service_date).toLocaleDateString('en-IN')}
+                          </td>
+
+                          <td className="px-6 py-4">
+                            <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-700">
+                              {record.service_type || 'Service'}
+                            </span>
+                          </td>
+
+                          <td className="px-6 py-4">
+                            {record.vendor || record.mechanic || '—'}
+                          </td>
+
+                          <td className="px-6 py-4 text-right font-medium">
+                            ₹ {Number(record.total_cost || 0).toLocaleString()}
+                          </td>
+
+                          <td className="px-6 py-4 text-right">
+                            {record.odometer || 0} KM
+                          </td>
+
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
