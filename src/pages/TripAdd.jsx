@@ -79,6 +79,7 @@ const initialForm = {
   truckWarnings: [],
   draftSaved: false,
   lastDraftTime: null,
+  odometerImage: null,
 };
 
 const formReducer = (state, action) => {
@@ -996,6 +997,44 @@ export default function TripAdd() {
                   )}
                 </div>
               </div>
+              <div>
+                <label className={lbl}>Odometer Image <span className="text-slate-400 font-normal normal-case">(optional)</span></label>
+                <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer bg-slate-50 hover:bg-indigo-50 hover:border-indigo-400 transition group">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) dispatch({ type: 'UPDATE_FIELD', field: 'odometerImage', value: file });
+                    }}
+                  />
+                  {form.odometerImage ? (
+                    <div className="flex items-center gap-2 px-3">
+                      <img
+                        src={URL.createObjectURL(form.odometerImage)}
+                        alt="Odometer"
+                        className="h-16 w-16 object-cover rounded-md border border-slate-200"
+                      />
+                      <div className="text-xs text-slate-600 flex-1 truncate">{form.odometerImage.name}</div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.preventDefault(); dispatch({ type: 'UPDATE_FIELD', field: 'odometerImage', value: null }); }}
+                        className="text-red-400 hover:text-red-600 transition"
+                      >
+                        <FiX className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1 text-slate-400 group-hover:text-indigo-500 transition">
+                      <FiUpload className="w-5 h-5" />
+                      <span className="text-xs font-medium">Upload odometer photo</span>
+                      <span className="text-xs">JPG, PNG up to 2MB</span>
+                    </div>
+                  )}
+                </label>
+              </div>
+              
             </div>
           </Sec>
 
