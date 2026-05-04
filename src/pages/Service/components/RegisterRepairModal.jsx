@@ -16,6 +16,13 @@ import { dummyGarages, dummyTrucks } from '../data/dummyData';
 
 const FIELD_CLS = 'w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100';
 const LABEL_CLS = 'block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5';
+const STATUS_STEPS = ['Reported', 'Under Repair', 'Completed'];
+
+const PRIORITY_CONFIG = {
+  Low:    { border: 'border-emerald-300', bg: 'bg-emerald-50',  header: 'bg-emerald-50 text-emerald-800', badge: 'bg-emerald-100 text-emerald-700', btn: 'border-emerald-400 bg-emerald-500 text-white', btnIdle: 'border-emerald-200 bg-white text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50', dot: 'bg-emerald-500' },
+  Medium: { border: 'border-amber-300',   bg: 'bg-amber-50',    header: 'bg-amber-50 text-amber-800',   badge: 'bg-amber-100 text-amber-700',   btn: 'border-amber-400 bg-amber-500 text-white',   btnIdle: 'border-amber-200 bg-white text-amber-700 hover:border-amber-400 hover:bg-amber-50',   dot: 'bg-amber-500'   },
+  High:   { border: 'border-red-400',     bg: 'bg-red-50',      header: 'bg-red-50 text-red-800',       badge: 'bg-red-100 text-red-700',       btn: 'border-red-500 bg-red-500 text-white',       btnIdle: 'border-red-200 bg-white text-red-700 hover:border-red-400 hover:bg-red-50',           dot: 'bg-red-500'     },
+};
 
 const previousOdometer = 140000;
 const mockVehicle = {
@@ -58,18 +65,19 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   const [reportedBy, setReportedBy] = useState('Driver');
   const [priority, setPriority] = useState('Medium');
 
-  const [truck, setTruck] = useState(dummyTrucks[0]?.id || '');
+  const [truck, setTruck] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [odometer, setOdometer] = useState(previousOdometer);
+  const [odometer, setOdometer] = useState('');
   const [garage, setGarage] = useState(dummyGarages[0]?.id || '');
-  const [repairStartTime, setRepairStartTime] = useState('09:00');
-  const [repairEndTime, setRepairEndTime] = useState('11:00');
+  const [repairStartTime, setRepairStartTime] = useState('');
+  const [repairEndTime, setRepairEndTime] = useState('');
   const [status, setStatus] = useState('Reported');
   const [repairNotes, setRepairNotes] = useState('');
   const [labourCost, setLabourCost] = useState(0);
 
   const [parts, setParts] = useState([]);
-  const [newPart, setNewPart] = useState({ name: '', cost: '', qty: '1', vendor: '' });
+  const [newPart, setNewPart] = useState({ name: '', costPerUnit: '', qty: '1', vendor: '' });
+  const [partErrors, setPartErrors] = useState({});
 
   const [files, setFiles] = useState([]);
   const [dragging, setDragging] = useState(false);
@@ -87,10 +95,10 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       setPriority(logData.priority || 'Medium');
       setTruck(logData.truck || dummyTrucks[0]?.id || '');
       setDate(logData.date || new Date().toISOString().split('T')[0]);
-      setOdometer(logData.odometer || previousOdometer);
-      setGarage(logData.garage || dummyGarages[0]?.id || '');
-      setRepairStartTime(logData.repairStartTime || '09:00');
-      setRepairEndTime(logData.repairEndTime || '11:00');
+      setOdometer(logData.odometer || '');
+      setGarage(logData.garage || '');
+      setRepairStartTime(logData.repairStartTime || '');
+      setRepairEndTime(logData.repairEndTime || '');
       setStatus(logData.status || 'Reported');
       setRepairNotes(logData.repairNotes || '');
       setLabourCost(logData.labourCost || 0);
@@ -104,10 +112,10 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       setBreakdownLocation('');
       setReportedBy('Driver');
       setPriority('Medium');
-      setTruck(dummyTrucks[0]?.id || '');
+      setTruck('');
       setDate(new Date().toISOString().split('T')[0]);
-      setOdometer(previousOdometer);
-      setGarage(dummyGarages[0]?.id || '');
+      setOdometer('');
+      setGarage('');
       setRepairStartTime('09:00');
       setRepairEndTime('11:00');
       setStatus('Reported');
@@ -120,28 +128,47 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     }
   }, [isOpen, logData]);
 
-  useEffect(() => {
-    if (status === 'Reported' && (parts.length > 0 || Number(labourCost) > 0)) {
-      setStatus('In Progress');
-    }
-  }, [parts.length, labourCost, status]);
+  const selectedTruck = useMemo(() => dummyTrucks.find(vehicle => vehicle.id === truck), [truck]);
+  const hasSelectedTruck = Boolean(truck);
+  const previousOdometer = selectedTruck?.lastOdometer || 0;
+  const isReported = status === 'Reported';
+  const isUnderRepair = status === 'Under Repair';
+  const isCompleted = status === 'Completed';
+  
+  // Reported  → only Issue Details editable
+  // Under Repair → Issue + Repair/Parts/Labour/Vendor/Times editable
+  // Completed → everything locked
+  const disableIssueDetails = isViewMode || isCompleted || !hasSelectedTruck;
+  const disableRepairDetails = isViewMode || isCompleted || isReported || !hasSelectedTruck;
+  const disableFiles = isViewMode || isCompleted || isReported || !hasSelectedTruck;
+  const isStatusDisabled = isViewMode || isCompleted || !hasSelectedTruck;
 
-  const partsTotal = useMemo(() => parts.reduce((sum, part) => sum + (Number(part.cost) * Number(part.qty) || 0), 0), [parts]);
+  const partsTotal = useMemo(() => parts.reduce((sum, p) => sum + (Number(p.costPerUnit) * Number(p.qty) || 0), 0), [parts]);
   const totalBill = useMemo(() => partsTotal + (Number(labourCost) || 0), [partsTotal, labourCost]);
   const downtime = useMemo(() => getDuration(repairStartTime, repairEndTime), [repairStartTime, repairEndTime]);
 
-  const vehicleStatus = status === 'Completed' ? 'Active' : 'Under Repair';
-  const vehicleBadge = vehicleStatus === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700';
+  const vehicleStatus = hasSelectedTruck ? (isCompleted ? 'Active' : status) : 'No vehicle selected';
+  const vehicleBadge = !hasSelectedTruck ? 'bg-gray-100 text-gray-600' : vehicleStatus === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700';
 
   const validate = () => {
     const nextErrors = {};
     if (!issueDescription.trim()) nextErrors.issueDescription = 'Issue description is required';
     if (!priority) nextErrors.priority = 'Priority is required';
     if (!truck) nextErrors.truck = 'Truck is required';
-    if (!date) nextErrors.date = 'Date is required';
-    if (!odometer) nextErrors.odometer = 'Odometer is required';
-    if (Number(odometer) < previousOdometer) nextErrors.odometer = `Odometer must be ≥ ${previousOdometer}`;
-    if (status === 'Completed' && files.length === 0) nextErrors.files = 'At least 1 proof file is recommended';
+    if (!isReported && !date) nextErrors.date = 'Date is required';
+    if (!isReported && date && date > new Date().toISOString().split('T')[0]) nextErrors.date = 'Date cannot be a future date';
+    if (!isReported && !odometer) nextErrors.odometer = 'Odometer reading is required';
+    if (!isReported && hasSelectedTruck && odometer && Number(odometer) < previousOdometer) nextErrors.odometer = `Odometer cannot be less than previous (${previousOdometer.toLocaleString()} KM)`;
+    if (isUnderRepair && !garage) nextErrors.garage = 'Select service provider to continue repair';
+    if (isUnderRepair && !repairStartTime) nextErrors.repairStartTime = 'Repair start time is required';
+    if (isUnderRepair && repairStartTime && repairEndTime) {
+      const [sh, sm] = repairStartTime.split(':').map(Number);
+      const [eh, em] = repairEndTime.split(':').map(Number);
+      if (eh * 60 + em === sh * 60 + sm) nextErrors.repairEndTime = 'End time cannot equal start time';
+    }
+    if (isCompleted && !repairNotes.trim()) nextErrors.repairNotes = 'Repair notes are required to complete';
+    if (isCompleted && totalBill <= 0) nextErrors.cost = 'Add labour or parts cost before completing repair';
+    if (isCompleted && files.length === 0) nextErrors.files = 'At least 1 proof file is recommended';
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -153,11 +180,21 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   };
 
   const addPart = () => {
-    const cost = Number(newPart.cost);
+    const errs = {};
+    if (!newPart.name.trim()) errs.name = 'Part name is required';
+    if (!newPart.costPerUnit || Number(newPart.costPerUnit) <= 0) errs.costPerUnit = 'Cost per unit is required';
+    if (!newPart.qty || Number(newPart.qty) < 1) errs.qty = 'Qty must be at least 1';
+    if (Object.keys(errs).length) { setPartErrors(errs); return; }
+    const costPerUnit = Number(newPart.costPerUnit);
     const qty = Number(newPart.qty);
-    if (!newPart.name.trim() || cost <= 0 || qty < 1) return;
-    setParts([...parts, { ...newPart, id: Date.now(), cost, qty }]);
-    setNewPart({ name: '', cost: '', qty: '1', vendor: '' });
+    const duplicate = parts.find(p => p.name.trim().toLowerCase() === newPart.name.trim().toLowerCase());
+    if (duplicate) {
+      setParts(parts.map(p => p.id === duplicate.id ? { ...p, qty: p.qty + qty } : p));
+    } else {
+      setParts([...parts, { ...newPart, id: Date.now(), costPerUnit, qty }]);
+    }
+    setNewPart({ name: '', costPerUnit: '', qty: '1', vendor: '' });
+    setPartErrors({});
   };
 
   const removePart = id => setParts(parts.filter(part => part.id !== id));
@@ -186,7 +223,45 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     return file.name;
   };
 
-  const isSaveDisabled = !issueDescription.trim() || !priority || !truck || !date || !odometer || Number(odometer) < previousOdometer;
+  const handleTruckChange = value => {
+    setTruck(value);
+    setOdometer('');
+    setGarage('');
+    setRepairStartTime('');
+    setRepairEndTime('');
+    setRepairNotes('');
+    setLabourCost(0);
+    setParts([]);
+    setNewPart({ name: '', costPerUnit: '', qty: '1', vendor: '' });
+    setFiles([]);
+    setErrors(prev => ({ ...prev, truck: undefined, odometer: undefined }));
+  };
+
+  const handleStatusChange = value => {
+    setStatus(value);
+    if (value === 'Under Repair' && !repairStartTime) {
+      const now = new Date();
+      setRepairStartTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
+    }
+    setErrors(prev => ({ ...prev, cost: undefined, files: undefined, repairStartTime: undefined }));
+  };
+
+  const getStatusButtonClass = step => {
+    if (step === status) {
+      if (step === 'Reported') return 'border-red-500 bg-red-500 text-white';
+      if (step === 'Under Repair') return 'border-amber-500 bg-amber-500 text-white';
+      return 'border-emerald-600 bg-emerald-600 text-white';
+    }
+    if (step === 'Reported') return 'border-red-200 bg-red-50 text-red-700 hover:border-red-300';
+    if (step === 'Under Repair') return 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300';
+    return 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300';
+  };
+
+  const isSaveDisabled = !issueDescription.trim()
+    || !priority
+    || !truck
+    || (!isReported && (!date || !odometer || Number(odometer) < previousOdometer))
+    || (isCompleted && totalBill <= 0);
 
   if (!isOpen) return null;
 
@@ -214,317 +289,476 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
 
           <div className="flex flex-col lg:flex-row overflow-hidden flex-1 bg-slate-50">
             <div className="w-full lg:w-[48%] overflow-y-auto p-6 space-y-6">
-              <div className="flex items-center justify-between gap-3 rounded-3xl bg-white p-4 shadow-sm border border-gray-200">
+              <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-200 space-y-4">
+                {/* Vehicle Dropdown */}
                 <div>
-                  <p className="text-xs uppercase tracking-[0.22em] text-gray-500">Vehicle</p>
-                  <p className="mt-1 font-semibold text-gray-900">{mockVehicle.number}</p>
+                  <label className={LABEL_CLS}>Vehicle <span className="text-red-500">*</span></label>
+                  <select
+                    disabled={isViewMode || isCompleted}
+                    value={truck}
+                    onChange={e => handleTruckChange(e.target.value)}
+                    className={`${FIELD_CLS} h-11 w-full ${errors.truck ? 'border-red-500' : 'border-gray-300'}`}
+                  >
+                    <option value="">-- Select vehicle --</option>
+                    {dummyTrucks.map(v => (
+                      <option key={v.id} value={v.id}>{v.id} — {v.model}</option>
+                    ))}
+                  </select>
+                  {errors.truck && <p className="text-xs text-red-600 mt-1">{errors.truck}</p>}
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${vehicleBadge}`}>{vehicleStatus}</span>
-              </div>
 
-              <div className="rounded-3xl bg-white p-5 shadow-sm border border-gray-200">
-                <SectionHeader
-                  icon={<AlertTriangle className="w-5 h-5 text-red-600" />}
-                  label="Issue Details"
-                  sub="Report the failure with context"
-                  color="bg-red-50 text-red-800"
-                />
-                <div className="space-y-4 mt-4">
-                  <div>
-                    <label className={LABEL_CLS}>Issue Description <span className="text-red-500">*</span></label>
-                    <textarea
-                      disabled={isViewMode}
-                      rows={5}
-                      value={issueDescription}
-                      onChange={e => setIssueDescription(e.target.value)}
-                      className={`${FIELD_CLS} resize-none ${errors.issueDescription ? 'border-red-500 ring-red-100' : 'border-gray-300'}`}
-                      placeholder="Engine overheated during highway climb"
-                    />
-                    {errors.issueDescription && <p className="text-xs text-red-600 mt-1">{errors.issueDescription}</p>}
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className={LABEL_CLS}>Breakdown Type</label>
-                      <select
-                        disabled={isViewMode}
-                        value={breakdownType}
-                        onChange={e => setBreakdownType(e.target.value)}
-                        className={`${FIELD_CLS} border-gray-300`}
-                      >
-                        {['Engine', 'Electrical', 'Brake', 'Tyre', 'Accident', 'Other'].map(option => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
+                {/* Auto-fill info */}
+                {selectedTruck ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                      <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Vehicle No.</p>
+                      <p className="text-sm font-bold text-gray-800">{selectedTruck.id}</p>
                     </div>
-                    <div>
-                      <label className={LABEL_CLS}>Vehicle Condition</label>
-                      <select
-                        disabled={isViewMode}
-                        value={vehicleCondition}
-                        onChange={e => setVehicleCondition(e.target.value)}
-                        className={`${FIELD_CLS} border-gray-300`}
-                      >
-                        {['Running', 'Stopped', 'Breakdown'].map(option => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                      <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Model</p>
+                      <p className="text-sm font-bold text-gray-800">{selectedTruck.model}</p>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                      <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Driver</p>
+                      <p className="text-sm font-bold text-gray-800">{selectedTruck.driver}</p>
+                    </div>
+                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                      <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Prev. Odometer</p>
+                      <p className="text-sm font-bold text-gray-800 font-mono">{selectedTruck.lastOdometer.toLocaleString()} KM</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className={LABEL_CLS}>Breakdown Location</label>
-                      <input
-                        disabled={isViewMode}
-                        type="text"
-                        value={breakdownLocation}
-                        onChange={e => setBreakdownLocation(e.target.value)}
-                        placeholder="e.g. Near Vijayawada Highway"
-                        className={`${FIELD_CLS} border-gray-300`}
-                      />
-                    </div>
-                    <div>
-                      <label className={LABEL_CLS}>Reported By</label>
-                      <select
-                        disabled={isViewMode}
-                        value={reportedBy}
-                        onChange={e => setReportedBy(e.target.value)}
-                        className={`${FIELD_CLS} border-gray-300`}
-                      >
-                        {['Driver', 'Supervisor', 'Admin'].map(option => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
+                ) : (
+                  <div className="rounded-xl bg-orange-50 border border-orange-100 px-4 py-3 text-xs text-orange-600 font-medium">
+                    ⚠ Select a vehicle to enable the form
                   </div>
-                  <div>
-                    <label className={LABEL_CLS}>Priority <span className="text-red-500">*</span></label>
-                    <select
-                      disabled={isViewMode}
-                      value={priority}
-                      onChange={e => setPriority(e.target.value)}
-                      className={`${FIELD_CLS} border-gray-300 ${errors.priority ? 'border-red-500 ring-red-100' : ''}`}
-                    >
-                      <option value="">-- Select Priority --</option>
-                      <option value="High">High (Urgent)</option>
-                      <option value="Medium">Medium</option>
-                      <option value="Low">Low</option>
-                    </select>
-                    {errors.priority && <p className="text-xs text-red-600 mt-1">{errors.priority}</p>}
+                )}
+
+                {/* Repair Progress — always visible */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className={LABEL_CLS + ' mb-0'}>Repair Progress</label>
+                    <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${vehicleBadge}`}>{vehicleStatus}</span>
                   </div>
+                  <div className="flex gap-2">
+                    {STATUS_STEPS.map(step => {
+                      const isDisabled = isStatusDisabled || (step === 'Completed' && totalBill <= 0) || isCompleted;
+                      return (
+                        <button
+                          key={step}
+                          type="button"
+                          disabled={isDisabled}
+                          onClick={() => handleStatusChange(step)}
+                          className={`flex-1 px-2 py-2 rounded-lg border text-[11px] font-bold transition disabled:cursor-not-allowed disabled:opacity-40 ${getStatusButtonClass(step)}`}
+                        >
+                          {step}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {!hasSelectedTruck && <p className="text-[10px] text-gray-400 mt-1">Select a vehicle to change status</p>}
+                  {hasSelectedTruck && totalBill <= 0 && !isCompleted && (
+                    <p className="text-[10px] text-gray-500 mt-1">Completion unlocks after labour or parts cost is added.</p>
+                  )}
                 </div>
               </div>
 
-              <div className="rounded-3xl bg-white p-5 shadow-sm border border-gray-200">
+              <div className={`space-y-6 ${!hasSelectedTruck ? 'opacity-40 pointer-events-none select-none' : isCompleted ? 'opacity-60 pointer-events-none select-none' : ''}`}>
+                {(() => {
+                  const pc = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.Medium;
+                  return (
+                    <div className={`rounded-3xl bg-white p-5 shadow-sm border-2 ${pc.border} transition-colors`}>
+                      <div className={`flex items-center justify-between gap-3 rounded-2xl px-4 py-3 ${pc.header} transition-colors`}>
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-xl bg-white/80"><AlertTriangle className="w-5 h-5 text-red-600" /></div>
+                          <div>
+                            <p className="text-sm font-bold">Issue Details</p>
+                            <p className="text-[11px] text-gray-500">Report the failure with context</p>
+                          </div>
+                        </div>
+                        {priority && (
+                          <span className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold ${pc.badge}`}>
+                            <span className={`w-2 h-2 rounded-full ${pc.dot}`} />
+                            {priority} Priority
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="space-y-4 mt-4">
+                        <div>
+                          <label className={LABEL_CLS}>Issue Description <span className="text-red-500">*</span></label>
+                          <textarea
+                            disabled={disableIssueDetails}
+                            rows={4}
+                            value={issueDescription}
+                            onChange={e => setIssueDescription(e.target.value)}
+                            className={`${FIELD_CLS} resize-none ${errors.issueDescription ? 'border-red-500 ring-1 ring-red-100' : 'border-gray-300'}`}
+                            placeholder="Engine overheated during highway climb"
+                          />
+                          {errors.issueDescription && <p className="text-xs text-red-600 mt-1">{errors.issueDescription}</p>}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className={LABEL_CLS}>Breakdown Type</label>
+                            <select
+                              disabled={disableIssueDetails}
+                              value={breakdownType}
+                              onChange={e => setBreakdownType(e.target.value)}
+                              className={`${FIELD_CLS} border-gray-300`}
+                            >
+                              {['Engine', 'Tyre', 'Electrical', 'Brake', 'Accident', 'Other'].map(opt => (
+                                <option key={opt} value={opt}>{opt}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className={LABEL_CLS}>Vehicle Condition</label>
+                            <div className="flex gap-2 mt-0.5">
+                              {['Running', 'Not Running'].map(opt => (
+                                <button
+                                  key={opt}
+                                  type="button"
+                                  disabled={disableIssueDetails}
+                                  onClick={() => setVehicleCondition(opt)}
+                                  className={`flex-1 py-2.5 rounded-lg border text-xs font-bold transition disabled:opacity-60 disabled:cursor-not-allowed ${
+                                    vehicleCondition === opt
+                                      ? opt === 'Running'
+                                        ? 'border-emerald-500 bg-emerald-500 text-white'
+                                        : 'border-red-500 bg-red-500 text-white'
+                                      : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'
+                                  }`}
+                                >
+                                  {opt === 'Running' ? '✓ Running' : '✕ Not Running'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className={LABEL_CLS}>Breakdown Location</label>
+                            <input
+                              disabled={disableIssueDetails}
+                              type="text"
+                              value={breakdownLocation}
+                              onChange={e => setBreakdownLocation(e.target.value)}
+                              placeholder="e.g. Near Vijayawada Highway"
+                              className={`${FIELD_CLS} border-gray-300`}
+                            />
+                          </div>
+                          <div>
+                            <label className={LABEL_CLS}>Reported By</label>
+                            <div className="flex gap-2 mt-0.5">
+                              {['Driver', 'Supervisor'].map(opt => (
+                                <button
+                                  key={opt}
+                                  type="button"
+                                  disabled={disableIssueDetails}
+                                  onClick={() => setReportedBy(opt)}
+                                  className={`flex-1 py-2.5 rounded-lg border text-xs font-bold transition disabled:opacity-60 disabled:cursor-not-allowed ${
+                                    reportedBy === opt
+                                      ? 'border-orange-500 bg-orange-500 text-white'
+                                      : 'border-gray-200 bg-white text-gray-600 hover:border-orange-300'
+                                  }`}
+                                >
+                                  {opt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className={LABEL_CLS}>Priority <span className="text-red-500">*</span></label>
+                          <div className="flex gap-2">
+                            {['Low', 'Medium', 'High'].map(lvl => {
+                              const cfg = PRIORITY_CONFIG[lvl];
+                              const isActive = priority === lvl;
+                              return (
+                                <button
+                                  key={lvl}
+                                  type="button"
+                                  disabled={disableIssueDetails}
+                                  onClick={() => setPriority(lvl)}
+                                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg border text-xs font-bold transition disabled:opacity-60 disabled:cursor-not-allowed ${isActive ? cfg.btn : cfg.btnIdle}`}
+                                >
+                                  <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-white' : cfg.dot}`} />
+                                  {lvl}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {errors.priority && <p className="text-xs text-red-600 mt-1">{errors.priority}</p>}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className={`rounded-3xl bg-white p-5 shadow-sm border border-gray-200 transition-opacity ${isReported ? 'opacity-50 pointer-events-none select-none' : ''}`}>
                 <SectionHeader
                   icon={<Clock className="w-5 h-5 text-orange-600" />}
                   label="Repair Details"
-                  sub="Track repair status and downtime"
+                  sub={isReported ? 'Available when status is Under Repair' : 'Track repair status and downtime'}
                   color="bg-orange-50 text-orange-800"
                 />
                 <div className="space-y-4 mt-4">
-                  <div>
-                    <label className={LABEL_CLS}>Select Truck <span className="text-red-500">*</span></label>
-                    <select
-                      disabled={isViewMode}
-                      value={truck}
-                      onChange={e => setTruck(e.target.value)}
-                      className={`${FIELD_CLS} border-gray-300 ${errors.truck ? 'border-red-500 ring-red-100' : ''}`}
-                    >
-                      <option value="">-- Select --</option>
-                      {dummyTrucks.map(vehicle => (
-                        <option key={vehicle.id} value={vehicle.id}>{vehicle.truckNo}</option>
-                      ))}
-                    </select>
-                    {errors.truck && <p className="text-xs text-red-600 mt-1">{errors.truck}</p>}
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className={LABEL_CLS}>Date <span className="text-red-500">*</span></label>
                       <input
-                        disabled={isViewMode}
+                        disabled={disableRepairDetails}
                         type="date"
                         value={date}
+                        max={new Date().toISOString().split('T')[0]}
                         onChange={e => setDate(e.target.value)}
-                        className={`${FIELD_CLS} border-gray-300 ${errors.date ? 'border-red-500 ring-red-100' : ''}`}
+                        className={`${FIELD_CLS} border-gray-300 ${errors.date ? 'border-red-500 ring-1 ring-red-100' : ''}`}
                       />
-                      {errors.date && <p className="text-xs text-red-600 mt-1">{errors.date}</p>}
+                      {errors.date
+                        ? <p className="text-xs text-red-600 mt-1">{errors.date}</p>
+                        : <p className="text-[11px] text-gray-400 mt-1">Cannot be a future date</p>
+                      }
                     </div>
                     <div>
                       <label className={LABEL_CLS}>Odometer (KM) <span className="text-red-500">*</span></label>
                       <input
-                        disabled={isViewMode}
+                        disabled={disableRepairDetails}
                         type="number"
                         value={odometer}
-                        onChange={e => setOdometer(e.target.value)}
-                        className={`${FIELD_CLS} border-gray-300 font-mono ${errors.odometer ? 'border-red-500 ring-red-100' : ''}`}
+                        min={previousOdometer}
+                        onChange={e => {
+                          setOdometer(e.target.value);
+                          setErrors(prev => ({ ...prev, odometer: undefined }));
+                        }}
+                        className={`${FIELD_CLS} font-mono ${errors.odometer ? 'border-red-500 ring-1 ring-red-100' : 'border-gray-300'}`}
+                        placeholder={previousOdometer ? `Min: ${previousOdometer.toLocaleString()}` : ''}
                       />
-                      {errors.odometer && <p className="text-xs text-red-600 mt-1">{errors.odometer}</p>}
-                    </div>
-                    <div>
-                      <label className={LABEL_CLS}>Status</label>
-                      <select
-                        disabled={isViewMode}
-                        value={status}
-                        onChange={e => setStatus(e.target.value)}
-                        className={`${FIELD_CLS} border-gray-300`}
-                      >
-                        {['Reported', 'In Progress', 'Completed'].map(option => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
+                      {errors.odometer
+                        ? <p className="text-xs text-red-600 mt-1">{errors.odometer}</p>
+                        : previousOdometer > 0 && <p className="text-[11px] text-gray-400 mt-1">Last recorded: {previousOdometer.toLocaleString()} KM</p>
+                      }
                     </div>
                   </div>
                   <div>
-                    <label className={LABEL_CLS}>Garage / Mechanic</label>
+                    <label className={LABEL_CLS}>Garage / Mechanic {isUnderRepair && <span className="text-red-500">*</span>}</label>
                     <select
-                      disabled={isViewMode}
+                      disabled={disableRepairDetails}
                       value={garage}
-                      onChange={e => setGarage(e.target.value)}
-                      className={FIELD_CLS}
+                      onChange={e => {
+                        setGarage(e.target.value);
+                        setErrors(prev => ({ ...prev, garage: undefined }));
+                      }}
+                      className={`${FIELD_CLS} ${errors.garage ? 'border-red-500 ring-1 ring-red-100' : ''}`}
                     >
                       <option value="">Select Service Provider</option>
                       {dummyGarages.map(g => (
                         <option key={g.id} value={g.id}>{g.name}</option>
                       ))}
                     </select>
+                    {errors.garage && <p className="text-xs text-red-600 mt-1">{errors.garage}</p>}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className={LABEL_CLS}>Repair Start</label>
+                      <label className={LABEL_CLS}>Repair Start {isUnderRepair && <span className="text-red-500">*</span>}</label>
                       <input
-                        disabled={isViewMode}
+                        disabled={disableRepairDetails}
                         type="time"
                         value={repairStartTime}
-                        onChange={e => setRepairStartTime(e.target.value)}
-                        className={FIELD_CLS}
+                        onChange={e => {
+                          const val = e.target.value;
+                          setRepairStartTime(val);
+                          setRepairEndTime('');
+                          if (val && isReported) handleStatusChange('Under Repair');
+                          setErrors(prev => ({ ...prev, repairStartTime: undefined, repairEndTime: undefined }));
+                        }}
+                        className={`${FIELD_CLS} ${errors.repairStartTime ? 'border-red-500 ring-1 ring-red-100' : ''}`}
                       />
+                      {repairStartTime && (
+                        <p className="text-[11px] text-gray-400 mt-1">
+                          {new Date(`1970-01-01T${repairStartTime}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
+                        </p>
+                      )}
+                      {errors.repairStartTime && <p className="text-xs text-red-600 mt-1">{errors.repairStartTime}</p>}
                     </div>
                     <div>
                       <label className={LABEL_CLS}>Repair End</label>
                       <input
-                        disabled={isViewMode}
+                        disabled={disableRepairDetails || !repairStartTime}
                         type="time"
                         value={repairEndTime}
-                        onChange={e => setRepairEndTime(e.target.value)}
-                        className={FIELD_CLS}
+                        onChange={e => {
+                          setRepairEndTime(e.target.value);
+                          setErrors(prev => ({ ...prev, repairEndTime: undefined }));
+                        }}
+                        className={`${FIELD_CLS} ${errors.repairEndTime ? 'border-red-500 ring-1 ring-red-100' : ''}`}
                       />
+                      {repairEndTime && repairStartTime && (() => {
+                        const [sh, sm] = repairStartTime.split(':').map(Number);
+                        const [eh, em] = repairEndTime.split(':').map(Number);
+                        const isOvernight = eh * 60 + em <= sh * 60 + sm;
+                        return (
+                          <p className={`text-[11px] mt-1 ${isOvernight ? 'text-amber-500' : 'text-gray-400'}`}>
+                            {new Date(`1970-01-01T${repairEndTime}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
+                            {isOvernight && ' · ends next day'}
+                          </p>
+                        );
+                      })()}
+                      {!repairEndTime && errors.repairEndTime
+                        ? <p className="text-xs text-red-600 mt-1">{errors.repairEndTime}</p>
+                        : !repairStartTime && !disableRepairDetails && <p className="text-[11px] text-gray-400 mt-1">Select start time first</p>
+                      }
                     </div>
                   </div>
                   <div className="rounded-3xl bg-gray-50 border border-gray-200 p-4 text-sm text-gray-600">
                     <div className="flex items-center justify-between gap-4">
                       <span className="font-semibold">Downtime</span>
-                      <span className="font-semibold text-gray-900">{downtime}</span>
+                      <span className={`font-semibold ${repairStartTime && repairEndTime ? 'text-gray-900' : 'text-gray-400 text-xs'}`}>
+                        {repairStartTime && repairEndTime ? downtime : 'Downtime will be calculated automatically'}
+                      </span>
                     </div>
                   </div>
                   <div>
-                    <label className={LABEL_CLS}>Repair Notes</label>
+                    <label className={LABEL_CLS}>Repair Notes {isCompleted && <span className="text-red-500">*</span>}</label>
                     <textarea
-                      disabled={isViewMode}
+                      disabled={disableRepairDetails}
                       rows={3}
                       value={repairNotes}
-                      onChange={e => setRepairNotes(e.target.value)}
-                      className={`${FIELD_CLS} resize-none`}
-                      placeholder="Add repair diagnosis or observations..."
+                      onChange={e => {
+                        setRepairNotes(e.target.value);
+                        setErrors(prev => ({ ...prev, repairNotes: undefined }));
+                      }}
+                      className={`${FIELD_CLS} resize-none ${errors.repairNotes ? 'border-red-500 ring-1 ring-red-100' : ''}`}
+                      placeholder="Mention what was repaired / replaced"
                     />
+                    {errors.repairNotes
+                      ? <p className="text-xs text-red-600 mt-1">{errors.repairNotes}</p>
+                      : <p className="text-[11px] text-gray-400 mt-1">Mention what was repaired / replaced</p>
+                    }
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="w-full lg:w-[52%] overflow-y-auto p-6 space-y-6">
-              <div className="rounded-3xl bg-white p-5 shadow-sm border border-gray-200">
+              <div className={`rounded-3xl bg-white p-5 shadow-sm border border-gray-200 transition-opacity ${isReported ? 'opacity-50 pointer-events-none select-none' : ''}`}>
                 <SectionHeader
                   icon={<Package className="w-5 h-5 text-blue-600" />}
                   label="Parts & Cost"
-                  sub="Add parts and auto-calculate totals"
+                  sub={isReported ? 'Available when status is Under Repair' : 'Add parts and auto-calculate totals'}
                   color="bg-blue-50 text-blue-800"
                 />
                 <div className="space-y-4 mt-4">
-                  {!isViewMode && (
-                    <div className="grid grid-cols-[1fr_auto] gap-4">
-                      <div className="space-y-3">
-                        <input
-                          type="text"
-                          placeholder="Part Name"
-                          value={newPart.name}
-                          onChange={e => setNewPart({ ...newPart, name: e.target.value })}
-                          className={FIELD_CLS}
-                        />
-                        <div className="grid grid-cols-3 gap-3">
-                          <input
-                            type="number"
-                            placeholder="Cost"
-                            value={newPart.cost}
-                            onChange={e => setNewPart({ ...newPart, cost: e.target.value })}
-                            className={FIELD_CLS}
-                          />
-                          <input
-                            type="number"
-                            placeholder="Qty"
-                            min="1"
-                            value={newPart.qty}
-                            onChange={e => setNewPart({ ...newPart, qty: e.target.value })}
-                            className={FIELD_CLS}
-                          />
-                          <input
-                            type="text"
-                            placeholder="Vendor"
-                            value={newPart.vendor}
-                            onChange={e => setNewPart({ ...newPart, vendor: e.target.value })}
-                            className={FIELD_CLS}
-                          />
+                  {!isCompleted && !isViewMode && hasSelectedTruck && (
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2">
+                        <div>
+                          <input type="text" placeholder="Part name" disabled={isReported} value={newPart.name}
+                            onChange={e => { setNewPart({ ...newPart, name: e.target.value }); setPartErrors(p => ({ ...p, name: undefined })); }}
+                            className={`${FIELD_CLS} ${partErrors.name ? 'border-red-500' : ''}`} />
+                          {partErrors.name && <p className="text-[10px] text-red-500 mt-0.5">{partErrors.name}</p>}
                         </div>
+                        <div>
+                          <input type="number" placeholder="Cost/unit" min="0" disabled={isReported} value={newPart.costPerUnit}
+                            onChange={e => { setNewPart({ ...newPart, costPerUnit: e.target.value }); setPartErrors(p => ({ ...p, costPerUnit: undefined })); }}
+                            className={`${FIELD_CLS} ${partErrors.costPerUnit ? 'border-red-500' : ''}`} />
+                          {partErrors.costPerUnit && <p className="text-[10px] text-red-500 mt-0.5">{partErrors.costPerUnit}</p>}
+                        </div>
+                        <div>
+                          <input type="number" placeholder="Qty" min="1" disabled={isReported} value={newPart.qty}
+                            onChange={e => { setNewPart({ ...newPart, qty: e.target.value }); setPartErrors(p => ({ ...p, qty: undefined })); }}
+                            className={`${FIELD_CLS} ${partErrors.qty ? 'border-red-500' : ''}`} />
+                          {partErrors.qty && <p className="text-[10px] text-red-500 mt-0.5">{partErrors.qty}</p>}
+                        </div>
+                        <input type="text" placeholder="Vendor" disabled={isReported} value={newPart.vendor}
+                          onChange={e => setNewPart({ ...newPart, vendor: e.target.value })} className={FIELD_CLS} />
                       </div>
-                      <button
-                        onClick={addPart}
-                        disabled={!newPart.name.trim() || Number(newPart.cost) <= 0 || Number(newPart.qty) < 1}
-                        className="h-fit self-end rounded-xl bg-blue-600 px-4 py-3 text-white font-semibold shadow-sm hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        <Plus className="w-4 h-4 inline-block" /> Add
+                      {Number(newPart.costPerUnit) > 0 && Number(newPart.qty) >= 1 && (
+                        <p className="text-[11px] text-blue-600 font-semibold">Row total: ₹{(Number(newPart.costPerUnit) * Number(newPart.qty)).toFixed(2)}</p>
+                      )}
+                      <button onClick={addPart} disabled={isReported}
+                        className="w-full py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1.5">
+                        <Plus className="w-4 h-4" /> Add Part
                       </button>
                     </div>
                   )}
 
-                  <div className="overflow-hidden rounded-3xl border border-gray-200">
-                    <div className="grid grid-cols-12 gap-2 bg-slate-100 px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                      <div className="col-span-5">Part</div>
+                  <div className="overflow-hidden rounded-2xl border border-gray-200">
+                    <div className="grid grid-cols-12 gap-1 bg-slate-100 px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                      <div className="col-span-4">Part</div>
                       <div className="col-span-1 text-center">Qty</div>
-                      <div className="col-span-3">Vendor</div>
-                      <div className="col-span-2 text-right">Cost</div>
-                      <div className="col-span-1" />
+                      <div className="col-span-2 text-right">Unit</div>
+                      <div className="col-span-3 text-right">Total</div>
+                      <div className="col-span-2 truncate">Vendor</div>
                     </div>
-                    <div className="max-h-56 overflow-y-auto bg-white">
+                    <div className="max-h-48 overflow-y-auto bg-white divide-y divide-gray-100">
                       {parts.length === 0 ? (
-                        <div className="p-6 text-center text-sm text-gray-400">No parts added yet</div>
+                        <div className="py-8 text-center">
+                          <Package className="w-8 h-8 text-gray-200 mx-auto mb-2" />
+                          <p className="text-sm font-medium text-gray-400">No parts added yet</p>
+                          <p className="text-[11px] text-gray-300 mt-0.5">Add parts to calculate repair cost</p>
+                        </div>
                       ) : (
-                        parts.map(part => (
-                          <div key={part.id} className="grid grid-cols-12 gap-2 p-3 border-t border-gray-100 text-sm text-gray-700">
-                            <div className="col-span-5 font-semibold truncate">{part.name}</div>
-                            <div className="col-span-1 text-center font-mono">{part.qty}</div>
-                            <div className="col-span-3 truncate text-xs text-gray-500">{part.vendor || '-'}</div>
-                            <div className="col-span-2 text-right font-semibold">₹{part.cost}</div>
-                            <div className="col-span-1 flex justify-end">
-                              {!isViewMode && (
-                                <button onClick={() => removePart(part.id)} className="text-gray-400 hover:text-red-600 transition-colors">
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
+                        parts.map((part, i) => {
+                          const rowTotal = Number(part.costPerUnit) * Number(part.qty);
+                          return (
+                            <div key={part.id} className={`grid grid-cols-12 gap-1 px-3 py-2.5 text-sm items-center ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}`}>
+                              <div className="col-span-4">
+                                <p className="font-semibold text-gray-800 truncate">{part.name}</p>
+                                {part.vendor && <p className="text-[10px] text-gray-400 truncate">{part.vendor}</p>}
+                              </div>
+                              <div className="col-span-1 text-center">
+                                <span className="inline-block bg-gray-100 text-gray-600 text-xs font-bold rounded px-1.5 py-0.5">{part.qty}</span>
+                              </div>
+                              <div className="col-span-2 text-right text-xs text-gray-400">₹{Number(part.costPerUnit).toFixed(0)}</div>
+                              <div className="col-span-3 text-right">
+                                <span className="font-bold text-blue-600">₹{rowTotal.toFixed(2)}</span>
+                              </div>
+                              <div className="col-span-2 flex justify-end">
+                                {!disableRepairDetails && (
+                                  <button onClick={() => removePart(part.id)} className="p-1 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="rounded-3xl bg-slate-50 border border-slate-200 p-4">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500 mb-2">Parts Total</p>
-                      <p className="text-lg font-semibold">₹{partsTotal.toFixed(2)}</p>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+                        <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Parts Total</p>
+                        <p className="text-base font-bold">₹{partsTotal.toFixed(2)}</p>
+                      </div>
+                      <div className="rounded-2xl bg-slate-50 border border-slate-200 p-3">
+                        <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">Labour Cost</p>
+                        {disableRepairDetails ? (
+                          <p className="text-base font-bold">₹{(Number(labourCost) || 0).toFixed(2)}</p>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-gray-500 text-sm font-semibold">₹</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={labourCost}
+                              onChange={e => setLabourCost(Number(e.target.value) >= 0 ? e.target.value : 0)}
+                              className={`${FIELD_CLS} py-1 h-7 text-sm`}
+                              placeholder="0"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div className="rounded-3xl bg-slate-50 border border-slate-200 p-4">
-                      <p className="text-[11px] uppercase tracking-[0.18em] text-gray-500 mb-2">Labour</p>
-                      <p className="text-lg font-semibold">₹{(Number(labourCost) || 0).toFixed(2)}</p>
+                    <div className="rounded-2xl bg-blue-600 p-4 flex items-center justify-between">
+                      <p className="text-sm font-bold text-white">Total Repair Cost</p>
+                      <p className="text-xl font-bold text-white">₹{totalBill.toFixed(2)}</p>
                     </div>
+                    {errors.cost && <p className="text-xs text-red-600">{errors.cost}</p>}
                   </div>
                 </div>
               </div>
@@ -537,24 +771,26 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                   color="bg-emerald-50 text-emerald-800"
                 />
                 <div className="mt-4">
-                  <div
-                    onDragOver={e => { e.preventDefault(); setDragging(true); }}
-                    onDragLeave={() => setDragging(false)}
-                    onDrop={handleDrop}
-                    className={`rounded-3xl border-2 border-dashed p-6 text-center transition-colors ${dragging ? 'border-emerald-400 bg-emerald-50' : 'border-gray-300 bg-gray-50 hover:border-emerald-400'}`}
-                  >
-                    <p className="text-sm text-gray-600">Drag & drop images or PDF files here, or click to upload</p>
-                    <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:border-emerald-500 hover:text-emerald-700">
-                      <Upload className="w-4 h-4" /> Choose files
-                      <input
-                        type="file"
-                        multiple
-                        accept="image/*,.pdf"
-                        className="hidden"
-                        onChange={e => handleFiles(e.target.files)}
-                      />
-                    </label>
-                  </div>
+                  {!disableFiles && (
+                    <div
+                      onDragOver={e => { e.preventDefault(); setDragging(true); }}
+                      onDragLeave={() => setDragging(false)}
+                      onDrop={handleDrop}
+                      className={`rounded-3xl border-2 border-dashed p-6 text-center transition-colors ${dragging ? 'border-emerald-400 bg-emerald-50' : 'border-gray-300 bg-gray-50 hover:border-emerald-400'}`}
+                    >
+                      <p className="text-sm text-gray-600">Drag & drop images or PDF files here, or click to upload</p>
+                      <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 hover:border-emerald-500 hover:text-emerald-700">
+                        <Upload className="w-4 h-4" /> Choose files
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*,.pdf"
+                          className="hidden"
+                          onChange={e => handleFiles(e.target.files)}
+                        />
+                      </label>
+                    </div>
+                  )}
                   {errors.files && <p className="mt-2 text-xs text-orange-600">{errors.files}</p>}
                   {status === 'Completed' && files.length === 0 && (
                     <p className="mt-3 text-xs text-orange-600">Recommended: Attach at least one proof file when completing repair.</p>
@@ -575,7 +811,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                             <p className="truncate font-semibold">{getFileLabel(file.file)}</p>
                             <p className="text-xs text-gray-500">{file.file.type}</p>
                           </div>
-                          {!isViewMode && (
+                          {!disableFiles && (
                             <button onClick={() => removeFile(file.id)} className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 transition-colors">
                               <Trash2 className="w-4 h-4" />
                             </button>
@@ -589,6 +825,32 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
             </div>
           </div>
 
+          {isCompleted && (
+            <div className="bg-emerald-50 border-t border-emerald-100 px-6 py-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="p-1.5 bg-emerald-500 rounded-full text-white"><Wrench className="w-3 h-3" /></div>
+                <h3 className="text-sm font-bold text-emerald-900">Completion Summary</h3>
+              </div>
+              <div className="grid grid-cols-4 gap-4">
+                <div className="bg-white rounded-xl p-3 border border-emerald-100 shadow-sm">
+                  <p className="text-[10px] uppercase text-emerald-600 font-bold mb-1">Total Bill</p>
+                  <p className="text-lg font-bold text-emerald-900">₹{totalBill.toFixed(2)}</p>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-emerald-100 shadow-sm">
+                  <p className="text-[10px] uppercase text-emerald-600 font-bold mb-1">Parts Replaced</p>
+                  <p className="text-lg font-bold text-emerald-900">{parts.length}</p>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-emerald-100 shadow-sm">
+                  <p className="text-[10px] uppercase text-emerald-600 font-bold mb-1">Labour Cost</p>
+                  <p className="text-lg font-bold text-emerald-900">₹{(Number(labourCost) || 0).toFixed(2)}</p>
+                </div>
+                <div className="bg-white rounded-xl p-3 border border-emerald-100 shadow-sm">
+                  <p className="text-[10px] uppercase text-emerald-600 font-bold mb-1">Downtime</p>
+                  <p className="text-lg font-bold text-emerald-900">{downtime}</p>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between gap-4 px-6 py-4 bg-white border-t border-gray-200">
             <div className="text-sm text-gray-500">Previous odometer value: <span className="font-semibold">{previousOdometer} KM</span></div>
             <div className="flex items-center gap-3">
