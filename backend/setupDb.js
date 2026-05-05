@@ -37,6 +37,20 @@ async function createTable() {
       await db.query(`INSERT INTO vehicles (vehicle_no, type) VALUES ('MH-12-AB-1234', 'Truck'), ('DL-01-CD-5678', 'Van')`);
       console.log("Sample data inserted.");
     }
+
+    // Create repair_files table
+    const repairFilesQuery = `
+      CREATE TABLE IF NOT EXISTS repair_files (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        repair_id INT NOT NULL,
+        file_name VARCHAR(255) NOT NULL,
+        file_type VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (repair_id) REFERENCES repair_services(id) ON DELETE CASCADE
+      )
+    `;
+    await db.query(repairFilesQuery);
+    console.log("Table 'repair_files' created successfully!");
   } catch (error) {
     console.error("Error creating table:", error);
   } finally {

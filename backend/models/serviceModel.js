@@ -104,7 +104,71 @@ getAll: async () => {
   `, [vehicleId]);
 
   return rows;
-}
+},
+
+  // ✅ GET BY ID
+getById: async (id) => {
+
+  const [service] = await db.query(`
+    SELECT 
+      s.*,
+      v.vehicle_no,
+
+      (
+        SELECT sp.vendor 
+        FROM service_parts sp 
+        WHERE sp.service_id = s.id 
+        LIMIT 1
+      ) AS vendor
+
+    FROM vehicle_services s
+    JOIN vehicles v ON s.vehicle_id = v.id
+    WHERE s.id = ?
+  `, [id]);
+
+  const [parts] = await db.query(`
+    SELECT * FROM service_parts WHERE service_id = ?
+  `, [id]);
+
+  const [files] = await db.query(`
+    SELECT * FROM service_files WHERE service_id = ?
+  `, [id]);
+
+  return {
+    ...service[0],
+    parts,
+    files
+  };
+},
+
+  getParts: async (serviceId) => {
+    const [rows] = await db.query(`
+      SELECT part_name, quantity, cost, vendor
+      FROM service_parts
+      WHERE service_id = ?`,
+      [serviceId]
+    );
+
+    return rows;
+  },
+
+  // ✅ UPDATE SERVICE
+  update: async (id, data) => {
+    const [result] = await db.query(
+      'UPDATE vehicle_services SET ? WHERE id = ?',
+      [data, id]
+    );
+    return result;
+  },
+
+  // ✅ DELETE PARTS
+  deleteParts: async (serviceId) => {
+    const [result] = await db.query(
+      'DELETE FROM service_parts WHERE service_id = ?',
+      [serviceId]
+    );
+    return result;
+  }
 
 };
 

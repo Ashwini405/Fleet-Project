@@ -12,5 +12,6 @@ router.get('/', serviceController.getAllServices);
 
 // ✅ GET BY VEHICLE
 router.get('/vehicle/:vehicleId', serviceController.getByVehicle);
+router.get('/:id', serviceController.getServiceById);
 
 module.exports = router;

@@ -1,18 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, Wrench, Eye } from 'lucide-react';
-import { dummyRepairLogs, dummyTrucks } from '../data/dummyData';
 import RegisterRepairModal from './RegisterRepairModal';
 
 export default function RepairWorksTab() {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterTruck, setFilterTruck] = useState("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [viewLog, setViewLog] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
 
-  const filteredLogs = dummyRepairLogs.filter(log => {
-    const matchesSearch = log.garage.toLowerCase().includes(searchTerm.toLowerCase()) || log.truckNo.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTruck = filterTruck === 'all' || log.truckNo === filterTruck;
+  // Fetch repair logs and vehicles from backend
+  useEffect(() => {
+    fetch('http://localhost:5001/api/repair')
+      .then(res => res.json())
+      .then(data => setLogs(data.data || []))
+      .catch(err => console.error('Error fetching repair logs:', err));
+
+    fetch('http://localhost:5001/api/vehicles')
+      .then(res => res.json())
+      .then(data => setVehicles(data.data || []))
+      .catch(err => console.error('Error fetching vehicles:', err));
+  }, []);
+
+  // Filter logs based on search term and selected vehicle
+  const filteredLogs = logs.filter(log => {
+    const matchesSearch =
+      (log.garage || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (log.vehicle_no || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesTruck = filterTruck === 'all' || log.vehicle_id == filterTruck;
+
     return matchesSearch && matchesTruck;
   });
 
@@ -41,7 +61,9 @@ export default function RepairWorksTab() {
               onChange={(e) => setFilterTruck(e.target.value)}
             >
               <option value="all">All Trucks</option>
-              {dummyTrucks.map(t => <option key={t.id} value={t.id}>{t.id}</option>)}
+              {vehicles.map(v => (
+                <option key={v.id} value={v.id}>{v.vehicle_no}</option>
+              ))}
             </select>
           </div>
           <div className="w-full md:w-40">
@@ -87,22 +109,26 @@ export default function RepairWorksTab() {
                   className="hover:bg-orange-50/30 transition-colors group"
                 >
                   <td className="p-4">
-                    <span className="text-sm font-medium text-gray-600">{log.date}</span>
+                    <span className="text-sm font-medium text-gray-600">
+                      {new Date(log.service_date).toLocaleDateString('en-IN')}
+                    </span>
                   </td>
                   <td className="p-4">
-                    <span className="font-bold text-gray-800 tracking-tight">{log.truckNo}</span>
+                    <span className="font-bold text-gray-800 tracking-tight">{log.vehicle_no}</span>
                   </td>
                   <td className="p-4">
-                    <span className="text-sm font-semibold text-gray-700">{log.garage}</span>
+                    <span className="text-sm font-semibold text-gray-700">{log.garage || '—'}</span>
                   </td>
                   <td className="p-4">
-                    <span className="text-sm font-bold text-orange-600">{log.type}</span>
+                    <span className="text-sm font-bold text-orange-600">{log.breakdown_type || 'Repair'}</span>
                   </td>
                   <td className="p-4">
-                    <span className="text-sm text-gray-600 font-mono">{log.odometer.toLocaleString()}</span>
+                    <span className="text-sm text-gray-600 font-mono">{Number(log.odometer || 0).toLocaleString()}</span>
                   </td>
                   <td className="p-4 text-right">
-                    <span className="font-bold text-gray-900 tracking-tight">₹ {log.totalCost.toLocaleString()}</span>
+                    <span className="font-bold text-gray-900 tracking-tight">
+                      ₹ {Number(log.total_cost || 0).toLocaleString()}
+                    </span>
                   </td>
                   <td className="p-4 text-center">
                     {log.status === 'Completed' ? (
@@ -117,7 +143,7 @@ export default function RepairWorksTab() {
                   </td>
                   <td className="p-4 text-center">
                     <button 
-                      onClick={() => setViewLog(log)}
+                      onClick={() => navigate(`/repair/${log.id}`)}
                       className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-500 group-hover:text-orange-600 hover:bg-orange-50 px-2 py-1.5 rounded-lg transition-colors border border-transparent group-hover:border-orange-200"
                     >
                       <Eye className="w-3.5 h-3.5" /> View
@@ -135,7 +161,10 @@ export default function RepairWorksTab() {
         </div>
       </div>
 
-      <RegisterRepairModal isOpen={isAddOpen || !!viewLog} onClose={() => { setIsAddOpen(false); setViewLog(null); }} logData={viewLog} />
+      <RegisterRepairModal 
+        isOpen={isAddOpen} 
+        onClose={() => { setIsAddOpen(false); }} 
+      />
     </div>
   );
 }
