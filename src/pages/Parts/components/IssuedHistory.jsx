@@ -1,74 +1,147 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { History, ArrowRight } from 'lucide-react';
+import { History, Search, Truck, CalendarDays } from 'lucide-react';
 
 export default function IssuedHistory({ history }) {
+  const [vehicleFilter, setVehicleFilter] = useState('All');
+  const [partFilter, setPartFilter] = useState('All');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+
+  const vehicles = useMemo(() => Array.from(new Set(history.map((item) => item.vehicleNumber).filter(Boolean))), [history]);
+  const parts = useMemo(() => Array.from(new Set(history.map((item) => item.partName).filter(Boolean))), [history]);
+
+  const filteredHistory = useMemo(() => {
+    return history.filter((record) => {
+      if (vehicleFilter !== 'All' && record.vehicleNumber !== vehicleFilter) return false;
+      if (partFilter !== 'All' && record.partName !== partFilter) return false;
+      if (fromDate && record.date < fromDate) return false;
+      if (toDate && record.date > toDate) return false;
+      const search = searchTerm.trim().toLowerCase();
+      if (!search) return true;
+      return [record.partName, record.vehicleNumber, record.serviceType, record.vendor]
+        .filter(Boolean)
+        .some((value) => value.toLowerCase().includes(search));
+    });
+  }, [history, vehicleFilter, partFilter, fromDate, toDate, searchTerm]);
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
-      
-      {/* Header Area */}
-      <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
-         <h3 className="text-sm font-bold text-slate-800 tracking-tight flex items-center gap-2">
-            <History className="w-4 h-4 text-slate-400" /> Issued Parts History
-         </h3>
-         <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full">
-            {history.length}
-         </span>
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900 flex items-center gap-2">
+            <History className="h-5 w-5 text-slate-600" /> Issued Parts History
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">Track service part consumption, vehicle usage and issue cost.</p>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-slate-600">{filteredHistory.length} records</span>
       </div>
 
-      {/* Table Content */}
-      <div className="flex-1 overflow-x-auto min-h-0 bg-white">
-         <table className="w-full text-left border-collapse">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 mb-5">
+        <label className="block text-sm font-semibold text-slate-500">
+          Vehicle
+          <select
+            value={vehicleFilter}
+            onChange={(e) => setVehicleFilter(e.target.value)}
+            className="mt-2 w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+          >
+            <option value="All">All vehicles</option>
+            {vehicles.map((vehicle) => (
+              <option key={vehicle} value={vehicle}>{vehicle}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block text-sm font-semibold text-slate-500">
+          Part
+          <select
+            value={partFilter}
+            onChange={(e) => setPartFilter(e.target.value)}
+            className="mt-2 w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+          >
+            <option value="All">All parts</option>
+            {parts.map((part) => (
+              <option key={part} value={part}>{part}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block text-sm font-semibold text-slate-500">
+          Search
+          <div className="relative mt-2">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search part, vehicle or vendor"
+              className="w-full rounded-3xl border border-slate-200 bg-white py-3 pl-11 pr-4 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+            />
+          </div>
+        </label>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 mb-5">
+        <label className="block text-sm font-semibold text-slate-500">
+          From date
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="mt-2 w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+          />
+        </label>
+        <label className="block text-sm font-semibold text-slate-500">
+          To date
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="mt-2 w-full rounded-3xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
+          />
+        </label>
+      </div>
+
+      <div className="overflow-x-auto rounded-3xl border border-slate-200">
+        <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-slate-100 bg-white sticky top-0 z-10 text-slate-400 text-[9px] font-bold uppercase tracking-widest">
-              <th className="py-2 px-2 md:py-4 md:px-5 w-1/4">Date</th>
-              <th className="py-2 px-2 md:py-4 md:px-5 w-1/4">Part</th>
-              <th className="py-2 px-2 md:py-4 md:px-5 w-1/4 hidden sm:table-cell">Truck / Odo</th>
-              <th className="py-2 px-2 md:py-4 md:px-5 w-1/4 text-center">Qty</th>
+            <tr className="border-b border-slate-200 bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-[0.22em]">
+              <th className="px-4 py-3">Date</th>
+              <th className="px-4 py-3">Part</th>
+              <th className="px-4 py-3">Vehicle</th>
+              <th className="px-4 py-3 text-center">Qty</th>
+              <th className="px-4 py-3">Service type</th>
+              <th className="px-4 py-3 text-right">Cost</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50 relative">
+          <tbody className="divide-y divide-slate-100 bg-white">
             <AnimatePresence>
-               {history.map((record, index) => (
-                 <motion.tr 
-                   key={record.id}
-                   initial={{ opacity: 0, x: -10, backgroundColor: '#eff6ff' }}
-                   animate={{ opacity: 1, x: 0, backgroundColor: '#ffffff' }}
-                   exit={{ opacity: 0, scale: 0.95 }}
-                   transition={{ duration: 0.3, delay: index * 0.05 }}
-                   className="hover:bg-slate-50 transition-colors group"
-                 >
-                   <td className="py-2 px-2 md:py-4 md:px-5">
-                     <span className="text-[11px] font-semibold text-slate-500 whitespace-nowrap">{record.date}</span>
-                   </td>
-                   <td className="py-2 px-2 md:py-4 md:px-5">
-                     <span className="text-xs font-bold text-slate-800 tracking-tight truncate block max-w-[120px]">{record.itemName}</span>
-                   </td>
-                   <td className="py-2 px-2 md:py-4 md:px-5 hidden sm:table-cell">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                         <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">{record.truckNo}</span>
-                      </div>
-                      <span className="text-[10px] font-medium text-slate-500">{record.odometer}</span>
-                   </td>
-                   <td className="py-2 px-2 md:py-4 md:px-5 text-center">
-                     <span className="inline-flex items-center justify-center font-black text-slate-700 bg-slate-100 w-6 h-6 rounded text-xs">
-                        {record.qty}
-                     </span>
-                   </td>
-                 </motion.tr>
-               ))}
+              {filteredHistory.map((record, index) => (
+                <motion.tr
+                  key={record.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.03 }}
+                  className="hover:bg-slate-50 transition-colors"
+                >
+                  <td className="px-4 py-4 text-sm text-slate-600">{record.date}</td>
+                  <td className="px-4 py-4 text-sm font-semibold text-slate-900">{record.partName}</td>
+                  <td className="px-4 py-4 text-sm text-slate-600">{record.vehicleNumber}</td>
+                  <td className="px-4 py-4 text-center text-sm font-bold text-slate-900">{record.qty}</td>
+                  <td className="px-4 py-4 text-sm text-slate-600">{record.serviceType}</td>
+                  <td className="px-4 py-4 text-right text-sm font-semibold text-slate-900">₹{record.cost.toFixed(2)}</td>
+                </motion.tr>
+              ))}
             </AnimatePresence>
-            {history.length === 0 && (
+            {filteredHistory.length === 0 && (
               <tr>
-                 <td colSpan={4} className="py-12 px-6 text-center text-slate-400">
-                    <p className="text-sm font-medium">No issue records found.</p>
-                 </td>
+                <td colSpan="6" className="px-4 py-12 text-center text-sm text-slate-400">No issued parts match the filters.</td>
               </tr>
             )}
           </tbody>
-         </table>
+        </table>
       </div>
-
     </div>
   );
 }

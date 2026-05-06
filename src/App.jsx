@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Menu } from "lucide-react";
 import Sidebar from "./layout/Sidebar";
 import { DUMMY_VEHICLES } from "./pages/vehicleData";
+import { InventoryProvider } from "./context/InventoryContext";
 
 // Pages
 import Dashboard from "./pages/Dashboard";
@@ -64,8 +65,9 @@ export default function App() {
             <span className="text-indigo-600 font-black text-lg">🚛 Fleet</span>
           </div>
 
-          <div className="flex-1 p-4 md:p-6">
-            <Routes>
+          <InventoryProvider>
+            <div className="flex-1 p-4 md:p-6">
+              <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/vehicles" element={<VehicleMaster vehicles={vehicles} setVehicles={setVehicles} />} />
               <Route path="/vehicles/add" element={<AddVehicle vehicles={vehicles} setVehicles={setVehicles} />} />
@@ -96,6 +98,7 @@ export default function App() {
               <Route path="/audit" element={<AuditLogs />} />
             </Routes>
           </div>
+          </InventoryProvider>
         </div>
       </div>
     </BrowserRouter>
