@@ -28,30 +28,7 @@ export default function IncidentsModule() {
   return (
     <div className="flex flex-col md:flex-row min-h-[calc(100vh-4rem)] bg-[#f8fafc]">
       
-      {/* Secondary Sidebar — desktop only */}
-      <div className="w-[280px] bg-[#1e293b] text-white flex-shrink-0 flex-col hidden md:flex">
-        <div className="p-6 pb-4 border-b border-white/10">
-           <h2 className="text-xl font-bold tracking-tight text-white flex items-center gap-2">
-             <AlertTriangle className="w-5 h-5 text-red-500" />
-             INCIDENTS
-           </h2>
-        </div>
-
-        <div className="px-6 flex-1 flex flex-col pt-6">
-           <div className="flex items-center justify-center p-8 opacity-20 mb-6">
-              <AlertTriangle className="w-32 h-32" />
-           </div>
-           
-           <div className="p-5 bg-white/5 rounded-2xl border border-white/10 mt-auto mb-6">
-              <h4 className="text-white font-bold mb-3 text-xs uppercase tracking-widest text-red-400">Emergency Protocol</h4>
-              <ul className="text-xs text-white/70 space-y-3 font-medium">
-                 <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Log Critical Issues</li>
-                 <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Track Fuel Theft</li>
-                 <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-red-500"></span> Evidence Collection</li>
-              </ul>
-           </div>
-        </div>
-      </div>
+      
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
