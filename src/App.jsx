@@ -20,6 +20,8 @@ import TripAdd from "./pages/TripAdd";
 import TripReport from "./pages/TripReport";
 import Fuel from "./pages/Fuel";
 import Service from "./pages/Service";
+import DetailRepairWorks from "./pages/Service/components/DetailRepairWorks";
+import DetailPeriodicService from "./pages/Service/components/DetailPeriodicService";
 import Tyres from "./pages/Tyres";
 import Parts from "./pages/Parts";
 import Inspection from "./pages/Inspection";
@@ -49,9 +51,8 @@ export default function App() {
         />
 
         {/* Sidebar */}
-        <div className={`fixed lg:sticky top-0 h-screen z-50 transition-transform duration-300 ${
-          mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}>
+        <div className={`fixed lg:sticky top-0 h-screen z-50 transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          }`}>
           <Sidebar onClose={() => setMobileOpen(false)} />
         </div>
 
@@ -82,6 +83,10 @@ export default function App() {
               <Route path="/trips/:id/report" element={<TripReport />} />
               <Route path="/fuel/*" element={<Fuel />} />
               <Route path="/service" element={<Service />} />
+              <Route path="/repair/:id" element={<DetailRepairWorks />} />
+              <Route path="/service/:id" element={<DetailPeriodicService />} />
+              <Route path="/service/periodic/:id" element={<DetailPeriodicService />} />
+              <Route path="/service/repair/:id" element={<DetailRepairWorks />} />
               <Route path="/renewals" element={<Renewals />} />
               <Route path="/tyres" element={<Tyres />} />
               <Route path="/parts" element={<Parts />} />

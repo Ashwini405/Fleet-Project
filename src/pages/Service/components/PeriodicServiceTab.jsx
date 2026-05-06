@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, Search, Calendar, Eye, Clock } from 'lucide-react';
 import RegisterPeriodicServiceModal from './RegisterPeriodicServiceModal';
 
 export default function PeriodicServiceTab() {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterTruck, setFilterTruck] = useState("all");
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [viewLog, setViewLog] = useState(null);
   const [logs, setLogs] = useState([]);
   const [trucks, setTrucks] = useState([]);
 
@@ -141,7 +142,7 @@ export default function PeriodicServiceTab() {
                     </td>
                     <td className="py-2 px-2 md:py-4 md:px-4 text-center">
                       <button 
-                        onClick={() => setViewLog(log)}
+                        onClick={() => navigate(`/service/periodic/${log.id}`)}
                         className="inline-flex items-center gap-1 text-[11px] font-bold text-gray-500 group-hover:text-teal-600 hover:bg-teal-50 px-2 py-1.5 rounded-lg transition-colors border border-transparent group-hover:border-teal-200"
                       >
                         <Eye className="w-3.5 h-3.5" /> View
@@ -162,8 +163,8 @@ export default function PeriodicServiceTab() {
       </div>
 
       <RegisterPeriodicServiceModal 
-        isOpen={isAddOpen || !!viewLog} 
-        onClose={() => { setIsAddOpen(false); setViewLog(null); }} 
+        isOpen={isAddOpen} 
+        onClose={() => { setIsAddOpen(false); }} 
       />
     </div>
   );

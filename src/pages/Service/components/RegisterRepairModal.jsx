@@ -12,23 +12,15 @@ import {
   FileText,
   Truck,
 } from 'lucide-react';
-import { dummyGarages, dummyTrucks } from '../data/dummyData';
 
 const FIELD_CLS = 'w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100';
 const LABEL_CLS = 'block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5';
 const STATUS_STEPS = ['Reported', 'Under Repair', 'Completed'];
 
 const PRIORITY_CONFIG = {
-  Low:    { border: 'border-emerald-300', bg: 'bg-emerald-50',  header: 'bg-emerald-50 text-emerald-800', badge: 'bg-emerald-100 text-emerald-700', btn: 'border-emerald-400 bg-emerald-500 text-white', btnIdle: 'border-emerald-200 bg-white text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50', dot: 'bg-emerald-500' },
-  Medium: { border: 'border-amber-300',   bg: 'bg-amber-50',    header: 'bg-amber-50 text-amber-800',   badge: 'bg-amber-100 text-amber-700',   btn: 'border-amber-400 bg-amber-500 text-white',   btnIdle: 'border-amber-200 bg-white text-amber-700 hover:border-amber-400 hover:bg-amber-50',   dot: 'bg-amber-500'   },
-  High:   { border: 'border-red-400',     bg: 'bg-red-50',      header: 'bg-red-50 text-red-800',       badge: 'bg-red-100 text-red-700',       btn: 'border-red-500 bg-red-500 text-white',       btnIdle: 'border-red-200 bg-white text-red-700 hover:border-red-400 hover:bg-red-50',           dot: 'bg-red-500'     },
-};
-
-const previousOdometer = 140000;
-const mockVehicle = {
-  id: 1,
-  number: 'AP39AB7896',
-  status: 'Active',
+  Low: { border: 'border-emerald-300', bg: 'bg-emerald-50', header: 'bg-emerald-50 text-emerald-800', badge: 'bg-emerald-100 text-emerald-700', btn: 'border-emerald-400 bg-emerald-500 text-white', btnIdle: 'border-emerald-200 bg-white text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50', dot: 'bg-emerald-500' },
+  Medium: { border: 'border-amber-300', bg: 'bg-amber-50', header: 'bg-amber-50 text-amber-800', badge: 'bg-amber-100 text-amber-700', btn: 'border-amber-400 bg-amber-500 text-white', btnIdle: 'border-amber-200 bg-white text-amber-700 hover:border-amber-400 hover:bg-amber-50', dot: 'bg-amber-500' },
+  High: { border: 'border-red-400', bg: 'bg-red-50', header: 'bg-red-50 text-red-800', badge: 'bg-red-100 text-red-700', btn: 'border-red-500 bg-red-500 text-white', btnIdle: 'border-red-200 bg-white text-red-700 hover:border-red-400 hover:bg-red-50', dot: 'bg-red-500' },
 };
 
 function SectionHeader({ icon, label, sub, color }) {
@@ -58,6 +50,7 @@ function getDuration(start, end) {
 export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   const isViewMode = !!logData;
 
+  // ─── State for UI fields (all remain unchanged) ─────────────────────────
   const [issueDescription, setIssueDescription] = useState('');
   const [breakdownType, setBreakdownType] = useState('Engine');
   const [vehicleCondition, setVehicleCondition] = useState('Running');
@@ -68,7 +61,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   const [truck, setTruck] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [odometer, setOdometer] = useState('');
-  const [garage, setGarage] = useState(dummyGarages[0]?.id || '');
+  const [garage, setGarage] = useState('');
   const [repairStartTime, setRepairStartTime] = useState('');
   const [repairEndTime, setRepairEndTime] = useState('');
   const [status, setStatus] = useState('Reported');
@@ -84,6 +77,24 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState('');
 
+  // ─── Database state – replaces dummy imports ────────────────────────────
+  const [vehicles, setVehicles] = useState([]);
+  const [garages, setGarages] = useState([]);
+
+  // Fetch vehicles and garages from backend
+  useEffect(() => {
+    fetch('http://localhost:5001/api/vehicles')
+      .then(res => res.json())
+      .then(data => setVehicles(data.data || []))
+      .catch(err => console.error('Vehicle fetch error:', err));
+
+    fetch('http://localhost:5001/api/garages')
+      .then(res => res.json())
+      .then(data => setGarages(data.data || []))
+      .catch(err => console.error('Garage fetch error:', err));
+  }, []);
+
+  // ─── Populate fields when editing an existing repair (logData) ─────────
   useEffect(() => {
     if (!isOpen) return;
     if (logData) {
@@ -93,19 +104,29 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       setBreakdownLocation(logData.breakdownLocation || '');
       setReportedBy(logData.reportedBy || 'Driver');
       setPriority(logData.priority || 'Medium');
-      setTruck(logData.truck || dummyTrucks[0]?.id || '');
-      setDate(logData.date || new Date().toISOString().split('T')[0]);
+      setTruck(logData.vehicle_id?.toString() || '');
+      setDate(logData.service_date || new Date().toISOString().split('T')[0]);
       setOdometer(logData.odometer || '');
       setGarage(logData.garage || '');
-      setRepairStartTime(logData.repairStartTime || '');
-      setRepairEndTime(logData.repairEndTime || '');
+      setRepairStartTime(logData.repair_start_time || '');
+      setRepairEndTime(logData.repair_end_time || '');
       setStatus(logData.status || 'Reported');
-      setRepairNotes(logData.repairNotes || '');
-      setLabourCost(logData.labourCost || 0);
-      setParts(logData.parts || []);
-      setFiles(logData.files || []);
+      setRepairNotes(logData.repair_notes || '');
+      setLabourCost(logData.labour_cost || 0);
+      setParts(
+        Array.isArray(logData.parts)
+          ? logData.parts
+          : JSON.parse(logData.parts || '[]')
+      );
+
+      setFiles(
+        Array.isArray(logData.files)
+          ? logData.files
+          : JSON.parse(logData.files || '[]')
+      );
       setErrors({});
     } else {
+      // Reset form when adding new repair
       setIssueDescription('');
       setBreakdownType('Engine');
       setVehicleCondition('Running');
@@ -116,8 +137,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       setDate(new Date().toISOString().split('T')[0]);
       setOdometer('');
       setGarage('');
-      setRepairStartTime('09:00');
-      setRepairEndTime('11:00');
+      setRepairStartTime('');
+      setRepairEndTime('');
       setStatus('Reported');
       setRepairNotes('');
       setLabourCost(0);
@@ -128,16 +149,17 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     }
   }, [isOpen, logData]);
 
-  const selectedTruck = useMemo(() => dummyTrucks.find(vehicle => vehicle.id === truck), [truck]);
+  // ─── Derived values from database (replaces dummyTrucks) ────────────────
+  const selectedTruck = useMemo(
+    () => vehicles.find(v => v.id === Number(truck)),
+    [truck, vehicles]
+  );
+  const previousOdometer = selectedTruck?.last_odometer || 0;
   const hasSelectedTruck = Boolean(truck);
-  const previousOdometer = selectedTruck?.lastOdometer || 0;
   const isReported = status === 'Reported';
   const isUnderRepair = status === 'Under Repair';
   const isCompleted = status === 'Completed';
-  
-  // Reported  → only Issue Details editable
-  // Under Repair → Issue + Repair/Parts/Labour/Vendor/Times editable
-  // Completed → everything locked
+
   const disableIssueDetails = isViewMode || isCompleted || !hasSelectedTruck;
   const disableRepairDetails = isViewMode || isCompleted || isReported || !hasSelectedTruck;
   const disableFiles = isViewMode || isCompleted || isReported || !hasSelectedTruck;
@@ -148,8 +170,13 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   const downtime = useMemo(() => getDuration(repairStartTime, repairEndTime), [repairStartTime, repairEndTime]);
 
   const vehicleStatus = hasSelectedTruck ? (isCompleted ? 'Active' : status) : 'No vehicle selected';
-  const vehicleBadge = !hasSelectedTruck ? 'bg-gray-100 text-gray-600' : vehicleStatus === 'Active' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700';
+  const vehicleBadge = !hasSelectedTruck
+    ? 'bg-gray-100 text-gray-600'
+    : vehicleStatus === 'Active'
+      ? 'bg-emerald-100 text-emerald-700'
+      : 'bg-red-100 text-red-700';
 
+  // ─── Validation (unchanged) ────────────────────────────────────────────
   const validate = () => {
     const nextErrors = {};
     if (!issueDescription.trim()) nextErrors.issueDescription = 'Issue description is required';
@@ -158,7 +185,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     if (!isReported && !date) nextErrors.date = 'Date is required';
     if (!isReported && date && date > new Date().toISOString().split('T')[0]) nextErrors.date = 'Date cannot be a future date';
     if (!isReported && !odometer) nextErrors.odometer = 'Odometer reading is required';
-    if (!isReported && hasSelectedTruck && odometer && Number(odometer) < previousOdometer) nextErrors.odometer = `Odometer cannot be less than previous (${previousOdometer.toLocaleString()} KM)`;
+    if (!isReported && hasSelectedTruck && odometer && Number(odometer) < previousOdometer)
+      nextErrors.odometer = `Odometer cannot be less than previous (${previousOdometer.toLocaleString()} KM)`;
     if (isUnderRepair && !garage) nextErrors.garage = 'Select service provider to continue repair';
     if (isUnderRepair && !repairStartTime) nextErrors.repairStartTime = 'Repair start time is required';
     if (isUnderRepair && repairStartTime && repairEndTime) {
@@ -173,12 +201,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSave = () => {
-    if (!validate()) return;
-    setToast('Repair record saved successfully');
-    window.setTimeout(() => setToast(''), 3000);
-  };
-
+  // ─── Parts management (unchanged) ──────────────────────────────────────
   const addPart = () => {
     const errs = {};
     if (!newPart.name.trim()) errs.name = 'Part name is required';
@@ -199,6 +222,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
 
   const removePart = id => setParts(parts.filter(part => part.id !== id));
 
+  // ─── File handling (unchanged) ─────────────────────────────────────────
   const handleFiles = filesList => {
     const valid = Array.from(filesList).filter(file => ['image/jpeg', 'image/png', 'application/pdf', 'image/jpg'].includes(file.type));
     const mapped = valid.map(file => ({
@@ -218,11 +242,16 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   };
 
   const getFileLabel = file => {
-    if (file.type.includes('image')) return file.name;
-    if (file.type === 'application/pdf') return file.name;
-    return file.name;
+    const type = file.type || file.file_type || '';
+    const name = file.name || file.file_name || 'File';
+
+    if (type.includes('pdf')) return 'PDF';
+    if (type.includes('image')) return 'Image';
+    if (type.includes('sheet') || type.includes('excel')) return 'Excel';
+    return name;
   };
 
+  // ─── Handlers for changing truck and status (unchanged) ────────────────
   const handleTruckChange = value => {
     setTruck(value);
     setOdometer('');
@@ -263,8 +292,67 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     || (!isReported && (!date || !odometer || Number(odometer) < previousOdometer))
     || (isCompleted && totalBill <= 0);
 
+  // ─── SAVE TO BACKEND (replaces dummy ) ─────────────────────────────────
+  const handleSave = async () => {
+    if (!validate()) return;
+
+    const payload = {
+      vehicle_id: truck,
+      vehicle_no: selectedTruck?.vehicle_no || '',
+      model: selectedTruck?.make_brand || '',
+      driver_name: selectedTruck?.driver_name || '',
+      previous_odometer: previousOdometer,
+
+      issue_description: issueDescription,
+      breakdown_type: breakdownType,
+      vehicle_condition: vehicleCondition,
+      breakdown_location: breakdownLocation,
+      reported_by: reportedBy,
+      priority: priority,
+
+      service_date: date,
+      odometer: odometer,
+      garage: garage,
+
+      repair_start_time: repairStartTime,
+      repair_end_time: repairEndTime,
+      downtime: downtime,
+
+      repair_notes: repairNotes,
+      status: status,
+
+      labour_cost: labourCost,
+      parts_total: partsTotal,
+      total_cost: totalBill,
+
+      parts: JSON.stringify(parts),
+      files: JSON.stringify(files.map(f => ({ name: f.file?.name || f.name || f.file_name, type: f.file?.type || f.type || f.file_type, size: f.file?.size || f.size }))),
+    };
+
+    try {
+      const res = await fetch('http://localhost:5001/api/repair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || 'Error saving repair');
+        console.error(data);
+        return;
+      }
+      setToast('Repair record saved successfully ✅');
+      setTimeout(() => setToast(''), 3000);
+      onClose();
+    } catch (err) {
+      console.error(err);
+      alert('Backend connection failed');
+    }
+  };
+
   if (!isOpen) return null;
 
+  // ─── Render – all UI remains identical, only data sources changed ──────
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -288,6 +376,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
           </div>
 
           <div className="flex flex-col lg:flex-row overflow-hidden flex-1 bg-slate-50">
+            {/* LEFT COLUMN – Vehicle & Issue Details */}
             <div className="w-full lg:w-[48%] overflow-y-auto p-6 space-y-6">
               <div className="rounded-2xl bg-white p-5 shadow-sm border border-gray-200 space-y-4">
                 {/* Vehicle Dropdown */}
@@ -300,31 +389,31 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                     className={`${FIELD_CLS} h-11 w-full ${errors.truck ? 'border-red-500' : 'border-gray-300'}`}
                   >
                     <option value="">-- Select vehicle --</option>
-                    {dummyTrucks.map(v => (
-                      <option key={v.id} value={v.id}>{v.id} — {v.model}</option>
+                    {vehicles.map(v => (
+                      <option key={v.id} value={v.id}>{v.vehicle_no} — {v.make_brand}</option>
                     ))}
                   </select>
                   {errors.truck && <p className="text-xs text-red-600 mt-1">{errors.truck}</p>}
                 </div>
 
-                {/* Auto-fill info */}
+                {/* Auto-fill info (from DB fields) */}
                 {selectedTruck ? (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
                       <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Vehicle No.</p>
-                      <p className="text-sm font-bold text-gray-800">{selectedTruck.id}</p>
+                      <p className="text-sm font-bold text-gray-800">{selectedTruck.vehicle_no}</p>
                     </div>
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
                       <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Model</p>
-                      <p className="text-sm font-bold text-gray-800">{selectedTruck.model}</p>
+                      <p className="text-sm font-bold text-gray-800">{selectedTruck.make_brand}</p>
                     </div>
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
                       <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Driver</p>
-                      <p className="text-sm font-bold text-gray-800">{selectedTruck.driver}</p>
+                      <p className="text-sm font-bold text-gray-800">{selectedTruck.driver_name}</p>
                     </div>
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
                       <p className="text-[10px] uppercase tracking-wider text-gray-400 mb-0.5">Prev. Odometer</p>
-                      <p className="text-sm font-bold text-gray-800 font-mono">{selectedTruck.lastOdometer.toLocaleString()} KM</p>
+                      <p className="text-sm font-bold text-gray-800 font-mono">{previousOdometer.toLocaleString()} KM</p>
                     </div>
                   </div>
                 ) : (
@@ -333,7 +422,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                   </div>
                 )}
 
-                {/* Repair Progress — always visible */}
+                {/* Repair Progress */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className={LABEL_CLS + ' mb-0'}>Repair Progress</label>
@@ -362,6 +451,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                 </div>
               </div>
 
+              {/* Issue Details section (priority + description etc.) */}
               <div className={`space-y-6 ${!hasSelectedTruck ? 'opacity-40 pointer-events-none select-none' : isCompleted ? 'opacity-60 pointer-events-none select-none' : ''}`}>
                 {(() => {
                   const pc = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.Medium;
@@ -420,13 +510,12 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                                   type="button"
                                   disabled={disableIssueDetails}
                                   onClick={() => setVehicleCondition(opt)}
-                                  className={`flex-1 py-2.5 rounded-lg border text-xs font-bold transition disabled:opacity-60 disabled:cursor-not-allowed ${
-                                    vehicleCondition === opt
+                                  className={`flex-1 py-2.5 rounded-lg border text-xs font-bold transition disabled:opacity-60 disabled:cursor-not-allowed ${vehicleCondition === opt
                                       ? opt === 'Running'
                                         ? 'border-emerald-500 bg-emerald-500 text-white'
                                         : 'border-red-500 bg-red-500 text-white'
                                       : 'border-gray-200 bg-white text-gray-600 hover:border-gray-400'
-                                  }`}
+                                    }`}
                                 >
                                   {opt === 'Running' ? '✓ Running' : '✕ Not Running'}
                                 </button>
@@ -456,11 +545,10 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                                   type="button"
                                   disabled={disableIssueDetails}
                                   onClick={() => setReportedBy(opt)}
-                                  className={`flex-1 py-2.5 rounded-lg border text-xs font-bold transition disabled:opacity-60 disabled:cursor-not-allowed ${
-                                    reportedBy === opt
+                                  className={`flex-1 py-2.5 rounded-lg border text-xs font-bold transition disabled:opacity-60 disabled:cursor-not-allowed ${reportedBy === opt
                                       ? 'border-orange-500 bg-orange-500 text-white'
                                       : 'border-gray-200 bg-white text-gray-600 hover:border-orange-300'
-                                  }`}
+                                    }`}
                                 >
                                   {opt}
                                 </button>
@@ -497,6 +585,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                 })()}
               </div>
 
+              {/* Repair Details section (only visible when not Reported) */}
               <div className={`rounded-3xl bg-white p-5 shadow-sm border border-gray-200 transition-opacity ${isReported ? 'opacity-50 pointer-events-none select-none' : ''}`}>
                 <SectionHeader
                   icon={<Clock className="w-5 h-5 text-orange-600" />}
@@ -553,8 +642,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                       className={`${FIELD_CLS} ${errors.garage ? 'border-red-500 ring-1 ring-red-100' : ''}`}
                     >
                       <option value="">Select Service Provider</option>
-                      {dummyGarages.map(g => (
-                        <option key={g.id} value={g.id}>{g.name}</option>
+                      {garages.map(g => (
+                        <option key={g.id} value={g.name}>{g.name}</option>
                       ))}
                     </select>
                     {errors.garage && <p className="text-xs text-red-600 mt-1">{errors.garage}</p>}
@@ -641,6 +730,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
               </div>
             </div>
 
+            {/* RIGHT COLUMN – Parts & Cost, Documents */}
             <div className="w-full lg:w-[52%] overflow-y-auto p-6 space-y-6">
               <div className={`rounded-3xl bg-white p-5 shadow-sm border border-gray-200 transition-opacity ${isReported ? 'opacity-50 pointer-events-none select-none' : ''}`}>
                 <SectionHeader
@@ -798,18 +888,22 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
 
                   {files.length > 0 && (
                     <div className="mt-4 grid gap-3">
-                      {files.map(file => (
+                      {files.map(file => {
+                        const fileObj = file.file || file;
+                        const fileName = fileObj.name || fileObj.file_name || 'File';
+                        const fileType = fileObj.type || fileObj.file_type || '';
+                        return (
                         <div key={file.id} className="flex items-center gap-3 rounded-3xl border border-gray-200 bg-white p-3">
                           {file.preview ? (
-                            <img src={file.preview} alt={file.file.name} className="h-16 w-16 rounded-xl object-cover" />
+                            <img src={file.preview} alt={fileName} className="h-16 w-16 rounded-xl object-cover" />
                           ) : (
                             <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
                               <FileText className="w-6 h-6" />
                             </div>
                           )}
                           <div className="flex-1 min-w-0">
-                            <p className="truncate font-semibold">{getFileLabel(file.file)}</p>
-                            <p className="text-xs text-gray-500">{file.file.type}</p>
+                            <p className="truncate font-semibold">{getFileLabel(fileObj)}</p>
+                            <p className="text-xs text-gray-500">{fileType}</p>
                           </div>
                           {!disableFiles && (
                             <button onClick={() => removeFile(file.id)} className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-red-600 transition-colors">
@@ -817,7 +911,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                             </button>
                           )}
                         </div>
-                      ))}
+                      );
+                      })}
                     </div>
                   )}
                 </div>

@@ -87,6 +87,35 @@ exports.getAllServices = async (req, res) => {
 };
 
 
+// ✅ GET SERVICE BY ID
+exports.getServiceById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const data = await Service.getById(id);
+
+    if (!data) {
+      return res.status(404).json({
+        success: false,
+        message: 'Service not found'
+      });
+    }
+
+    // ✅ JUST RETURN DATA (already includes parts + files)
+    res.json({
+      success: true,
+      data
+    });
+
+  } catch (error) {
+    console.error("GET SERVICE BY ID ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
+};
+
 // ✅ GET BY VEHICLE
 exports.getByVehicle = async (req, res) => {
   try {
@@ -102,5 +131,58 @@ exports.getByVehicle = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false });
+  }
+};
+
+// ✅ UPDATE SERVICE
+exports.updateService = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      vehicle_id,
+      service_date,
+      odometer,
+      service_type,
+      labour_cost,
+      total_cost,
+      status,
+      work_description,
+      completed_date,
+      parts
+    } = req.body;
+
+    // Update main service fields
+    await Service.update(id, {
+      vehicle_id,
+      service_date,
+      odometer,
+      service_type,
+      labour_cost,
+      total_cost,
+      status,
+      work_description,
+      completed_date
+    });
+
+    // Update parts if provided
+    if (parts) {
+      await Service.deleteParts(id);
+      const parsedParts = JSON.parse(parts);
+      await Service.addParts(id, parsedParts);
+    }
+
+    // Add new files if provided
+    if (req.files && req.files.length > 0) {
+      await Service.addFiles(id, req.files);
+    }
+
+    res.json({
+      success: true,
+      message: 'Service updated successfully'
+    });
+
+  } catch (error) {
+    console.error('UPDATE SERVICE ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

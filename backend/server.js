@@ -11,6 +11,8 @@ const driverRoutes = require('./routes/driverRoutes');
 const tripRoutes = require('./routes/tripRoutes');
 const fuelRoutes = require('./routes/fuelRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
+const repairRoutes = require('./routes/repairRoutes');
+const garageRoutes = require('./routes/garageRoutes');
 
 const app = express();
 
@@ -33,6 +35,8 @@ app.use('/api/drivers', driverRoutes);
 app.use('/api/trips', tripRoutes);
 app.use('/api/fuel', fuelRoutes);
 app.use('/api/services', serviceRoutes);
+app.use('/api/repair', repairRoutes);
+app.use('/api/garages', garageRoutes);
 
 
 // 🔥 TEST ROUTE
