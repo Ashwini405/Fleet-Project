@@ -4,17 +4,80 @@ const db = require('../config/db'); // imported once for reuse
 // @desc    Get all vehicles
 // @route   GET /api/vehicles
 const getVehicles = async (req, res) => {
+
   try {
-    const vehicles = await Vehicle.getAll();
+
+    const [vehicles] = await db.query(`
+
+      SELECT
+
+        v.id,
+        v.vehicle_no,
+        v.default_route,
+
+        v.type,
+        v.initial_odometer,
+
+        v.make_brand,
+        v.fuel_type,
+        v.model_year,
+        v.body_type,
+
+        v.gps_device_id,
+        v.fastag_id,
+
+        v.vehicle_status,
+
+        d.id AS driver_id,
+        d.full_name AS driver_name,
+        d.mobile AS driver_phone,
+
+        s.id AS station_id,
+        s.station_name,
+
+        sp.id AS supervisor_id,
+        sp.full_name AS supervisor_name,
+        sp.mobile AS supervisor_phone
+
+      FROM vehicles v
+
+      LEFT JOIN drivers d
+      ON v.assigned_driver = d.id
+
+      LEFT JOIN stations s
+      ON v.station_id = s.id
+
+      LEFT JOIN supervisors sp
+      ON v.supervisor_id = sp.id
+
+      ORDER BY v.vehicle_no ASC
+
+    `);
 
     res.status(200).json({
+
       success: true,
+
       count: vehicles.length,
+
       data: vehicles
+
     });
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Server Error' });
+
+    console.error(
+
+      'GET VEHICLES ERROR:',
+      error
+    );
+
+    res.status(500).json({
+
+      success: false,
+
+      message: 'Server Error'
+    });
   }
 };
 

@@ -329,7 +329,7 @@ export default function VehicleMaster() {
             truckNo: v.vehicle_no || '—',
             status: v.vehicle_status || 'Active',
             driver: v.assigned_driver_name || v.driver_name || '—',
-            plant: v.source_plant || '—',
+            plant: v.station_name || '—',
             type: v.type || '—',
             odometer: v.initial_odometer || 0,
             supervisor: v.supervisor_name || '—',
