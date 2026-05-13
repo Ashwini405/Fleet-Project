@@ -33,7 +33,7 @@ import Payments from "./pages/Payments";
 import Reports from "./pages/Reports";
 import Staff from "./pages/Staff";
 import Settings from "./pages/Settings/index";
-import Renewals from "./pages/Renewals";
+
 import Documents from "./pages/Documents/index";
 import AuditLogs from "./pages/AuditLogs/index";
 
@@ -87,7 +87,7 @@ export default function App() {
               <Route path="/service/:id" element={<DetailPeriodicService />} />
               <Route path="/service/periodic/:id" element={<DetailPeriodicService />} />
               <Route path="/service/repair/:id" element={<DetailRepairWorks />} />
-              <Route path="/renewals" element={<Renewals />} />
+              
               <Route path="/tyres" element={<Tyres />} />
               <Route path="/parts" element={<Parts />} />
               <Route path="/inspection" element={<Inspection />} />

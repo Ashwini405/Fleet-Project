@@ -36,7 +36,7 @@ export default function Sidebar({ onClose }) {
       icon: Wrench,
       items: [
         { name: "Service & Maintenance", path: "/service" },
-        { name: "Renewal Reminders", path: "/renewals" },
+        
         { name: "Tyres Management", path: "/tyres" },
         { name: "Parts & Inventory", path: "/parts" },
         { name: "Vehicle Inspection", path: "/inspection" },

@@ -1,4 +1,4 @@
-import React, { useContext, useMemo, useState } from 'react';
+import React, { useContext, useMemo, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { InventoryContext } from '../../context/InventoryContext';
 import KPICards from './components/KPICards';
@@ -36,6 +36,7 @@ export default function PartsModule() {
   const [viewItem, setViewItem] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
   const [toast, setToast] = useState(null);
+  const [vehicles, setVehicles] = useState([]);  // 🔥 NEW: store vehicles from database
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
 
@@ -43,20 +44,61 @@ export default function PartsModule() {
 
   const filteredInventory = useMemo(() => inventory.filter((item) => {
     if (filters.category !== 'All' && item.category !== filters.category) return false;
-    if (filters.status !== 'All' && item.stockStatus !== filters.status) return false;
-    if (filters.vendor !== 'All' && item.preferredVendor !== filters.vendor) return false;
+    if (filters.status !== 'All' && item.stock_status !== filters.status) return false;
+    if (filters.vendor !== 'All' && item.preferred_vendor !== filters.vendor) return false;
     if (filters.warehouse !== 'All' && item.warehouse !== filters.warehouse) return false;
     if (filters.showExpiring && !item.expiringSoon) return false;
     if (filters.showCritical && item.stockStatus !== 'Critical') return false;
     if (filters.showLowStock && item.stockStatus !== 'Low Stock' && item.stockStatus !== 'Critical') return false;
     const s = filters.search.trim().toLowerCase();
     if (!s) return true;
-    return [item.name, item.partCode, item.category, item.preferredVendor, item.warehouse, ...(item.compatibleVehicles || [])].filter(Boolean).some((v) => v.toLowerCase().includes(s));
+    return [
+      item.part_name,
+      item.sku,
+      item.category,
+      item.preferred_vendor,
+      item.warehouse,
+      ...(item.compatible_vehicles || [])
+    ]
+      .filter(Boolean)
+      .some((v) =>
+        v.toString().toLowerCase().includes(s)
+      );
   }), [inventory, filters]);
 
-  const handleAdd = (payload) => {
-    const r = addInventoryItem(payload);
-    r.success ? showToast('Part added successfully.') : showToast(r.error, 'error');
+  const handleAdd = async (formData) => {
+
+    try {
+
+      const response = await fetch(
+        'http://localhost:5001/api/inventory',
+        {
+          method: 'POST',
+          body: formData
+        }
+      );
+
+      const result = await response.json();
+
+      console.log(result);
+
+      if (result.success) {
+
+        alert('Part added successfully');
+
+        fetchInventoryParts();
+
+      } else {
+
+        alert(result.message);
+      }
+
+    } catch (error) {
+
+      console.error(error);
+
+      alert('Server Error');
+    }
   };
 
   const handleEdit = (id, payload) => {
@@ -78,6 +120,22 @@ export default function PartsModule() {
     const r = stockOut(form);
     r.success ? showToast('Part issued successfully.') : showToast(r.error, 'error');
   };
+
+  // 🔥 Fetch vehicles from backend for compatible vehicles suggestions
+  const fetchVehicles = async () => {
+    try {
+      const response = await fetch('http://localhost:5001/api/vehicles');
+      const result = await response.json();
+      console.log('VEHICLES:', result);
+      setVehicles(result.data || []);
+    } catch (error) {
+      console.error('Vehicle fetch error:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchVehicles();
+  }, []);
 
   const handleExport = () => {
     const csv = exportInventoryReport();
@@ -136,7 +194,11 @@ export default function PartsModule() {
             <AlertsPanel inventory={inventory} purchaseOrders={purchaseOrders} />
             <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-5">
               <InventoryAnalytics summary={summary} />
-              <ActivityFeed movementHistory={movementHistory} />
+              <ActivityFeed
+                movementHistory={movementHistory}
+                purchaseOrders={purchaseOrders}
+                issueHistory={issueHistory}
+              />
             </div>
           </motion.div>
         )}
@@ -178,7 +240,11 @@ export default function PartsModule() {
         {/* Activity */}
         {activeSection === 'Activity' && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-            <ActivityFeed movementHistory={movementHistory} />
+            <ActivityFeed
+              movementHistory={movementHistory}
+              purchaseOrders={purchaseOrders}
+              issueHistory={issueHistory}
+            />
             <StockMovementHistory movementHistory={movementHistory} />
           </motion.div>
         )}
@@ -193,6 +259,7 @@ export default function PartsModule() {
         editItem={editItem}
         vendors={vendorList}
         warehouseList={warehouseList}
+        vehicles={vehicles}   // 🔥 pass vehicles for compatible suggestions
       />
       <StockInModal isOpen={!!stockInItem} onClose={() => setStockInItem(null)} item={stockInItem} onSubmit={handleStockIn} vendors={vendorList} />
       <StockOutModal isOpen={!!stockOutItem} onClose={() => setStockOutItem(null)} item={stockOutItem} onSubmit={handleStockOut} />

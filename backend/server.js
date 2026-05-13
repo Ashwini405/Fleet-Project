@@ -13,6 +13,12 @@ const fuelRoutes = require('./routes/fuelRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
 const repairRoutes = require('./routes/repairRoutes');
 const garageRoutes = require('./routes/garageRoutes');
+const inventoryRoutes = require('./routes/inventoryRoutes');
+const incidentsRoutes = require('./routes/incidentsRoutes');
+const warrantyRoutes = require('./routes/warrantiesRoutes');
+const warrantyClaimRoutes =
+require('./routes/warrantyClaimRoutes');
+
 
 const app = express();
 
@@ -37,7 +43,13 @@ app.use('/api/fuel', fuelRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/repair', repairRoutes);
 app.use('/api/garages', garageRoutes);
-
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/incidents', incidentsRoutes);
+app.use('/api/warranties', warrantyRoutes);
+app.use(
+  '/api/warranty-claims',
+  warrantyClaimRoutes
+);
 
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {
