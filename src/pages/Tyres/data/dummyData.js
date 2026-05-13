@@ -1,19 +1,18 @@
 export const dummyTrucks = [
-  { id: 'AP91 TB 9602', model: 'Tata Prima 5530', totalTyres: 10, recentChanges: 'No Recent Changes' },
-  { id: 'AP79 TB 6578', model: 'Tata Prima 5530', totalTyres: 10, recentChanges: 'No Recent Changes' },
-  { id: 'AP29 TB 9293', model: 'Tata Prima 5530', totalTyres: 10, recentChanges: '1 Tyre Replaced' },
-  { id: 'AP88 TB 9146', model: 'Tata Prima 5530', totalTyres: 10, recentChanges: '2 Tyres Replaced' },
+  { id: 'AP91 TB 9602', model: 'Tata Prima 5530', totalTyres: 10, recentChanges: 'No Recent Changes', currentOdo: 78500 },
+  { id: 'AP79 TB 6578', model: 'Tata Prima 5530', totalTyres: 10, recentChanges: 'No Recent Changes', currentOdo: 54200 },
+  { id: 'AP29 TB 9293', model: 'Tata Prima 5530', totalTyres: 10, recentChanges: '1 Tyre Replaced',   currentOdo: 91300 },
+  { id: 'AP88 TB 9146', model: 'Tata Prima 5530', totalTyres: 10, recentChanges: '2 Tyres Replaced',  currentOdo: 63750 },
 ];
 
 export const dummyActiveTyres = [
-  { id: 'T-3457', truckNo: 'AP91 TB 9602', make: 'Ceat', model: 'Milaze', fittedDate: '2025-09-17', fittedOdo: 23892, presentOdo: 34210, expectedLife: 100000, material: 'Radial Steel', vendor: 'Tyre World', position: 'Front Left', health: 'Good' },
-  { id: 'T-9237', truckNo: 'AP91 TB 9602', make: 'Apollo', model: 'Alnac', fittedDate: '2024-12-30', fittedOdo: 59662, presentOdo: 78119, expectedLife: 100000, material: 'Radial Steel', vendor: 'Tyre World', position: 'Front Right', health: 'Medium' },
-  { id: 'T-4685', truckNo: 'AP91 TB 9602', make: 'MRF', model: 'Zapper', fittedDate: '2025-02-03', fittedOdo: 30072, presentOdo: 31092, expectedLife: 100000, material: 'Nylon', vendor: 'Highway Auth', position: 'L1 Outer', health: 'Good' },
-  { id: 'T-7717', truckNo: 'AP91 TB 9602', make: 'JK Tyre', model: 'UX Royale', fittedDate: '2025-10-28', fittedOdo: 42582, presentOdo: 51771, expectedLife: 80000, material: 'Radial Steel', vendor: 'Global Tyres', position: 'L1 Inner', health: 'Good' },
-  { id: 'T-5547', truckNo: 'AP91 TB 9602', make: 'Ceat', model: 'Milaze', fittedDate: '2025-04-11', fittedOdo: 26207, presentOdo: 44400, expectedLife: 100000, material: 'Radial Steel', vendor: 'Tyre World', position: 'R1 Inner', health: 'Medium' },
-  { id: 'T-6857', truckNo: 'AP91 TB 9602', make: 'Ceat', model: 'Milaze', fittedDate: '2025-08-28', fittedOdo: 46980, presentOdo: 62500, expectedLife: 80000, material: 'Radial Steel', vendor: 'Tyre World', position: 'R1 Outer', health: 'Medium' },
-  { id: 'T-3510', truckNo: 'AP91 TB 9602', make: 'Apollo', model: 'EnduRace', fittedDate: '2025-05-21', fittedOdo: 45268, presentOdo: 55295, expectedLife: 100000, material: 'Radial Steel', vendor: 'Highway Auth', position: 'L2 Outer', health: 'Good' },
-  // Let's add some poor health tires dynamically later or assume health logic based on percentage (e.g. running > 80% = red)
+  { id: 'T-3457', truckNo: 'AP91 TB 9602', make: 'Ceat',     model: 'Milaze',    fittedDate: '2025-09-17', fittedOdo: 23892, presentOdo: 34210, expectedLife: 100000, material: 'Radial Steel', vendor: 'Tyre World',   position: 'FL',       health: 'Good'   },
+  { id: 'T-9237', truckNo: 'AP91 TB 9602', make: 'Apollo',   model: 'Alnac',     fittedDate: '2024-12-30', fittedOdo: 59662, presentOdo: 78119, expectedLife: 100000, material: 'Radial Steel', vendor: 'Tyre World',   position: 'FR',       health: 'Medium' },
+  { id: 'T-4685', truckNo: 'AP91 TB 9602', make: 'MRF',      model: 'Zapper',    fittedDate: '2025-02-03', fittedOdo: 30072, presentOdo: 31092, expectedLife: 100000, material: 'Nylon',        vendor: 'Highway Auth', position: 'L1_OUTER', health: 'Good'   },
+  { id: 'T-7717', truckNo: 'AP91 TB 9602', make: 'JK Tyre',  model: 'UX Royale', fittedDate: '2025-10-28', fittedOdo: 42582, presentOdo: 51771, expectedLife: 80000,  material: 'Radial Steel', vendor: 'Global Tyres', position: 'L1_INNER', health: 'Good'   },
+  { id: 'T-5547', truckNo: 'AP91 TB 9602', make: 'Ceat',     model: 'Milaze',    fittedDate: '2025-04-11', fittedOdo: 26207, presentOdo: 44400, expectedLife: 100000, material: 'Radial Steel', vendor: 'Tyre World',   position: 'R1_INNER', health: 'Medium' },
+  { id: 'T-6857', truckNo: 'AP91 TB 9602', make: 'Ceat',     model: 'Milaze',    fittedDate: '2025-08-28', fittedOdo: 46980, presentOdo: 62500, expectedLife: 80000,  material: 'Radial Steel', vendor: 'Tyre World',   position: 'R1_OUTER', health: 'Medium' },
+  { id: 'T-3510', truckNo: 'AP91 TB 9602', make: 'Apollo',   model: 'EnduRace',  fittedDate: '2025-05-21', fittedOdo: 45268, presentOdo: 55295, expectedLife: 100000, material: 'Radial Steel', vendor: 'Highway Auth', position: 'L2_OUTER', health: 'Good'   },
 ];
 
 export const dummyOldTyres = [
