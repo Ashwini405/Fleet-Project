@@ -38,7 +38,7 @@ export default function TyreQRCard({ tyreId }) {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 flex flex-col items-center gap-3 w-full h-full">
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-3.5 flex flex-col items-center gap-2.5 w-full">
 
       {/* Header */}
       <div className="flex items-center gap-2 self-start">
@@ -50,8 +50,8 @@ export default function TyreQRCard({ tyreId }) {
 
       {/* QR or empty state */}
       {tyreId ? (
-        <div ref={qrRef} className="bg-white p-3 rounded-xl border border-gray-100 shadow-inner">
-          <QRCodeCanvas value={qrValue} size={130} bgColor="#ffffff" fgColor="#0f172a" level="M" />
+        <div ref={qrRef} className="bg-white p-2.5 rounded-xl border border-gray-100 shadow-inner">
+          <QRCodeCanvas value={qrValue} size={112} bgColor="#ffffff" fgColor="#0f172a" level="M" />
         </div>
       ) : (
         <div className="w-[158px] h-[158px] rounded-xl border-2 border-dashed border-gray-200
@@ -65,7 +65,7 @@ export default function TyreQRCard({ tyreId }) {
       <p className="text-[11px] font-bold text-slate-700 tracking-widest font-mono">{tyreId}</p>
 
       {/* Action buttons */}
-      <div className="flex gap-2 w-full mt-auto">
+      <div className="flex gap-2 w-full">
         <button
           onClick={handleDownload}
           aria-label="Download QR"

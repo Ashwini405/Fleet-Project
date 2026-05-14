@@ -1,11 +1,28 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Activity, History, FileText, Edit2, ArchiveX, Printer, Paperclip } from 'lucide-react';
+import { X, Activity, History, FileText, Edit2, ArchiveX, Printer, Paperclip, Package, MapPin } from 'lucide-react';
 import TyreQRCard from './TyreQRCard';
 import { layoutPositions } from '../data/dummyData';
 
 const positionLabel = (id) =>
   layoutPositions.find(p => p.id === id)?.label ?? id;
+
+/* ── Stock age helper ──────────────────────────────────────────────────────── */
+function storedSince(purchaseDate) {
+  if (!purchaseDate) return 'Unknown';
+  const start = new Date(purchaseDate);
+  const now   = new Date();
+  let years  = now.getFullYear() - start.getFullYear();
+  let months = now.getMonth()    - start.getMonth();
+  if (months < 0) { years -= 1; months += 12; }
+  if (years === 0 && months === 0) {
+    const d = Math.floor((now - start) / 86400000);
+    return d < 1 ? 'Today' : `${d} day${d > 1 ? 's' : ''}`;
+  }
+  if (years === 0) return `${months} Month${months > 1 ? 's' : ''}`;
+  if (months === 0) return `${years} Year${years > 1 ? 's' : ''}`;
+  return `${years} Yr ${months} Mo`;
+}
 
 /* ── Health config ─────────────────────────────────────────────────────────── */
 const HEALTH = {
@@ -48,11 +65,12 @@ function HeaderBtn({ icon: Icon, label, onClick, rounded }) {
 /* ── Spec row ──────────────────────────────────────────────────────────────── */
 function SpecRow({ label, value, accent, truncate }) {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-gray-100 last:border-0 gap-4">
-      <span className="text-[11px] font-medium text-gray-500 uppercase tracking-wider shrink-0">{label}</span>
-      <span className={`text-sm font-semibold text-right leading-tight
-        ${accent ? 'text-emerald-600 font-mono' : 'text-slate-800'}
-        ${truncate ? 'truncate max-w-[140px]' : ''}`}
+    <div className="flex items-center justify-between py-2.5 border-b border-gray-100 last:border-0 gap-4">
+      <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider shrink-0">{label}</span>
+      <span
+        className={`text-xs font-semibold text-right leading-tight
+          ${accent ? 'text-emerald-600 font-mono' : 'text-slate-800'}
+          ${truncate ? 'truncate max-w-[140px]' : ''}`}
         title={truncate ? String(value) : undefined}
       >
         {value}
@@ -61,23 +79,40 @@ function SpecRow({ label, value, accent, truncate }) {
   );
 }
 
-/* ── Lifecycle steps ───────────────────────────────────────────────────────── */
-const STEPS = [
-  { label: 'Purchased' },
-  { label: 'Mounted'   },
-  { label: 'Inspection'},
-  { label: 'Active', current: true },
-];
+/* ── Mini ODO card ─────────────────────────────────────────────────────────── */
+function MiniCard({ label, value, accent }) {
+  return (
+    <div className="bg-slate-50 rounded-xl border border-slate-100 px-4 py-3">
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+      <p className={`text-sm font-black font-mono ${accent ? 'text-blue-600' : 'text-slate-800'}`}>{value}</p>
+    </div>
+  );
+}
 
 /* ── Main modal ────────────────────────────────────────────────────────────── */
 export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
   if (!isOpen || !tyreData) return null;
 
-  const remainingLife = Math.max(tyreData.expectedLife - tyreData.runningKm, 0);
-  const runningPct    = Math.min((tyreData.runningKm / tyreData.expectedLife) * 100, 100);
+  const isStock       = tyreData.status === 'In Stock';
+  const remainingLife = isStock ? 0 : Math.max((tyreData.expectedLife || 0) - (tyreData.runningKm || 0), 0);
+  const runningPct    = isStock ? 0 : Math.min(((tyreData.runningKm || 0) / (tyreData.expectedLife || 1)) * 100, 100);
   const lifeUsedPct   = Math.round(runningPct);
   const hs            = HEALTH[tyreData.health] || HEALTH.Good;
   const attachCount   = tyreData.attachments?.length ?? 0;
+
+  /* ── Lifecycle steps ─────────────────────────────────────────────────────── */
+  const STEPS = isStock
+    ? [
+        { label: 'Purchased', done: true },
+        { label: 'Registered', done: true },
+        { label: 'In Stock', done: true, current: true },
+      ]
+    : [
+        { label: 'Purchased',  done: true },
+        { label: 'Mounted',    done: true },
+        { label: 'Inspection', done: true },
+        { label: 'Active',     done: true, current: true },
+      ];
 
   return (
     <AnimatePresence>
@@ -94,188 +129,251 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
           style={{ boxShadow: '0 32px 80px rgba(0,0,0,0.24)' }}
         >
 
-          {/* ══ STICKY HEADER ══════════════════════════════════════════════════ */}
-          <div className="shrink-0 sticky top-0 z-10 bg-gradient-to-r from-[#0f172a] to-[#1a2744] px-7 py-5 flex items-center justify-between">
-
-            {/* Left — title block */}
+          {/* ══ HEADER ══════════════════════════════════════════════════════════ */}
+          <div className="shrink-0 bg-gradient-to-r from-[#0f172a] to-[#1a2744] px-6 py-4 flex items-center justify-between">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2.5">
-                <h3 className="text-[17px] font-black text-white tracking-tight leading-none">
-                  Tyre Data Sheet
-                </h3>
-                <span className="px-2 py-0.5 bg-emerald-500 text-[10px] text-white font-bold uppercase tracking-widest rounded-md leading-none">
-                  Active
-                </span>
+                <h3 className="text-[15px] font-black text-white tracking-tight leading-none">Tyre Data Sheet</h3>
+                {isStock ? (
+                  <span className="inline-flex items-center px-2 py-0.5 bg-blue-500/20 text-blue-300 border border-blue-500/40 text-[9.5px] font-black uppercase tracking-widest rounded-full leading-none">
+                    IN STOCK
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9.5px] font-black uppercase tracking-widest rounded-full leading-none">
+                    ACTIVE
+                  </span>
+                )}
               </div>
-              <p className="text-[11px] text-blue-400 font-semibold tracking-[0.12em] uppercase leading-none mt-0.5">
-                Serial ID: {tyreData.id}
+              <p className="text-[11px] text-blue-400/80 font-semibold tracking-[0.1em] uppercase leading-none mt-0.5">
+                Serial: {tyreData.id}
               </p>
             </div>
-
-            {/* Right — actions */}
-            <div className="flex items-center gap-1.5">
-              <HeaderBtn icon={Edit2}   label="Edit Tyre"        />
+            <div className="flex items-center gap-1">
+              <HeaderBtn icon={Edit2}    label="Edit Tyre" />
               <HeaderBtn icon={ArchiveX} label="Move to Old Stock" />
-              <HeaderBtn icon={Printer} label="Print Report"     />
-              <div className="w-px h-5 bg-white/20 mx-1" />
+              <HeaderBtn icon={Printer}  label="Print Report" />
+              <div className="w-px h-4 bg-white/20 mx-1.5" />
               <HeaderBtn icon={X} label="Close" onClick={onClose} rounded />
             </div>
           </div>
 
-          {/* ══ SCROLLABLE BODY ════════════════════════════════════════════════ */}
+          {/* ══ SCROLLABLE BODY ═════════════════════════════════════════════════ */}
           <div
-            className="overflow-y-auto flex-1 p-6 bg-gray-50/70 space-y-4"
+            className="overflow-y-auto flex-1 p-5 bg-gray-50/70 space-y-4"
             style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}
           >
 
             {/* ── Metric Cards ─────────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {isStock ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
 
-              {/* Total Running */}
-              <div className="bg-white rounded-2xl border border-gray-100 border-t-2 border-t-blue-400 shadow-sm p-5
-                flex flex-col items-center justify-center text-center gap-2
-                transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
-                <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                  <Activity className="w-5 h-5 text-blue-500" />
-                </div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Running</p>
-                <p className="text-3xl font-black text-gray-800 tracking-tight leading-none">
-                  {tyreData.runningKm.toLocaleString()}
-                  <span className="text-sm font-bold text-gray-400 ml-1">km</span>
-                </p>
-              </div>
-
-              {/* Est. Remaining */}
-              <div className="bg-white rounded-2xl border border-gray-100 border-t-2 border-t-slate-400 shadow-sm p-5
-                flex flex-col items-center justify-center text-center gap-2 relative overflow-hidden
-                transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
-                {/* progress stripe */}
-                <div className="absolute top-0 left-0 h-[3px] w-full bg-gray-100 rounded-full">
-                  <div className={`h-full rounded-full ${hs.bar} transition-all duration-700`} style={{ width: `${runningPct}%` }} />
-                </div>
-                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center mt-1">
-                  <History className="w-5 h-5 text-slate-500" />
-                </div>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Est. Remaining</p>
-                <p className="text-3xl font-black text-blue-600 tracking-tight leading-none">
-                  {remainingLife.toLocaleString()}
-                  <span className="text-sm font-bold text-blue-400 ml-1">km</span>
-                </p>
-              </div>
-
-              {/* Current Health */}
-              <div className={`${hs.bg} ${hs.border} border border-t-2 rounded-2xl shadow-sm p-5
-                flex flex-col items-center justify-center text-center gap-1.5
-                transition-all duration-200 hover:-translate-y-1 hover:shadow-lg`}>
-                <div className="w-10 h-10 rounded-xl bg-white/60 flex items-center justify-center">
-                  <div className={`w-4 h-4 rounded-full ${hs.fill}`} />
-                </div>
-                <p className={`text-[10px] font-bold ${hs.text} opacity-70 uppercase tracking-widest`}>Current Health</p>
-                <p className={`text-2xl font-black ${hs.text} tracking-tight uppercase leading-none`}>
-                  {tyreData.health}
-                </p>
-                {/* mini progress bar */}
-                <div className="w-full mt-1">
-                  <div className="h-1.5 w-full bg-white/50 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${hs.bar} transition-all duration-700`} style={{ width: `${lifeUsedPct}%` }} />
+                <div className="bg-white rounded-xl border border-gray-100 border-t-2 border-t-blue-400 shadow-sm px-4 py-3.5
+                  flex flex-col items-center justify-center text-center gap-1.5
+                  transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <Package className="w-4 h-4 text-blue-500" />
                   </div>
-                  <p className={`text-[10px] font-semibold ${hs.text} opacity-60 mt-1`}>{lifeUsedPct}% Life Used</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Stock Status</p>
+                  <p className="text-lg font-black text-blue-600 tracking-tight leading-none">In Stock</p>
+                  <span className="text-[10px] font-semibold text-blue-400 bg-blue-50 px-2 py-0.5 rounded-full ring-1 ring-blue-200">Warehouse Inventory</span>
                 </div>
-              </div>
 
-            </div>
+                <div className="bg-white rounded-xl border border-gray-100 border-t-2 border-t-amber-400 shadow-sm px-4 py-3.5
+                  flex flex-col items-center justify-center text-center gap-1.5
+                  transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
+                  <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                    <History className="w-4 h-4 text-amber-500" />
+                  </div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Stored Since</p>
+                  <p className="text-lg font-black text-slate-800 tracking-tight leading-none">
+                    {storedSince(tyreData.fittedDate || tyreData.purchaseDate)}
+                  </p>
+                  <span className="text-[10px] text-slate-400 font-medium">{tyreData.fittedDate || tyreData.purchaseDate || '—'}</span>
+                </div>
+
+                <div className="bg-white rounded-xl border border-gray-100 border-t-2 border-t-slate-400 shadow-sm px-4 py-3.5
+                  flex flex-col items-center justify-center text-center gap-1.5
+                  transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
+                  <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
+                    <MapPin className="w-4 h-4 text-slate-500" />
+                  </div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Location</p>
+                  <p className="text-lg font-black text-slate-800 tracking-tight leading-none">Warehouse</p>
+                  <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Central Stock</span>
+                </div>
+
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+
+                <div className="bg-white rounded-xl border border-gray-100 border-t-2 border-t-blue-400 shadow-sm px-4 py-3.5
+                  flex flex-col items-center justify-center text-center gap-1.5
+                  transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center">
+                    <Activity className="w-4 h-4 text-blue-500" />
+                  </div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Running</p>
+                  <p className="text-2xl font-black text-gray-800 tracking-tight leading-none">
+                    {(tyreData.runningKm || 0).toLocaleString()}
+                    <span className="text-xs font-bold text-gray-400 ml-1">km</span>
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-xl border border-gray-100 border-t-2 border-t-slate-400 shadow-sm px-4 py-3.5
+                  flex flex-col items-center justify-center text-center gap-1.5 relative overflow-hidden
+                  transition-all duration-200 hover:-translate-y-1 hover:shadow-lg">
+                  <div className="absolute top-0 left-0 h-[3px] w-full bg-gray-100">
+                    <div className={`h-full ${hs.bar} transition-all duration-700`} style={{ width: `${runningPct}%` }} />
+                  </div>
+                  <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center mt-0.5">
+                    <History className="w-4 h-4 text-slate-500" />
+                  </div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Est. Remaining</p>
+                  <p className="text-2xl font-black text-blue-600 tracking-tight leading-none">
+                    {remainingLife.toLocaleString()}
+                    <span className="text-xs font-bold text-blue-400 ml-1">km</span>
+                  </p>
+                </div>
+
+                <div className={`${hs.bg} ${hs.border} border border-t-2 rounded-xl shadow-sm px-4 py-3.5
+                  flex flex-col items-center justify-center text-center gap-1
+                  transition-all duration-200 hover:-translate-y-1 hover:shadow-lg`}>
+                  <div className="w-8 h-8 rounded-lg bg-white/60 flex items-center justify-center">
+                    <div className={`w-3.5 h-3.5 rounded-full ${hs.fill}`} />
+                  </div>
+                  <p className={`text-[10px] font-bold ${hs.text} opacity-70 uppercase tracking-widest`}>Current Health</p>
+                  <p className={`text-2xl font-black ${hs.text} tracking-tight uppercase leading-none`}>{tyreData.health}</p>
+                  <div className="w-full mt-1">
+                    <div className="h-1.5 w-full bg-white/50 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${hs.bar} transition-all duration-700`} style={{ width: `${lifeUsedPct}%` }} />
+                    </div>
+                    <p className={`text-[10px] font-semibold ${hs.text} opacity-60 mt-0.5`}>{lifeUsedPct}% Life Used</p>
+                  </div>
+                </div>
+
+              </div>
+            )}
 
             {/* ── Full Specification ────────────────────────────────────────── */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-6 py-3.5 border-b border-gray-100 flex items-center gap-2">
+              <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
                 <FileText className="w-4 h-4 text-gray-400" />
                 <h4 className="text-sm font-bold text-slate-800 tracking-tight">Full Specification</h4>
               </div>
-
-              <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-5">
 
                 {/* QR */}
-                <div className="md:row-span-2">
+                <div>
                   <TyreQRCard tyreId={tyreData.id} />
                 </div>
 
-                {/* Left column */}
+                {/* Left column — always visible */}
                 <div>
                   <SpecRow label="Tyre Serial No" value={tyreData.id} />
                   <SpecRow label="Brand / Make"   value={tyreData.make} />
                   <SpecRow label="Model"          value={tyreData.model} />
-                  <SpecRow label="Material Type"  value={tyreData.material || 'Radial Steel'} />
-                  <SpecRow label="Date of Issue"  value={tyreData.fittedDate} />
+                  <SpecRow label="Tyre Size"      value={tyreData.tyreSize || '—'} />
+                  <SpecRow label="Material Type"  value={tyreData.material || '—'} />
+                  <SpecRow label="Expected Life"  value={tyreData.expectedLife ? `${tyreData.expectedLife.toLocaleString()} km` : '—'} />
                 </div>
 
                 {/* Right column */}
                 <div>
-                  <SpecRow label="Expected Life"    value={`${tyreData.expectedLife.toLocaleString()} km`} />
-                  <SpecRow label="Vendor"           value={tyreData.vendor || 'Unknown Provider'} />
-                  <SpecRow label="Tyre Cost"        value={`₹ ${(tyreData.cost || 14500).toLocaleString()}`} accent />
-                  <SpecRow label="Current Location" value={`${tyreData.truckNo} (${positionLabel(tyreData.position)})`} truncate />
-                  <SpecRow label="Fitted Odometer"  value={`${tyreData.fittedOdo.toLocaleString()} km`} />
+                  <SpecRow label="Vendor"        value={tyreData.vendor || 'Unknown Provider'} />
+                  <SpecRow label="Purchase Date" value={tyreData.fittedDate || tyreData.purchaseDate || '—'} />
+                  <SpecRow label="Tyre Cost"     value={tyreData.cost ? `₹ ${tyreData.cost.toLocaleString('en-IN')}` : '—'} accent />
+                  {isStock ? (
+                    <>
+                      <SpecRow label="Stock Status"     value="In Stock" />
+                      <SpecRow label="Warehouse Zone"   value="Central Warehouse" />
+                      <SpecRow label="Purchase Age"     value={storedSince(tyreData.fittedDate || tyreData.purchaseDate)} />
+                    </>
+                  ) : (
+                    <>
+                      <SpecRow
+                        label="Current Truck"
+                        value={tyreData.truckNo && tyreData.truckNo !== '—' ? tyreData.truckNo : 'Not Mounted Yet'}
+                        truncate
+                      />
+                      <SpecRow
+                        label="Tyre Position"
+                        value={tyreData.position && tyreData.position !== '—' ? positionLabel(tyreData.position) : '—'}
+                      />
+                    </>
+                  )}
                 </div>
+
+                {/* Mounted-only operational mini cards */}
+                {!isStock && (
+                  <div className="md:col-start-2 md:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <MiniCard label="Fitted ODO"   value={tyreData.fittedOdo  ? `${tyreData.fittedOdo.toLocaleString()} km`  : '—'} />
+                    <MiniCard label="Present ODO"  value={tyreData.presentOdo ? `${tyreData.presentOdo.toLocaleString()} km` : '—'} />
+                    <MiniCard label="Running KM"   value={tyreData.runningKm  ? `${tyreData.runningKm.toLocaleString()} km`  : '—'} accent />
+                    <MiniCard label="Mounted Date" value={tyreData.fittedDate || '—'} />
+                  </div>
+                )}
 
               </div>
             </div>
 
             {/* ── Lifecycle Timeline ───────────────────────────────────────── */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-6 py-5">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">Lifecycle</p>
-              <div className="flex items-center overflow-x-auto pb-1">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Lifecycle</p>
+              <div className="flex items-start justify-between">
                 {STEPS.map((step, i) => (
                   <React.Fragment key={step.label}>
-                    <div className="flex flex-col items-center shrink-0">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black border-2 transition-all duration-200
+                    <div className="flex flex-col items-center flex-1">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black border-2 transition-all duration-200
                         ${step.current
-                          ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200 scale-110'
+                          ? 'bg-blue-600 border-blue-600 text-white shadow-md shadow-blue-200'
                           : 'bg-emerald-500 border-emerald-500 text-white'}`}
                       >
                         {i + 1}
                       </div>
-                      <span className={`text-[10px] font-semibold mt-2 whitespace-nowrap
+                      <span className={`text-[10px] font-semibold mt-1.5 whitespace-nowrap
                         ${step.current ? 'text-blue-600' : 'text-emerald-600'}`}>
                         {step.label}
                       </span>
                     </div>
                     {i < STEPS.length - 1 && (
-                      <div className="flex-1 h-[3px] mx-2 min-w-[28px] bg-emerald-300 rounded-full" />
+                      <div className="flex-1 h-[2px] mt-3.5 bg-emerald-300 rounded-full" />
                     )}
                   </React.Fragment>
                 ))}
               </div>
             </div>
 
-            {/* ── Bottom Cards ─────────────────────────────────────────────── */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* ── Bottom: ODO + Attachments ────────────────────────────────── */}
+            <div className={`grid gap-4 ${isStock ? 'grid-cols-1' : 'grid-cols-1 sm:grid-cols-2'}`}>
 
-              {/* Present Odometer */}
-              <div className="bg-slate-50 rounded-2xl border border-slate-100 shadow-sm p-5
-                flex items-center justify-between
-                transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 min-h-[88px]">
-                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Present Odometer</p>
-                  <p className="text-2xl font-black text-slate-800 font-mono mt-1.5 leading-none">
-                    {tyreData.presentOdo.toLocaleString()}
-                    <span className="text-sm font-bold text-slate-400 ml-1">km</span>
-                  </p>
+              {/* Present Odometer — mounted only */}
+              {!isStock && (
+                <div className="bg-slate-50 rounded-2xl border border-slate-100 shadow-sm p-5
+                  flex items-center justify-between
+                  transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Present Odometer</p>
+                    <p className="text-2xl font-black text-slate-800 font-mono mt-1.5 leading-none">
+                      {(tyreData.presentOdo || 0).toLocaleString()}
+                      <span className="text-sm font-bold text-slate-400 ml-1">km</span>
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-slate-200/70 flex items-center justify-center shrink-0">
+                    <Activity className="w-5 h-5 text-slate-500" />
+                  </div>
                 </div>
-                <div className="w-10 h-10 rounded-xl bg-slate-200/70 flex items-center justify-center shrink-0">
-                  <Activity className="w-5 h-5 text-slate-500" />
-                </div>
-              </div>
+              )}
 
               {/* Bill & Attachments */}
               <div className="bg-blue-50/50 rounded-2xl border border-blue-100 shadow-sm p-5
                 flex items-center justify-between
-                transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 min-h-[88px]">
+                transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
                     <Paperclip className="w-4 h-4 text-blue-500" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Bill &amp; Picture</p>
+                    <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest">Bill & Picture</p>
                     <p className="text-sm font-semibold text-slate-700 mt-1 leading-tight">
                       {attachCount > 0
                         ? `${attachCount} Attachment${attachCount > 1 ? 's' : ''} Available`
@@ -283,16 +381,18 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
                     </p>
                   </div>
                 </div>
-                <button className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700
-                  text-white text-xs font-bold rounded-xl shadow-sm shrink-0 ml-3
-                  transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                  <FileText className="w-3.5 h-3.5" /> View
-                </button>
+                {attachCount > 0 && (
+                  <button className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700
+                    text-white text-xs font-bold rounded-xl shadow-sm shrink-0 ml-3
+                    transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
+                    <FileText className="w-3.5 h-3.5" /> View
+                  </button>
+                )}
               </div>
 
             </div>
 
-          </div>{/* end scrollable body */}
+          </div>
         </motion.div>
       </div>
     </AnimatePresence>

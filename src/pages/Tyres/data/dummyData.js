@@ -1,8 +1,10 @@
 export const dummyTrucks = [
-  { id: 'AP91 TB 9602', model: 'Tata Prima 5530', totalTyres: 10, recentChanges: 'No Recent Changes', currentOdo: 78500 },
-  { id: 'AP79 TB 6578', model: 'Tata Prima 5530', totalTyres: 10, recentChanges: 'No Recent Changes', currentOdo: 54200 },
-  { id: 'AP29 TB 9293', model: 'Tata Prima 5530', totalTyres: 10, recentChanges: '1 Tyre Replaced',   currentOdo: 91300 },
-  { id: 'AP88 TB 9146', model: 'Tata Prima 5530', totalTyres: 10, recentChanges: '2 Tyres Replaced',  currentOdo: 63750 },
+  { id: 'AP91 TB 9602', model: 'Tata Prima 5530',    totalTyres: 10, vehicleType: 'truck_10', recentChanges: 'No Recent Changes', currentOdo: 78500, tyreSize: '295/90R20' },
+  { id: 'AP79 TB 6578', model: 'Ashok Leyland 1616', totalTyres: 6,  vehicleType: 'truck_6',  recentChanges: 'No Recent Changes', currentOdo: 54200, tyreSize: '295/90R20' },
+  { id: 'AP29 TB 9293', model: 'Tata LPT 3118',      totalTyres: 12, vehicleType: 'truck_12', recentChanges: '1 Tyre Replaced',   currentOdo: 91300, tyreSize: '295/90R20' },
+  { id: 'AP88 TB 9146', model: 'Volvo FH16 Trailer',  totalTyres: 18, vehicleType: 'trailer',  recentChanges: '2 Tyres Replaced',  currentOdo: 63750, tyreSize: '315/80R22.5' },
+  { id: 'AP55 TB 1234', model: 'TATA Starbus Ultra',  totalTyres: 6,  vehicleType: 'bus',      recentChanges: 'No Recent Changes', currentOdo: 42100, tyreSize: '295/90R20' },
+  { id: 'AP33 TB 5678', model: 'Tata LPT 2518 Tanker',totalTyres: 10, vehicleType: 'tanker',   recentChanges: 'No Recent Changes', currentOdo: 31200, tyreSize: '295/90R20' },
 ];
 
 export const dummyActiveTyres = [
@@ -15,11 +17,20 @@ export const dummyActiveTyres = [
   { id: 'T-3510', truckNo: 'AP91 TB 9602', make: 'Apollo',   model: 'EnduRace',  fittedDate: '2025-05-21', fittedOdo: 45268, presentOdo: 55295, expectedLife: 100000, material: 'Radial Steel', vendor: 'Highway Auth', position: 'L2_OUTER', health: 'Good'   },
 ];
 
+export const dummyStockTyres = [
+  { id: 'S-1021', make: 'Apollo',      model: 'EnduRace',  tyreSize: '295/90R20',   material: 'Radial',          vendor: 'Apollo Dealer',   purchaseDate: '2025-03-10', cost: 14500 },
+  { id: 'S-1022', make: 'MRF',         model: 'Milaze',    tyreSize: '12R22.5',     material: 'Radial Tubeless', vendor: 'MRF Distributor', purchaseDate: '2025-04-22', cost: 13800 },
+  { id: 'S-1023', make: 'Ceat',        model: 'Winmile',   tyreSize: '295/90R20',   material: 'Radial',          vendor: 'Tyre World',      purchaseDate: '2025-05-01', cost: 12900 },
+  { id: 'S-1024', make: 'Bridgestone', model: 'R154',      tyreSize: '315/80R22.5', material: 'Radial Tubeless', vendor: 'Global Tyres',    purchaseDate: '2025-06-15', cost: 18200 },
+  { id: 'S-1025', make: 'JK Tyre',     model: 'Jet Xtra',  tyreSize: '295/90R20',   material: 'Radial',          vendor: 'Highway Auth',    purchaseDate: '2025-07-03', cost: 13100 },
+];
+
 export const dummyOldTyres = [
-  { tyreNo: 'OLD-3065', vehicleNo: 'AP51 TB 9816', entryDate: '2023-10-15', runningKm: 120000, storeLocation: 'Scrap Yard', status: 'Scrap' },
-  { tyreNo: 'OLD-6703', vehicleNo: 'AP21 TB 9393', entryDate: '2023-10-15', runningKm: 120000, storeLocation: 'Retreading Area', status: 'Reusable' },
-  { tyreNo: 'OLD-5146', vehicleNo: 'AP59 TB 9721', entryDate: '2023-10-15', runningKm: 120000, storeLocation: 'Retreading Area', status: 'Reusable' },
-  { tyreNo: 'OLD-3091', vehicleNo: 'AP45 TB 2483', entryDate: '2023-10-15', runningKm: 120000, storeLocation: 'Scrap Yard', status: 'Scrap' },
+  { tyreNo: 'OLD-3065', make: 'MRF',     model: 'Zapper',   tyreSize: '295/90R20',   material: 'Radial', vehicleNo: 'AP51 TB 9816', lastPosition: 'FL',       removedDate: '2024-03-10', runningKm: 120000, expectedLife: 100000, remainingTread: 5,  removalReason: 'Worn Out',   condition: 'Poor',   storeLocation: 'Scrap Yard',       status: 'SCRAP',      notes: '' },
+  { tyreNo: 'OLD-6703', make: 'Apollo',  model: 'EnduRace', tyreSize: '315/80R22.5', material: 'Radial', vehicleNo: 'AP21 TB 9393', lastPosition: 'FR',       removedDate: '2024-06-22', runningKm: 42000,  expectedLife: 100000, remainingTread: 55, removalReason: 'Rotation',   condition: 'Good',   storeLocation: 'Reusable Storage', status: 'REUSABLE',   notes: 'Good condition, suitable for remount' },
+  { tyreNo: 'OLD-5146', make: 'Ceat',    model: 'Milaze',   tyreSize: '12R22.5',     material: 'Radial', vehicleNo: 'AP59 TB 9721', lastPosition: 'L1_OUTER', removedDate: '2024-05-15', runningKm: 60000,  expectedLife: 100000, remainingTread: 28, removalReason: 'Retreading', condition: 'Medium', storeLocation: 'Retreading Area',  status: 'RETREADING', notes: '' },
+  { tyreNo: 'OLD-3091', make: 'JK Tyre', model: 'Jet Xtra', tyreSize: '295/90R20',   material: 'Radial', vehicleNo: 'AP45 TB 2483', lastPosition: 'R1_OUTER', removedDate: '2024-01-08', runningKm: 115000, expectedLife: 100000, remainingTread: 3,  removalReason: 'Burst',      condition: 'Poor',   storeLocation: 'Scrap Yard',       status: 'SCRAP',      notes: '' },
+  { tyreNo: 'OLD-7821', make: 'Bridgestone', model: 'R154', tyreSize: '315/80R22.5', material: 'Radial', vehicleNo: 'AP88 TB 9146', lastPosition: 'L2_INNER', removedDate: '2024-08-30', runningKm: 48000,  expectedLife: 100000, remainingTread: 62, removalReason: 'Rotation',   condition: 'Good',   storeLocation: 'Reusable Storage', status: 'REUSABLE',   notes: 'Low mileage, excellent condition' },
 ];
 
 export const vendors = [
