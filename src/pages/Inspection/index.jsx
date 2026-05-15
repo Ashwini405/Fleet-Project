@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ClipboardCheck, Plus, ListChecks, History, CalendarCheck2 } from 'lucide-react';
-import { dummyHistory, dummyPlans } from './data/dummyData';
 
 import OverviewTab from './tabs/OverviewTab';
 import HistoryTab from './tabs/HistoryTab';
@@ -11,8 +10,10 @@ import ViewInspectionModal from './components/ViewInspectionModal';
 
 export default function InspectionModule() {
   const [activeTab, setActiveTab] = useState('Overview');
-  const [historyData, setHistoryData] = useState(dummyHistory);
-  const [plansData, setPlansData] = useState(dummyPlans);
+  const [historyData, setHistoryData] = useState([]);
+  const [plansData, setPlansData] = useState([]);
+  const [vehiclesData, setVehiclesData] = useState([]);
+  const [loadingPlans, setLoadingPlans] = useState(false);
 
   // Modals state
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -23,6 +24,73 @@ export default function InspectionModule() {
     { id: 'History', icon: History, label: 'History & Logs' },
     { id: 'Plans', icon: CalendarCheck2, label: 'Inspection Plans' }
   ];
+
+  // Fetch inspection plans from backend
+  const fetchPlans = async () => {
+    try {
+      setLoadingPlans(true);
+      const response = await fetch('http://localhost:5001/api/inspection-plans');
+      const data = await response.json();
+
+      if (data.success) {
+        const formatted = data.data.map(plan => ({
+          ...plan,
+          type: plan.plan_type || 'Maintenance',
+          items: typeof plan.checklist_items === 'string'
+            ? JSON.parse(plan.checklist_items)
+            : plan.checklist_items || []
+        }));
+        setPlansData(formatted);
+      }
+    } catch (error) {
+      console.error('FETCH INSPECTION PLANS ERROR:', error);
+    } finally {
+      setLoadingPlans(false);
+    }
+  };
+
+  // Fetch inspections (history) from backend
+  const fetchInspections = async () => {
+    try {
+      const response = await fetch('http://localhost:5001/api/inspections');
+      const data = await response.json();
+
+      if (data.success) {
+        const formatted = data.data.map(item => ({
+          id: item.inspection_number,
+          date: new Date(item.inspection_date).toLocaleDateString(),
+          vehicle: item.vehicle_number,
+          inspector: item.inspector_name,
+          status: item.inspection_status,
+          rawData: item
+        }));
+        setHistoryData(formatted);
+      }
+    } catch (error) {
+      console.error('FETCH INSPECTIONS ERROR:', error);
+    }
+  };
+
+  // Fetch vehicles from backend
+  const fetchVehicles = async () => {
+    try {
+      const response = await fetch('http://localhost:5001/api/vehicles');
+      const data = await response.json();
+
+      if (data.success) {
+        setVehiclesData(data.data);
+      }
+    } catch (error) {
+      console.error('FETCH VEHICLES ERROR:', error);
+    }
+  };
+
+  // Load all data when component mounts
+  useEffect(() => {
+    fetchPlans();
+    fetchInspections();
+    fetchVehicles();
+  }, []);
 
   const handleAddNewInspection = (newRecord) => {
     setHistoryData([newRecord, ...historyData]);
@@ -72,7 +140,12 @@ export default function InspectionModule() {
            <AnimatePresence mode="wait">
               {activeTab === 'Overview' && (
                 <motion.div key="Overview" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
-                   <OverviewTab historyData={historyData} onViewReport={setViewingInspection} />
+                   <OverviewTab 
+                     historyData={historyData} 
+                     vehiclesData={vehiclesData}
+                     onViewReport={setViewingInspection} 
+                     onStartInspection={() => setIsNewModalOpen(true)} 
+                   />
                 </motion.div>
               )}
               {activeTab === 'History' && (
@@ -82,7 +155,12 @@ export default function InspectionModule() {
               )}
               {activeTab === 'Plans' && (
                 <motion.div key="Plans" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
-                   <PlansTab plansData={plansData} setPlansData={setPlansData} />
+                   <PlansTab 
+                     plansData={plansData} 
+                     setPlansData={setPlansData} 
+                     fetchPlans={fetchPlans} 
+                     loadingPlans={loadingPlans} 
+                   />
                 </motion.div>
               )}
            </AnimatePresence>

@@ -6,7 +6,13 @@ export default function ViewInspectionModal({ isOpen, onClose, inspectionData })
   if (!isOpen || !inspectionData) return null;
 
   const isPassed = inspectionData.status === 'Passed';
-  const checklist = inspectionData.details?.checklist || [];
+  // Use the rawData from the API (attached in InspectionModule) or fallback to inspectionData directly
+  const raw = inspectionData.rawData || inspectionData;
+  const checklist = raw?.checklist_results
+    ? (typeof raw.checklist_results === 'string'
+        ? JSON.parse(raw.checklist_results)
+        : raw.checklist_results)
+    : [];
 
   return (
     <AnimatePresence>
@@ -24,7 +30,7 @@ export default function ViewInspectionModal({ isOpen, onClose, inspectionData })
                   Inspection Report
                </h3>
                <p className="text-xs text-slate-400 font-bold tracking-widest uppercase mt-1">
-                  ID: {inspectionData.id} <span className="opacity-50 mx-1">|</span> Plan: {inspectionData.details.plan}
+                  ID: {inspectionData.id} <span className="opacity-50 mx-1">|</span> Plan: {raw?.plan_title || inspectionData.plan || '—'}
                </p>
             </div>
             <button 
@@ -68,7 +74,7 @@ export default function ViewInspectionModal({ isOpen, onClose, inspectionData })
                   </div>
                   <div className="flex justify-between items-center">
                      <span className="text-xs font-semibold text-slate-500">Odometer</span>
-                     <span className="text-sm font-bold text-slate-800 font-mono">{inspectionData.details.odo}</span>
+                     <span className="text-sm font-bold text-slate-800 font-mono">{raw?.odometer || '—'}</span>
                   </div>
                </div>
 
@@ -80,7 +86,7 @@ export default function ViewInspectionModal({ isOpen, onClose, inspectionData })
                   </div>
                   <div className="flex justify-between items-center">
                      <span className="text-xs font-semibold text-slate-500">Location</span>
-                     <span className="text-sm font-bold text-slate-800">{inspectionData.details.location}</span>
+                     <span className="text-sm font-bold text-slate-800">{raw?.location || '—'}</span>
                   </div>
                </div>
             </div>
@@ -96,26 +102,25 @@ export default function ViewInspectionModal({ isOpen, onClose, inspectionData })
                   
                   {checklist.length > 0 ? checklist.map((item, i) => (
                      <div key={i} className="p-4 flex justify-between items-center bg-white">
-                        <span className="text-sm font-medium text-slate-700">{item.name}</span>
+                        <span className="text-sm font-medium text-slate-700">{item.item_name || item.name}</span>
                         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-bold uppercase tracking-widest rounded ${
-                           item.result === 'Pass' ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'
+                           (item.result === 'Pass' || item.result === 'Passed') ? 'text-green-700 bg-green-50' : 'text-red-700 bg-red-50'
                         }`}>
-                           <span className={`w-1.5 h-1.5 rounded-full ${item.result === 'Pass' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                           {item.result === 'Pass' ? 'Passed' : 'Failed'}
+                           <span className={`w-1.5 h-1.5 rounded-full ${(item.result === 'Pass' || item.result === 'Passed') ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                           {(item.result === 'Pass' || item.result === 'Passed') ? 'Passed' : 'Failed'}
                         </span>
                      </div>
                   )) : (
                      <div className="p-4 bg-white text-sm text-slate-500">
-                        {/* Fallback for hardcoded history items that don't have a generated checklist in dummyData */}
                         <p className="mb-2">Historical report summary. Individual line items not detailed in legacy export.</p>
-                        <p><strong>Notes:</strong> {inspectionData.details.notes || 'No specific notes recorded.'}</p>
+                        <p><strong>Notes:</strong> {raw?.final_notes || 'No inspection notes recorded.'}</p>
                      </div>
                   )}
 
-                  {inspectionData.details.notes && checklist.length > 0 && (
+                  {raw?.final_notes && checklist.length > 0 && (
                      <div className="p-4 bg-white border-t border-slate-200">
                         <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Inspector Notes</span>
-                        <p className="text-sm text-slate-700">{inspectionData.details.notes}</p>
+                        <p className="text-sm text-slate-700">{raw.final_notes}</p>
                      </div>
                   )}
 

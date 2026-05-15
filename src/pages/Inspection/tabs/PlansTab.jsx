@@ -1,12 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, ListChecks, ArrowRight, Settings } from 'lucide-react';
 import CreatePlanModal from '../components/CreatePlanModal';
 
 export default function PlansTab({ plansData, setPlansData }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleAddPlan = (newPlan) => {
-    setPlansData([...plansData, newPlan]);
+  // Fetch all inspection plans from the backend
+  const fetchPlans = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5001/api/inspection-plans');
+      const data = await response.json();
+
+      if (data.success) {
+        const formatted = data.data.map(plan => ({
+          ...plan,
+          // Convert plan_type to uppercase for consistent styling (e.g., "MAINTENANCE")
+          type: (plan.plan_type || 'Maintenance').toUpperCase(),
+          // checklist_items may already be an array (not a string) from the API
+          items: typeof plan.checklist_items === 'string'
+            ? JSON.parse(plan.checklist_items)
+            : plan.checklist_items || []
+        }));
+        setPlansData(formatted);
+      }
+    } catch (error) {
+      console.error('FETCH PLANS ERROR:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load plans when component mounts
+  useEffect(() => {
+    fetchPlans();
+  }, []);
+
+  // After creating a new plan, refresh the list
+  const handleAddPlan = () => {
+    fetchPlans();
   };
 
   return (
@@ -26,10 +59,24 @@ export default function PlansTab({ plansData, setPlansData }) {
          </button>
       </div>
 
-      {/* Plans Map */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-         
-         {plansData.map((plan, idx) => (
+      {/* Loading State */}
+      {loading && (
+        <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center text-sm font-semibold text-slate-500">
+          Loading Inspection Plans...
+        </div>
+      )}
+
+      {/* Plans Grid */}
+      {!loading && plansData.length === 0 ? (
+        <div className="col-span-full bg-white rounded-2xl border border-slate-200 p-10 text-center">
+          <h3 className="text-lg font-bold text-slate-700">No Inspection Plans Found</h3>
+          <p className="text-sm text-slate-400 mt-2">
+            Create your first inspection plan.
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {plansData.map((plan, idx) => (
             <div key={idx} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 flex flex-col group hover:shadow-md transition-shadow relative overflow-hidden">
                
                <div className="flex justify-between items-start mb-4 relative z-10">
@@ -53,21 +100,22 @@ export default function PlansTab({ plansData, setPlansData }) {
                      </div>
                      <div>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Checklist Items</p>
-                        <p className="text-sm font-semibold text-slate-700 mt-0.5">{plan.items.length} Configured Checkpoints</p>
+                        <p className="text-sm font-semibold text-slate-700 mt-0.5">{(plan.items || []).length} Configured Checkpoints</p>
                      </div>
                   </div>
                   
                   <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
                      <p className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-widest">Includes:</p>
                      <ul className="text-xs text-slate-600 font-medium space-y-2">
-                        {plan.items.slice(0, 3).map((item, i) => (
+                        {(plan.items || []).slice(0, 3).map((item, i) => (
                            <li key={i} className="flex gap-2 items-center truncate">
-                              <span className="w-1 h-1 rounded-full bg-slate-300"></span> {item}
+                              <span className="w-1 h-1 rounded-full bg-slate-300"></span> 
+                              {item.desc || item}
                            </li>
                         ))}
-                        {plan.items.length > 3 && (
+                        {(plan.items || []).length > 3 && (
                            <li className="text-slate-400 text-[10px] font-bold italic pt-1">
-                              + {plan.items.length - 3} more items...
+                              + {(plan.items || []).length - 3} more items...
                            </li>
                         )}
                      </ul>
@@ -85,9 +133,9 @@ export default function PlansTab({ plansData, setPlansData }) {
                </div>
 
             </div>
-         ))}
-
-      </div>
+          ))}
+        </div>
+      )}
 
       <CreatePlanModal 
          isOpen={isModalOpen}
