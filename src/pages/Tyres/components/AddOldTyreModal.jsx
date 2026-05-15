@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, AlertCircle, ChevronDown } from 'lucide-react';
-import { useTyreLifecycle } from '../index';
+import axios from 'axios';
 import { layoutPositions } from '../data/dummyData';
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -21,7 +21,7 @@ const PLACEMENTS = layoutPositions.map(p => ({ id: p.id, label: p.label }));
 
 const EMPTY = {
   tyreNo: '', brand: '', model: '', tyreSize: '', material: '',
-  vehicleNo: '', lastPosition: '', removedDate: '',
+  vehicleId: null, vehicleNo: '', lastPosition: '', removedDate: '',
   runningKm: '', expectedLife: '', remainingTread: '',
   status: 'OLD_STOCK', storeLocation: '', removalReason: '', notes: '',
 };
@@ -67,9 +67,36 @@ function SectionHead({ title }) {
 }
 
 export default function AddOldTyreModal({ isOpen, onClose }) {
-  const { oldTyres, addOldTyre } = useTyreLifecycle();
-  const [form, setForm]   = useState(EMPTY);
+  const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState({});
+  const [oldTyres, setOldTyres] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+
+  // Fetch existing old tyres for duplicate check and vehicles for dropdown
+  useEffect(() => {
+    if (isOpen) {
+      fetchOldTyres();
+      fetchVehicles();
+    }
+  }, [isOpen]);
+
+  const fetchOldTyres = async () => {
+    try {
+      const res = await axios.get('http://localhost:5001/api/old-tyres');
+      setOldTyres(res.data.data || []);
+    } catch (error) {
+      console.log('Fetch Old Tyres Error:', error);
+    }
+  };
+
+  const fetchVehicles = async () => {
+    try {
+      const res = await axios.get('http://localhost:5001/api/vehicles');
+      setVehicles(res.data.data || []);
+    } catch (error) {
+      console.log('Fetch Vehicles Error:', error);
+    }
+  };
 
   const set = (k, v) => {
     setForm(p => ({ ...p, [k]: v }));
@@ -79,56 +106,72 @@ export default function AddOldTyreModal({ isOpen, onClose }) {
   const validate = () => {
     const e = {};
     const no = form.tyreNo.trim().toUpperCase();
-    if (!no)                                                    e.tyreNo       = 'Tyre number is required';
-    else if (oldTyres.some(t => t.tyreNo.toUpperCase() === no)) e.tyreNo       = 'Tyre number already exists in old stock';
-    if (!form.brand)                                            e.brand        = 'Brand is required';
-    if (!form.model.trim())                                     e.model        = 'Model is required';
-    if (!form.tyreSize)                                         e.tyreSize     = 'Tyre size is required';
-    if (!form.removedDate)                                      e.removedDate  = 'Removed date is required';
-    else if (form.removedDate > today())                        e.removedDate  = 'Cannot be a future date';
-    if (!form.runningKm)                                        e.runningKm    = 'Total ran KM is required';
-    else if (parseInt(form.runningKm) < 0)                     e.runningKm    = 'Cannot be negative';
+    if (!no) e.tyreNo = 'Tyre number is required';
+    else if (oldTyres.some(t => String(t.old_tyre_number || '').toUpperCase() === no))
+      e.tyreNo = 'Tyre number already exists in old stock';
+    if (!form.brand) e.brand = 'Brand is required';
+    if (!form.model.trim()) e.model = 'Model is required';
+    if (!form.tyreSize) e.tyreSize = 'Tyre size is required';
+    if (!form.removedDate) e.removedDate = 'Removed date is required';
+    else if (form.removedDate > today()) e.removedDate = 'Cannot be a future date';
+    if (!form.runningKm) e.runningKm = 'Total ran KM is required';
+    else if (parseInt(form.runningKm) < 0) e.runningKm = 'Cannot be negative';
     if (form.remainingTread !== '' && (parseInt(form.remainingTread) < 0 || parseInt(form.remainingTread) > 100))
-                                                                e.remainingTread = 'Must be 0–100';
-    if (!form.status)                                           e.status       = 'Status is required';
-    if (!form.storeLocation)                                    e.storeLocation = 'Store location is required';
+      e.remainingTread = 'Must be 0–100';
+    if (!form.status) e.status = 'Status is required';
+    if (!form.storeLocation) e.storeLocation = 'Store location is required';
     return e;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
-    addOldTyre({
-      tyreNo:        form.tyreNo.trim().toUpperCase(),
-      make:          form.brand,
-      model:         form.model.trim(),
-      tyreSize:      form.tyreSize,
-      material:      form.material,
-      vehicleNo:     form.vehicleNo.trim() || null,
-      lastPosition:  form.lastPosition || null,
-      removedDate:   form.removedDate,
-      runningKm:     parseInt(form.runningKm),
-      expectedLife:  form.expectedLife ? parseInt(form.expectedLife) : null,
-      remainingTread:form.remainingTread !== '' ? parseInt(form.remainingTread) : null,
-      removalReason: form.removalReason || null,
-      condition:     null,
-      storeLocation: form.storeLocation,
-      status:        form.status,
-      notes:         form.notes.trim() || null,
-    });
+    if (Object.keys(e).length) {
+      setErrors(e);
+      return;
+    }
+
+    try {
+      await axios.post('http://localhost:5001/api/old-tyres', {
+        old_tyre_number: form.tyreNo.trim().toUpperCase(),
+        brand: form.brand,
+        model: form.model.trim(),
+        tyre_size: form.tyreSize,
+        material_type: form.material,
+        vehicle_id: form.vehicleId || null,
+        vehicle_number: form.vehicleNo || null,
+        last_position: form.lastPosition || null,
+        removed_date: form.removedDate,
+        removal_reason: form.removalReason || null,
+        running_km: form.runningKm,
+        expected_life_km: form.expectedLife || null,
+        remaining_tread_percent: form.remainingTread || null,
+        tyre_status: form.status,
+        store_location: form.storeLocation,
+        notes: form.notes || null,
+      });
+
+      setForm(EMPTY);
+      setErrors({});
+      onClose();
+    } catch (error) {
+      console.log('Create Old Tyre Error:', error);
+    }
+  };
+
+  const handleClose = () => {
     setForm(EMPTY);
     setErrors({});
     onClose();
   };
 
-  const handleClose = () => { setForm(EMPTY); setErrors({}); onClose(); };
-
   if (!isOpen) return null;
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
-        onClick={e => e.target === e.currentTarget && handleClose()}>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+        onClick={e => e.target === e.currentTarget && handleClose()}
+      >
         <motion.div
           initial={{ opacity: 0, scale: 0.96, y: 16 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -146,22 +189,29 @@ export default function AddOldTyreModal({ isOpen, onClose }) {
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5">Manually add a used tyre to old stock inventory</p>
             </div>
-            <button onClick={handleClose}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 hover:rotate-90">
+            <button
+              onClick={handleClose}
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all duration-200 hover:rotate-90"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
 
           {/* Body */}
-          <div className="overflow-y-auto flex-1 p-5 space-y-3"
-            style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}>
-
+          <div
+            className="overflow-y-auto flex-1 p-5 space-y-3"
+            style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}
+          >
             <SectionHead title="Basic Tyre Info" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label required>Old Tyre Number</Label>
-                <input value={form.tyreNo} onChange={e => set('tyreNo', e.target.value.toUpperCase())}
-                  placeholder="e.g. OLD-5001" className={inputCls(errors.tyreNo) + ' font-mono'} />
+                <input
+                  value={form.tyreNo}
+                  onChange={e => set('tyreNo', e.target.value.toUpperCase())}
+                  placeholder="e.g. OLD-5001"
+                  className={inputCls(errors.tyreNo) + ' font-mono'}
+                />
                 <Err msg={errors.tyreNo} />
               </div>
               <div>
@@ -174,8 +224,12 @@ export default function AddOldTyreModal({ isOpen, onClose }) {
               </div>
               <div>
                 <Label required>Model</Label>
-                <input value={form.model} onChange={e => set('model', e.target.value)}
-                  placeholder="e.g. EnduRace" className={inputCls(errors.model)} />
+                <input
+                  value={form.model}
+                  onChange={e => set('model', e.target.value)}
+                  placeholder="e.g. EnduRace"
+                  className={inputCls(errors.model)}
+                />
                 <Err msg={errors.model} />
               </div>
               <div>
@@ -199,8 +253,21 @@ export default function AddOldTyreModal({ isOpen, onClose }) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>Last Vehicle Number</Label>
-                <input value={form.vehicleNo} onChange={e => set('vehicleNo', e.target.value)}
-                  placeholder="e.g. AP91 TB 9602" className={inputCls(false)} />
+                <Sel
+                  value={form.vehicleNo}
+                  onChange={e => {
+                    const selectedVehicle = vehicles.find(v => v.vehicle_no === e.target.value);
+                    set('vehicleNo', e.target.value);
+                    set('vehicleId', selectedVehicle?.id || null);
+                  }}
+                >
+                  <option value="">Select Vehicle</option>
+                  {vehicles.map(vehicle => (
+                    <option key={vehicle.id} value={vehicle.vehicle_no}>
+                      {vehicle.vehicle_no}
+                    </option>
+                  ))}
+                </Sel>
               </div>
               <div>
                 <Label>Last Mounted Position</Label>
@@ -211,8 +278,13 @@ export default function AddOldTyreModal({ isOpen, onClose }) {
               </div>
               <div>
                 <Label required>Removed Date</Label>
-                <input type="date" value={form.removedDate} max={today()}
-                  onChange={e => set('removedDate', e.target.value)} className={inputCls(errors.removedDate)} />
+                <input
+                  type="date"
+                  value={form.removedDate}
+                  max={today()}
+                  onChange={e => set('removedDate', e.target.value)}
+                  className={inputCls(errors.removedDate)}
+                />
                 <Err msg={errors.removedDate} />
               </div>
               <div>
@@ -228,20 +300,38 @@ export default function AddOldTyreModal({ isOpen, onClose }) {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <Label required>Total Ran KM</Label>
-                <input type="number" min="0" value={form.runningKm} onChange={e => set('runningKm', e.target.value)}
-                  placeholder="e.g. 85000" className={inputCls(errors.runningKm) + ' font-mono'} />
+                <input
+                  type="number"
+                  min="0"
+                  value={form.runningKm}
+                  onChange={e => set('runningKm', e.target.value)}
+                  placeholder="e.g. 85000"
+                  className={inputCls(errors.runningKm) + ' font-mono'}
+                />
                 <Err msg={errors.runningKm} />
               </div>
               <div>
                 <Label>Expected Life (km)</Label>
-                <input type="number" min="0" value={form.expectedLife} onChange={e => set('expectedLife', e.target.value)}
-                  placeholder="e.g. 100000" className={inputCls(false) + ' font-mono'} />
+                <input
+                  type="number"
+                  min="0"
+                  value={form.expectedLife}
+                  onChange={e => set('expectedLife', e.target.value)}
+                  placeholder="e.g. 100000"
+                  className={inputCls(false) + ' font-mono'}
+                />
               </div>
               <div>
                 <Label>Remaining Tread (%)</Label>
-                <input type="number" min="0" max="100" value={form.remainingTread}
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={form.remainingTread}
                   onChange={e => set('remainingTread', e.target.value)}
-                  placeholder="0–100" className={inputCls(errors.remainingTread) + ' font-mono'} />
+                  placeholder="0–100"
+                  className={inputCls(errors.remainingTread) + ' font-mono'}
+                />
                 <Err msg={errors.remainingTread} />
               </div>
             </div>
@@ -265,23 +355,31 @@ export default function AddOldTyreModal({ isOpen, onClose }) {
               </div>
               <div className="sm:col-span-2">
                 <Label>Notes / Remarks</Label>
-                <textarea rows={3} value={form.notes} onChange={e => set('notes', e.target.value)}
+                <textarea
+                  rows={3}
+                  value={form.notes}
+                  onChange={e => set('notes', e.target.value)}
                   placeholder="Optional remarks..."
-                  className="w-full px-3.5 py-2.5 bg-white border border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl text-sm font-medium text-slate-800 focus:outline-none transition-all duration-200 resize-none" />
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 rounded-xl text-sm font-medium text-slate-800 focus:outline-none transition-all duration-200 resize-none"
+                />
               </div>
             </div>
           </div>
 
           {/* Footer */}
           <div className="shrink-0 flex items-center justify-end gap-2.5 px-5 py-4 border-t border-slate-100 bg-slate-50/60">
-            <button onClick={handleClose}
-              className="h-10 px-5 text-sm font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all duration-200">
+            <button
+              onClick={handleClose}
+              className="h-10 px-5 text-sm font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all duration-200"
+            >
               Cancel
             </button>
-            <button onClick={handleSubmit}
+            <button
+              onClick={handleSubmit}
               className="h-10 px-6 text-sm font-extrabold text-white rounded-xl flex items-center gap-2
                 transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5"
-              style={{ background: 'linear-gradient(135deg, #ea580c 0%, #dc2626 100%)' }}>
+              style={{ background: 'linear-gradient(135deg, #ea580c 0%, #dc2626 100%)' }}
+            >
               <Plus className="w-4 h-4" /> Add to Old Stock
             </button>
           </div>

@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Archive, Layers, Trash2, RotateCcw, RefreshCw, Plus, MoreVertical } from 'lucide-react';
-import { useTyreLifecycle } from '../index';
+import axios from 'axios';
 import { layoutPositions } from '../data/dummyData';
 import OldTyreDetailsModal from '../components/OldTyreDetailsModal';
-import ReMountModal        from '../components/ReMountModal';
-import AddOldTyreModal     from '../components/AddOldTyreModal';
+import ReMountModal from '../components/ReMountModal';
+import AddOldTyreModal from '../components/AddOldTyreModal';
 import { Toast, useToast, TableSkeleton, EmptyState, StickyTable, StickyThead } from '../components/ERPUtils';
 
 const posLabel = (id) => layoutPositions.find(p => p.id === id)?.label ?? id ?? '—';
@@ -98,18 +98,55 @@ function ActionMenu({ tyre, onView, onRemount, onMarkReusable, onRetread, onScra
 const filterCls = 'h-[38px] bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all';
 
 export default function OldTyresStockTab() {
-  const { oldTyres, updateOldTyre } = useTyreLifecycle();
   const { toasts, push, dismiss } = useToast();
 
-  const [loading, setLoading]             = useState(true);
-  const [search, setSearch]               = useState('');
-  const [filterStatus, setFilterStatus]   = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('all');
   const [filterLocation, setFilterLocation] = useState('all');
-  const [viewingTyre, setViewingTyre]     = useState(null);
+  const [viewingTyre, setViewingTyre] = useState(null);
   const [remountingTyre, setRemountingTyre] = useState(null);
-  const [isAddOpen, setIsAddOpen]         = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
 
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 400); return () => clearTimeout(t); }, []);
+  const [oldTyres, setOldTyres] = useState([]);
+
+  // Fetch old tyres from backend
+  const fetchOldTyres = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get('http://localhost:5001/api/old-tyres');
+      const tyres = res.data.data || [];
+      const formatted = tyres.map(tyre => ({
+        id: tyre.id,
+        tyreNo: tyre.old_tyre_number,
+        make: tyre.brand,
+        model: tyre.model,
+        tyreSize: tyre.tyre_size,
+        material: tyre.material_type,
+        vehicleId: tyre.vehicle_id,
+        vehicleNo: tyre.vehicle_number,
+        lastPosition: tyre.last_position,
+        removedDate: tyre.removed_date,
+        removalReason: tyre.removal_reason,
+        runningKm: Number(tyre.running_km || 0),
+        expectedLife: Number(tyre.expected_life_km || 0),
+        remainingTread: tyre.remaining_tread_percent !== null ? Number(tyre.remaining_tread_percent) : null,
+        status: tyre.tyre_status,
+        storeLocation: tyre.store_location,
+        notes: tyre.notes,
+        createdAt: tyre.created_at,
+      }));
+      setOldTyres(formatted);
+    } catch (error) {
+      console.log('Fetch Old Tyres Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOldTyres();
+  }, []);
 
   const locations = [...new Set(oldTyres.map(t => t.storeLocation).filter(Boolean))];
 
@@ -117,24 +154,51 @@ export default function OldTyresStockTab() {
     const matchSearch = [t.tyreNo, t.vehicleNo || '', t.removalReason || '', t.make || '', t.model || '']
       .some(v => v.toLowerCase().includes(search.toLowerCase()));
     return matchSearch &&
-      (filterStatus   === 'all' || t.status        === filterStatus) &&
+      (filterStatus === 'all' || t.status === filterStatus) &&
       (filterLocation === 'all' || t.storeLocation === filterLocation);
   });
 
   const hasFilters = search !== '' || filterStatus !== 'all' || filterLocation !== 'all';
   const clearFilters = () => { setSearch(''); setFilterStatus('all'); setFilterLocation('all'); };
 
-  const handleMarkReusable = (tyreNo) => {
-    updateOldTyre(tyreNo, { status: 'REUSABLE', storeLocation: 'Reusable Storage' });
-    push(`${tyreNo} marked as reusable`, 'success');
+  // API update helpers
+  const handleMarkReusable = async (tyreNo) => {
+    try {
+      await axios.put(`http://localhost:5001/api/old-tyres/${tyreNo}`, {
+        tyre_status: 'REUSABLE',
+        store_location: 'Reusable Storage',
+      });
+      fetchOldTyres();
+      push(`${tyreNo} marked as reusable`, 'success');
+    } catch (error) {
+      console.log(error);
+    }
   };
-  const handleRetread = (tyreNo) => {
-    updateOldTyre(tyreNo, { status: 'RETREADING', storeLocation: 'Retreading Area' });
-    push(`${tyreNo} sent for retreading`, 'warning');
+
+  const handleRetread = async (tyreNo) => {
+    try {
+      await axios.put(`http://localhost:5001/api/old-tyres/${tyreNo}`, {
+        tyre_status: 'RETREADING',
+        store_location: 'Retreading Area',
+      });
+      fetchOldTyres();
+      push(`${tyreNo} sent for retreading`, 'warning');
+    } catch (error) {
+      console.log(error);
+    }
   };
-  const handleScrap = (tyreNo) => {
-    updateOldTyre(tyreNo, { status: 'SCRAP', storeLocation: 'Scrap Yard' });
-    push(`${tyreNo} marked as scrap`, 'error');
+
+  const handleScrap = async (tyreNo) => {
+    try {
+      await axios.put(`http://localhost:5001/api/old-tyres/${tyreNo}`, {
+        tyre_status: 'SCRAP',
+        store_location: 'Scrap Yard',
+      });
+      fetchOldTyres();
+      push(`${tyreNo} marked as scrap`, 'error');
+    } catch (error) {
+      console.log(error);
+    }
   };
 
   return (
@@ -299,7 +363,7 @@ export default function OldTyresStockTab() {
                     {/* Removed Date */}
                     <td className="py-2.5 px-3 whitespace-nowrap">
                       <span className="text-[11px] font-medium text-gray-500 tabular-nums">
-                        {tyre.removedDate || tyre.entryDate || '—'}
+                        {tyre.removedDate || '—'}
                       </span>
                     </td>
 
@@ -377,10 +441,16 @@ export default function OldTyresStockTab() {
         )}
       </div>
 
-      <OldTyreDetailsModal tyre={viewingTyre}     onClose={() => setViewingTyre(null)} />
+      <OldTyreDetailsModal tyre={viewingTyre} onClose={() => setViewingTyre(null)} />
       <ReMountModal tyre={remountingTyre} onClose={() => setRemountingTyre(null)}
         onSuccess={(tyreNo) => { push(`${tyreNo} re-mounted successfully`, 'success'); }} />
-      <AddOldTyreModal     isOpen={isAddOpen}     onClose={() => setIsAddOpen(false)} />
+      <AddOldTyreModal
+        isOpen={isAddOpen}
+        onClose={() => {
+          setIsAddOpen(false);
+          fetchOldTyres();
+        }}
+      />
     </div>
   );
 }
