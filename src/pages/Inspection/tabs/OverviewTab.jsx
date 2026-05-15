@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { dummyVehicles } from '../data/dummyData';
 
-export default function OverviewTab({ historyData, onViewReport }) {
+export default function OverviewTab({ historyData, vehiclesData, onViewReport }) {
   const [filterVehicle, setFilterVehicle] = useState('All');
 
   // Aggregated KPIs
-  const totalFleet = dummyVehicles.length;
+  const totalFleet =
+  vehiclesData?.length || 0;
   const completedCount = historyData.length;
   const passedCount = historyData.filter(h => h.status === 'Passed').length;
   const failedCount = historyData.filter(h => h.status === 'Failed').length;
@@ -14,7 +14,7 @@ export default function OverviewTab({ historyData, onViewReport }) {
 
   const filteredHistory = filterVehicle === 'All' 
      ? historyData 
-     : historyData.filter(h => h.vehicle.includes(filterVehicle));
+     : historyData.filter(h => h.vehicle === filterVehicle);
 
   const kpiCards = [
     { title: 'Active Fleet', val: totalFleet, color: 'text-blue-600', bg: 'bg-white', border: 'border-blue-100', subtitle: '100% Operational' },
@@ -54,7 +54,11 @@ export default function OverviewTab({ historyData, onViewReport }) {
                onChange={(e) => setFilterVehicle(e.target.value)}
             >
                <option value="All">Filter by Vehicle...</option>
-               {dummyVehicles.map(v => <option key={v} value={v.split(' ')[0]}>{v.split(' ')[0]}</option>)}
+               {vehiclesData?.map(v => (
+                 <option key={v.id} value={v.vehicle_no}>
+                   {v.vehicle_no}
+                 </option>
+               ))}
             </select>
          </div>
 
@@ -84,13 +88,13 @@ export default function OverviewTab({ historyData, onViewReport }) {
                      </td>
                      <td className="py-4 px-6">
                         <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded inline-block">{record.vehicle}</span>
-                     </td>
+                      </td>
                      <td className="py-4 px-6">
                         <span className="text-[11px] font-semibold text-slate-500 block mb-1">{record.inspector}</span>
                         <span className={`text-[10px] font-bold uppercase tracking-widest ${record.status === 'Passed' ? 'text-green-600' : 'text-red-600'}`}>
                            {record.status}
                         </span>
-                     </td>
+                      </td>
                      <td className="py-4 px-6 text-right">
                         <button 
                            onClick={(e) => { e.stopPropagation(); onViewReport(record); }}
@@ -98,15 +102,15 @@ export default function OverviewTab({ historyData, onViewReport }) {
                         >
                            View
                         </button>
-                     </td>
+                      </td>
                    </motion.tr>
                 ))}
                 {filteredHistory.length === 0 && (
-                  <tr>
+                   <tr>
                      <td colSpan={4} className="py-12 px-6 text-center text-slate-400 font-medium text-sm">
                         No completed inspections found for '{filterVehicle}'
-                     </td>
-                  </tr>
+                      </td>
+                   </tr>
                 )}
               </tbody>
             </table>

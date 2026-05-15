@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { DownloadCloud, Search, AlertCircle } from 'lucide-react';
-import { dummyVehicles } from '../data/dummyData';
 
-export default function HistoryTab({ historyData, onViewReport }) {
+export default function HistoryTab({ historyData, vehiclesData, onViewReport }) {
   const [filterVehicle, setFilterVehicle] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
 
   const filteredHistory = historyData.filter(h => {
-    const vMatch = filterVehicle === 'All' || h.vehicle.includes(filterVehicle);
+    const vMatch = filterVehicle === 'All' || h.vehicle === filterVehicle;
     const sMatch = filterStatus === 'All' || h.status === filterStatus;
     return vMatch && sMatch;
   });
@@ -25,7 +24,11 @@ export default function HistoryTab({ historyData, onViewReport }) {
                onChange={(e) => setFilterVehicle(e.target.value)}
             >
                <option value="All">All Vehicles</option>
-               {dummyVehicles.map(v => <option key={v} value={v.split(' ')[0]}>{v.split(' ')[0]}</option>)}
+               {vehiclesData?.map(v => (
+                 <option key={v.id} value={v.vehicle_no}>
+                   {v.vehicle_no}
+                 </option>
+               ))}
             </select>
             <select 
                className="p-2.5 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 shadow-sm"
@@ -54,7 +57,7 @@ export default function HistoryTab({ historyData, onViewReport }) {
                <th className="py-4 px-6">Inspector</th>
                <th className="py-4 px-6">Result</th>
                <th className="py-4 px-6 text-right">Action</th>
-             </tr>
+              </tr>
            </thead>
            <tbody className="divide-y divide-slate-50">
              {filteredHistory.map((record, index) => (
@@ -68,18 +71,18 @@ export default function HistoryTab({ historyData, onViewReport }) {
                 >
                   <td className="py-4 px-6 font-mono text-xs font-semibold text-slate-500">
                      {record.id}
-                  </td>
+                   </td>
                   <td className="py-4 px-6 text-sm font-bold text-slate-800">
                      {record.date}
-                  </td>
+                   </td>
                   <td className="py-4 px-6">
                      <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded mr-2 inline-block mb-1">{record.vehicle}</span>
-                     <span className="text-[10px] text-slate-500 font-medium block pr-4 truncate">{record.details.plan}</span>
-                  </td>
+                     <span className="text-[10px] text-slate-500 font-medium block pr-4 truncate">{record.plan || 'Inspection Plan'}</span>
+                   </td>
                   <td className="py-4 px-6">
                      <span className="text-xs font-semibold text-slate-700">{record.inspector}</span>
-                     <span className="text-[9px] text-slate-400 block mt-0.5">{record.details.location}</span>
-                  </td>
+                     <span className="text-[9px] text-slate-400 block mt-0.5">{record.location || 'Location'}</span>
+                   </td>
                   <td className="py-4 px-6">
                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
                         record.status === 'Passed' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -87,22 +90,22 @@ export default function HistoryTab({ historyData, onViewReport }) {
                         <span className={`w-1.5 h-1.5 rounded-full ${record.status === 'Passed' ? 'bg-green-500' : 'bg-red-500'}`}></span>
                         {record.status}
                      </span>
-                  </td>
+                   </td>
                   <td className="py-4 px-6 text-right">
                      <span className="text-xs font-bold text-slate-400 group-hover:text-blue-600 transition-colors">
                         Read Report &rarr;
                      </span>
-                  </td>
+                   </td>
                 </motion.tr>
              ))}
              
              {filteredHistory.length === 0 && (
-               <tr>
+                <tr>
                   <td colSpan={6} className="py-20 px-6 text-center text-slate-400">
                      <AlertCircle className="w-8 h-8 mx-auto mb-3 opacity-20" />
                      <p className="text-sm font-semibold">No inspection logs match the applied filters.</p>
-                  </td>
-               </tr>
+                   </td>
+                </tr>
              )}
            </tbody>
          </table>
