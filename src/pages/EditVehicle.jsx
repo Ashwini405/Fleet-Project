@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FiArrowLeft, FiSave, FiX, FiCheckCircle, FiUpload, FiFileText, FiImage, FiAlertCircle } from 'react-icons/fi';
+import { generateAxlePositions } from './axlePositionGenerator';
 
 const InputGroup = ({ label, name, type = 'text', placeholder, formData, handleChange }) => (
   <div>
@@ -154,6 +155,11 @@ export default function EditVehicle() {
     [formData.vehicleType]
   );
 
+  const axlePositions = useMemo(
+    () => generateAxlePositions(formData.wheelConfiguration),
+    [formData.wheelConfiguration]
+  );
+
   const docWarnings = useMemo(() => ({
     fcDoc: formData.fcValidity && !files.fcDoc ? 'FC document missing while FC validity is entered.' : undefined,
     taxDoc: formData.taxValidity && !files.taxDoc ? 'Tax document missing while Tax validity is entered.' : undefined,
@@ -237,6 +243,13 @@ export default function EditVehicle() {
             vehicleColor: v.vehicle_color ?? '',
             bodyType: v.body_type ?? '',
             remarks: v.remarks ?? '',
+
+            wheelConfiguration: v.wheel_configuration ?? '',
+            totalTyres: v.total_tyres ?? '',
+            axleCount: v.axle_count ?? '',
+            layoutType: v.layout_type ?? '',
+            spareTyreCount: v.spare_tyre_count ?? '',
+            defaultTyreSize: v.default_tyre_size ?? '',
           });
         }
       })
@@ -343,6 +356,15 @@ export default function EditVehicle() {
       formDataToSend.append("vehicle_color", formData.vehicleColor);
       formDataToSend.append("body_type", formData.bodyType);
       formDataToSend.append("remarks", formData.remarks);
+
+      // ✅ TYRE & AXLE
+      formDataToSend.append("wheel_configuration", formData.wheelConfiguration ?? '');
+      formDataToSend.append("total_tyres", formData.totalTyres ?? '');
+      formDataToSend.append("axle_count", formData.axleCount ?? '');
+      formDataToSend.append("layout_type", formData.layoutType ?? '');
+      formDataToSend.append("spare_tyre_count", formData.spareTyreCount ?? '');
+      formDataToSend.append("default_tyre_size", formData.defaultTyreSize ?? '');
+      formDataToSend.append("axle_positions", JSON.stringify(axlePositions));
 
       // 🔥 FILES (VERY IMPORTANT)
       if (files.insuranceDoc) formDataToSend.append("insurance_document", files.insuranceDoc);
@@ -526,9 +548,37 @@ export default function EditVehicle() {
             </div>
           </section>
 
-          {/* 9. Additional */}
+          {/* 9. Tyre & Axle Configuration */}
           <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-            <SectionHeader num="9" title="Additional Details" />
+            <SectionHeader num="9" title="Tyre & Axle Configuration" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <SelectGroup label="Wheel Configuration" name="wheelConfiguration" options={['4 Wheeler','6 Wheeler','8 Wheeler','10 Wheeler','12 Wheeler','14 Wheeler','18 Wheeler Trailer']} formData={formData} handleChange={handleChange} />
+              <InputGroup label="Total Tyres" name="totalTyres" type="number" placeholder="e.g. 6" formData={formData} handleChange={handleChange} />
+              <InputGroup label="Axle Count" name="axleCount" type="number" placeholder="e.g. 3" formData={formData} handleChange={handleChange} />
+              <SelectGroup label="Layout Type" name="layoutType" options={['4x2','6x2','6x4','8x4','10x4','Trailer Layout']} formData={formData} handleChange={handleChange} />
+              <InputGroup label="Spare Tyre Count" name="spareTyreCount" type="number" placeholder="e.g. 1" formData={formData} handleChange={handleChange} />
+              <InputGroup label="Default Tyre Size" name="defaultTyreSize" placeholder="e.g. 295/80R22.5" formData={formData} handleChange={handleChange} />
+            </div>
+            {axlePositions.length > 0 && (
+              <div className="mt-6 pt-5 border-t border-slate-100">
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
+                  Generated Axle Positions
+                  <span className="ml-2 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-bold text-[10px]">{axlePositions.length}</span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {axlePositions.map(pos => (
+                    <span key={pos} className="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-xs font-mono font-semibold select-none">
+                      {pos}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* 10. Additional */}
+          <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+            <SectionHeader num="10" title="Additional Details" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <InputGroup label="Vehicle Color" name="vehicleColor" placeholder="e.g. White, Red" formData={formData} handleChange={handleChange} />
               <SelectGroup label="Body Type" name="bodyType" options={['Truck', 'Trailer', 'Container', 'Tanker', 'Tipper']} formData={formData} handleChange={handleChange} />

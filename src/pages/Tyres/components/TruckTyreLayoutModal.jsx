@@ -6,7 +6,8 @@ import MountTyreModal from './MountTyreModal';
 import RemoveTyreModal from './RemoveTyreModal';
 import ReplaceTyreModal from './ReplaceTyreModal';
 import TyreDatasheetModal from './TyreDatasheetModal';
-import { getLayout, POSITION_LABELS } from '../data/vehicleLayouts';
+import { axleLayouts, posLabel, AXLE_TYPE_STYLES } from '../data/axleLayouts';
+import TyreConfigCards from './TyreConfigCards';
 
 const HEALTH = {
   Good:   { border: 'border-green-400',  bg: 'bg-green-50',   badge: 'bg-green-500',  glow: 'shadow-green-200',  text: 'text-green-700',  popupBorder: 'border-green-400', popupBg: 'from-green-50' },
@@ -119,6 +120,101 @@ function ActionBtn({ icon, label, cls, onClick }) {
   );
 }
 
+// ── TyreBlock — defined outside component so it never remounts on state change ──
+function TyreBlock({ posId, tyre, onMount, onPopup, activePopupId }) {
+  const label = posLabel(posId);
+
+  if (!tyre) {
+    return (
+      <div
+        onClick={() => onMount(posId)}
+        className="w-[86px] rounded-2xl border-2 border-dashed border-gray-300 bg-white flex flex-col items-center justify-center gap-1 py-3 cursor-pointer hover:border-blue-400 hover:bg-blue-50 hover:shadow-md transition-all group"
+        style={{ minHeight: '104px' }}
+      >
+        <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 group-hover:border-blue-400 flex items-center justify-center transition-colors">
+          <Plus className="w-3 h-3 text-gray-300 group-hover:text-blue-400" />
+        </div>
+        <span className="text-[8px] font-bold text-gray-400 group-hover:text-blue-500 uppercase mt-1">Empty</span>
+        <span className="text-[7px] text-gray-300 group-hover:text-blue-400 font-semibold text-center px-1 leading-tight">{label}</span>
+        <span className="text-[8px] font-black text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">+ Mount</span>
+      </div>
+    );
+  }
+
+  const h = HEALTH[tyre.health] || HEALTH.Good;
+  const runKm   = tyre.presentOdo - tyre.fittedOdo;
+  const lifePct = Math.round((runKm / tyre.expectedLife) * 100);
+  const treadPct = Math.max(0, 100 - lifePct);
+  const isPoor   = tyre.health === 'Poor';
+  const isActive = activePopupId === tyre.id;
+
+  return (
+    <div className="relative group">
+      <motion.div
+        onClick={() => onPopup(isActive ? null : tyre)}
+        animate={isPoor ? { boxShadow: ['0 0 0px #ef444430', '0 0 14px #ef444460', '0 0 0px #ef444430'] } : {}}
+        transition={isPoor ? { duration: 1.4, repeat: Infinity } : {}}
+        className={`w-[86px] rounded-2xl border-2 ${h.border} ${h.bg} flex flex-col items-start p-2.5 cursor-pointer
+          transition-all duration-150 hover:scale-105 hover:shadow-lg hover:z-10
+          ${isActive ? 'ring-2 ring-blue-500 ring-offset-2 scale-105 shadow-lg shadow-blue-200' : 'shadow-sm'}`}
+        style={{ minHeight: '104px' }}
+      >
+        <div className="flex items-center justify-between w-full mb-0.5">
+          <span className="text-[8px] font-black text-slate-700 truncate leading-none">{tyre.id}</span>
+          <span className={`text-[6px] font-black px-1 py-0.5 rounded-full text-white leading-none ${h.badge}`}>
+            {tyre.health === 'Poor' ? 'CRIT' : tyre.health.toUpperCase()}
+          </span>
+        </div>
+        <div className="text-[8px] font-bold text-slate-500 leading-none mb-1 truncate w-full">{tyre.make}</div>
+        <div className={`text-[10px] font-black leading-none ${h.text}`}>{(runKm / 1000).toFixed(1)}k km</div>
+        <div className="w-full mt-1 mb-0.5">
+          <div className="flex justify-between items-center mb-0.5">
+            <span className="text-[6px] text-gray-400 font-semibold">TREAD</span>
+            <span className={`text-[7px] font-black ${h.text}`}>{treadPct}%</span>
+          </div>
+          <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full ${h.badge}`} style={{ width: `${treadPct}%` }} />
+          </div>
+        </div>
+        <div className="text-[6px] text-gray-400 leading-none mt-auto pt-0.5 border-t border-gray-200/60 w-full">
+          {label} · {tyre.fittedDate}
+        </div>
+      </motion.div>
+
+      {/* Hover Tooltip */}
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 pointer-events-none
+        opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap">
+        <div className="bg-slate-900 text-white rounded-lg px-2.5 py-1.5 shadow-xl text-center">
+          <div className="text-[10px] font-black">{tyre.id}</div>
+          <div className={`text-[9px] font-bold ${h.text.replace('700','300')}`}>
+            {tyre.health.toUpperCase()} · {treadPct}%
+          </div>
+          <div className="text-[9px] text-gray-300">{runKm.toLocaleString()} km</div>
+        </div>
+        <div className="w-2 h-2 bg-slate-900 rotate-45 mx-auto -mt-1" />
+      </div>
+    </div>
+  );
+}
+
+// ── AxleRow — shaft line + type badge ────────────────────────────────────────
+function AxleRow({ axle, children }) {
+  const typeCls = AXLE_TYPE_STYLES[axle.type] || AXLE_TYPE_STYLES.rear;
+  return (
+    <div className="relative w-full">
+      {/* Axle shaft — vertically centred behind the tyre blocks */}
+      <div className="absolute top-1/2 left-0 right-0 h-[3px] bg-slate-600 -translate-y-1/2 z-0 rounded-full shadow-sm" />
+      <div className="flex justify-between items-center w-full relative z-10">{children}</div>
+      <div className="flex items-center justify-center gap-1.5 mt-2">
+        <span className={`text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${typeCls}`}>
+          {axle.type}
+        </span>
+        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{axle.label}</span>
+      </div>
+    </div>
+  );
+}
+
 export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
   if (!isOpen || !truckData) return null;
 
@@ -156,7 +252,7 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
   const handleFromInventory = (posId) => {
     setMountSlot(posId);
   };
-  const layout = getLayout(truckData.vehicleType);
+  const layout = axleLayouts[truckData.wheelConfiguration] ?? axleLayouts['10 Wheeler'];
 
   const handleRemoveConfirm = (tyreId, removalData) => {
     removeTyre(tyreId, removalData);
@@ -176,91 +272,6 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
 
   const getTyreByPosition = (posId) => truckTyres.find(t => t.position === posId);
 
-  const TyreBlock = ({ posId, label }) => {
-    const tyre = getTyreByPosition(posId);
-
-    if (!tyre) {
-      return (
-        <div
-          onClick={() => setMountSlot(posId)}
-          className="w-[86px] rounded-2xl border-2 border-dashed border-gray-300 bg-white flex flex-col items-center justify-center gap-1 py-3 cursor-pointer hover:border-blue-400 hover:bg-blue-50 hover:shadow-md transition-all group"
-          style={{ minHeight: '104px' }}
-        >
-          <div className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 group-hover:border-blue-400 flex items-center justify-center transition-colors">
-            <Plus className="w-3 h-3 text-gray-300 group-hover:text-blue-400" />
-          </div>
-          <span className="text-[8px] font-bold text-gray-400 group-hover:text-blue-500 uppercase mt-1">Empty</span>
-          <span className="text-[7px] text-gray-300 group-hover:text-blue-400 font-semibold">{label}</span>
-          <span className="text-[8px] font-black text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity mt-0.5">+ Mount</span>
-        </div>
-      );
-    }
-
-    const h = HEALTH[tyre.health] || HEALTH.Good;
-    const runKm = tyre.presentOdo - tyre.fittedOdo;
-    const lifePct = Math.round((runKm / tyre.expectedLife) * 100);
-    const treadPct = Math.max(0, 100 - lifePct);
-    const isPoor = tyre.health === 'Poor';
-    const isActive = activePopup?.id === tyre.id;
-
-    return (
-      <div className="relative group">
-        <motion.div
-          onClick={() => setActivePopup(isActive ? null : tyre)}
-          animate={isPoor ? { boxShadow: ['0 0 0px #ef444430', '0 0 14px #ef444460', '0 0 0px #ef444430'] } : {}}
-          transition={isPoor ? { duration: 1.4, repeat: Infinity } : {}}
-          className={`w-[86px] rounded-2xl border-2 ${h.border} ${h.bg} flex flex-col items-start p-2.5 cursor-pointer
-            transition-all duration-150 hover:scale-105 hover:shadow-lg hover:z-10
-            ${isActive ? `ring-2 ring-blue-500 ring-offset-2 scale-105 shadow-lg shadow-blue-200` : 'shadow-sm'}`}
-          style={{ minHeight: '104px' }}
-        >
-          <div className="flex items-center justify-between w-full mb-0.5">
-            <span className="text-[8px] font-black text-slate-700 truncate leading-none">{tyre.id}</span>
-            <span className={`text-[6px] font-black px-1 py-0.5 rounded-full text-white leading-none ${h.badge}`}>
-              {tyre.health === 'Poor' ? 'CRIT' : tyre.health.toUpperCase()}
-            </span>
-          </div>
-          <div className="text-[8px] font-bold text-slate-500 leading-none mb-1 truncate w-full">{tyre.make}</div>
-          <div className={`text-[10px] font-black leading-none ${h.text}`}>{(runKm / 1000).toFixed(1)}k km</div>
-          <div className="w-full mt-1 mb-0.5">
-            <div className="flex justify-between items-center mb-0.5">
-              <span className="text-[6px] text-gray-400 font-semibold">TREAD</span>
-              <span className={`text-[7px] font-black ${h.text}`}>{treadPct}%</span>
-            </div>
-            <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full ${h.badge}`} style={{ width: `${treadPct}%` }} />
-            </div>
-          </div>
-          <div className="text-[6px] text-gray-400 leading-none mt-auto pt-0.5 border-t border-gray-200/60 w-full">
-            {label} · {tyre.fittedDate}
-          </div>
-        </motion.div>
-
-        {/* Hover Tooltip */}
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-30 pointer-events-none
-          opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap">
-          <div className="bg-slate-900 text-white rounded-lg px-2.5 py-1.5 shadow-xl text-center">
-            <div className="text-[10px] font-black">{tyre.id}</div>
-            <div className={`text-[9px] font-bold ${h.text.replace('text-', 'text-').replace('700', '300')}`}>
-              {tyre.health.toUpperCase()} · {treadPct}%
-            </div>
-            <div className="text-[9px] text-gray-300">{runKm.toLocaleString()} km</div>
-          </div>
-          <div className="w-2 h-2 bg-slate-900 rotate-45 mx-auto -mt-1" />
-        </div>
-      </div>
-    );
-  };
-
-  const AxleRow = ({ label, children }) => (
-    <div className="relative w-full">
-      {/* Axle shaft line — sits behind the tyre blocks */}
-      <div className="absolute top-[48px] left-0 right-0 h-[3px] bg-slate-600 z-0 rounded-full shadow-sm" />
-      <div className="flex justify-between items-center w-full relative z-10">{children}</div>
-      <div className="text-center text-[9px] font-bold text-slate-500 uppercase tracking-widest mt-2 bg-slate-100 rounded-full px-3 py-0.5 w-fit mx-auto">{label}</div>
-    </div>
-  );
-
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/60 backdrop-blur-sm">
@@ -272,23 +283,21 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
           style={{ width: '96vw', maxWidth: '1400px', maxHeight: '92vh' }}
         >
           {/* Header */}
-          <div className="flex justify-between items-center px-5 py-3 bg-[#0f172a] text-white shrink-0">
-            <div>
-              <div className="flex items-center gap-3">
+          <div className="flex justify-between items-start px-5 py-3 bg-[#0f172a] text-white shrink-0">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-3 mb-2">
                 <h3 className="text-base font-black tracking-tight">Vehicle Axle Layout</h3>
-                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ring-1 ${layout.color}`}>
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ring-1 ${layout.color ?? 'text-slate-600 bg-slate-50 ring-slate-200'}`}>
                   {layout.label}
                 </span>
+                <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">
+                  {truckData.id}
+                </span>
+                <span className="text-[10px] text-gray-400 font-semibold">{truckData.model}</span>
               </div>
-              <div className="flex gap-4 mt-0.5">
-                <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">Truck: <span className="text-white">{truckData.id}</span></span>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Model: <span className="text-white">{truckData.model}</span></span>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Axles: <span className="text-white">{layout.axles.length}</span></span>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Capacity: <span className="text-white">{truckData.totalTyres}</span></span>
-                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Mounted: <span className="text-white">{truckTyres.length}</span></span>
-              </div>
+              <TyreConfigCards truckData={{ ...truckData, totalTyres: layout.totalTyres }} size="sm" />
             </div>
-            <button onClick={onClose} className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors">
+            <button onClick={onClose} className="ml-4 shrink-0 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -304,17 +313,31 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
                 <div className="absolute left-1/2 top-0 bottom-0 w-2.5 bg-slate-700 -translate-x-1/2 z-0 rounded-full shadow-inner" />
                 <div className="relative z-10 flex flex-col gap-8 py-2">
                   {layout.axles.map((axle) => (
-                    <AxleRow key={axle.name} label={axle.name}>
-                      {/* Left side */}
+                    <AxleRow key={axle.label} axle={axle}>
+                      {/* Left side — outer tyre first */}
                       <div className="flex gap-1.5">
                         {axle.left.map(posId => (
-                          <TyreBlock key={posId} posId={posId} label={POSITION_LABELS[posId] || posId} />
+                          <TyreBlock
+                            key={posId}
+                            posId={posId}
+                            tyre={getTyreByPosition(posId)}
+                            onMount={setMountSlot}
+                            onPopup={setActivePopup}
+                            activePopupId={activePopup?.id}
+                          />
                         ))}
                       </div>
-                      {/* Right side */}
+                      {/* Right side — inner tyre first */}
                       <div className="flex gap-1.5">
                         {axle.right.map(posId => (
-                          <TyreBlock key={posId} posId={posId} label={POSITION_LABELS[posId] || posId} />
+                          <TyreBlock
+                            key={posId}
+                            posId={posId}
+                            tyre={getTyreByPosition(posId)}
+                            onMount={setMountSlot}
+                            onPopup={setActivePopup}
+                            activePopupId={activePopup?.id}
+                          />
                         ))}
                       </div>
                     </AxleRow>

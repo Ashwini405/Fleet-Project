@@ -82,3 +82,6 @@ export const POSITION_LABELS = {
 
 export const getLayout = (vehicleType) =>
   VEHICLE_LAYOUTS[vehicleType] || VEHICLE_LAYOUTS['truck_10'];
+
+// Re-export canonical config so consumers can migrate to axleLayouts.js
+export { axleLayouts, WHEEL_CONFIG_OPTIONS, getPositions, posLabel, AXLE_TYPE_STYLES } from './axleLayouts';

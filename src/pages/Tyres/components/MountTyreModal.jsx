@@ -1,12 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search, CheckCircle, AlertCircle, Wrench, Package, RefreshCw, ChevronDown } from 'lucide-react';
-import { dummyStockTyres, dummyOldTyres, layoutPositions } from '../data/dummyData';
 import { useTyreLifecycle } from '../index';
+import { posLabel as axlePosLabel } from '../data/axleLayouts';
 
 const today = () => new Date().toISOString().split('T')[0];
-
-const POSITION_LABELS = Object.fromEntries(layoutPositions.map(p => [p.id, p.label]));
 
 const STATUS_CONFIG = {
   'In Stock':  { bg: 'bg-blue-50',   text: 'text-blue-700',   ring: 'ring-blue-200',   dot: 'bg-blue-500'   },
@@ -39,39 +37,52 @@ const inputCls = (err) =>
    ${err ? 'border-red-300 focus:ring-red-100' : 'border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-100'}`;
 
 export default function MountTyreModal({ isOpen, onClose, truckData, positionId }) {
-  const { activeTyres, mountTyreToTruck } = useTyreLifecycle();
+  const { activeTyres, stockTyres, oldTyres, mountTyreToTruck } = useTyreLifecycle();
 
-  const [search, setSearch]         = useState('');
-  const [sizeFilter, setSizeFilter] = useState('');
+  const [search, setSearch]           = useState('');
+  const [sizeFilter, setSizeFilter]   = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedTyre, setSelectedTyre] = useState(null);
   const [mountedDate, setMountedDate]   = useState(today());
-  const [fittedOdo, setFittedOdo]       = useState(String(truckData?.currentOdo ?? ''));
+  const [fittedOdo, setFittedOdo]       = useState('');
   const [notes, setNotes]               = useState('');
   const [errors, setErrors]             = useState({});
   const [done, setDone]                 = useState(false);
 
-  // Build combined tyre pool: stock + reusable old tyres
-  const mountedIds = new Set(activeTyres.map(t => t.id));
+  // Reset all form state whenever the modal opens for a new position
+  const prevPosRef = useRef(null);
+  if (isOpen && positionId !== prevPosRef.current) {
+    prevPosRef.current = positionId;
+    // Synchronously reset so first render is clean
+    if (search || sizeFilter || brandFilter || statusFilter || selectedTyre || done) {
+      setSearch(''); setSizeFilter(''); setBrandFilter(''); setStatusFilter('');
+      setSelectedTyre(null); setErrors({}); setDone(false);
+    }
+    const odoStr = String(truckData?.currentOdo ?? '');
+    if (fittedOdo !== odoStr) setFittedOdo(odoStr);
+    if (mountedDate !== today()) setMountedDate(today());
+  }
 
-  const stockPool = dummyStockTyres
-    .filter(t => !mountedIds.has(t.id))
-    .map(t => ({ ...t, _source: 'stock', _status: 'In Stock', runningKm: 0, remainingTread: 100 }));
+  // Build combined tyre pool from live context state
+  const allTyres = useMemo(() => {
+    const mountedIds = new Set(activeTyres.map(t => t.id));
+    const stockPool = stockTyres
+      .filter(t => !mountedIds.has(t.id))
+      .map(t => ({ ...t, _source: 'stock', _status: 'In Stock', runningKm: 0, remainingTread: 100 }));
+    const oldPool = oldTyres
+      .filter(t => t.status === 'REUSABLE' && !mountedIds.has(t.tyreNo))
+      .map(t => ({
+        id: t.tyreNo, make: t.make, model: t.model, tyreSize: t.tyreSize,
+        material: t.material, vendor: t.vehicleNo,
+        runningKm: t.runningKm, remainingTread: t.remainingTread,
+        _source: 'old', _status: 'REUSABLE',
+      }));
+    return [...stockPool, ...oldPool];
+  }, [activeTyres, stockTyres, oldTyres]);
 
-  const oldPool = dummyOldTyres
-    .filter(t => t.status === 'REUSABLE' && !mountedIds.has(t.tyreNo))
-    .map(t => ({
-      id: t.tyreNo, make: t.make, model: t.model, tyreSize: t.tyreSize,
-      material: t.material, vendor: t.vehicleNo,
-      runningKm: t.runningKm, remainingTread: t.remainingTread,
-      _source: 'old', _status: 'REUSABLE',
-    }));
-
-  const allTyres = [...stockPool, ...oldPool];
-
-  const uniqueSizes  = [...new Set(allTyres.map(t => t.tyreSize).filter(Boolean))];
-  const uniqueBrands = [...new Set(allTyres.map(t => t.make).filter(Boolean))];
+  const uniqueSizes  = useMemo(() => [...new Set(allTyres.map(t => t.tyreSize).filter(Boolean))], [allTyres]);
+  const uniqueBrands = useMemo(() => [...new Set(allTyres.map(t => t.make).filter(Boolean))], [allTyres]);
 
   const requiredSize = truckData?.tyreSize || null;
 
@@ -84,14 +95,14 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
     return matchSearch && matchSize && matchBrand && matchStatus;
   }), [allTyres, search, sizeFilter, brandFilter, statusFilter]);
 
-  const posLabel = POSITION_LABELS[positionId] || positionId;
+  const posLabel = axlePosLabel(positionId);
 
   const validate = () => {
     const e = {};
-    if (!selectedTyre)  e.tyre      = 'Select a tyre to mount';
+    if (!selectedTyre)  e.tyre        = 'Select a tyre to mount';
     if (!mountedDate)   e.mountedDate = 'Select mounted date';
     else if (mountedDate > today()) e.mountedDate = 'Cannot be a future date';
-    if (!fittedOdo)     e.fittedOdo = 'Enter fitted odometer';
+    if (!fittedOdo)     e.fittedOdo   = 'Enter fitted odometer';
     else if (parseInt(fittedOdo) < 0) e.fittedOdo = 'Cannot be negative';
     return e;
   };
@@ -99,33 +110,31 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
   const handleConfirm = () => {
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
-
     mountTyreToTruck(selectedTyre._source, selectedTyre.id, {
-      make:        selectedTyre.make,
-      model:       selectedTyre.model,
-      material:    selectedTyre.material || '',
+      make:         selectedTyre.make,
+      model:        selectedTyre.model,
+      material:     selectedTyre.material || '',
       expectedLife: 100000,
-      truckId:     truckData.id,
-      placement:   positionId,
-      fittedDate:  mountedDate,
-      fittedOdo:   parseInt(fittedOdo),
+      truckId:      truckData.id,
+      placement:    positionId,
+      fittedDate:   mountedDate,
+      fittedOdo:    parseInt(fittedOdo),
     });
     setDone(true);
   };
 
+  // Reset state then close — parent just calls setMountSlot(null)
   const handleClose = () => {
-    const wasMounted = done;
-    const mountedId  = selectedTyre?.id;
-    const mountedPos = positionId;
+    prevPosRef.current = null;
     setSearch(''); setSizeFilter(''); setBrandFilter(''); setStatusFilter('');
     setSelectedTyre(null); setMountedDate(today());
     setFittedOdo(String(truckData?.currentOdo ?? ''));
     setNotes(''); setErrors({}); setDone(false);
-    onClose(wasMounted ? mountedId : null, wasMounted ? mountedPos : null);
+    onClose();
   };
 
   const selectTyre = (t) => {
-    if (requiredSize && t.tyreSize !== requiredSize) return; // incompatible
+    if (requiredSize && t.tyreSize !== requiredSize) return;
     setSelectedTyre(prev => prev?.id === t.id ? null : t);
     setErrors(p => ({ ...p, tyre: '' }));
   };
