@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiSave, FiX, FiCheckCircle, FiUpload, FiFileText, FiImage } from 'react-icons/fi';
+import { generateAxlePositions } from './axlePositionGenerator';
 
 const InputGroup = ({ label, name, type = "text", placeholder, formData, handleChange, disabled = false, error }) => {
   // Determine maxLength based on field name
@@ -178,7 +179,13 @@ export default function AddVehicle() {
     reminderDays: '',
     vehicleColor: '',
     bodyType: '',
-    remarks: ''
+    remarks: '',
+    wheelConfiguration: '',
+    totalTyres: '',
+    axleCount: '',
+    layoutType: '',
+    spareTyreCount: '',
+    defaultTyreSize: ''
   });
 
   const [files, setFiles] = useState({
@@ -206,6 +213,11 @@ export default function AddVehicle() {
   const isCLLApplicable = useMemo(
     () => ['Tanker', 'LPG', 'Milk Transport'].includes(formData.vehicleType),
     [formData.vehicleType]
+  );
+
+  const axlePositions = useMemo(
+    () => generateAxlePositions(formData.wheelConfiguration),
+    [formData.wheelConfiguration]
   );
 
   const docWarnings = useMemo(() => ({
@@ -458,6 +470,13 @@ export default function AddVehicle() {
       formDataToSend.append("vehicle_color", formData.vehicleColor);
       formDataToSend.append("body_type", formData.bodyType);
       formDataToSend.append("remarks", formData.remarks);
+      formDataToSend.append("wheel_configuration", formData.wheelConfiguration);
+      formDataToSend.append("total_tyres", formData.totalTyres);
+      formDataToSend.append("axle_count", formData.axleCount);
+      formDataToSend.append("layout_type", formData.layoutType);
+      formDataToSend.append("spare_tyre_count", formData.spareTyreCount);
+      formDataToSend.append("default_tyre_size", formData.defaultTyreSize);
+      formDataToSend.append("axle_positions", JSON.stringify(axlePositions));
 
       if (files.insuranceDoc) formDataToSend.append("insurance_document", files.insuranceDoc);
       if (files.fcDoc) formDataToSend.append("fc_document", files.fcDoc);
@@ -641,10 +660,42 @@ export default function AddVehicle() {
             </div>
           </section>
 
-          {/* Section 9 - Additional Details */}
+          {/* Section 9 - Tyre & Axle Configuration */}
           <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
             <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
               <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">9</div>
+              Tyre &amp; Axle Configuration
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <SelectGroup label="Wheel Configuration" name="wheelConfiguration" options={['4 Wheeler','6 Wheeler','8 Wheeler','10 Wheeler','12 Wheeler','14 Wheeler','18 Wheeler Trailer']} formData={formData} handleChange={handleChange} />
+              <InputGroup label="Total Tyres" name="totalTyres" type="number" placeholder="e.g. 6" formData={formData} handleChange={handleChange} />
+              <InputGroup label="Axle Count" name="axleCount" type="number" placeholder="e.g. 3" formData={formData} handleChange={handleChange} />
+              <SelectGroup label="Layout Type" name="layoutType" options={['4x2','6x2','6x4','8x4','10x4','Trailer Layout']} formData={formData} handleChange={handleChange} />
+              <InputGroup label="Spare Tyre Count" name="spareTyreCount" type="number" placeholder="e.g. 1" formData={formData} handleChange={handleChange} />
+              <InputGroup label="Default Tyre Size" name="defaultTyreSize" placeholder="e.g. 295/80R22.5" formData={formData} handleChange={handleChange} />
+            </div>
+
+            {axlePositions.length > 0 && (
+              <div className="mt-6 pt-5 border-t border-slate-100">
+                <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-3">
+                  Generated Axle Positions
+                  <span className="ml-2 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-bold text-[10px]">{axlePositions.length}</span>
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {axlePositions.map(pos => (
+                    <span key={pos} className="px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 text-xs font-mono font-semibold select-none">
+                      {pos}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* Section 10 - Additional Details */}
+          <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">10</div>
               Additional Details
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -3,16 +3,294 @@ import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiEdit2, FiMapPin, FiUser, FiActivity, FiSearch, FiPlus, FiX, FiUploadCloud, FiEye, FiDownload } from 'react-icons/fi';
 import { DUMMY_VEHICLES } from './vehicleData';
+import { axleLayouts, posLabel, AXLE_TYPE_STYLES } from './Tyres/data/axleLayouts';
 
+// ── Health helpers ────────────────────────────────────────────────────────────
+const TREAD_COLOR = (pct) => {
+  if (pct > 70) return { text: 'text-green-600', bg: 'bg-green-500', badge: 'bg-green-100 text-green-700 border-green-200' };
+  if (pct >= 40) return { text: 'text-amber-500', bg: 'bg-amber-400', badge: 'bg-amber-100 text-amber-700 border-amber-200' };
+  return { text: 'text-red-600', bg: 'bg-red-500', badge: 'bg-red-100 text-red-700 border-red-200' };
+};
 
-const dummyTyres = [
-  { id: 1, position: "FL", serial: "MRF-10293", brand: "MRF", model: "Steel Muscle", tread: "85%", km: "15,000" },
-  { id: 2, position: "FR", serial: "MRF-10294", brand: "MRF", model: "Steel Muscle", tread: "82%", km: "15,000" },
-  { id: 3, position: "RL1", serial: "APL-54921", brand: "Apollo", model: "EnduRace", tread: "60%", km: "45,000" },
-  { id: 4, position: "RL2", serial: "APL-54922", brand: "Apollo", model: "EnduRace", tread: "65%", km: "45,000" },
-  { id: 5, position: "RR1", serial: "JK-99210", brand: "JK Tyre", model: "Jetway JUH5", tread: "70%", km: "30,000" },
-  { id: 6, position: "RR2", serial: "JK-99211", brand: "JK Tyre", model: "Jetway JUH5", tread: "35%", km: "60,000" },
-];
+// ── TyreSlot — single position card ──────────────────────────────────────────
+function TyreSlot({ posId, tyre, selected, onSelect }) {
+  const label = posLabel(posId);
+  const isSelected = selected === posId;
+
+  if (!tyre) {
+    return (
+      <div
+        onClick={() => onSelect(isSelected ? null : posId)}
+        className={`flex flex-col items-center justify-center gap-1 w-14 h-20 rounded-lg border-2 border-dashed cursor-pointer transition-all
+          ${isSelected ? 'border-indigo-400 bg-indigo-50' : 'border-slate-300 bg-white hover:border-indigo-300 hover:bg-indigo-50/40'}`}
+      >
+        <FiPlus className={`w-3.5 h-3.5 ${isSelected ? 'text-indigo-500' : 'text-slate-400'}`} />
+        <span className="text-[8px] font-bold text-slate-400 uppercase text-center leading-tight px-0.5">{posId}</span>
+      </div>
+    );
+  }
+
+  const treadPct = parseInt(tyre.tread) || 0;
+  const c = TREAD_COLOR(treadPct);
+
+  return (
+    <div
+      onClick={() => onSelect(isSelected ? null : posId)}
+      className={`flex flex-col items-start gap-0.5 w-14 h-20 rounded-lg border-2 p-1.5 cursor-pointer transition-all
+        ${isSelected
+          ? 'border-indigo-500 bg-indigo-50 shadow-md shadow-indigo-100 outline outline-2 outline-indigo-200 outline-offset-1'
+          : 'border-slate-600 bg-slate-800 hover:scale-105 hover:shadow-lg'}`}
+    >
+      <span className={`text-[7px] font-black truncate w-full leading-none ${isSelected ? 'text-indigo-700' : 'text-slate-300'}`}>{tyre.serial}</span>
+      <span className={`text-[8px] font-bold truncate w-full leading-none ${isSelected ? 'text-indigo-600' : 'text-white'}`}>{tyre.brand}</span>
+      <div className="w-full mt-auto">
+        <div className="flex justify-between items-center mb-0.5">
+          <span className={`text-[7px] font-bold ${isSelected ? c.text : 'text-slate-300'}`}>{treadPct}%</span>
+        </div>
+        <div className="w-full h-1 bg-slate-600 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full ${c.bg}`} style={{ width: `${treadPct}%` }} />
+        </div>
+      </div>
+      <span className={`text-[7px] font-semibold w-full text-center leading-none mt-0.5 ${isSelected ? 'text-indigo-500' : 'text-slate-400'}`}>{posId}</span>
+    </div>
+  );
+}
+
+// ── DynamicAxleLayout — loops axleLayouts config ──────────────────────────────
+function DynamicAxleLayout({ wheelConfig, mountedTyres, selectedPos, onSelect }) {
+  const layout = axleLayouts[wheelConfig];
+
+  if (!layout) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+        <span className="text-sm font-semibold">No layout configured</span>
+        <span className="text-xs mt-1">Set Wheel Configuration in vehicle settings</span>
+      </div>
+    );
+  }
+
+  const tyreMap = {};
+  mountedTyres.forEach(t => { tyreMap[t.position] = t; });
+
+  return (
+    <div className="flex flex-col items-center gap-1 w-full">
+      {/* Config badge */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ring-1 ${layout.color}`}>{layout.label}</span>
+        <span className="text-[10px] text-slate-400 font-semibold">{layout.axleCount} axles · {layout.totalTyres} tyres · {layout.layoutType}</span>
+      </div>
+
+      {/* Chassis spine + axle rows */}
+      <div className="relative w-full max-w-[320px]">
+        {/* Vertical chassis spine */}
+        <div className="absolute left-1/2 top-0 bottom-0 w-2 bg-slate-700 -translate-x-1/2 rounded-full z-0" />
+
+        <div className="relative z-10 flex flex-col gap-6 py-2">
+          {layout.axles.map((axle) => {
+            const typeCls = AXLE_TYPE_STYLES[axle.type] || AXLE_TYPE_STYLES.rear;
+            return (
+              <div key={axle.label} className="relative">
+                {/* Horizontal axle shaft */}
+                <div className="absolute top-1/2 left-0 right-0 h-[3px] bg-slate-600 -translate-y-1/2 z-0 rounded-full" />
+
+                {/* Tyre blocks */}
+                <div className="relative z-10 flex justify-between items-center">
+                  {/* Left side */}
+                  <div className="flex gap-1">
+                    {axle.left.map(posId => (
+                      <TyreSlot key={posId} posId={posId} tyre={tyreMap[posId]} selected={selectedPos} onSelect={onSelect} />
+                    ))}
+                  </div>
+                  {/* Right side */}
+                  <div className="flex gap-1">
+                    {axle.right.map(posId => (
+                      <TyreSlot key={posId} posId={posId} tyre={tyreMap[posId]} selected={selectedPos} onSelect={onSelect} />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Axle label */}
+                <div className="flex items-center justify-center gap-1.5 mt-1.5">
+                  <span className={`text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${typeCls}`}>{axle.type}</span>
+                  <span className="text-[9px] font-semibold text-slate-500">{axle.label}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── TyresTab — full Tyres tab for VehicleDetails ──────────────────────────────
+function TyresTab({ vehicle }) {
+  const [selectedPos, setSelectedPos] = useState(null);
+
+  // Use dummyTyres mapped to position for now; replace with API call when backend ready
+  const mountedTyres = [
+    { position: 'FL',  serial: 'MRF-10293', brand: 'MRF',     model: 'Steel Muscle', tread: '85%', km: '15,000' },
+    { position: 'FR',  serial: 'MRF-10294', brand: 'MRF',     model: 'Steel Muscle', tread: '82%', km: '15,000' },
+    { position: 'L1_OUTER', serial: 'APL-54921', brand: 'Apollo', model: 'EnduRace', tread: '60%', km: '45,000' },
+    { position: 'L1_INNER', serial: 'APL-54922', brand: 'Apollo', model: 'EnduRace', tread: '65%', km: '45,000' },
+    { position: 'R1_INNER', serial: 'JK-99210',  brand: 'JK Tyre', model: 'Jetway', tread: '70%', km: '30,000' },
+    { position: 'R1_OUTER', serial: 'JK-99211',  brand: 'JK Tyre', model: 'Jetway', tread: '35%', km: '60,000' },
+  ];
+
+  const wheelConfig = vehicle.wheel_configuration;
+  const layout = axleLayouts[wheelConfig];
+  const allPositions = layout ? layout.axles.flatMap(a => [...a.left, ...a.right]) : [];
+  const tyreMap = {};
+  mountedTyres.forEach(t => { tyreMap[t.position] = t; });
+
+  const mounted  = mountedTyres.filter(t => allPositions.includes(t.position));
+  const healthy  = mounted.filter(t => parseInt(t.tread) > 70).length;
+  const warning  = mounted.filter(t => { const v = parseInt(t.tread); return v >= 40 && v <= 70; }).length;
+  const critical = mounted.filter(t => parseInt(t.tread) < 40).length;
+  const empty    = allPositions.length - mounted.length;
+
+  const selectedTyre = selectedPos ? tyreMap[selectedPos] : null;
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800 tracking-tight">Tyre Management</h2>
+          {wheelConfig
+            ? <p className="text-xs text-slate-500 mt-0.5">{wheelConfig} · {layout?.totalTyres ?? '—'} slots · {layout?.layoutType ?? '—'}</p>
+            : <p className="text-xs text-amber-600 mt-0.5">No wheel configuration set — edit vehicle to configure</p>}
+        </div>
+        <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm">
+          <FiPlus className="w-4 h-4" /> Add Tyre
+        </button>
+      </div>
+
+      {/* Stats bar */}
+      <div className="flex flex-wrap gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
+        {[['Total Slots', allPositions.length, 'bg-slate-100 text-slate-700'],
+          ['Mounted', mounted.length, 'bg-indigo-50 text-indigo-700'],
+          ['Empty', empty, 'bg-orange-50 text-orange-700'],
+          ['Healthy', healthy, 'bg-green-50 text-green-700'],
+          ['Warning', warning, 'bg-amber-50 text-amber-700'],
+          ['Critical', critical, 'bg-red-50 text-red-700'],
+        ].map(([label, val, cls]) => (
+          <div key={label} className="flex items-center gap-1.5">
+            <span className="font-semibold text-slate-700">{label}:</span>
+            <span className={`px-2 py-0.5 rounded font-bold ${cls}`}>{val}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        {/* Dynamic axle diagram */}
+        <div className="col-span-1 border border-slate-200 rounded-xl p-5 bg-slate-50 shadow-sm overflow-y-auto" style={{ maxHeight: '600px' }}>
+          <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 text-center">Axle Diagram</h3>
+          <DynamicAxleLayout
+            wheelConfig={wheelConfig}
+            mountedTyres={mountedTyres}
+            selectedPos={selectedPos}
+            onSelect={setSelectedPos}
+          />
+          <p className="text-[9px] text-slate-400 text-center mt-4">Click slot to inspect · Dashed = empty</p>
+        </div>
+
+        {/* Right panel: selected tyre detail + table */}
+        <div className="col-span-1 xl:col-span-2 flex flex-col gap-4">
+
+          {/* Selected tyre detail card */}
+          {selectedPos && (
+            <div className={`rounded-xl border-2 p-4 ${
+              selectedTyre
+                ? `${TREAD_COLOR(parseInt(selectedTyre.tread)).badge.split(' ').map(c => c.startsWith('border') ? c : '').filter(Boolean).join(' ')} bg-white shadow-sm`
+                : 'border-dashed border-indigo-300 bg-indigo-50/50'
+            }`}>
+              {selectedTyre ? (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[['Position', selectedPos], ['Serial', selectedTyre.serial], ['Brand', selectedTyre.brand],
+                    ['Model', selectedTyre.model], ['Tread', selectedTyre.tread], ['KM Run', selectedTyre.km],
+                  ].map(([k, v]) => (
+                    <div key={k}>
+                      <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{k}</div>
+                      <div className="text-sm font-bold text-slate-800 mt-0.5">{v}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <FiPlus className="w-5 h-5 text-indigo-400" />
+                  <div>
+                    <p className="text-sm font-bold text-indigo-700">Empty slot — {selectedPos}</p>
+                    <p className="text-xs text-slate-500">{posLabel(selectedPos)} · Click to mount a tyre</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tyre table */}
+          <div className="border border-slate-200 rounded-xl shadow-sm overflow-hidden text-sm bg-white flex-1">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left whitespace-nowrap">
+                <thead className="bg-slate-50/80 text-slate-500 text-xs uppercase font-semibold tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="px-5 py-3">Pos</th>
+                    <th className="px-5 py-3">Serial</th>
+                    <th className="px-5 py-3">Brand / Model</th>
+                    <th className="px-5 py-3 text-center">Tread</th>
+                    <th className="px-5 py-3 text-right">KM Run</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {allPositions.map(posId => {
+                    const t = tyreMap[posId];
+                    const isActive = selectedPos === posId;
+                    if (!t) return (
+                      <tr key={posId} onClick={() => setSelectedPos(isActive ? null : posId)}
+                        className={`cursor-pointer transition-colors ${isActive ? 'bg-indigo-50' : 'hover:bg-slate-50/50'}`}>
+                        <td className="px-5 py-3">
+                          <span className={`inline-flex items-center justify-center px-2 py-0.5 border rounded font-bold text-[10px] ${isActive ? 'bg-indigo-100 border-indigo-200 text-indigo-700' : 'bg-slate-100 border-slate-200 text-slate-500'}`}>{posId}</span>
+                        </td>
+                        <td colSpan={4} className="px-5 py-3 text-slate-400 text-xs italic">Empty slot — {posLabel(posId)}</td>
+                      </tr>
+                    );
+                    const treadPct = parseInt(t.tread);
+                    const c = TREAD_COLOR(treadPct);
+                    return (
+                      <tr key={posId} onClick={() => setSelectedPos(isActive ? null : posId)}
+                        className={`cursor-pointer transition-colors ${isActive ? 'bg-indigo-50/70' : 'hover:bg-slate-50/50'}`}>
+                        <td className="px-5 py-3">
+                          <span className={`inline-flex items-center justify-center px-2 py-0.5 border rounded font-bold text-[10px] ${isActive ? 'bg-indigo-100 border-indigo-200 text-indigo-700' : 'bg-slate-100 border-slate-300 text-slate-700'}`}>{posId}</span>
+                        </td>
+                        <td className={`px-5 py-3 font-medium ${isActive ? 'text-indigo-900' : 'text-slate-900'}`}>{t.serial}</td>
+                        <td className="px-5 py-3">
+                          <div className={`font-medium ${isActive ? 'text-indigo-800' : 'text-slate-800'}`}>{t.brand}</div>
+                          <div className="text-[11px] text-slate-500">{t.model}</div>
+                        </td>
+                        <td className="px-5 py-3 text-center">
+                          <div className="flex flex-col items-center gap-1 w-14 mx-auto">
+                            <span className={`font-semibold text-xs ${c.text}`}>{t.tread}</span>
+                            <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full ${c.bg}`} style={{ width: t.tread }} />
+                            </div>
+                          </div>
+                        </td>
+                        <td className={`px-5 py-3 text-right ${isActive ? 'text-indigo-600 font-medium' : 'text-slate-600'}`}>{t.km}</td>
+                      </tr>
+                    );
+                  })}
+                  {allPositions.length === 0 && (
+                    <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-400 text-sm">No wheel configuration set for this vehicle.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const dummyBatteries = [
   { id: 1, serial: "BAT-78901", brand: "Exide", model: "Xpress Heavy Duty", installDate: "10 Jan 2023", expiryDate: "10 Jan 2026", status: "Good" },
@@ -76,25 +354,12 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
   };
 
   const [isAddTyreModalOpen, setIsAddTyreModalOpen] = useState(false);
-  const [selectedTyrePos, setSelectedTyrePos] = useState(null);
 
   const [tyreForm, setTyreForm] = useState({
     serial: '', brand: '', model: '', position: '', date: '', life: '', vendor: '', cost: ''
   });
   const handleTyreFormChange = (e) => {
     setTyreForm({ ...tyreForm, [e.target.name]: e.target.value });
-  };
-
-  const totalTyres = dummyTyres.length;
-  const healthyTyres = dummyTyres.filter(t => parseInt(t.tread) > 70).length;
-  const warningTyres = dummyTyres.filter(t => parseInt(t.tread) >= 40 && parseInt(t.tread) <= 70).length;
-  const criticalTyres = dummyTyres.filter(t => parseInt(t.tread) < 40).length;
-
-  const getTreadColor = (treadStr) => {
-    const val = parseInt(treadStr);
-    if (val > 70) return { text: 'text-green-600', bg: 'bg-green-500' };
-    if (val >= 40) return { text: 'text-amber-500', bg: 'bg-amber-400' };
-    return { text: 'text-red-600', bg: 'bg-red-500' };
   };
 
   const [isUploadDocModalOpen, setIsUploadDocModalOpen] = useState(false);
@@ -393,6 +658,40 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
               </div>
             </div>
 
+            {/* Tyre & Axle Configuration */}
+            <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
+              <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200">
+                Tyre &amp; Axle Configuration
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 md:gap-y-6 gap-x-4">
+                <InfoItem label="Wheel Configuration" value={vehicle.wheel_configuration} />
+                <InfoItem label="Total Tyres" value={vehicle.total_tyres} />
+                <InfoItem label="Axle Count" value={vehicle.axle_count} />
+                <InfoItem label="Layout Type" value={vehicle.layout_type} />
+                <InfoItem label="Spare Tyre Count" value={vehicle.spare_tyre_count} />
+                <InfoItem label="Default Tyre Size" value={vehicle.default_tyre_size} />
+              </div>
+              {(() => {
+                let positions = [];
+                try { positions = vehicle.axle_positions ? JSON.parse(vehicle.axle_positions) : []; } catch {}
+                return positions.length > 0 ? (
+                  <div className="mt-4 pt-4 border-t border-slate-200">
+                    <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">
+                      Axle Positions
+                      <span className="ml-2 px-1.5 py-0.5 rounded bg-indigo-50 text-indigo-600 font-bold text-[10px]">{positions.length}</span>
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {positions.map(pos => (
+                        <span key={pos} className="px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 text-slate-700 text-xs font-mono font-semibold">
+                          {pos}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+
             {/* Compliance Summary */}
             <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
               <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200">
@@ -493,139 +792,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
 
         {/* Tyres Tab */}
         {activeTab === 'Tyres' && (
-          <div className="flex flex-col h-full animate-in fade-in duration-200">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-slate-800 tracking-tight">Tyre Management</h2>
-              <button
-                onClick={() => setIsAddTyreModalOpen(true)}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center shadow-sm sticky top-4"
-              >
-                <FiPlus className="w-5 h-5 mr-1.5" />
-                Add Tyre
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-
-              {/* Visual Layout */}
-              <div className="col-span-1 border border-slate-200 rounded-xl p-6 bg-slate-50 flex flex-col items-center justify-center shadow-sm">
-                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-8 w-full text-center">Axle Layout</h3>
-                <div className="flex flex-col items-center gap-12">
-                  {/* Front Axle */}
-                  <div className="flex items-center gap-16 relative">
-                    <div className="absolute top-1/2 left-0 right-0 h-2 bg-slate-300 -z-10 translate-y-[-50%] rounded-full"></div>
-                    <div
-                      onClick={() => setSelectedTyrePos(selectedTyrePos === 'FL' ? null : 'FL')}
-                      className={`w-14 h-24 rounded-md border-2 flex items-center justify-center text-xs font-bold transition-all cursor-pointer hover:-translate-y-1 shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_16px_rgba(0,0,0,0.12)] ${selectedTyrePos === 'FL' ? 'bg-indigo-600 border-indigo-400 text-white outline outline-2 outline-indigo-200 outline-offset-2' : 'bg-slate-800 border-slate-600 text-white'}`}
-                    >FL</div>
-                    <div
-                      onClick={() => setSelectedTyrePos(selectedTyrePos === 'FR' ? null : 'FR')}
-                      className={`w-14 h-24 rounded-md border-2 flex items-center justify-center text-xs font-bold transition-all cursor-pointer hover:-translate-y-1 shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_16px_rgba(0,0,0,0.12)] ${selectedTyrePos === 'FR' ? 'bg-indigo-600 border-indigo-400 text-white outline outline-2 outline-indigo-200 outline-offset-2' : 'bg-slate-800 border-slate-600 text-white'}`}
-                    >FR</div>
-                  </div>
-
-                  {/* Rear Axle */}
-                  <div className="flex items-center gap-12 relative">
-                    <div className="absolute top-1/2 left-0 right-0 h-2 bg-slate-300 -z-10 translate-y-[-50%] rounded-full"></div>
-                    <div className="flex gap-1">
-                      <div
-                        onClick={() => setSelectedTyrePos(selectedTyrePos === 'RL1' ? null : 'RL1')}
-                        className={`w-12 h-24 rounded-md border-2 flex items-center justify-center text-[10px] font-bold transition-all cursor-pointer hover:-translate-y-1 shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_16px_rgba(0,0,0,0.12)] ${selectedTyrePos === 'RL1' ? 'bg-indigo-600 border-indigo-400 text-white outline outline-2 outline-indigo-200 outline-offset-2' : 'bg-slate-800 border-slate-600 text-white'}`}
-                      >RL1</div>
-                      <div
-                        onClick={() => setSelectedTyrePos(selectedTyrePos === 'RL2' ? null : 'RL2')}
-                        className={`w-12 h-24 rounded-md border-2 flex items-center justify-center text-[10px] font-bold transition-all cursor-pointer hover:-translate-y-1 shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_16px_rgba(0,0,0,0.12)] ${selectedTyrePos === 'RL2' ? 'bg-indigo-600 border-indigo-400 text-white outline outline-2 outline-indigo-200 outline-offset-2' : 'bg-slate-800 border-slate-600 text-white'}`}
-                      >RL2</div>
-                    </div>
-                    <div className="flex gap-1">
-                      <div
-                        onClick={() => setSelectedTyrePos(selectedTyrePos === 'RR1' ? null : 'RR1')}
-                        className={`w-12 h-24 rounded-md border-2 flex items-center justify-center text-[10px] font-bold transition-all cursor-pointer hover:-translate-y-1 shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_16px_rgba(0,0,0,0.12)] ${selectedTyrePos === 'RR1' ? 'bg-indigo-600 border-indigo-400 text-white outline outline-2 outline-indigo-200 outline-offset-2' : 'bg-slate-800 border-slate-600 text-white'}`}
-                      >RR1</div>
-                      <div
-                        onClick={() => setSelectedTyrePos(selectedTyrePos === 'RR2' ? null : 'RR2')}
-                        className={`w-12 h-24 rounded-md border-2 flex items-center justify-center text-[10px] font-bold transition-all cursor-pointer hover:-translate-y-1 shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:shadow-[0_8px_16px_rgba(0,0,0,0.12)] ${selectedTyrePos === 'RR2' ? 'bg-indigo-600 border-indigo-400 text-white outline outline-2 outline-indigo-200 outline-offset-2' : 'bg-slate-800 border-slate-600 text-white'}`}
-                      >RR2</div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Data Table Container */}
-              <div className="col-span-1 xl:col-span-2 flex flex-col gap-4">
-
-                {/* Header Info Banner */}
-                <div className="flex flex-wrap items-center gap-3 md:gap-6 px-4 md:px-5 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-xs md:text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-800">Total Tyres:</span>
-                    <span className="bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-bold">{totalTyres}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-800">Healthy:</span>
-                    <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded text-xs font-bold">{healthyTyres}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-800">Warning:</span>
-                    <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded text-xs font-bold">{warningTyres}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-slate-800">Critical:</span>
-                    <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded text-xs font-bold">{criticalTyres}</span>
-                  </div>
-                </div>
-
-                {/* Data Table */}
-                <div className="border border-slate-200 rounded-xl shadow-sm overflow-hidden text-sm bg-white flex-1">
-                  <div className="overflow-x-auto h-full">
-                    <table className="w-full text-left whitespace-nowrap">
-                      <thead className="bg-slate-50/80 text-slate-500 text-xs uppercase font-semibold tracking-wider border-b border-slate-200">
-                        <tr>
-                          <th className="px-5 py-4 rounded-tl-xl whitespace-nowrap">Pos</th>
-                          <th className="px-5 py-4 whitespace-nowrap">Tyre ID / Serial</th>
-                          <th className="px-5 py-4 whitespace-nowrap">Make & Model</th>
-                          <th className="px-5 py-4 text-center whitespace-nowrap">Tread %</th>
-                          <th className="px-5 py-4 text-right rounded-tr-xl whitespace-nowrap">KM Run</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {dummyTyres.map((tyre) => {
-                          const colors = getTreadColor(tyre.tread);
-                          return (
-                            <tr
-                              key={tyre.id}
-                              onClick={() => setSelectedTyrePos(tyre.position === selectedTyrePos ? null : tyre.position)}
-                              className={`transition-colors cursor-pointer ${selectedTyrePos === tyre.position ? 'bg-indigo-50/70 highlight-row' : 'hover:bg-slate-50/50'}`}
-                            >
-                              <td className="px-5 py-4">
-                                <span className={`inline-flex items-center justify-center px-2 py-1 border rounded font-bold text-[11px] shadow-sm transition-colors ${selectedTyrePos === tyre.position ? 'bg-indigo-100 border-indigo-200 text-indigo-700' : 'bg-slate-100 border-slate-300 text-slate-700'}`}>
-                                  {tyre.position}
-                                </span>
-                              </td>
-                              <td className={`px-5 py-4 font-medium transition-colors ${selectedTyrePos === tyre.position ? 'text-indigo-900' : 'text-slate-900'}`}>{tyre.serial}</td>
-                              <td className="px-5 py-4">
-                                <div className={`font-medium transition-colors ${selectedTyrePos === tyre.position ? 'text-indigo-800' : 'text-slate-800'}`}>{tyre.brand}</div>
-                                <div className={`text-[11px] transition-colors ${selectedTyrePos === tyre.position ? 'text-indigo-500' : 'text-slate-500'}`}>{tyre.model}</div>
-                              </td>
-                              <td className="px-5 py-4 text-center">
-                                <div className="flex flex-col items-center gap-1 w-16 mx-auto">
-                                  <span className={`font-semibold text-xs ${colors.text}`}>{tyre.tread}</span>
-                                  <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden relative">
-                                    <div className={`absolute left-0 top-0 bottom-0 ${colors.bg}`} style={{ width: tyre.tread }}></div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className={`px-5 py-4 text-right transition-colors ${selectedTyrePos === tyre.position ? 'text-indigo-600 font-medium' : 'text-slate-600'}`}>{tyre.km}</td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-          </div>
+          <TyresTab vehicle={vehicle} />
         )}
 
         {/* Documents Tab (now dynamic) */}
