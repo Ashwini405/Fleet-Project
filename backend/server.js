@@ -20,6 +20,8 @@ const warrantyClaimRoutes =
 require('./routes/warrantyClaimRoutes');
 const inspectionPlanRoutes = require('./routes/inspectionPlanRoutes');
 const inspectionRoutes = require('./routes/inspectionRoutes');
+const tyreRoutes = require('./routes/tyreRoutes');
+const oldTyreRoutes = require('./routes/oldTyreRoutes');
 
 const app = express();
 
@@ -59,6 +61,14 @@ app.use(
 
 );
 app.use('/api/inspections', inspectionRoutes);
+app.use(
+  '/api/tyres',
+  tyreRoutes
+);
+app.use(
+  '/api/old-tyres',
+  oldTyreRoutes
+);
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {
   res.send('Fleet Management Backend is running...');

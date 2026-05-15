@@ -1,12 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, Eye, QrCode, Truck, AlertTriangle, X, MinusCircle } from 'lucide-react';
-import { dummyTrucks } from '../data/dummyData';
-import { useTyreLifecycle } from '../index';
-import RegisterTyreModal  from '../components/RegisterTyreModal';
+import axios from 'axios';
+import RegisterTyreModal from '../components/RegisterTyreModal';
 import TyreDatasheetModal from '../components/TyreDatasheetModal';
-import QRScannerModal     from '../components/QRScannerModal';
-import RemoveTyreModal    from '../components/RemoveTyreModal';
+import QRScannerModal from '../components/QRScannerModal';
+import RemoveTyreModal from '../components/RemoveTyreModal';
 import { Toast, useToast, TableSkeleton, EmptyState, HealthBadge, TreadBar, StickyTable, StickyThead } from '../components/ERPUtils';
 
 function calcHealth(runningKm, expectedLife) {
@@ -18,27 +17,113 @@ function calcHealth(runningKm, expectedLife) {
 }
 
 export default function AllTyresTab() {
-  const { activeTyres, removeTyre, registerTyre } = useTyreLifecycle();
   const { toasts, push, dismiss } = useToast();
 
-  const [loading, setLoading]         = useState(true);
-  const [search, setSearch]           = useState('');
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [filterTruck, setFilterTruck] = useState('all');
   const [filterHealth, setFilterHealth] = useState('all');
-  const [filterDate, setFilterDate]   = useState('');
+  const [filterDate, setFilterDate] = useState('');
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [viewingTyre, setViewingTyre] = useState(null);
   const [removingTyre, setRemovingTyre] = useState(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
-  useEffect(() => { const t = setTimeout(() => setLoading(false), 400); return () => clearTimeout(t); }, []);
+  // Data from backend
+  const [activeTyres, setActiveTyres] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
 
+  // Fetch tyres (only mounted) and vehicles from DB
+  useEffect(() => {
+    fetchTyres();
+    fetchVehicles();
+  }, []);
+
+  const fetchTyres = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get('http://localhost:5001/api/tyres');
+      const tyres =
+        res.data.data ||
+        res.data.tyres ||
+        [];
+
+      console.log('ALL TYRES:', tyres);
+
+      // Keep only mounted tyres
+      const mountedTyres = tyres.filter(
+
+        tyre =>
+
+          String(tyre.status)
+            .trim()
+            .toLowerCase() === 'mounted'
+
+      );
+
+      console.log('MOUNTED TYRES:', mountedTyres);
+      const formatted = mountedTyres.map(tyre => {
+        const files = Array.isArray(tyre.tyre_files)
+  ? tyre.tyre_files
+  : (
+      tyre.tyre_files
+        ? JSON.parse(tyre.tyre_files)
+        : []
+    );
+        return {
+          id: tyre.tyre_number,
+          serialNo: tyre.serial_no,
+          make: tyre.brand,
+          model: tyre.model,
+          size: tyre.tyre_size,
+          material: tyre.material_type,
+          truckId: tyre.vehicle_id,
+          truckNo: tyre.vehicle_number || 'N/A',
+          position: tyre.tyre_position,
+          fittedDate: tyre.date_of_issue,
+          fittedOdo: Number(tyre.fitted_odometer || 0),
+          presentOdo: Number(tyre.running_km || 0) + Number(tyre.fitted_odometer || 0),
+          expectedLife: Number(tyre.expected_life_km || 0),
+          health: tyre.tyre_health,
+          vendor: tyre.vendor_name,
+          invoiceNo: tyre.invoice_number,
+          tyreCost: tyre.tyre_cost,
+          files,
+        };
+      });
+      setActiveTyres(formatted);
+      console.log('FORMATTED TYRES:', formatted);
+    } catch (error) {
+      console.log('Fetch Tyres Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchVehicles = async () => {
+    try {
+      const res = await axios.get('http://localhost:5001/api/vehicles');
+      setVehicles(
+        res.data.data ||
+        res.data.vehicles ||
+        []
+      );
+    } catch (error) {
+      console.log('Fetch Vehicles Error:', error);
+    }
+  };
+
+  // QR scan handler
   const handleQRScan = (val) => {
     setIsScannerOpen(false);
     const serial = val.startsWith('TYRE-') ? val.slice(5) : val;
-    const found  = activeTyres.find(t => t.id === serial);
-    if (found) { openTyre(found); push('Tyre found via QR scan', 'success'); }
-    else push('No tyre found for scanned QR', 'error');
+    const found = activeTyres.find(t => t.id === serial);
+    if (found) {
+      openTyre(found);
+      push('Tyre found via QR scan', 'success');
+    } else {
+      push('No tyre found for scanned QR', 'error');
+    }
   };
 
   const openTyre = (tyre) => {
@@ -46,32 +131,49 @@ export default function AllTyresTab() {
     setViewingTyre({ ...tyre, runningKm, health: calcHealth(runningKm, tyre.expectedLife) });
   };
 
+  // Remove handler (temporarily without DB call – you can implement later)
   const handleRemoveConfirm = (tyreId, removalData) => {
-    removeTyre(tyreId, removalData);
+    // TODO: call API to mark tyre as removed
+    // removeTyre(tyreId, removalData);
     setRemovingTyre(null);
-    push(`${tyreId} removed → Old Tyres Stock`, 'warning');
+    push(`${tyreId} removed → Old Tyres Stock (demo)`, 'warning');
+    fetchTyres(); // refresh list
   };
 
+  // Filtering
   const norm = search.startsWith('TYRE-') ? search.slice(5) : search;
   const filtered = useMemo(() => activeTyres.filter(t => {
-    const rk = t.presentOdo - t.fittedOdo;
-    const h  = calcHealth(rk, t.expectedLife);
+    const runningKm = t.presentOdo - t.fittedOdo;
+    const health = calcHealth(runningKm, t.expectedLife);
     return (
-      [t.id, t.make, t.model, t.truckNo].some(v => v?.toLowerCase().includes(norm.toLowerCase())) &&
-      (filterTruck  === 'all' || t.truckNo === filterTruck) &&
-      (filterHealth === 'all' || h === filterHealth) &&
-      (!filterDate  || t.fittedDate >= filterDate)
+      [t.id, t.make, t.model, t.truckNo].some(
+        v =>
+          String(v || '')
+            .toLowerCase()
+            .includes(norm.toLowerCase())
+      ) &&
+      (filterTruck === 'all' || t.truckNo === filterTruck) &&
+      (filterHealth === 'all' || health === filterHealth) &&
+      (!filterDate || t.fittedDate >= filterDate)
     );
   }), [activeTyres, norm, filterTruck, filterHealth, filterDate]);
 
   const counts = useMemo(() => {
     const c = { Good: 0, Medium: 0, Critical: 0 };
-    activeTyres.forEach(t => { const h = calcHealth(t.presentOdo - t.fittedOdo, t.expectedLife); c[h] = (c[h] || 0) + 1; });
+    activeTyres.forEach(t => {
+      const h = calcHealth(t.presentOdo - t.fittedOdo, t.expectedLife);
+      c[h] = (c[h] || 0) + 1;
+    });
     return c;
   }, [activeTyres]);
 
   const hasFilters = filterTruck !== 'all' || search !== '' || filterDate !== '' || filterHealth !== 'all';
-  const clearFilters = () => { setFilterTruck('all'); setSearch(''); setFilterDate(''); setFilterHealth('all'); };
+  const clearFilters = () => {
+    setFilterTruck('all');
+    setSearch('');
+    setFilterDate('');
+    setFilterHealth('all');
+  };
 
   return (
     <div className="space-y-5">
@@ -85,8 +187,8 @@ export default function AllTyresTab() {
             <span className="text-xs text-gray-500 font-medium">{activeTyres.length} Mounted</span>
             <span className="w-px h-3 bg-gray-300" />
             {[
-              { label: `${counts.Good} Good`,     cls: 'text-emerald-700 bg-emerald-50 ring-emerald-200', dot: 'bg-emerald-500' },
-              { label: `${counts.Medium} Medium`, cls: 'text-amber-700 bg-amber-50 ring-amber-200',       dot: 'bg-amber-400'   },
+              { label: `${counts.Good} Good`, cls: 'text-emerald-700 bg-emerald-50 ring-emerald-200', dot: 'bg-emerald-500' },
+              { label: `${counts.Medium} Medium`, cls: 'text-amber-700 bg-amber-50 ring-amber-200', dot: 'bg-amber-400' },
               ...(counts.Critical > 0 ? [{ label: `${counts.Critical} Critical`, cls: 'text-red-700 bg-red-50 ring-red-200', dot: 'bg-red-500', icon: AlertTriangle }] : []),
             ].map(({ label, cls, dot, icon: Icon }) => (
               <span key={label} className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ring-1 ${cls}`}>
@@ -125,7 +227,7 @@ export default function AllTyresTab() {
             <select value={filterTruck} onChange={e => setFilterTruck(e.target.value)}
               className="w-full py-2 px-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all">
               <option value="all">All Trucks</option>
-              {dummyTrucks.map(t => <option key={t.id} value={t.id}>{t.id}</option>)}
+              {vehicles.map(v => <option key={v.id} value={v.vehicle_no}>{v.vehicle_no}</option>)}
             </select>
           </div>
           <div className="w-36">
@@ -180,9 +282,11 @@ export default function AllTyresTab() {
                   </td></tr>
                 ) : filtered.map((tyre, idx) => {
                   const runningKm = tyre.presentOdo - tyre.fittedOdo;
-                  const health    = calcHealth(runningKm, tyre.expectedLife);
-                  const lifePct   = Math.round((runningKm / tyre.expectedLife) * 100);
-                  const treadPct  = Math.max(0, 100 - lifePct);
+                  const health = calcHealth(runningKm, tyre.expectedLife);
+                  const lifePct = tyre.expectedLife > 0
+                    ? Math.round((runningKm / tyre.expectedLife) * 100)
+                    : 0;
+                  const treadPct = Math.max(0, 100 - lifePct);
                   return (
                     <motion.tr key={tyre.id}
                       initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
@@ -253,9 +357,11 @@ export default function AllTyresTab() {
               onAction={hasFilters ? clearFilters : () => setIsRegisterOpen(true)} />
           ) : filtered.map(tyre => {
             const runningKm = tyre.presentOdo - tyre.fittedOdo;
-            const health    = calcHealth(runningKm, tyre.expectedLife);
-            const lifePct   = Math.round((runningKm / tyre.expectedLife) * 100);
-            const treadPct  = Math.max(0, 100 - lifePct);
+            const health = calcHealth(runningKm, tyre.expectedLife);
+            const lifePct = tyre.expectedLife > 0
+              ? Math.round((runningKm / tyre.expectedLife) * 100)
+              : 0;
+            const treadPct = Math.max(0, 100 - lifePct);
             return (
               <motion.div key={tyre.id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                 className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm space-y-3 hover:shadow-md transition-shadow">
@@ -300,7 +406,13 @@ export default function AllTyresTab() {
         )}
       </div>
 
-      <RegisterTyreModal isOpen={isRegisterOpen} onClose={() => setIsRegisterOpen(false)} onRegister={registerTyre} />
+      <RegisterTyreModal
+        isOpen={isRegisterOpen}
+        onClose={() => {
+          setIsRegisterOpen(false);
+          fetchTyres(); // refresh list after registration
+        }}
+      />
       <TyreDatasheetModal isOpen={!!viewingTyre} onClose={() => setViewingTyre(null)} tyreData={viewingTyre} />
       <QRScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onScan={handleQRScan} />
       <AnimatePresence>
