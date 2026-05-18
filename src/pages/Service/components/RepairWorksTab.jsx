@@ -135,9 +135,14 @@ export default function RepairWorksTab() {
                       <span className="inline-flex items-center text-[10px] uppercase font-bold tracking-widest text-green-700 bg-green-100 px-2 py-1 rounded">
                         Completed
                       </span>
+                    ) : log.status === 'Under Repair' ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] uppercase font-bold tracking-widest text-red-700 bg-red-100 px-2 py-1 rounded">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                        Under Repair
+                      </span>
                     ) : (
                       <span className="inline-flex items-center text-[10px] uppercase font-bold tracking-widest text-yellow-700 bg-yellow-100 px-2 py-1 rounded">
-                        Pending
+                        Reported
                       </span>
                     )}
                   </td>
@@ -163,7 +168,14 @@ export default function RepairWorksTab() {
 
       <RegisterRepairModal 
         isOpen={isAddOpen} 
-        onClose={() => { setIsAddOpen(false); }} 
+        onClose={() => {
+          setIsAddOpen(false);
+          // Refresh logs after save so new repair appears immediately
+          fetch('http://localhost:5001/api/repair')
+            .then(res => res.json())
+            .then(data => setLogs(data.data || []))
+            .catch(err => console.error('Error refreshing repair logs:', err));
+        }} 
       />
     </div>
   );

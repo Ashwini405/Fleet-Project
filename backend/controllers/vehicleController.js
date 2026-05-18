@@ -372,6 +372,29 @@ const uploadDocument = async (req, res) => {
   }
 };
 
+// @desc  Update vehicle repair/active status
+// @route PATCH /api/vehicles/:id/status
+const updateVehicleStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body; // 'active' | 'under_repair'
+
+    if (!['active', 'under_repair', 'reported'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status value' });
+    }
+
+    await db.query(
+      'UPDATE vehicles SET vehicle_status = ? WHERE id = ?',
+      [status, id]
+    );
+
+    res.json({ success: true, message: `Vehicle status updated to ${status}` });
+  } catch (error) {
+    console.error('updateVehicleStatus error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
 module.exports = {
   getVehicles,
   getVehicleById,
@@ -380,5 +403,6 @@ module.exports = {
   deleteVehicle,
   getVehicleByNumber,
   uploadDocument,
-  checkAvailability
+  checkAvailability,
+  updateVehicleStatus
 };

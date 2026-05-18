@@ -3,8 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Truck, Wrench, AlertTriangle, MapPin, User, Flag,
   Calendar, Clock, DollarSign, Package, FileText, Image, File,
-  CheckCircle, AlertCircle, Loader2, Phone, Navigation
+  CheckCircle, AlertCircle, Loader2, Pencil
 } from 'lucide-react';
+import RegisterRepairModal from './RegisterRepairModal';
 
 const DetailRepairWorks = () => {
   const { id } = useParams();
@@ -12,25 +13,27 @@ const DetailRepairWorks = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`http://localhost:5001/api/repair/${id}`);
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || 'Unable to load repair details');
+      }
+      setData(result.data);
+    } catch (err) {
+      console.error('Error loading repair details:', err);
+      setError(err.message || 'Failed to load repair details');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`http://localhost:5001/api/repair/${id}`);
-        const result = await response.json();
-        if (!response.ok || !result.success) {
-          throw new Error(result.message || 'Unable to load repair details');
-        }
-        setData(result.data);
-      } catch (err) {
-        console.error('Error loading repair details:', err);
-        setError(err.message || 'Failed to load repair details');
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
   }, [id]);
 
@@ -122,9 +125,19 @@ const DetailRepairWorks = () => {
       </button>
 
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Repair Details</h1>
-        <p className="text-slate-500 mt-1">Complete breakdown and repair records</p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Repair Details</h1>
+          <p className="text-slate-500 mt-1">Complete breakdown and repair records</p>
+        </div>
+        {data.status !== 'Completed' && (
+          <button
+            onClick={() => setIsEditOpen(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 text-white rounded-xl text-sm font-bold shadow-sm hover:bg-orange-700 transition-colors"
+          >
+            <Pencil className="w-4 h-4" /> Update Repair
+          </button>
+        )}
       </div>
 
       {/* Overview Cards */}
@@ -441,6 +454,15 @@ const DetailRepairWorks = () => {
           </div>
         )}
       </div>
+
+      <RegisterRepairModal
+        isOpen={isEditOpen}
+        onClose={() => {
+          setIsEditOpen(false);
+          fetchData();
+        }}
+        logData={data}
+      />
     </div>
   );
 };

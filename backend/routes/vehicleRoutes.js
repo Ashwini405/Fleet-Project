@@ -11,7 +11,8 @@ const {
   deleteVehicle,
   getVehicleByNumber,
   uploadDocument,
-  checkAvailability
+  checkAvailability,
+  updateVehicleStatus
 } = require('../controllers/vehicleController');
 
 
@@ -50,6 +51,10 @@ router.get('/by-number/:vehicle_no', getVehicleByNumber);
 
 // ===================== CHECK AVAILABILITY =====================
 router.get('/availability/:vehicle_no', checkAvailability);
+
+
+// ===================== UPDATE VEHICLE STATUS (repair / active) =====================
+router.patch('/:id/status', updateVehicleStatus);
 
 
 // ===================== GET VEHICLE BY ID =====================

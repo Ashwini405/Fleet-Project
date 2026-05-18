@@ -134,6 +134,8 @@ getById: async (id) => {
     SELECT * FROM service_files WHERE service_id = ?
   `, [id]);
 
+  if (!service[0]) return null;
+
   return {
     ...service[0],
     parts,
