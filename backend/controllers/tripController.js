@@ -8,6 +8,20 @@ const createTrip = async (req, res) => {
     console.log("REQ BODY:", req.body);
     const tripData = req.body;
 
+    // ── Block vehicles under repair ──────────────────────────────────────
+    if (tripData.vehicle_id) {
+      const [[vehicle]] = await db.query(
+        'SELECT vehicle_status, vehicle_no FROM vehicles WHERE id = ?',
+        [tripData.vehicle_id]
+      );
+      if (vehicle?.vehicle_status === 'under_repair') {
+        return res.status(400).json({
+          success: false,
+          message: `Vehicle ${vehicle.vehicle_no} is currently under repair and cannot be assigned to a trip.`
+        });
+      }
+    }
+
     const newTrip = await Trip.create(tripData);
 
     res.status(201).json({

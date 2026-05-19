@@ -1,50 +1,21 @@
 const express = require('express');
-
 const router = express.Router();
-
 const upload = require('../config/multer');
 
 const {
-
   createTyre,
-
-  getAllTyres
-
+  getAllTyres,
+  getMountedTyresByVehicle,
+  getAvailableReplacementTyres,
+  processTyreService,
+  getTyreServiceHistory,
 } = require('../controllers/tyreController');
 
-
-// ======================================================
-// CREATE TYRE
-// ======================================================
-
-router.post(
-
-  '/',
-
-  upload.array(
-
-    'tyre_files',
-
-    20
-
-  ),
-
-  createTyre
-
-);
-
-
-// ======================================================
-// GET ALL TYRES
-// ======================================================
-
-router.get(
-
-  '/',
-
-  getAllTyres
-
-);
-
+router.post('/', upload.array('tyre_files', 20), createTyre);
+router.get('/', getAllTyres);
+router.get('/mounted/:vehicleId', getMountedTyresByVehicle);
+router.get('/available-replacements', getAvailableReplacementTyres);
+router.post('/service', processTyreService);
+router.get('/history/:tyreNumber', getTyreServiceHistory);
 
 module.exports = router;

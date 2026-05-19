@@ -12,12 +12,15 @@ export default function PeriodicServiceTab() {
   const [logs, setLogs] = useState([]);
   const [trucks, setTrucks] = useState([]);
 
-  useEffect(() => {
+  const fetchLogs = () => {
     fetch('http://localhost:5001/api/services')
       .then(res => res.json())
       .then(data => setLogs(data.data || []))
       .catch(err => console.error('Error fetching services:', err));
+  };
 
+  useEffect(() => {
+    fetchLogs();
     fetch('http://localhost:5001/api/vehicles')
       .then(res => res.json())
       .then(data => setTrucks(data.data || []))
@@ -164,7 +167,7 @@ export default function PeriodicServiceTab() {
 
       <RegisterPeriodicServiceModal 
         isOpen={isAddOpen} 
-        onClose={() => { setIsAddOpen(false); }} 
+        onClose={() => { setIsAddOpen(false); fetchLogs(); }} 
       />
     </div>
   );

@@ -1,17 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  X,
-  Wrench,
-  Package,
-  Plus,
-  Upload,
-  Trash2,
-  AlertTriangle,
-  Clock,
-  FileText,
-  Truck,
+  X, Wrench, Package, Plus, Upload, Trash2,
+  AlertTriangle, Clock, FileText, Truck,
 } from 'lucide-react';
+import TyreServiceWorkflow from './TyreServiceWorkflow';
 
 const FIELD_CLS = 'w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100';
 const LABEL_CLS = 'block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5';
@@ -48,7 +41,7 @@ function getDuration(start, end) {
 }
 
 export default function RegisterRepairModal({ isOpen, onClose, logData }) {
-  const isViewMode = !!logData;
+  const isViewMode = false; // edit mode is always allowed when modal is open
 
   // ─── State for UI fields (all remain unchanged) ─────────────────────────
   const [issueDescription, setIssueDescription] = useState('');
@@ -76,6 +69,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   const [dragging, setDragging] = useState(false);
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState('');
+  const [tyreWorkflow, setTyreWorkflow] = useState({});
 
   // ─── Database state – replaces dummy imports ────────────────────────────
   const [vehicles, setVehicles] = useState([]);
@@ -105,11 +99,11 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       setReportedBy(logData.reportedBy || 'Driver');
       setPriority(logData.priority || 'Medium');
       setTruck(logData.vehicle_id?.toString() || '');
-      setDate(logData.service_date || new Date().toISOString().split('T')[0]);
+      setDate(logData.service_date ? logData.service_date.split('T')[0] : new Date().toISOString().split('T')[0]);
       setOdometer(logData.odometer || '');
       setGarage(logData.garage || '');
-      setRepairStartTime(logData.repair_start_time || '');
-      setRepairEndTime(logData.repair_end_time || '');
+      setRepairStartTime(logData.repair_start_time ? logData.repair_start_time.slice(0, 5) : '');
+      setRepairEndTime(logData.repair_end_time ? logData.repair_end_time.slice(0, 5) : '');
       setStatus(logData.status || 'Reported');
       setRepairNotes(logData.repair_notes || '');
       setLabourCost(logData.labour_cost || 0);
@@ -160,10 +154,10 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   const isUnderRepair = status === 'Under Repair';
   const isCompleted = status === 'Completed';
 
-  const disableIssueDetails = isViewMode || isCompleted || !hasSelectedTruck;
-  const disableRepairDetails = isViewMode || isCompleted || isReported || !hasSelectedTruck;
-  const disableFiles = isViewMode || isCompleted || isReported || !hasSelectedTruck;
-  const isStatusDisabled = isViewMode || isCompleted || !hasSelectedTruck;
+  const disableIssueDetails = !hasSelectedTruck;
+  const disableRepairDetails = isReported || !hasSelectedTruck;
+  const disableFiles = isReported || !hasSelectedTruck;
+  const isStatusDisabled = isViewMode || !hasSelectedTruck;
 
   const partsTotal = useMemo(() => parts.reduce((sum, p) => sum + (Number(p.costPerUnit) * Number(p.qty) || 0), 0), [parts]);
   const totalBill = useMemo(() => partsTotal + (Number(labourCost) || 0), [partsTotal, labourCost]);
@@ -183,9 +177,13 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     if (!priority) nextErrors.priority = 'Priority is required';
     if (!truck) nextErrors.truck = 'Truck is required';
     if (!isReported && !date) nextErrors.date = 'Date is required';
-    if (!isReported && date && date > new Date().toISOString().split('T')[0]) nextErrors.date = 'Date cannot be a future date';
-    if (!isReported && !odometer) nextErrors.odometer = 'Odometer reading is required';
-    if (!isReported && hasSelectedTruck && odometer && Number(odometer) < previousOdometer)
+    if (!isReported && !isCompleted && date) {
+      const today = new Date().toISOString().split('T')[0];
+      const cleanDate = date.split('T')[0];
+      if (cleanDate > today) nextErrors.date = 'Date cannot be a future date';
+    }
+    if (!isReported && !isCompleted && !odometer) nextErrors.odometer = 'Odometer reading is required';
+    if (!isReported && !isCompleted && hasSelectedTruck && odometer && Number(odometer) < previousOdometer)
       nextErrors.odometer = `Odometer cannot be less than previous (${previousOdometer.toLocaleString()} KM)`;
     if (isUnderRepair && !garage) nextErrors.garage = 'Select service provider to continue repair';
     if (isUnderRepair && !repairStartTime) nextErrors.repairStartTime = 'Repair start time is required';
@@ -195,8 +193,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       if (eh * 60 + em === sh * 60 + sm) nextErrors.repairEndTime = 'End time cannot equal start time';
     }
     if (isCompleted && !repairNotes.trim()) nextErrors.repairNotes = 'Repair notes are required to complete';
-    if (isCompleted && totalBill <= 0) nextErrors.cost = 'Add labour or parts cost before completing repair';
-    if (isCompleted && files.length === 0) nextErrors.files = 'At least 1 proof file is recommended';
+    if (isCompleted && grandTotal <= 0) nextErrors.cost = 'Add labour, parts or tyre cost before completing repair';
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -286,13 +283,14 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     return 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300';
   };
 
+  const grandTotal = totalBill + (breakdownType === 'Tyre' ? Number(tyreWorkflow.total_tyre_cost || 0) : 0);
+
   const isSaveDisabled = !issueDescription.trim()
     || !priority
     || !truck
-    || (!isReported && (!date || !odometer || Number(odometer) < previousOdometer))
-    || (isCompleted && totalBill <= 0);
+    || (isUnderRepair && (!date || !odometer || Number(odometer) < previousOdometer));
 
-  // ─── SAVE TO BACKEND (replaces dummy ) ─────────────────────────────────
+  // ─── SAVE TO BACKEND ─────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!validate()) return;
 
@@ -310,12 +308,12 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       reported_by: reportedBy,
       priority: priority,
 
-      service_date: date,
-      odometer: odometer,
-      garage: garage,
+      service_date: date ? date.split('T')[0] : null,
+      odometer: odometer || null,
+      garage: garage || null,
 
-      repair_start_time: repairStartTime,
-      repair_end_time: repairEndTime,
+      repair_start_time: repairStartTime || null,
+      repair_end_time: repairEndTime || null,
       downtime: downtime,
 
       repair_notes: repairNotes,
@@ -323,15 +321,21 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
 
       labour_cost: labourCost,
       parts_total: partsTotal,
-      total_cost: totalBill,
+      total_cost: totalBill + (breakdownType === 'Tyre' ? Number(tyreWorkflow.total_tyre_cost || 0) : 0),
 
       parts: JSON.stringify(parts),
       files: JSON.stringify(files.map(f => ({ name: f.file?.name || f.name || f.file_name, type: f.file?.type || f.type || f.file_type, size: f.file?.size || f.size }))),
     };
 
     try {
-      const res = await fetch('http://localhost:5001/api/repair', {
-        method: 'POST',
+      const isEdit = Boolean(logData?.id);
+      const url = isEdit
+        ? `http://localhost:5001/api/repair/${logData.id}`
+        : 'http://localhost:5001/api/repair';
+      const method = isEdit ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
@@ -341,8 +345,38 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
         console.error(data);
         return;
       }
-      setToast('Repair record saved successfully ✅');
-      setTimeout(() => setToast(''), 3000);
+
+      // ── Update vehicle status based on repair status ──────────────────
+      const vehicleStatus = status === 'Completed' ? 'active' : status === 'Under Repair' ? 'under_repair' : 'reported';
+      await fetch(`http://localhost:5001/api/vehicles/${truck}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: vehicleStatus }),
+      }).catch(err => console.warn('Vehicle status update failed:', err));
+
+      // ── Process tyre service if breakdown type is Tyre ────────────────
+      if (breakdownType === 'Tyre' && tyreWorkflow.action_taken) {
+        const repairId = data.id || logData?.id || null;
+        await fetch('http://localhost:5001/api/tyres/service', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...tyreWorkflow,
+            repair_id: repairId,
+            vehicle_id: truck,
+            vehicle_no: selectedTruck?.vehicle_no || '',
+          }),
+        }).catch(err => console.warn('Tyre service processing failed:', err));
+      }
+
+      setToast(
+        status === 'Completed'
+          ? 'Repair completed ✅ — Vehicle is now Active and available for trips'
+          : status === 'Under Repair'
+          ? 'Repair saved ✅ — Vehicle marked as Under Repair (unavailable for trips)'
+          : 'Repair reported ✅'
+      );
+      setTimeout(() => setToast(''), 4000);
       onClose();
     } catch (err) {
       console.error(err);
@@ -383,7 +417,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                 <div>
                   <label className={LABEL_CLS}>Vehicle <span className="text-red-500">*</span></label>
                   <select
-                    disabled={isViewMode || isCompleted}
+                    disabled={false}
                     value={truck}
                     onChange={e => handleTruckChange(e.target.value)}
                     className={`${FIELD_CLS} h-11 w-full ${errors.truck ? 'border-red-500' : 'border-gray-300'}`}
@@ -430,7 +464,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                   </div>
                   <div className="flex gap-2">
                     {STATUS_STEPS.map(step => {
-                      const isDisabled = isStatusDisabled || (step === 'Completed' && totalBill <= 0) || isCompleted;
+                      const isDisabled = isStatusDisabled || (step === 'Completed' && grandTotal <= 0) || isCompleted;
                       return (
                         <button
                           key={step}
@@ -445,14 +479,14 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                     })}
                   </div>
                   {!hasSelectedTruck && <p className="text-[10px] text-gray-400 mt-1">Select a vehicle to change status</p>}
-                  {hasSelectedTruck && totalBill <= 0 && !isCompleted && (
+                  {hasSelectedTruck && grandTotal <= 0 && !isCompleted && (
                     <p className="text-[10px] text-gray-500 mt-1">Completion unlocks after labour or parts cost is added.</p>
                   )}
                 </div>
               </div>
 
               {/* Issue Details section (priority + description etc.) */}
-              <div className={`space-y-6 ${!hasSelectedTruck ? 'opacity-40 pointer-events-none select-none' : isCompleted ? 'opacity-60 pointer-events-none select-none' : ''}`}>
+              <div className={`space-y-6 ${!hasSelectedTruck ? 'opacity-40 pointer-events-none select-none' : ''}`}>
                 {(() => {
                   const pc = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.Medium;
                   return (
@@ -523,6 +557,16 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                             </div>
                           </div>
                         </div>
+
+                        {/* Tyre Service Workflow — shown only for Tyre breakdown */}
+                        {breakdownType === 'Tyre' && hasSelectedTruck && (
+                          <TyreServiceWorkflow
+                            vehicleId={truck}
+                            vehicleNo={selectedTruck?.vehicle_no || ''}
+                            currentOdometer={odometer}
+                            onChange={setTyreWorkflow}
+                          />
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
                           <div>
@@ -846,8 +890,15 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                     </div>
                     <div className="rounded-2xl bg-blue-600 p-4 flex items-center justify-between">
                       <p className="text-sm font-bold text-white">Total Repair Cost</p>
-                      <p className="text-xl font-bold text-white">₹{totalBill.toFixed(2)}</p>
+                      <p className="text-xl font-bold text-white">
+                        ₹{(totalBill + (breakdownType === 'Tyre' ? Number(tyreWorkflow.total_tyre_cost || 0) : 0)).toFixed(2)}
+                      </p>
                     </div>
+                    {breakdownType === 'Tyre' && Number(tyreWorkflow.total_tyre_cost || 0) > 0 && (
+                      <p className="text-[11px] text-blue-600 font-semibold">
+                        Parts & Labour ₹{totalBill.toFixed(2)} + Tyre Expense ₹{Number(tyreWorkflow.total_tyre_cost).toFixed(2)}
+                      </p>
+                    )}
                     {errors.cost && <p className="text-xs text-red-600">{errors.cost}</p>}
                   </div>
                 </div>
@@ -929,7 +980,9 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
               <div className="grid grid-cols-4 gap-4">
                 <div className="bg-white rounded-xl p-3 border border-emerald-100 shadow-sm">
                   <p className="text-[10px] uppercase text-emerald-600 font-bold mb-1">Total Bill</p>
-                  <p className="text-lg font-bold text-emerald-900">₹{totalBill.toFixed(2)}</p>
+                  <p className="text-lg font-bold text-emerald-900">
+                    ₹{(totalBill + (breakdownType === 'Tyre' ? Number(tyreWorkflow.total_tyre_cost || 0) : 0)).toFixed(2)}
+                  </p>
                 </div>
                 <div className="bg-white rounded-xl p-3 border border-emerald-100 shadow-sm">
                   <p className="text-[10px] uppercase text-emerald-600 font-bold mb-1">Parts Replaced</p>
