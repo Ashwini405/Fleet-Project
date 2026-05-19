@@ -2,37 +2,69 @@ import React, { useRef } from 'react';
 import { QRCodeCanvas } from 'qrcode.react';
 import { QrCode, Download, Printer } from 'lucide-react';
 
-export default function TyreQRCard({ tyreId }) {
-  const qrRef   = useRef(null);
-  const qrValue = `TYRE-${tyreId}`;
+export default function TyreQRCard({ tyre }) {
+  // Map all possible database fields (tyres, old_tyres, etc.) to a consistent structure
+  const mappedTyre = {
+    tyreNo: tyre?.tyre_number || tyre?.old_tyre_number || tyre?.tyreNo || tyre?.id || 'UNKNOWN',
+    brand: tyre?.brand || tyre?.make || '',
+    model: tyre?.model || '',
+    vehicleNo: tyre?.vehicle_number || tyre?.vehicleNo || '',
+    position: tyre?.tyre_position || tyre?.last_position || tyre?.position || '',
+    status: tyre?.status || tyre?.tyre_status || '',
+    runningKm: Number(tyre?.running_km || tyre?.runningKm || 0),
+  };
+
+  // QR payload – stores real database information, not just a plain ID
+  const qrValue = JSON.stringify({
+    tyre_number: mappedTyre.tyreNo,
+    brand: mappedTyre.brand,
+    model: mappedTyre.model,
+    vehicle: mappedTyre.vehicleNo,
+    position: mappedTyre.position,
+    status: mappedTyre.status,
+    running_km: mappedTyre.runningKm,
+  });
+
+  const qrRef = useRef(null);
 
   const handleDownload = () => {
     const canvas = qrRef.current?.querySelector('canvas');
-    if (!canvas) return;
+    if (!canvas) {
+      alert('QR not available');
+      return;
+    }
     const a = document.createElement('a');
-    a.href     = canvas.toDataURL('image/png');
-    a.download = `${qrValue}.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.download = `${mappedTyre.tyreNo}.png`;
     a.click();
   };
 
   const handlePrint = () => {
     const canvas = qrRef.current?.querySelector('canvas');
-    if (!canvas) return;
+    if (!canvas) {
+      alert('QR not available');
+      return;
+    }
     const dataUrl = canvas.toDataURL('image/png');
     const win = window.open('', '_blank', 'width=400,height=500');
     win.document.write(`
-      <html><head><title>Tyre QR – ${tyreId}</title>
-      <style>
-        body { margin:0; display:flex; flex-direction:column; align-items:center;
-               justify-content:center; height:100vh; font-family:sans-serif; background:#fff; }
-        img  { width:180px; height:180px; }
-        p    { margin-top:12px; font-size:14px; font-weight:700; letter-spacing:.05em; color:#1e293b; }
-        span { font-size:11px; color:#64748b; margin-top:4px; display:block; }
-      </style></head>
-      <body onload="window.print();window.close()">
-        <img src="${dataUrl}" />
-        <p>${tyreId}</p><span>${qrValue}</span>
-      </body></html>
+      <html>
+        <head>
+          <title>Tyre QR – ${mappedTyre.tyreNo}</title>
+          <style>
+            body { margin:0; display:flex; flex-direction:column; align-items:center;
+                   justify-content:center; height:100vh; font-family:sans-serif; background:#fff; }
+            img  { width:180px; height:180px; }
+            p    { margin-top:12px; font-size:14px; font-weight:700; letter-spacing:.05em; color:#1e293b; }
+            span { font-size:11px; color:#64748b; margin-top:4px; display:block; }
+          </style>
+        </head>
+        <body onload="window.print();window.close()">
+          <img src="${dataUrl}" />
+          <p>${mappedTyre.tyreNo}</p>
+          <span>${qrValue}</span>
+        </body>
+      </html>
     `);
     win.document.close();
   };
@@ -48,8 +80,8 @@ export default function TyreQRCard({ tyreId }) {
         <span className="text-[10px] font-bold text-slate-600 uppercase tracking-widest">QR Identification</span>
       </div>
 
-      {/* QR or empty state */}
-      {tyreId ? (
+      {/* QR code or empty state */}
+      {mappedTyre.tyreNo ? (
         <div ref={qrRef} className="bg-white p-2.5 rounded-xl border border-gray-100 shadow-inner">
           <QRCodeCanvas value={qrValue} size={112} bgColor="#ffffff" fgColor="#0f172a" level="M" />
         </div>
@@ -61,8 +93,25 @@ export default function TyreQRCard({ tyreId }) {
         </div>
       )}
 
-      {/* Serial label */}
-      <p className="text-[11px] font-bold text-slate-700 tracking-widest font-mono">{tyreId}</p>
+      {/* Tyre serial */}
+      <p className="text-[11px] font-bold text-slate-700 tracking-widest font-mono">
+        {mappedTyre.tyreNo}
+      </p>
+
+      {/* Status badge */}
+      {mappedTyre.status && (
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+          {mappedTyre.status}
+        </p>
+      )}
+
+      {/* Vehicle & position info (if available) */}
+      {mappedTyre.vehicleNo && (
+        <p className="text-[10px] text-slate-500 font-medium">
+          {mappedTyre.vehicleNo}
+          {mappedTyre.position ? ` • ${mappedTyre.position}` : ''}
+        </p>
+      )}
 
       {/* Action buttons */}
       <div className="flex gap-2 w-full">

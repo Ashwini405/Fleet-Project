@@ -1,7 +1,6 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search, CheckCircle, AlertCircle, Wrench, Package, RefreshCw, ChevronDown } from 'lucide-react';
-import { useTyreLifecycle } from '../index';
 import { posLabel as axlePosLabel } from '../data/axleLayouts';
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -37,7 +36,11 @@ const inputCls = (err) =>
    ${err ? 'border-red-300 focus:ring-red-100' : 'border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-100'}`;
 
 export default function MountTyreModal({ isOpen, onClose, truckData, positionId }) {
-  const { activeTyres, stockTyres, oldTyres, mountTyreToTruck } = useTyreLifecycle();
+  // Database states – no local lifecycle hook
+  const [activeTyres, setActiveTyres] = useState([]);
+  const [stockTyres, setStockTyres] = useState([]);
+  const [oldTyres, setOldTyres] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [search, setSearch]           = useState('');
   const [sizeFilter, setSizeFilter]   = useState('');
@@ -50,11 +53,10 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
   const [errors, setErrors]             = useState({});
   const [done, setDone]                 = useState(false);
 
-  // Reset all form state whenever the modal opens for a new position
+  // Reset form when modal opens for a new position
   const prevPosRef = useRef(null);
   if (isOpen && positionId !== prevPosRef.current) {
     prevPosRef.current = positionId;
-    // Synchronously reset so first render is clean
     if (search || sizeFilter || brandFilter || statusFilter || selectedTyre || done) {
       setSearch(''); setSizeFilter(''); setBrandFilter(''); setStatusFilter('');
       setSelectedTyre(null); setErrors({}); setDone(false);
@@ -64,20 +66,82 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
     if (mountedDate !== today()) setMountedDate(today());
   }
 
-  // Build combined tyre pool from live context state
+  // Fetch all tyre data from backend
+  const fetchTyres = async () => {
+    try {
+      // 1. Active tyres (Mounted)
+      const activeRes = await fetch('http://localhost:5001/api/tyres');
+      const activeData = await activeRes.json();
+      if (activeData.success) {
+        const mounted = activeData.data
+          .filter(t => t.status === 'Mounted')
+          .map(t => ({
+            id: t.tyre_number,
+            make: t.brand,
+            model: t.model,
+            tyreSize: t.tyre_size,
+            material: t.material_type,
+            runningKm: Number(t.running_km || 0),
+            remainingTread: 100,
+            truckNo: t.vehicle_number,
+            position: t.tyre_position
+          }));
+        setActiveTyres(mounted);
+      }
+
+      // 2. Stock tyres (In Stock)
+      const stockRes = await fetch('http://localhost:5001/api/tyres/in-stock');
+      const stockData = await stockRes.json();
+      if (stockData.success) {
+        const stock = stockData.data.map(t => ({
+          id: t.tyre_number,
+          make: t.brand,
+          model: t.model,
+          tyreSize: t.tyre_size,
+          material: t.material_type,
+          runningKm: Number(t.running_km || 0),
+          remainingTread: 100,
+          _source: 'stock',
+          _status: 'In Stock'
+        }));
+        setStockTyres(stock);
+      }
+
+      // 3. Old tyres (Reusable)
+      const oldRes = await fetch('http://localhost:5001/api/old-tyres');
+      const oldData = await oldRes.json();
+      if (oldData.success) {
+        const old = oldData.data.map(t => ({
+          id: t.old_tyre_number,
+          make: t.brand,
+          model: t.model,
+          tyreSize: t.tyre_size,
+          material: t.material_type,
+          runningKm: Number(t.running_km || 0),
+          remainingTread: Number(t.remaining_tread_percent || 0),
+          _source: 'old',
+          _status: 'REUSABLE'
+        }));
+        setOldTyres(old);
+      }
+    } catch (error) {
+      console.error('Fetch tyres error:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchTyres();
+  }, []);
+
+  // Combine available tyres (stock + reusable old tyres) excluding those already mounted
   const allTyres = useMemo(() => {
     const mountedIds = new Set(activeTyres.map(t => t.id));
     const stockPool = stockTyres
       .filter(t => !mountedIds.has(t.id))
-      .map(t => ({ ...t, _source: 'stock', _status: 'In Stock', runningKm: 0, remainingTread: 100 }));
+      .map(t => ({ ...t, _source: 'stock', _status: 'In Stock', runningKm: t.runningKm || 0, remainingTread: 100 }));
     const oldPool = oldTyres
-      .filter(t => t.status === 'REUSABLE' && !mountedIds.has(t.tyreNo))
-      .map(t => ({
-        id: t.tyreNo, make: t.make, model: t.model, tyreSize: t.tyreSize,
-        material: t.material, vendor: t.vehicleNo,
-        runningKm: t.runningKm, remainingTread: t.remainingTread,
-        _source: 'old', _status: 'REUSABLE',
-      }));
+      .filter(t => !mountedIds.has(t.id))
+      .map(t => ({ ...t, _source: 'old', _status: 'REUSABLE' }));
     return [...stockPool, ...oldPool];
   }, [activeTyres, stockTyres, oldTyres]);
 
@@ -107,23 +171,64 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
     return e;
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
-    mountTyreToTruck(selectedTyre._source, selectedTyre.id, {
-      make:         selectedTyre.make,
-      model:        selectedTyre.model,
-      material:     selectedTyre.material || '',
-      expectedLife: 100000,
-      truckId:      truckData.id,
-      placement:    positionId,
-      fittedDate:   mountedDate,
-      fittedOdo:    parseInt(fittedOdo),
-    });
-    setDone(true);
+    if (Object.keys(e).length) {
+      setErrors(e);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const payload = {
+        tyre_number: selectedTyre.id,
+        vehicle_number:
+
+  truckData.vehicle_no
+
+    ? truckData.vehicle_no
+
+    : truckData.registration_number
+
+    ? truckData.registration_number
+
+    : truckData.truck_number
+
+    ? truckData.truck_number
+
+    : '',
+        vehicle_id:
+          truckData.vehicle_id ||
+          truckData.vehicleId ||
+          null,
+        tyre_position: positionId || '',
+        fitted_odometer: parseInt(fittedOdo),
+        date_of_issue: mountedDate,
+        running_km: 0,
+        status: 'Mounted'
+      };
+
+      console.log('MOUNT PAYLOAD:', payload);
+      const response = await fetch('http://localhost:5001/api/tyres/mount', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDone(true);
+        fetchTyres(); // refresh lists
+      } else {
+        alert(data.message || 'Mount failed');
+      }
+    } catch (error) {
+      console.error('Mount error:', error);
+      alert('Could not connect to server');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Reset state then close — parent just calls setMountSlot(null)
   const handleClose = () => {
     prevPosRef.current = null;
     setSearch(''); setSizeFilter(''); setBrandFilter(''); setStatusFilter('');
@@ -155,7 +260,7 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
           className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
           style={{ width: '92vw', maxWidth: '860px', maxHeight: '92vh', boxShadow: '0 32px 80px rgba(0,0,0,0.25)' }}
         >
-          {/* ── Header ── */}
+          {/* Header */}
           <div className="shrink-0 px-5 py-4 bg-gradient-to-r from-[#0f172a] to-[#1e293b] flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">
@@ -170,7 +275,7 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
           </div>
 
           {done ? (
-            /* ── Success State ── */
+            /* Success State */
             <div className="flex-1 flex flex-col items-center justify-center gap-4 p-10 text-center">
               <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
                 <CheckCircle className="w-8 h-8 text-emerald-600" />
@@ -178,11 +283,11 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
               <div>
                 <p className="text-base font-black text-slate-800">Tyre Mounted Successfully</p>
                 <p className="text-xs text-slate-400 mt-1">
-                  {selectedTyre?.id} → {truckData.id} · {posLabel}
+                  {selectedTyre?.id} → {truckData.vehicle_no || truckData.id} · {posLabel}
                 </p>
               </div>
               <div className="text-[11px] text-slate-500 bg-slate-50 rounded-xl px-4 py-2 border border-slate-100">
-                Tyre Mounted · Mounted on {truckData.id} · Position: {posLabel}
+                Tyre Mounted · Mounted on {truckData.vehicle_no || truckData.id} · Position: {posLabel}
               </div>
               <button onClick={handleClose}
                 className="h-10 px-8 text-sm font-bold text-white bg-slate-800 rounded-xl hover:bg-slate-700 transition-all">
@@ -193,7 +298,7 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
             <div className="flex-1 overflow-hidden flex flex-col min-h-0">
               <div className="flex-1 overflow-y-auto p-5 space-y-4" style={{ scrollbarWidth: 'thin', scrollbarColor: '#cbd5e1 transparent' }}>
 
-                {/* ── Top Summary ── */}
+                {/* Top Summary */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     ['Truck', truckData.id],
@@ -208,7 +313,7 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
                   ))}
                 </div>
 
-                {/* ── Filters ── */}
+                {/* Filters */}
                 <div className="flex flex-wrap gap-2 items-end">
                   <div className="flex-1 min-w-[140px]">
                     <label className="block text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Search</label>
@@ -244,7 +349,7 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
                   )}
                 </div>
 
-                {/* ── Tyre Selection Cards ── */}
+                {/* Tyre Selection Cards */}
                 <div>
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">
                     Available Tyres <span className="text-slate-300">({filtered.length})</span>
@@ -319,7 +424,7 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
                   )}
                 </div>
 
-                {/* ── Form Fields ── */}
+                {/* Form Fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-100">
                   <Field label="Mounted Date" required>
                     <input type="date" value={mountedDate} max={today()}
@@ -346,7 +451,7 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
 
               </div>
 
-              {/* ── Sticky Footer ── */}
+              {/* Sticky Footer */}
               <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-100 bg-slate-50/60">
                 <div className="text-[10px] text-slate-400 font-medium">
                   {selectedTyre
@@ -359,10 +464,11 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
                     Cancel
                   </button>
                   <button onClick={handleConfirm}
+                    disabled={loading}
                     className="h-10 px-6 text-sm font-extrabold text-white rounded-xl flex items-center gap-2
-                      transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                      transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
                     style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}>
-                    <Wrench className="w-4 h-4" /> Confirm Mount
+                    <Wrench className="w-4 h-4" /> {loading ? 'Mounting...' : 'Confirm Mount'}
                   </button>
                 </div>
               </div>

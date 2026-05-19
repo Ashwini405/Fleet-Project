@@ -2,7 +2,18 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Activity, History, FileText, Edit2, ArchiveX, Printer, Paperclip, Package, MapPin } from 'lucide-react';
 import TyreQRCard from './TyreQRCard';
-import { layoutPositions } from '../data/dummyData';
+
+// Static positions – no longer imported from dummyData
+const layoutPositions = [
+  { id: 'FL', label: 'Front Left' },
+  { id: 'FR', label: 'Front Right' },
+  { id: 'RL', label: 'Rear Left' },
+  { id: 'RR', label: 'Rear Right' },
+  { id: 'RLO', label: 'Rear Left Outer' },
+  { id: 'RLI', label: 'Rear Left Inner' },
+  { id: 'RRO', label: 'Rear Right Outer' },
+  { id: 'RRI', label: 'Rear Right Inner' }
+];
 
 const positionLabel = (id) =>
   layoutPositions.find(p => p.id === id)?.label ?? id;
@@ -93,12 +104,52 @@ function MiniCard({ label, value, accent }) {
 export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
   if (!isOpen || !tyreData) return null;
 
-  const isStock       = tyreData.status === 'In Stock';
-  const remainingLife = isStock ? 0 : Math.max((tyreData.expectedLife || 0) - (tyreData.runningKm || 0), 0);
-  const runningPct    = isStock ? 0 : Math.min(((tyreData.runningKm || 0) / (tyreData.expectedLife || 1)) * 100, 100);
+  // ── Map database fields to the structure expected by this component ──
+  const mappedTyre = {
+    id: tyreData.tyre_number || tyreData.old_tyre_number || tyreData.id,
+    make: tyreData.brand || tyreData.make,
+    model: tyreData.model,
+    tyreSize: tyreData.tyre_size || tyreData.tyreSize,
+    material: tyreData.material_type || tyreData.material,
+    health: tyreData.tyre_health || tyreData.health || 'Good',
+    runningKm: Number(tyreData.running_km || tyreData.runningKm || 0),
+    expectedLife: Number(tyreData.expected_life_km || tyreData.expectedLife || 0),
+    fittedOdo: Number(tyreData.fitted_odometer || tyreData.fittedOdo || 0),
+    presentOdo: Number(tyreData.fitted_odometer || tyreData.fittedOdo || 0) +
+                Number(tyreData.running_km || tyreData.runningKm || 0),
+    truckNo: tyreData.vehicle_number || tyreData.truckNo || '—',
+    position: tyreData.tyre_position || tyreData.position || '—',
+    fittedDate: tyreData.date_of_issue || tyreData.fittedDate || tyreData.purchase_date || '',
+    purchaseDate: tyreData.purchase_date || tyreData.purchaseDate || '',
+    vendor: tyreData.vendor_name || tyreData.vendor || '',
+    cost: Number(tyreData.tyre_cost || tyreData.cost || 0),
+    status: tyreData.status || tyreData.tyre_status || 'In Stock',
+    attachments: (() => {
+      try {
+        if (!tyreData.tyre_files) return [];
+        return typeof tyreData.tyre_files === 'string'
+          ? JSON.parse(tyreData.tyre_files)
+          : tyreData.tyre_files;
+      } catch {
+        return [];
+      }
+    })()
+  };
+
+  const isStock =
+
+    mappedTyre.status === 'In Stock' ||
+
+    mappedTyre.status === 'OLD_STOCK' ||
+
+    mappedTyre.status === 'RETREADING' ||
+
+    mappedTyre.status === 'REUSABLE';
+  const remainingLife = isStock ? 0 : Math.max((mappedTyre.expectedLife || 0) - (mappedTyre.runningKm || 0), 0);
+  const runningPct    = isStock ? 0 : Math.min(((mappedTyre.runningKm || 0) / (mappedTyre.expectedLife || 1)) * 100, 100);
   const lifeUsedPct   = Math.round(runningPct);
-  const hs            = HEALTH[tyreData.health] || HEALTH.Good;
-  const attachCount   = tyreData.attachments?.length ?? 0;
+  const hs            = HEALTH[mappedTyre.health] || HEALTH.Good;
+  const attachCount   = mappedTyre.attachments?.length ?? 0;
 
   /* ── Lifecycle steps ─────────────────────────────────────────────────────── */
   const STEPS = isStock
@@ -145,7 +196,7 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
                 )}
               </div>
               <p className="text-[11px] text-blue-400/80 font-semibold tracking-[0.1em] uppercase leading-none mt-0.5">
-                Serial: {tyreData.id}
+                Serial: {mappedTyre.id}
               </p>
             </div>
             <div className="flex items-center gap-1">
@@ -186,9 +237,9 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
                   </div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Stored Since</p>
                   <p className="text-lg font-black text-slate-800 tracking-tight leading-none">
-                    {storedSince(tyreData.fittedDate || tyreData.purchaseDate)}
+                    {storedSince(mappedTyre.fittedDate || mappedTyre.purchaseDate)}
                   </p>
-                  <span className="text-[10px] text-slate-400 font-medium">{tyreData.fittedDate || tyreData.purchaseDate || '—'}</span>
+                  <span className="text-[10px] text-slate-400 font-medium">{mappedTyre.fittedDate || mappedTyre.purchaseDate || '—'}</span>
                 </div>
 
                 <div className="bg-white rounded-xl border border-gray-100 border-t-2 border-t-slate-400 shadow-sm px-4 py-3.5
@@ -214,7 +265,7 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
                   </div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Running</p>
                   <p className="text-2xl font-black text-gray-800 tracking-tight leading-none">
-                    {(tyreData.runningKm || 0).toLocaleString()}
+                    {(mappedTyre.runningKm || 0).toLocaleString()}
                     <span className="text-xs font-bold text-gray-400 ml-1">km</span>
                   </p>
                 </div>
@@ -242,7 +293,7 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
                     <div className={`w-3.5 h-3.5 rounded-full ${hs.fill}`} />
                   </div>
                   <p className={`text-[10px] font-bold ${hs.text} opacity-70 uppercase tracking-widest`}>Current Health</p>
-                  <p className={`text-2xl font-black ${hs.text} tracking-tight uppercase leading-none`}>{tyreData.health}</p>
+                  <p className={`text-2xl font-black ${hs.text} tracking-tight uppercase leading-none`}>{mappedTyre.health}</p>
                   <div className="w-full mt-1">
                     <div className="h-1.5 w-full bg-white/50 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full ${hs.bar} transition-all duration-700`} style={{ width: `${lifeUsedPct}%` }} />
@@ -264,40 +315,40 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
 
                 {/* QR */}
                 <div>
-                  <TyreQRCard tyreId={tyreData.id} />
+                  <TyreQRCard tyreId={mappedTyre.id} />
                 </div>
 
                 {/* Left column — always visible */}
                 <div>
-                  <SpecRow label="Tyre Serial No" value={tyreData.id} />
-                  <SpecRow label="Brand / Make"   value={tyreData.make} />
-                  <SpecRow label="Model"          value={tyreData.model} />
-                  <SpecRow label="Tyre Size"      value={tyreData.tyreSize || '—'} />
-                  <SpecRow label="Material Type"  value={tyreData.material || '—'} />
-                  <SpecRow label="Expected Life"  value={tyreData.expectedLife ? `${tyreData.expectedLife.toLocaleString()} km` : '—'} />
+                  <SpecRow label="Tyre Serial No" value={mappedTyre.id} />
+                  <SpecRow label="Brand / Make"   value={mappedTyre.make} />
+                  <SpecRow label="Model"          value={mappedTyre.model} />
+                  <SpecRow label="Tyre Size"      value={mappedTyre.tyreSize || '—'} />
+                  <SpecRow label="Material Type"  value={mappedTyre.material || '—'} />
+                  <SpecRow label="Expected Life"  value={mappedTyre.expectedLife ? `${mappedTyre.expectedLife.toLocaleString()} km` : '—'} />
                 </div>
 
                 {/* Right column */}
                 <div>
-                  <SpecRow label="Vendor"        value={tyreData.vendor || 'Unknown Provider'} />
-                  <SpecRow label="Purchase Date" value={tyreData.fittedDate || tyreData.purchaseDate || '—'} />
-                  <SpecRow label="Tyre Cost"     value={tyreData.cost ? `₹ ${tyreData.cost.toLocaleString('en-IN')}` : '—'} accent />
+                  <SpecRow label="Vendor"        value={mappedTyre.vendor || 'Unknown Provider'} />
+                  <SpecRow label="Purchase Date" value={mappedTyre.fittedDate || mappedTyre.purchaseDate || '—'} />
+                  <SpecRow label="Tyre Cost"     value={mappedTyre.cost ? `₹ ${mappedTyre.cost.toLocaleString('en-IN')}` : '—'} accent />
                   {isStock ? (
                     <>
                       <SpecRow label="Stock Status"     value="In Stock" />
                       <SpecRow label="Warehouse Zone"   value="Central Warehouse" />
-                      <SpecRow label="Purchase Age"     value={storedSince(tyreData.fittedDate || tyreData.purchaseDate)} />
+                      <SpecRow label="Purchase Age"     value={storedSince(mappedTyre.fittedDate || mappedTyre.purchaseDate)} />
                     </>
                   ) : (
                     <>
                       <SpecRow
                         label="Current Truck"
-                        value={tyreData.truckNo && tyreData.truckNo !== '—' ? tyreData.truckNo : 'Not Mounted Yet'}
+                        value={mappedTyre.truckNo && mappedTyre.truckNo !== '—' ? mappedTyre.truckNo : 'Not Mounted Yet'}
                         truncate
                       />
                       <SpecRow
                         label="Tyre Position"
-                        value={tyreData.position && tyreData.position !== '—' ? positionLabel(tyreData.position) : '—'}
+                        value={mappedTyre.position && mappedTyre.position !== '—' ? positionLabel(mappedTyre.position) : '—'}
                       />
                     </>
                   )}
@@ -306,10 +357,10 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
                 {/* Mounted-only operational mini cards */}
                 {!isStock && (
                   <div className="md:col-start-2 md:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <MiniCard label="Fitted ODO"   value={tyreData.fittedOdo  ? `${tyreData.fittedOdo.toLocaleString()} km`  : '—'} />
-                    <MiniCard label="Present ODO"  value={tyreData.presentOdo ? `${tyreData.presentOdo.toLocaleString()} km` : '—'} />
-                    <MiniCard label="Running KM"   value={tyreData.runningKm  ? `${tyreData.runningKm.toLocaleString()} km`  : '—'} accent />
-                    <MiniCard label="Mounted Date" value={tyreData.fittedDate || '—'} />
+                    <MiniCard label="Fitted ODO"   value={mappedTyre.fittedOdo  ? `${mappedTyre.fittedOdo.toLocaleString()} km`  : '—'} />
+                    <MiniCard label="Present ODO"  value={mappedTyre.presentOdo ? `${mappedTyre.presentOdo.toLocaleString()} km` : '—'} />
+                    <MiniCard label="Running KM"   value={mappedTyre.runningKm  ? `${mappedTyre.runningKm.toLocaleString()} km`  : '—'} accent />
+                    <MiniCard label="Mounted Date" value={mappedTyre.fittedDate || '—'} />
                   </div>
                 )}
 
@@ -354,7 +405,7 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Present Odometer</p>
                     <p className="text-2xl font-black text-slate-800 font-mono mt-1.5 leading-none">
-                      {(tyreData.presentOdo || 0).toLocaleString()}
+                      {(mappedTyre.presentOdo || 0).toLocaleString()}
                       <span className="text-sm font-bold text-slate-400 ml-1">km</span>
                     </p>
                   </div>
@@ -382,11 +433,21 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
                   </div>
                 </div>
                 {attachCount > 0 && (
-                  <button className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700
-                    text-white text-xs font-bold rounded-xl shadow-sm shrink-0 ml-3
-                    transition-all duration-200 hover:shadow-md hover:-translate-y-0.5">
-                    <FileText className="w-3.5 h-3.5" /> View
-                  </button>
+                      <button
+                        onClick={() => {
+                          mappedTyre.attachments.forEach(file => {
+                            window.open(
+                              `${import.meta.env.VITE_API_URL}/uploads/${file}`,
+                              '_blank'
+                            );
+                          });
+                        }}
+                        className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700
+                          text-white text-xs font-bold rounded-xl shadow-sm shrink-0 ml-3
+                          transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+                      >
+                        <FileText className="w-3.5 h-3.5" /> View
+                      </button>
                 )}
               </div>
 

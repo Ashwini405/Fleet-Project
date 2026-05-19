@@ -40,7 +40,7 @@ export function CardSkeleton({ count = 4 }) {
 }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
-export function EmptyState({ icon: Icon, title, subtitle, action, onAction }) {
+export function EmptyState({ icon: Icon = Info, title, subtitle, action, onAction }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -76,7 +76,7 @@ export function Toast({ toasts, onDismiss }) {
   return (
     <div className="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
       <AnimatePresence>
-        {toasts.map(t => {
+        {Array.isArray(toasts) && toasts.map(t => {
           const cfg = TOAST_STYLES[t.type] || TOAST_STYLES.success;
           const Icon = cfg.icon;
           return (
@@ -108,7 +108,10 @@ export function useToast() {
   const push = React.useCallback((msg, type = 'success', duration = 3500) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     setToasts(prev => [...prev, { id, msg, type }]);
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), duration);
+    const timer = setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, duration);
+    return () => clearTimeout(timer);
   }, []);
 
   const dismiss = React.useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), []);
@@ -118,19 +121,24 @@ export function useToast() {
 
 // ── Tread bar ─────────────────────────────────────────────────────────────────
 export function TreadBar({ pct }) {
-  const color = pct <= 20 ? 'bg-red-500' : pct <= 50 ? 'bg-amber-500' : 'bg-emerald-500';
+  const safePct = Number(pct || 0);
+  const color = safePct <= 20
+    ? 'bg-red-500'
+    : safePct <= 50
+      ? 'bg-amber-500'
+      : 'bg-emerald-500';
   return (
     <div className="flex items-center gap-1.5">
       <div className="w-14 h-1.5 bg-gray-200 rounded-full overflow-hidden">
         <motion.div
           initial={{ width: 0 }}
-          animate={{ width: `${Math.min(pct, 100)}%` }}
+          animate={{ width: `${Math.min(safePct, 100)}%` }}
           transition={{ duration: 0.6, ease: 'easeOut' }}
           className={`h-full rounded-full ${color}`}
         />
       </div>
-      <span className={`text-[10px] font-bold tabular-nums ${pct <= 20 ? 'text-red-600' : pct <= 50 ? 'text-amber-600' : 'text-emerald-600'}`}>
-        {pct}%
+      <span className={`text-[10px] font-bold tabular-nums ${safePct <= 20 ? 'text-red-600' : safePct <= 50 ? 'text-amber-600' : 'text-emerald-600'}`}>
+        {safePct}%
       </span>
     </div>
   );
@@ -145,10 +153,17 @@ const HEALTH_STYLE = {
 };
 
 export function HealthBadge({ health }) {
-  const h = HEALTH_STYLE[health] || HEALTH_STYLE.Good;
+  const normalizedHealth = String(health || 'Good').trim().toLowerCase();
+  const healthKey =
+    normalizedHealth === 'good' ? 'Good'
+    : normalizedHealth === 'medium' ? 'Medium'
+    : normalizedHealth === 'poor' ? 'Poor'
+    : normalizedHealth === 'critical' ? 'Critical'
+    : 'Good';
+  const h = HEALTH_STYLE[healthKey] || HEALTH_STYLE.Good;
   return (
     <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${h.pill}`}>
-      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${h.dot}`} />{health}
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${h.dot}`} />{healthKey}
     </span>
   );
 }
@@ -171,3 +186,17 @@ export function StickyThead({ children }) {
     </thead>
   );
 }
+
+// ── Default export for convenience ────────────────────────────────────────────
+export default {
+  Shimmer,
+  TableSkeleton,
+  CardSkeleton,
+  EmptyState,
+  Toast,
+  useToast,
+  TreadBar,
+  HealthBadge,
+  StickyTable,
+  StickyThead,
+};

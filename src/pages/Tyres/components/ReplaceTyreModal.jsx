@@ -1,31 +1,30 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Search, CheckCircle, AlertCircle, Wrench, Package, RefreshCw, ChevronDown, ArrowLeftRight, MinusCircle, AlertTriangle } from 'lucide-react';
-import { dummyStockTyres, dummyOldTyres, layoutPositions } from '../data/dummyData';
-import { useTyreLifecycle } from '../index';
+import { layoutPositions } from '../data/dummyData'; // only static positions
 
 const today = () => new Date().toISOString().split('T')[0];
 
 const POSITION_LABELS = Object.fromEntries(layoutPositions.map(p => [p.id, p.label]));
 
 const STATUS_CONFIG = {
-  'In Stock':  { bg: 'bg-blue-50',   text: 'text-blue-700',   ring: 'ring-blue-200',   dot: 'bg-blue-500'   },
-  'REUSABLE':  { bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200', dot: 'bg-emerald-500' },
+  'In Stock': { bg: 'bg-blue-50', text: 'text-blue-700', ring: 'ring-blue-200', dot: 'bg-blue-500' },
+  'REUSABLE': { bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200', dot: 'bg-emerald-500' },
 };
 
-const REASONS    = ['Worn Out','Puncture','Sidewall Damage','Rotation','Retreading','Burst','Preventive Replacement'];
-const CONDITIONS = ['Good','Medium','Poor','Critical'];
+const REASONS = ['Worn Out', 'Puncture', 'Sidewall Damage', 'Rotation', 'Retreading', 'Burst', 'Preventive Replacement'];
+const CONDITIONS = ['Good', 'Medium', 'Poor', 'Critical'];
 const NEXT_ACTIONS = [
-  { value: 'Move To Old Stock',   label: 'Move To Old Stock',   color: 'text-slate-700  bg-slate-100  ring-slate-300'  },
-  { value: 'Send For Retreading', label: 'Send For Retreading', color: 'text-amber-700  bg-amber-50   ring-amber-300'  },
-  { value: 'Scrap Tyre',          label: 'Scrap Tyre',          color: 'text-red-700    bg-red-50     ring-red-300'    },
-  { value: 'Reusable Spare',      label: 'Reusable Spare',      color: 'text-blue-700   bg-blue-50    ring-blue-300'   },
+  { value: 'Move To Old Stock', label: 'Move To Old Stock', color: 'text-slate-700  bg-slate-100  ring-slate-300' },
+  { value: 'Send For Retreading', label: 'Send For Retreading', color: 'text-amber-700  bg-amber-50   ring-amber-300' },
+  { value: 'Scrap Tyre', label: 'Scrap Tyre', color: 'text-red-700    bg-red-50     ring-red-300' },
+  { value: 'Reusable Spare', label: 'Reusable Spare', color: 'text-blue-700   bg-blue-50    ring-blue-300' },
 ];
 const ACTION_LOCATION = {
-  'Move To Old Stock':   'Warehouse Stock',
+  'Move To Old Stock': 'Warehouse Stock',
   'Send For Retreading': 'Retreading Area',
-  'Scrap Tyre':          'Scrap Yard',
-  'Reusable Spare':      'Reusable Storage',
+  'Scrap Tyre': 'Scrap Yard',
+  'Reusable Spare': 'Reusable Storage',
 };
 
 function calcHealth(runningKm, expectedLife) {
@@ -66,11 +65,18 @@ const selectCls = (err) =>
    appearance-none focus:outline-none focus:ring-2 transition-all duration-200 cursor-pointer
    ${err ? 'border-red-300 focus:ring-red-100' : 'border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-100'}`;
 
-export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionId, currentTyre }) {
-  const { activeTyres, replaceTyre } = useTyreLifecycle();
+export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionId, currentTyre,  onSuccess }) {
+  // ──────────────────────────────────────────────────────────────────────────
+  // State from database
+  // ──────────────────────────────────────────────────────────────────────────
+  const [activeTyres, setActiveTyres] = useState([]);
+  const [stockTyres, setStockTyres] = useState([]);
+  const [oldTyres, setOldTyres] = useState([]);
+  const [loading, setLoading] = useState(false);
 
+  // Workflow state
   const [step, setStep] = useState(1); // 1: Current Tyre Summary, 2: Remove Settings, 3: Select Replacement, 4: Mount Settings
-  const [search, setSearch]         = useState('');
+  const [search, setSearch] = useState('');
   const [sizeFilter, setSizeFilter] = useState('');
   const [brandFilter, setBrandFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -78,46 +84,116 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
 
   // Remove form
   const [removeForm, setRemoveForm] = useState({
-    removalDate:    today(),
-    currentOdo:     String(truckData?.currentOdo ?? ''),
-    reason:         '',
-    condition:      '',
+    removalDate: today(),
+    currentOdo: String(truckData?.currentOdo ?? ''),
+    reason: '',
+    condition: '',
     remainingTread: '',
-    nextAction:     '',
-    storeLocation:  '',
-    notes:          '',
+    nextAction: '',
+    storeLocation: '',
+    notes: '',
   });
 
   // Mount form
   const [mountForm, setMountForm] = useState({
     mountedDate: today(),
-    fittedOdo:   String(truckData?.currentOdo ?? ''),
-    notes:       '',
+    fittedOdo: String(truckData?.currentOdo ?? ''),
+    notes: '',
   });
 
   const [errors, setErrors] = useState({});
   const [done, setDone] = useState(false);
 
-  // Build combined tyre pool: stock + reusable old tyres
+  // ──────────────────────────────────────────────────────────────────────────
+  // Fetch tyres from database
+  // ──────────────────────────────────────────────────────────────────────────
+  const fetchTyres = async () => {
+    try {
+      // Active mounted tyres
+      const activeRes = await fetch('http://localhost:5001/api/tyres');
+      const activeData = await activeRes.json();
+      if (activeData.success) {
+        const mounted = activeData.data
+          .filter(t => t.status === 'Mounted')
+          .map(t => ({
+            id: t.tyre_number,
+            make: t.brand,
+            model: t.model,
+            tyreSize: t.tyre_size,
+            material: t.material_type,
+            truckNo: t.vehicle_number,
+            position: t.tyre_position,
+            fittedDate: t.date_of_issue,
+            fittedOdo: Number(t.fitted_odometer || 0),
+            presentOdo: Number(t.fitted_odometer || 0) + Number(t.running_km || 0),
+            expectedLife: Number(t.expected_life_km || 0),
+            runningKm: Number(t.running_km || 0),
+          }));
+        setActiveTyres(mounted);
+      }
+
+      // In‑stock tyres
+      const stockRes = await fetch('http://localhost:5001/api/tyres/in-stock');
+      const stockData = await stockRes.json();
+      if (stockData.success) {
+        const stock = stockData.data.map(t => ({
+          id: t.tyre_number,
+          make: t.brand,
+          model: t.model,
+          tyreSize: t.tyre_size,
+          material: t.material_type,
+          runningKm: Number(t.running_km || 0),
+          remainingTread: 100,
+          _source: 'stock',
+          _status: 'In Stock',
+        }));
+        setStockTyres(stock);
+      }
+
+      // Old tyres (only reusable ones)
+      const oldRes = await fetch('http://localhost:5001/api/old-tyres');
+      const oldData = await oldRes.json();
+      if (oldData.success) {
+        const unique = [];
+        const seen = new Set();
+        oldData.data.forEach(t => {
+          if (t.tyre_status !== 'REUSABLE') return;
+          if (seen.has(t.old_tyre_number)) return;
+          seen.add(t.old_tyre_number);
+          unique.push({
+            id: t.old_tyre_number,
+            make: t.brand,
+            model: t.model,
+            tyreSize: t.tyre_size,
+            material: t.material_type,
+            runningKm: Number(t.running_km || 0),
+            remainingTread: Number(t.remaining_tread_percent || 0),
+            _source: 'old',
+            _status: 'REUSABLE',
+          });
+        });
+        setOldTyres(unique);
+      }
+    } catch (error) {
+      console.error('Fetch tyres error:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchTyres();
+  }, []);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Combine available tyres for replacement (exclude currently mounted ones)
+  // ──────────────────────────────────────────────────────────────────────────
   const mountedIds = new Set(activeTyres.map(t => t.id));
-  mountedIds.delete(currentTyre?.id); // Allow current tyre to be replaced
+  if (currentTyre) mountedIds.delete(currentTyre.id); // allow replacing the current tyre itself
 
-  const stockPool = dummyStockTyres
-    .filter(t => !mountedIds.has(t.id))
-    .map(t => ({ ...t, _source: 'stock', _status: 'In Stock', runningKm: 0, remainingTread: 100 }));
-
-  const oldPool = dummyOldTyres
-    .filter(t => t.status === 'REUSABLE' && !mountedIds.has(t.tyreNo))
-    .map(t => ({
-      id: t.tyreNo, make: t.make, model: t.model, tyreSize: t.tyreSize,
-      material: t.material, vendor: t.vehicleNo,
-      runningKm: t.runningKm, remainingTread: t.remainingTread,
-      _source: 'old', _status: 'REUSABLE',
-    }));
-
+  const stockPool = stockTyres.filter(t => !mountedIds.has(t.id));
+  const oldPool = oldTyres.filter(t => !mountedIds.has(t.id));
   const allTyres = [...stockPool, ...oldPool];
 
-  const uniqueSizes  = [...new Set(allTyres.map(t => t.tyreSize).filter(Boolean))];
+  const uniqueSizes = [...new Set(allTyres.map(t => t.tyreSize).filter(Boolean))];
   const uniqueBrands = [...new Set(allTyres.map(t => t.make).filter(Boolean))];
 
   const requiredSize = truckData?.tyreSize || null;
@@ -125,8 +201,8 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
   const filtered = useMemo(() => allTyres.filter(t => {
     const q = search.toLowerCase();
     const matchSearch = !search || [t.id, t.make, t.model, t.tyreSize].some(v => v?.toLowerCase().includes(q));
-    const matchSize   = !sizeFilter   || t.tyreSize === sizeFilter;
-    const matchBrand  = !brandFilter  || t.make === brandFilter;
+    const matchSize = !sizeFilter || t.tyreSize === sizeFilter;
+    const matchBrand = !brandFilter || t.make === brandFilter;
     const matchStatus = !statusFilter || t._status === statusFilter;
     return matchSearch && matchSize && matchBrand && matchStatus;
   }), [allTyres, search, sizeFilter, brandFilter, statusFilter]);
@@ -139,6 +215,9 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
   const currentTreadPct = Math.max(0, 100 - currentLifePct);
   const currentHealth = currentTyre ? calcHealth(currentRunningKm, currentTyre.expectedLife) : 'Good';
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // Form handlers
+  // ──────────────────────────────────────────────────────────────────────────
   const setRemove = (k, v) => {
     setRemoveForm(p => ({ ...p, [k]: v }));
     setErrors(p => ({ ...p, [k]: '' }));
@@ -151,13 +230,14 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
 
   const validateRemove = () => {
     const e = {};
-    if (!removeForm.removalDate)                                          e.removalDate  = 'Required';
-    else if (removeForm.removalDate > today())                            e.removalDate  = 'Cannot be a future date';
-    if (!removeForm.currentOdo)                                           e.currentOdo   = 'Required';
-    else if (parseInt(removeForm.currentOdo) < (currentTyre?.fittedOdo ?? 0))   e.currentOdo   = `Must be ≥ fitted ODO (${currentTyre?.fittedOdo?.toLocaleString()} km)`;
-    if (!removeForm.reason)      e.reason      = 'Select a reason';
-    if (!removeForm.condition)   e.condition   = 'Select condition';
-    if (!removeForm.nextAction)  e.nextAction  = 'Select next action';
+    if (!removeForm.removalDate) e.removalDate = 'Required';
+    else if (removeForm.removalDate > today()) e.removalDate = 'Cannot be a future date';
+    if (!removeForm.currentOdo) e.currentOdo = 'Required';
+    else if (parseInt(removeForm.currentOdo) < (currentTyre?.fittedOdo ?? 0))
+      e.currentOdo = `Must be ≥ fitted ODO (${currentTyre?.fittedOdo?.toLocaleString()} km)`;
+    if (!removeForm.reason) e.reason = 'Select a reason';
+    if (!removeForm.condition) e.condition = 'Select condition';
+    if (!removeForm.nextAction) e.nextAction = 'Select next action';
     if (!removeForm.storeLocation) e.storeLocation = 'Select store location';
     return e;
   };
@@ -173,21 +253,31 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
   };
 
   const selectReplacement = (t) => {
-    if (requiredSize && t.tyreSize !== requiredSize) return; // incompatible
-    setSelectedReplacement(prev => prev?.id === t.id ? null : t);
+    if (requiredSize && t.tyreSize !== requiredSize) return;
+    setSelectedReplacement({ ...t });
     setErrors(p => ({ ...p, replacement: '' }));
   };
 
   const handleNext = () => {
     if (step === 1) {
       setStep(2);
-    } else if (step === 2) {
+      return;
+    }
+    if (step === 2) {
       const e = validateRemove();
-      if (Object.keys(e).length) { setErrors(e); return; }
+      if (Object.keys(e).length) {
+        setErrors(e);
+        return;
+      }
       setStep(3);
-    } else if (step === 3) {
-      const e = validateMount();
-      if (Object.keys(e).length) { setErrors(e); return; }
+      return;
+    }
+    // STEP 3 → STEP 4
+    if (step === 3) {
+      if (!selectedReplacement?.id) {
+        setErrors({ replacement: 'Select replacement tyre' });
+        return;
+      }
       setStep(4);
     }
   };
@@ -196,27 +286,110 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
     if (step > 1) setStep(step - 1);
   };
 
-  const handleConfirm = () => {
-    replaceTyre(currentTyre.id, selectedReplacement._source, selectedReplacement.id, {
-      make:         selectedReplacement.make,
-      model:        selectedReplacement.model,
-      material:    selectedReplacement.material || '',
-      expectedLife: 100000,
-      truckId:     truckData.id,
-      placement:   positionId,
-      fittedDate:  mountForm.mountedDate,
-      fittedOdo:   parseInt(mountForm.fittedOdo),
-    }, {
-      removalDate: removeForm.removalDate,
-      currentOdo:  parseInt(removeForm.currentOdo),
-      reason:      removeForm.reason,
-      condition:   removeForm.condition,
-      remainingTread: removeForm.remainingTread,
-      nextAction:  removeForm.nextAction,
-      storeLocation: removeForm.storeLocation,
-      notes:       removeForm.notes,
-    });
-    setDone(true);
+  // ──────────────────────────────────────────────────────────────────────────
+  // Main Replace Logic – calls backend APIs
+  // ──────────────────────────────────────────────────────────────────────────
+  const handleConfirm = async () => {
+    try {
+      setLoading(true);
+
+      // 1. Insert old tyre record (current tyre)
+      const oldTyrePayload = {
+        old_tyre_number: currentTyre.id,
+        brand: currentTyre.make,
+        model: currentTyre.model,
+        tyre_size: currentTyre.tyreSize || '',
+        material_type: currentTyre.material || '',
+        vehicle_id: null,                    // old tyre no longer attached
+        vehicle_number:
+
+  truckData.vehicle_no ||
+
+  truckData.truckNo ||
+
+  truckData.id ||
+
+  '',
+        last_position: positionId,
+        removed_date: removeForm.removalDate,
+        removal_reason: removeForm.reason,
+        running_km: currentRunningKm,
+        expected_life_km: currentTyre.expectedLife || 0,
+        remaining_tread_percent: removeForm.remainingTread || 0,
+        tyre_status:
+          removeForm.nextAction === 'Scrap Tyre' ? 'SCRAP'
+            : removeForm.nextAction === 'Send For Retreading' ? 'RETREADING'
+              : removeForm.nextAction === 'Reusable Spare' ? 'REUSABLE'
+                : 'OLD_STOCK',
+        store_location: removeForm.storeLocation,
+        notes: removeForm.notes,
+      };
+
+      const oldRes = await fetch('http://localhost:5001/api/old-tyres', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(oldTyrePayload),
+      });
+      if (!(await oldRes.json()).success) {
+        alert('Failed to move old tyre to old stock');
+        return;
+      }
+
+      // 2. Remove current tyre (set status to 'In Stock' and clear all assignment fields)
+      await fetch('http://localhost:5001/api/tyres/mount', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tyre_number: currentTyre.id,
+          status: 'In Stock',
+          vehicle_id: null,
+          vehicle_number: '',
+          tyre_position: '',
+          fitted_odometer: 0,
+          date_of_issue: null,
+          running_km: currentRunningKm,
+        }),
+      });
+
+      // 3. Mount the replacement tyre
+      await fetch('http://localhost:5001/api/tyres/mount', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tyre_number: selectedReplacement.id,
+          status: 'Mounted',
+          vehicle_id:
+
+  truckData.vehicleId ||
+
+  truckData.vehicle_id ||
+
+  null,          // backend will resolve vehicle_id from vehicle_number
+          vehicle_number:
+
+  truckData.vehicle_no ||
+
+  truckData.truckNo ||
+
+  truckData.id,
+          tyre_position: positionId,
+          fitted_odometer: mountForm.fittedOdo,
+          date_of_issue: mountForm.mountedDate,
+          running_km: 0,
+        }),
+      });
+
+      setDone(true);
+
+await fetchTyres();
+
+onSuccess?.();
+    } catch (error) {
+      console.error('Replace error:', error);
+      alert('Replacement failed – server error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => {
@@ -224,19 +397,19 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
     setSearch(''); setSizeFilter(''); setBrandFilter(''); setStatusFilter('');
     setSelectedReplacement(null);
     setRemoveForm({
-      removalDate:    today(),
-      currentOdo:     String(truckData?.currentOdo ?? ''),
-      reason:         '',
-      condition:      '',
+      removalDate: today(),
+      currentOdo: String(truckData?.currentOdo ?? ''),
+      reason: '',
+      condition: '',
       remainingTread: '',
-      nextAction:     '',
-      storeLocation:  '',
-      notes:          '',
+      nextAction: '',
+      storeLocation: '',
+      notes: '',
     });
     setMountForm({
       mountedDate: today(),
-      fittedOdo:   String(truckData?.currentOdo ?? ''),
-      notes:       '',
+      fittedOdo: String(truckData?.currentOdo ?? ''),
+      notes: '',
     });
     setErrors({});
     setDone(false);
@@ -266,14 +439,16 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
           className="bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden"
           style={{ width: '92vw', maxWidth: '900px', maxHeight: '92vh', boxShadow: '0 32px 80px rgba(0,0,0,0.25)' }}
         >
-          {/* ── Header ── */}
+          {/* Header */}
           <div className="shrink-0 px-5 py-4 bg-gradient-to-r from-[#0f172a] to-[#1e293b] flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">
                 <ArrowLeftRight className="w-4 h-4 text-blue-400" />
                 <h3 className="text-[15px] font-black text-white tracking-tight">Replace Tyre Workflow</h3>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium mt-0.5">Replace {currentTyre.id} on {truckData.id} · {posLabel}</p>
+              <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                Replace {currentTyre.id} on {truckData.id} · {posLabel}
+              </p>
             </div>
             <button onClick={handleClose} className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all hover:rotate-90">
               <X className="w-4 h-4" />
@@ -285,9 +460,8 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
             <div className="flex items-center justify-between">
               {steps.map((s, i) => (
                 <div key={s.id} className="flex items-center">
-                  <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all ${
-                    step >= s.id ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white border-slate-300 text-slate-400'
-                  }`}>
+                  <div className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-all ${step >= s.id ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white border-slate-300 text-slate-400'
+                    }`}>
                     {s.icon}
                   </div>
                   <div className="ml-2">
@@ -302,7 +476,7 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
           </div>
 
           {done ? (
-            /* ── Success State ── */
+            /* Success State */
             <div className="flex-1 flex flex-col items-center justify-center gap-4 p-10 text-center">
               <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
                 <CheckCircle className="w-8 h-8 text-emerald-600" />
@@ -356,11 +530,10 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
                           </div>
                           <div className="flex justify-between">
                             <span className="text-xs text-slate-500">Health</span>
-                            <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${
-                              currentHealth === 'Good' ? 'bg-green-100 text-green-700' :
+                            <span className={`text-sm font-bold px-2 py-0.5 rounded-full ${currentHealth === 'Good' ? 'bg-green-100 text-green-700' :
                               currentHealth === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-red-100 text-red-700'
-                            }`}>{currentHealth}</span>
+                                'bg-red-100 text-red-700'
+                              }`}>{currentHealth}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-xs text-slate-500">Mounted Date</span>
@@ -447,7 +620,7 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
                           </select>
                         </div>
                         {removeForm.nextAction && (
-                          <span className={`mt-1.5 inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ring-1 ${NEXT_ACTIONS.find(a=>a.value===removeForm.nextAction)?.color}`}>
+                          <span className={`mt-1.5 inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ring-1 ${NEXT_ACTIONS.find(a => a.value === removeForm.nextAction)?.color}`}>
                             {removeForm.nextAction}
                           </span>
                         )}
@@ -458,7 +631,7 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
                         <div className="relative">
                           <select value={removeForm.storeLocation} onChange={e => setRemove('storeLocation', e.target.value)} className={selectCls(errors.storeLocation)}>
                             <option value="">Select Location</option>
-                            {['Scrap Yard','Retreading Area','Warehouse Stock','Reusable Storage'].map(l => <option key={l}>{l}</option>)}
+                            {['Scrap Yard', 'Retreading Area', 'Warehouse Stock', 'Reusable Storage'].map(l => <option key={l}>{l}</option>)}
                           </select>
                         </div>
                         <Err msg={errors.storeLocation} />
@@ -554,7 +727,7 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
                                 className={`relative rounded-xl border-2 p-3 transition-all duration-150 cursor-pointer
                                   ${incompatible ? 'opacity-40 cursor-not-allowed border-slate-100 bg-slate-50' :
                                     isSelected ? 'border-blue-500 bg-blue-50 shadow-md shadow-blue-100' :
-                                    'border-slate-100 bg-white hover:border-blue-300 hover:shadow-sm'}`}
+                                      'border-slate-100 bg-white hover:border-blue-300 hover:shadow-sm'}`}
                               >
                                 {isSelected && (
                                   <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
@@ -650,7 +823,7 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
 
               </div>
 
-              {/* ── Sticky Footer ── */}
+              {/* Sticky Footer */}
               <div className="shrink-0 flex items-center justify-between gap-3 px-5 py-4 border-t border-slate-100 bg-slate-50/60">
                 <div className="text-[10px] text-slate-400 font-medium">
                   Step {step} of 4 · {steps.find(s => s.id === step)?.label}
@@ -671,10 +844,11 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
                     </button>
                   ) : (
                     <button onClick={handleConfirm}
+                      disabled={loading}
                       className="h-10 px-6 text-sm font-extrabold text-white rounded-xl flex items-center gap-2
-                        transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                        transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
                       style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}>
-                      <ArrowLeftRight className="w-4 h-4" /> Replace Tyre
+                      <ArrowLeftRight className="w-4 h-4" /> {loading ? 'Replacing...' : 'Replace Tyre'}
                     </button>
                   )}
                 </div>

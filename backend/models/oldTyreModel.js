@@ -6,6 +6,13 @@ const db = require('../config/db');
 // ======================================================
 
 const createOldTyre = async (data) => {
+    await db.query(
+  `
+  DELETE FROM old_tyres
+  WHERE old_tyre_number = ?
+  `,
+  [data.old_tyre_number]
+);
 
   const [result] = await db.query(
 

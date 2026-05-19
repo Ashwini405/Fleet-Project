@@ -1,7 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, RefreshCcw, Gauge, Plus, FileText, ArrowLeftRight, PackageCheck, Archive, MinusCircle, CheckCircle, Wrench, Trash2, RotateCcw, ClipboardCheck, Clock } from 'lucide-react';
-import { useTyreLifecycle } from '../index';
 import MountTyreModal from './MountTyreModal';
 import RemoveTyreModal from './RemoveTyreModal';
 import ReplaceTyreModal from './ReplaceTyreModal';
@@ -9,10 +8,12 @@ import TyreDatasheetModal from './TyreDatasheetModal';
 import { axleLayouts, posLabel, AXLE_TYPE_STYLES } from '../data/axleLayouts';
 import TyreConfigCards from './TyreConfigCards';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+
 const HEALTH = {
-  Good:   { border: 'border-green-400',  bg: 'bg-green-50',   badge: 'bg-green-500',  glow: 'shadow-green-200',  text: 'text-green-700',  popupBorder: 'border-green-400', popupBg: 'from-green-50' },
-  Medium: { border: 'border-orange-400', bg: 'bg-orange-50',  badge: 'bg-orange-500', glow: 'shadow-orange-200', text: 'text-orange-700', popupBorder: 'border-orange-400', popupBg: 'from-orange-50' },
-  Poor:   { border: 'border-red-400',    bg: 'bg-red-50',     badge: 'bg-red-500',    glow: 'shadow-red-200',    text: 'text-red-700',   popupBorder: 'border-red-400',   popupBg: 'from-red-50'   },
+  Good: { border: 'border-green-400', bg: 'bg-green-50', badge: 'bg-green-500', glow: 'shadow-green-200', text: 'text-green-700', popupBorder: 'border-green-400', popupBg: 'from-green-50' },
+  Medium: { border: 'border-orange-400', bg: 'bg-orange-50', badge: 'bg-orange-500', glow: 'shadow-orange-200', text: 'text-orange-700', popupBorder: 'border-orange-400', popupBg: 'from-orange-50' },
+  Poor: { border: 'border-red-400', bg: 'bg-red-50', badge: 'bg-red-500', glow: 'shadow-red-200', text: 'text-red-700', popupBorder: 'border-red-400', popupBg: 'from-red-50' },
 };
 const healthColor = { Good: 'bg-green-500', Medium: 'bg-yellow-500', Poor: 'bg-red-500' };
 const healthBorder = { Good: 'border-green-400', Medium: 'border-yellow-400', Poor: 'border-red-400' };
@@ -24,18 +25,18 @@ function TyreOpsPopup({ tyre, truckData, onClose, onRemove, onReplace, onViewDet
   const treadPct = Math.max(0, 100 - lifePct);
 
   const details = [
-    ['Tyre No',        tyre.id],
-    ['Brand / Model',  `${tyre.make} ${tyre.model}`],
-    ['Truck No',       truckData.id],
-    ['Axle Position',  tyre.position],
-    ['Mounted Date',   tyre.fittedDate],
-    ['Fitted Odo',     `${tyre.fittedOdo.toLocaleString()} km`],
-    ['Current Odo',    `${tyre.presentOdo.toLocaleString()} km`],
-    ['Running KM',     `${runKm.toLocaleString()} km`],
-    ['Tread Left',     `${treadPct}%`],
-    ['Health Status',  tyre.health],
-    ['Material',       tyre.material],
-    ['Expected Life',  `${tyre.expectedLife.toLocaleString()} km`],
+    ['Tyre No', tyre.id],
+    ['Brand / Model', `${tyre.make} ${tyre.model}`],
+    ['Truck No', truckData.id],
+    ['Axle Position', tyre.position],
+    ['Mounted Date', tyre.fittedDate],
+    ['Fitted Odo', `${tyre.fittedOdo.toLocaleString()} km`],
+    ['Current Odo', `${tyre.presentOdo.toLocaleString()} km`],
+    ['Running KM', `${runKm.toLocaleString()} km`],
+    ['Tread Left', `${treadPct}%`],
+    ['Health Status', tyre.health],
+    ['Material', tyre.material],
+    ['Expected Life', `${tyre.expectedLife.toLocaleString()} km`],
   ];
 
   return (
@@ -142,10 +143,10 @@ function TyreBlock({ posId, tyre, onMount, onPopup, activePopupId }) {
   }
 
   const h = HEALTH[tyre.health] || HEALTH.Good;
-  const runKm   = tyre.presentOdo - tyre.fittedOdo;
+  const runKm = tyre.presentOdo - tyre.fittedOdo;
   const lifePct = Math.round((runKm / tyre.expectedLife) * 100);
   const treadPct = Math.max(0, 100 - lifePct);
-  const isPoor   = tyre.health === 'Poor';
+  const isPoor = tyre.health === 'Poor';
   const isActive = activePopupId === tyre.id;
 
   return (
@@ -186,7 +187,7 @@ function TyreBlock({ posId, tyre, onMount, onPopup, activePopupId }) {
         opacity-0 group-hover:opacity-100 transition-opacity duration-150 whitespace-nowrap">
         <div className="bg-slate-900 text-white rounded-lg px-2.5 py-1.5 shadow-xl text-center">
           <div className="text-[10px] font-black">{tyre.id}</div>
-          <div className={`text-[9px] font-bold ${h.text.replace('700','300')}`}>
+          <div className={`text-[9px] font-bold ${h.text.replace('700', '300')}`}>
             {tyre.health.toUpperCase()} · {treadPct}%
           </div>
           <div className="text-[9px] text-gray-300">{runKm.toLocaleString()} km</div>
@@ -218,18 +219,96 @@ function AxleRow({ axle, children }) {
 export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
   if (!isOpen || !truckData) return null;
 
-  const { activeTyres, activityLog, removeTyre, quickRemoveTyre } = useTyreLifecycle();
-  const truckTyres = activeTyres.filter(t => t.truckNo === truckData.id);
-  const recentActivity = activityLog.filter(a => a.truckId === truckData.id).slice(0, 10);
-  const [activePopup, setActivePopup]   = useState(null);
+  const [activeTyres, setActiveTyres] = useState([]);
+  const [activityLog] = useState([]); // Not yet implemented – backend pending
+  const [activePopup, setActivePopup] = useState(null);
   const [selectedTyre, setSelectedTyre] = useState(null);
-  const [mountSlot, setMountSlot]       = useState(null);
+  const [mountSlot, setMountSlot] = useState(null);
   const [removingTyre, setRemovingTyre] = useState(null);
-  const [replaceTyre, setReplaceTyre]   = useState(null);
-  const [viewingTyre, setViewingTyre]   = useState(null);
-  const [removeToast, setRemoveToast]   = useState(null);
+  const [replaceTyre, setReplaceTyre] = useState(null);
+  const [viewingTyre, setViewingTyre] = useState(null);
+  const [removeToast, setRemoveToast] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0); // 🔁 force re-fetch
 
-  // Full Details — build tyre datasheet object
+  // Fetch mounted tyres from database (now a reusable function)
+  const fetchTyres = async () => {
+    try {
+      const response = await fetch(
+        `${API_URL}/api/tyres`
+      );
+      const data = await response.json();
+      if (data.success) {
+        console.log('ALL TYRES FROM DB:', data.data);
+        const mountedTyres = data.data
+          .filter(
+            tyre =>
+              String(tyre.status || '')
+                .trim()
+                .toLowerCase() === 'mounted'
+          )
+
+          .map(tyre => ({
+            id: tyre.tyre_number,
+            make: tyre.brand,
+            model: tyre.model,
+            truckNo: String(
+              tyre.vehicle_number ||
+              tyre.vehicle_no ||
+              ''
+            ).trim(),
+            position:
+              tyre.tyre_position ||
+              '',
+            fittedDate: tyre.date_of_issue,
+            fittedOdo: Number(tyre.fitted_odometer || 0),
+            presentOdo: Number(tyre.fitted_odometer || 0) + Number(tyre.running_km || 0),
+            expectedLife: Number(tyre.expected_life_km || 0),
+            health: tyre.tyre_health || 'Good',
+            tyreSize: tyre.tyre_size,
+            material: tyre.material_type,
+            runningKm: Number(tyre.running_km || 0)
+          }));
+        setActiveTyres(mountedTyres);
+      }
+    } catch (error) {
+      console.error('Error fetching tyres:', error);
+    }
+  };
+
+  // Load tyres on mount and whenever refreshKey changes
+  useEffect(() => {
+    fetchTyres();
+  }, [refreshKey]);
+
+  // Normalized filter for truck tyres
+  const truckTyres = activeTyres.filter((tyre) => {
+    const tyreTruck = String(
+      tyre.truckNo ||
+      tyre.vehicle_number ||
+      ''
+    )
+      .trim()
+      .toLowerCase();
+
+    const targetTruck = String(
+      truckData.vehicle_no ||
+      truckData.vehicleNumber ||
+      truckData.id ||
+      ''
+    )
+      .trim()
+      .toLowerCase();
+
+    return tyreTruck === targetTruck;
+  });
+
+  const recentActivity = []; // Backend pending – will be replaced with real API call later
+  const layout =
+    axleLayouts[
+    truckData.wheelConfiguration ||
+    truckData.wheel_configuration
+    ] ?? axleLayouts['10 Wheeler'];
+
   const handleViewDetails = (tyre) => {
     const runKm = tyre.presentOdo - tyre.fittedOdo;
     const lifePct = Math.round((runKm / tyre.expectedLife) * 100);
@@ -240,37 +319,76 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
     });
   };
 
-  // Send to Old Stock — quick remove with default data
+  // Placeholder for send to old stock – will be replaced with real API
   const handleSendOldStock = (tyre) => {
-    quickRemoveTyre(tyre.id, truckData.currentOdo ?? tyre.presentOdo);
-    if (selectedTyre?.id === tyre.id) setSelectedTyre(null);
-    setRemoveToast(`${tyre.id} moved to Old Stock`);
+    alert('Send to Old Stock API pending');
+    setRemoveToast(`${tyre.id} moved to Old Stock (demo)`);
     setTimeout(() => setRemoveToast(null), 3500);
   };
 
-  // From Inventory — open mount modal for that position
   const handleFromInventory = (posId) => {
     setMountSlot(posId);
   };
-  const layout = axleLayouts[truckData.wheelConfiguration] ?? axleLayouts['10 Wheeler'];
 
+  // Placeholder for remove confirmation
   const handleRemoveConfirm = (tyreId, removalData) => {
-    removeTyre(tyreId, removalData);
+    alert('Remove tyre backend pending');
     setRemovingTyre(null);
-    if (selectedTyre?.id === tyreId) setSelectedTyre(null);
-    setRemoveToast(`${tyreId} removed → ${removalData.storeLocation}`);
+    setRemoveToast(`${tyreId} removed → ${removalData.storeLocation} (demo)`);
     setTimeout(() => setRemoveToast(null), 3500);
   };
 
-  const handleReplaceClose = () => {
+  const handleReplaceClose = async () => {
     setReplaceTyre(null);
+    setActivePopup(null);
+    setSelectedTyre(null);
+    await fetchTyres();
+    setRefreshKey(prev => prev + 1);
   };
 
   const formatTimestamp = (iso) => new Date(iso).toLocaleString('en-US', {
     day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
   });
 
-  const getTyreByPosition = (posId) => truckTyres.find(t => t.position === posId);
+ const getTyreByPosition = (posId) => {
+
+  const positionMap = {
+
+    frontleft: 'FL',
+    frontright: 'FR',
+
+    frontleft2: 'FL2',
+    frontright2: 'FR2',
+
+    axle1leftouter: 'L1_OUTER',
+    axle1leftinner: 'L1_INNER',
+    axle1rightinner: 'R1_INNER',
+    axle1rightouter: 'R1_OUTER',
+
+    axle2leftouter: 'L2_OUTER',
+    axle2leftinner: 'L2_INNER',
+    axle2rightinner: 'R2_INNER',
+    axle2rightouter: 'R2_OUTER',
+  };
+
+  const normalizedLayoutPos = String(posId || '')
+    .trim()
+    .toUpperCase();
+
+  return truckTyres.find((t) => {
+
+    const tyrePos = String(t.position || '')
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, '');
+
+    const normalizedTyrePos =
+      positionMap[tyrePos] || tyrePos.toUpperCase();
+
+    return normalizedTyrePos === normalizedLayoutPos;
+  });
+};
+
 
   return (
     <AnimatePresence>
@@ -295,7 +413,12 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
                 </span>
                 <span className="text-[10px] text-gray-400 font-semibold">{truckData.model}</span>
               </div>
-              <TyreConfigCards truckData={{ ...truckData, totalTyres: layout.totalTyres }} size="sm" />
+              <TyreConfigCards truckData={{
+                ...truckData, totalTyres:
+                  truckData.totalTyres ||
+                  truckData.total_tyres ||
+                  layout.totalTyres
+              }} size="sm" />
             </div>
             <button onClick={onClose} className="ml-4 shrink-0 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors">
               <X className="w-4 h-4" />
@@ -415,11 +538,11 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
                           <td className="px-1.5 py-1 font-bold text-slate-700 font-mono">{t.id}</td>
                           <td className="px-1.5 py-1 text-gray-500">{t.position}</td>
                           <td className="px-1.5 py-1 text-gray-600">{t.make}</td>
-                          <td className="px-1.5 py-1 font-semibold text-blue-600">{(runKm/1000).toFixed(1)}k</td>
+                          <td className="px-1.5 py-1 font-semibold text-blue-600">{(runKm / 1000).toFixed(1)}k</td>
                           <td className="px-1.5 py-1">
                             <div className="flex items-center gap-1">
                               <div className="w-8 h-1 bg-gray-200 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full ${lifePct > 80 ? 'bg-red-500' : lifePct > 50 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${Math.min(lifePct,100)}%` }} />
+                                <div className={`h-full rounded-full ${lifePct > 80 ? 'bg-red-500' : lifePct > 50 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${Math.min(lifePct, 100)}%` }} />
                               </div>
                               <span className="text-gray-500">{lifePct}%</span>
                             </div>
@@ -431,7 +554,9 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
                       );
                     })}
                     {truckTyres.length === 0 && (
-                      <tr><td colSpan={6} className="text-center py-4 text-gray-400 text-[9px]">No tyres assigned</td></tr>
+                      <tr>
+                        <td colSpan={6} className="text-center py-4 text-gray-400 text-[9px]">No tyres assigned</td>
+                      </tr>
                     )}
                   </tbody>
                 </table>
@@ -440,12 +565,11 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
 
             {/* RIGHT — Legend, Summary, Actions, Timeline */}
             <div className="p-3 flex flex-col gap-2 overflow-y-auto bg-white" style={{ scrollbarWidth: 'thin' }}>
-
               {/* Health Legend */}
               <div>
                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Health Legend</p>
                 <div className="bg-slate-50 rounded-xl border border-gray-100 p-2.5 flex flex-col gap-1.5">
-                  {[['Good','bg-green-500','> 70% tread'],['Medium','bg-orange-500','30–70%'],['Poor','bg-red-500','< 30% critical']].map(([label,color,desc]) => (
+                  {[['Good', 'bg-green-500', '> 70% tread'], ['Medium', 'bg-orange-500', '30–70%'], ['Poor', 'bg-red-500', '< 30% critical']].map(([label, color, desc]) => (
                     <div key={label} className="flex items-center gap-2">
                       <span className={`w-2.5 h-2.5 rounded shrink-0 ${color}`} />
                       <span className="text-[10px] font-bold text-slate-700">{label}</span>
@@ -461,9 +585,9 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
                 <div className="bg-slate-50 rounded-xl border border-gray-100 p-2 grid grid-cols-2 gap-1.5">
                   {[
                     ['Fitted', truckTyres.length, 'text-slate-800'],
-                    ['Empty',  truckData.totalTyres - truckTyres.length, 'text-orange-600'],
-                    ['Good',   truckTyres.filter(t => t.health === 'Good').length, 'text-emerald-600'],
-                    ['Attn',   truckTyres.filter(t => t.health !== 'Good').length, 'text-red-600'],
+                    ['Empty', truckData.totalTyres - truckTyres.length, 'text-orange-600'],
+                    ['Good', truckTyres.filter(t => t.health === 'Good').length, 'text-emerald-600'],
+                    ['Attn', truckTyres.filter(t => t.health !== 'Good').length, 'text-red-600'],
                   ].map(([label, val, cls]) => (
                     <div key={label} className="text-center bg-white rounded-lg py-1.5">
                       <div className={`text-base font-black ${cls}`}>{val}</div>
@@ -501,13 +625,13 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
                       <div className="absolute left-[14px] top-2.5 bottom-2.5 w-px bg-slate-200" />
                       {recentActivity.map((activity) => {
                         const EVENT_CONFIG = {
-                          mounted:    { dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700', icon: <Wrench className="w-2 h-2" />,        label: 'Mounted'    },
-                          removed:    { dot: 'bg-orange-500',  badge: 'bg-orange-100 text-orange-700',   icon: <MinusCircle className="w-2 h-2" />,   label: 'Removed'    },
-                          replaced:   { dot: 'bg-blue-500',    badge: 'bg-blue-100 text-blue-700',       icon: <ArrowLeftRight className="w-2 h-2" />, label: 'Replaced'   },
-                          remounted:  { dot: 'bg-slate-500',   badge: 'bg-slate-100 text-slate-700',     icon: <RotateCcw className="w-2 h-2" />,     label: 'Re-Mount'   },
-                          retreading: { dot: 'bg-amber-500',   badge: 'bg-amber-100 text-amber-700',     icon: <RefreshCcw className="w-2 h-2" />,    label: 'Retread'    },
-                          scrap:      { dot: 'bg-red-500',     badge: 'bg-red-100 text-red-700',         icon: <Trash2 className="w-2 h-2" />,        label: 'Scrap'      },
-                          inspection: { dot: 'bg-sky-500',     badge: 'bg-sky-100 text-sky-700',         icon: <ClipboardCheck className="w-2 h-2" />, label: 'Inspect'    },
+                          mounted: { dot: 'bg-emerald-500', badge: 'bg-emerald-100 text-emerald-700', icon: <Wrench className="w-2 h-2" />, label: 'Mounted' },
+                          removed: { dot: 'bg-orange-500', badge: 'bg-orange-100 text-orange-700', icon: <MinusCircle className="w-2 h-2" />, label: 'Removed' },
+                          replaced: { dot: 'bg-blue-500', badge: 'bg-blue-100 text-blue-700', icon: <ArrowLeftRight className="w-2 h-2" />, label: 'Replaced' },
+                          remounted: { dot: 'bg-slate-500', badge: 'bg-slate-100 text-slate-700', icon: <RotateCcw className="w-2 h-2" />, label: 'Re-Mount' },
+                          retreading: { dot: 'bg-amber-500', badge: 'bg-amber-100 text-amber-700', icon: <RefreshCcw className="w-2 h-2" />, label: 'Retread' },
+                          scrap: { dot: 'bg-red-500', badge: 'bg-red-100 text-red-700', icon: <Trash2 className="w-2 h-2" />, label: 'Scrap' },
+                          inspection: { dot: 'bg-sky-500', badge: 'bg-sky-100 text-sky-700', icon: <ClipboardCheck className="w-2 h-2" />, label: 'Inspect' },
                         };
                         const cfg = EVENT_CONFIG[activity.type] || { dot: 'bg-slate-400', badge: 'bg-slate-100 text-slate-600', icon: null, label: activity.type };
                         return (
@@ -544,9 +668,17 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
       <TyreDatasheetModal isOpen={!!viewingTyre} onClose={() => setViewingTyre(null)} tyreData={viewingTyre} />
       <MountTyreModal
         isOpen={!!mountSlot}
-        onClose={() => setMountSlot(null)}
+        onClose={async () => {
+          setMountSlot(null);
+          await fetchTyres();
+          setRefreshKey(prev => prev + 1);
+        }}
         truckData={truckData}
         positionId={mountSlot}
+        onSuccess={async () => {
+          await fetchTyres();
+          setRefreshKey(prev => prev + 1);
+        }}
       />
       <AnimatePresence>
         {removingTyre && (
@@ -563,6 +695,10 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
         truckData={truckData}
         positionId={replaceTyre?.position}
         currentTyre={replaceTyre}
+        onSuccess={() => {
+          fetchTyres();
+          setRefreshKey(prev => prev + 1);
+        }}
       />
 
       {/* Remove toast */}

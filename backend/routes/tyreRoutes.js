@@ -3,12 +3,17 @@ const express = require('express');
 const router = express.Router();
 
 const upload = require('../config/multer');
+const tyreController = require('../controllers/tyreController');
 
 const {
 
   createTyre,
 
-  getAllTyres
+  getAllTyres,
+
+  getInStockTyres,
+
+  mountTyre
 
 } = require('../controllers/tyreController');
 
@@ -46,5 +51,34 @@ router.get(
 
 );
 
+
+// ======================================================
+// GET IN STOCK TYRES
+// ======================================================
+
+router.get(
+
+  '/in-stock',
+
+  getInStockTyres
+
+);
+
+
+// ======================================================
+// MOUNT TYRE
+// ======================================================
+
+router.put(
+
+  '/mount',
+
+  mountTyre
+
+);
+router.get(
+  '/vehicle/:vehicleId',
+  tyreController.getTyresByVehicle
+);
 
 module.exports = router;
