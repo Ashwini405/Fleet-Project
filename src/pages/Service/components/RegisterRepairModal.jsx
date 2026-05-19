@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Wrench, Package, Plus, Upload, Trash2,
-  AlertTriangle, Clock, FileText, Truck,
+  AlertTriangle, Clock, FileText, Truck, Loader2, CheckCircle2,
 } from 'lucide-react';
 import TyreServiceWorkflow from './TyreServiceWorkflow';
+import { InventoryContext } from '../../../context/InventoryContext';
 
 const FIELD_CLS = 'w-full p-2.5 bg-white border border-gray-300 rounded-lg focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 text-sm shadow-sm disabled:opacity-75 disabled:bg-gray-100';
 const LABEL_CLS = 'block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5';
@@ -62,14 +63,21 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   const [labourCost, setLabourCost] = useState(0);
 
   const [parts, setParts] = useState([]);
-  const [newPart, setNewPart] = useState({ name: '', costPerUnit: '', qty: '1', vendor: '' });
+  const [newPart, setNewPart] = useState({ inventoryId: null, name: '', costPerUnit: '', qty: '1', vendor: '', availableStock: null });
   const [partErrors, setPartErrors] = useState({});
+  const [partSearch, setPartSearch] = useState('');
+  const [showPartDropdown, setShowPartDropdown] = useState(false);
+  const [savingInventory, setSavingInventory] = useState(false);
+  const [successToast, setSuccessToast] = useState('');
 
   const [files, setFiles] = useState([]);
   const [dragging, setDragging] = useState(false);
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState('');
   const [tyreWorkflow, setTyreWorkflow] = useState({});
+
+  // ─── Inventory context ───────────────────────────────────────────────────
+  const { inventory, stockOut } = useContext(InventoryContext);
 
   // ─── Database state – replaces dummy imports ────────────────────────────
   const [vehicles, setVehicles] = useState([]);
@@ -198,22 +206,53 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     return Object.keys(nextErrors).length === 0;
   };
 
-  // ─── Parts management (unchanged) ──────────────────────────────────────
+  // ─── Filtered inventory for part search ─────────────────────────────────
+  const filteredInventory = useMemo(() => {
+    if (!partSearch.trim()) return inventory.slice(0, 20);
+    const q = partSearch.toLowerCase();
+    return inventory.filter(i =>
+      i.name?.toLowerCase().includes(q) || i.partCode?.toLowerCase().includes(q)
+    ).slice(0, 20);
+  }, [inventory, partSearch]);
+
+  const handleSelectInventoryPart = (item) => {
+    setNewPart({
+      inventoryId: item.id,
+      name: item.name,
+      costPerUnit: String(item.costPrice || ''),
+      qty: '1',
+      vendor: item.preferredVendor || '',
+      availableStock: item.currentStock,
+    });
+    setPartSearch(item.name);
+    setShowPartDropdown(false);
+    setPartErrors({});
+  };
+
+  // ─── Parts management ────────────────────────────────────────────────────
   const addPart = () => {
     const errs = {};
-    if (!newPart.name.trim()) errs.name = 'Part name is required';
+    if (!newPart.name.trim()) errs.name = 'Select a part from inventory';
     if (!newPart.costPerUnit || Number(newPart.costPerUnit) <= 0) errs.costPerUnit = 'Cost per unit is required';
     if (!newPart.qty || Number(newPart.qty) < 1) errs.qty = 'Qty must be at least 1';
+    if (newPart.availableStock !== null && Number(newPart.qty) > newPart.availableStock)
+      errs.qty = `Exceeds available stock (${newPart.availableStock} available)`;
     if (Object.keys(errs).length) { setPartErrors(errs); return; }
     const costPerUnit = Number(newPart.costPerUnit);
     const qty = Number(newPart.qty);
-    const duplicate = parts.find(p => p.name.trim().toLowerCase() === newPart.name.trim().toLowerCase());
+    const duplicate = parts.find(p => p.inventoryId && p.inventoryId === newPart.inventoryId);
     if (duplicate) {
-      setParts(parts.map(p => p.id === duplicate.id ? { ...p, qty: p.qty + qty } : p));
+      const newQty = duplicate.qty + qty;
+      if (newPart.availableStock !== null && newQty > newPart.availableStock) {
+        setPartErrors({ qty: `Total qty (${newQty}) exceeds available stock (${newPart.availableStock})` });
+        return;
+      }
+      setParts(parts.map(p => p.id === duplicate.id ? { ...p, qty: newQty } : p));
     } else {
       setParts([...parts, { ...newPart, id: Date.now(), costPerUnit, qty }]);
     }
-    setNewPart({ name: '', costPerUnit: '', qty: '1', vendor: '' });
+    setNewPart({ inventoryId: null, name: '', costPerUnit: '', qty: '1', vendor: '', availableStock: null });
+    setPartSearch('');
     setPartErrors({});
   };
 
@@ -258,7 +297,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     setRepairNotes('');
     setLabourCost(0);
     setParts([]);
-    setNewPart({ name: '', costPerUnit: '', qty: '1', vendor: '' });
+    setNewPart({ inventoryId: null, name: '', costPerUnit: '', qty: '1', vendor: '', availableStock: null });
+    setPartSearch('');
     setFiles([]);
     setErrors(prev => ({ ...prev, truck: undefined, odometer: undefined }));
   };
@@ -293,6 +333,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   // ─── SAVE TO BACKEND ─────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!validate()) return;
+    setSavingInventory(true);
 
     const payload = {
       vehicle_id: truck,
@@ -369,18 +410,51 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
         }).catch(err => console.warn('Tyre service processing failed:', err));
       }
 
-      setToast(
-        status === 'Completed'
-          ? 'Repair completed ✅ — Vehicle is now Active and available for trips'
-          : status === 'Under Repair'
-          ? 'Repair saved ✅ — Vehicle marked as Under Repair (unavailable for trips)'
-          : 'Repair reported ✅'
-      );
-      setTimeout(() => setToast(''), 4000);
-      onClose();
+      // ── Deduct inventory stock on Completed (only on first-time completion) ──
+      const wasAlreadyCompleted = logData?.status === 'Completed';
+      if (status === 'Completed' && !wasAlreadyCompleted) {
+        const repairId = data.id || logData?.id || null;
+        // Match parts to inventory by inventoryId (new parts) or by name lookup (legacy parts)
+        const inventoryParts = parts.filter(p => p.inventoryId);
+        const legacyParts = parts.filter(p => !p.inventoryId && p.name);
+
+        // Resolve legacy parts by name match against inventory
+        const resolvedLegacy = legacyParts.map(p => {
+          const match = inventory.find(i => i.name?.toLowerCase() === p.name?.toLowerCase());
+          return match ? { ...p, inventoryId: match.id, costPerUnit: p.costPerUnit || match.costPrice } : null;
+        }).filter(Boolean);
+
+        const allDeductable = [...inventoryParts, ...resolvedLegacy];
+        for (const part of allDeductable) {
+          const result = await stockOut({
+            partId: part.inventoryId,
+            qty: part.qty,
+            vehicleNumber: selectedTruck?.vehicle_no || '',
+            odometer: odometer || 0,
+            serviceId: repairId ? String(repairId) : '',
+            date: date || new Date().toISOString().split('T')[0],
+            serviceType: 'Repair',
+            costPerUnit: part.costPerUnit,
+            vendor: part.vendor || '',
+          });
+          if (!result?.success) {
+            console.warn('Stock deduction failed for part:', part.name, result?.error);
+          }
+        }
+      }
+
+      const toastMsg = status === 'Completed'
+        ? 'Repair completed ✅ — Inventory updated & vehicle is now Active'
+        : status === 'Under Repair'
+        ? 'Repair saved ✅ — Vehicle marked as Under Repair'
+        : 'Repair reported ✅';
+      setSuccessToast(toastMsg);
+      setTimeout(() => { setSuccessToast(''); onClose(); }, 2500);
     } catch (err) {
       console.error(err);
       alert('Backend connection failed');
+    } finally {
+      setSavingInventory(false);
     }
   };
 
@@ -786,13 +860,57 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                 <div className="space-y-4 mt-4">
                   {!isCompleted && !isViewMode && hasSelectedTruck && (
                     <div className="space-y-2">
-                      <div className="grid grid-cols-[2fr_1fr_1fr_1fr] gap-2">
-                        <div>
-                          <input type="text" placeholder="Part name" disabled={isReported} value={newPart.name}
-                            onChange={e => { setNewPart({ ...newPart, name: e.target.value }); setPartErrors(p => ({ ...p, name: undefined })); }}
-                            className={`${FIELD_CLS} ${partErrors.name ? 'border-red-500' : ''}`} />
-                          {partErrors.name && <p className="text-[10px] text-red-500 mt-0.5">{partErrors.name}</p>}
+                      {/* Inventory search dropdown */}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Search inventory part..."
+                          disabled={isReported}
+                          value={partSearch}
+                          onChange={e => { setPartSearch(e.target.value); setShowPartDropdown(true); setNewPart(p => ({ ...p, inventoryId: null, name: e.target.value, availableStock: null })); setPartErrors(p => ({ ...p, name: undefined })); }}
+                          onFocus={() => setShowPartDropdown(true)}
+                          onBlur={() => setTimeout(() => setShowPartDropdown(false), 150)}
+                          className={`${FIELD_CLS} ${partErrors.name ? 'border-red-500' : ''}`}
+                        />
+                        {showPartDropdown && filteredInventory.length > 0 && (
+                          <div className="absolute z-20 top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto mt-1">
+                            {filteredInventory.map(item => (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onMouseDown={() => handleSelectInventoryPart(item)}
+                                className="w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between gap-2 text-sm border-b border-gray-100 last:border-0"
+                              >
+                                <div>
+                                  <p className="font-semibold text-gray-800">{item.name}</p>
+                                  <p className="text-[10px] text-gray-400">{item.partCode} · {item.preferredVendor || '—'}</p>
+                                </div>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  item.currentStock === 0 ? 'bg-red-100 text-red-600' :
+                                  item.currentStock <= item.minStock ? 'bg-amber-100 text-amber-700' :
+                                  'bg-emerald-100 text-emerald-700'
+                                }`}>{item.currentStock} {item.unit}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {partErrors.name && <p className="text-[10px] text-red-500 mt-0.5">{partErrors.name}</p>}
+                      </div>
+
+                      {/* Stock info badge */}
+                      {newPart.availableStock !== null && (
+                        <div className={`flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${
+                          newPart.availableStock === 0 ? 'bg-red-50 text-red-600' :
+                          newPart.availableStock <= 5 ? 'bg-amber-50 text-amber-700' :
+                          'bg-emerald-50 text-emerald-700'
+                        }`}>
+                          <Package className="w-3 h-3" />
+                          Available stock: {newPart.availableStock}
+                          {newPart.availableStock === 0 && ' — Out of stock'}
                         </div>
+                      )}
+
+                      <div className="grid grid-cols-[1fr_1fr_1fr] gap-2">
                         <div>
                           <input type="number" placeholder="Cost/unit" min="0" disabled={isReported} value={newPart.costPerUnit}
                             onChange={e => { setNewPart({ ...newPart, costPerUnit: e.target.value }); setPartErrors(p => ({ ...p, costPerUnit: undefined })); }}
@@ -811,7 +929,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                       {Number(newPart.costPerUnit) > 0 && Number(newPart.qty) >= 1 && (
                         <p className="text-[11px] text-blue-600 font-semibold">Row total: ₹{(Number(newPart.costPerUnit) * Number(newPart.qty)).toFixed(2)}</p>
                       )}
-                      <button onClick={addPart} disabled={isReported}
+                      <button onClick={addPart} disabled={isReported || newPart.availableStock === 0}
                         className="w-full py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-1.5">
                         <Plus className="w-4 h-4" /> Add Part
                       </button>
@@ -1002,19 +1120,24 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
           <div className="flex items-center justify-between gap-4 px-6 py-4 bg-white border-t border-gray-200">
             <div className="text-sm text-gray-500">Previous odometer value: <span className="font-semibold">{previousOdometer} KM</span></div>
             <div className="flex items-center gap-3">
-              <button onClick={onClose} className="rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors">
+              <button onClick={onClose} disabled={savingInventory} className="rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">
                 Cancel
               </button>
               <button
                 onClick={handleSave}
-                disabled={isSaveDisabled}
-                className="rounded-full bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isSaveDisabled || savingInventory}
+                className="rounded-full bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60 flex items-center gap-2"
               >
-                Save Repair
+                {savingInventory ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Repair'}
               </button>
             </div>
           </div>
 
+          {successToast && (
+            <div className="absolute bottom-6 right-6 rounded-2xl bg-emerald-600 px-5 py-3 text-sm text-white shadow-lg flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4" />{successToast}
+            </div>
+          )}
           {toast && (
             <div className="absolute bottom-6 right-6 rounded-3xl bg-emerald-600 px-5 py-3 text-sm text-white shadow-lg">
               {toast}

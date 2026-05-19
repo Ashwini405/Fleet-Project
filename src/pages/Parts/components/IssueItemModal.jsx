@@ -1,460 +1,231 @@
-import React, {
-  useState,
-  useEffect
-} from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, AlertCircle, ChevronDown, Search, Loader2 } from 'lucide-react';
 
-import {
-  motion,
-  AnimatePresence
-} from 'framer-motion';
+const emptyForm = {
+  issue_date: new Date().toISOString().split('T')[0],
+  quantity: '',
+  price_per_unit: '',
+  odometer: '',
+};
 
-import {
-  X,
-  ArrowRightCircle,
-  Truck
-} from 'lucide-react';
-
-
-// ======================================================
-// ✅ COMPONENT
-// ======================================================
-
-export default function IssueItemModal({
-
-  isOpen,
-
-  onClose,
-
-  itemData,
-
-  onIssue,
-
-  vehicleOptions = []
-
-}) {
-
-  const [formData, setFormData] =
-    useState({
-
-      truckNo: '',
-
-      issueDate:
-        new Date()
-          .toISOString()
-          .split('T')[0],
-
-      qty: 1,
-
-      price: '',
-
-      odometer: ''
-    });
-
-
-  // ======================================================
-  // ✅ RESET
-  // ======================================================
+export default function IssueItemModal({ isOpen, item, onClose, onSuccess }) {
+  const [form, setForm] = useState(emptyForm);
+  const [selectedVehicle, setSelectedVehicle] = useState(null);
+  const [vehicles, setVehicles] = useState([]);
+  const [vehiclesLoading, setVehiclesLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const dropdownRef = useRef(null);
 
   useEffect(() => {
-
     if (isOpen) {
-
-      setFormData({
-
-        truckNo: '',
-
-        issueDate:
-          new Date()
-            .toISOString()
-            .split('T')[0],
-
-        qty: 1,
-
-        price: '',
-
-        odometer: ''
-      });
+      setForm(emptyForm);
+      setSelectedVehicle(null);
+      setSearch('');
+      setError('');
+      setDropdownOpen(false);
+      fetchVehicles();
     }
-
   }, [isOpen]);
 
+  useEffect(() => {
+    const handler = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
-  // ======================================================
-  // ✅ EXIT
-  // ======================================================
-
-  if (!isOpen || !itemData)
-    return null;
-
-
-  // ======================================================
-  // ✅ SAFE STOCK
-  // ======================================================
-
-  const availableStock =
-    Number(
-      itemData.currentStock || 0
-    );
-
-
-  // ======================================================
-  // ✅ SUBMIT
-  // ======================================================
-
-  const handleSubmit = () => {
-
-    if (
-
-      !formData.truckNo ||
-
-      !formData.odometer ||
-
-      Number(formData.qty) <= 0
-
-    ) {
-
-      return;
+  const fetchVehicles = async () => {
+    setVehiclesLoading(true);
+    try {
+      const res = await fetch('http://localhost:5001/api/vehicles');
+      const data = await res.json();
+      setVehicles(data.data || []);
+    } catch {
+      setVehicles([]);
+    } finally {
+      setVehiclesLoading(false);
     }
-
-    onIssue({
-
-      ...formData,
-
-      qty:
-        Number(formData.qty),
-
-      odometer:
-        Number(formData.odometer),
-
-      price:
-        Number(formData.price || 0)
-    });
   };
 
+  if (!isOpen || !item) return null;
+
+  const available = Number(item.current_stock || 0);
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
+
+  const filteredVehicles = vehicles.filter(v =>
+    v.vehicle_no?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const qty = Number(form.quantity);
+  const isOverStock = qty > 0 && qty > available;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedVehicle) return setError('Please select a truck.');
+    if (!qty || qty <= 0) return setError('Enter a valid quantity.');
+    if (qty > available) return setError(`Insufficient stock available. Only ${available} unit(s) in stock.`);
+    setError('');
+    setLoading(true);
+    try {
+      const res = await fetch('http://localhost:5001/api/inventory/stock-out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          partId: item.id,
+          qty,
+          vehicleNumber: selectedVehicle.vehicle_no,
+          odometer: Number(form.odometer) || 0,
+          costPerUnit: Number(form.price_per_unit) || 0,
+          date: form.issue_date,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Failed to issue item.');
+      onSuccess(qty);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-
-    <AnimatePresence>
-
-      {isOpen && (
-
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
-
-          <motion.div
-            initial={{
-              opacity: 0,
-              scale: 0.95,
-              y: 10
-            }}
-            animate={{
-              opacity: 1,
-              scale: 1,
-              y: 0
-            }}
-            exit={{
-              opacity: 0,
-              scale: 0.95,
-              y: 10
-            }}
-            className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden flex flex-col"
-          >
-
-            {/* ====================================================== */}
-            {/* HEADER */}
-            {/* ====================================================== */}
-
-            <div className="flex justify-between items-center px-6 py-5 bg-white border-b border-slate-100 shrink-0">
-
-              <div>
-
-                <h3 className="text-lg font-black flex items-center gap-3 tracking-tight text-slate-800">
-
-                  <ArrowRightCircle className="w-5 h-5 text-blue-600" />
-
-                  Issue Item
-
-                </h3>
-
-                <p className="text-xs text-slate-400 font-medium mt-1">
-
-                  You are issuing:
-                  {' '}
-
-                  <strong className="text-slate-600">
-
-                    {itemData.name || 'Unknown'}
-                    {' '}
-                    (
-                    {itemData.brand || 'N/A'}
-                    )
-
-                  </strong>
-
-                </p>
-
-              </div>
-
-
-              <button
-                onClick={onClose}
-                className="p-1.5 rounded-full bg-slate-50 hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
-              >
-
-                <X className="w-4 h-4" />
-
-              </button>
-
-            </div>
-
-
-            {/* ====================================================== */}
-            {/* FORM */}
-            {/* ====================================================== */}
-
-            <div className="p-6 space-y-5 bg-slate-50/50">
-
-              {/* VEHICLE */}
-
-              <div>
-
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-
-                  Vehicle / Truck
-
-                </label>
-
-
-                <select
-                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm transition-shadow"
-                  value={formData.truckNo}
-                  onChange={(e) =>
-
-                    setFormData({
-
-                      ...formData,
-
-                      truckNo:
-                        e.target.value
-                    })
-                  }
-                >
-
-                  <option value="">
-
-                    Select Vehicle
-
-                  </option>
-
-
-                  {vehicleOptions.map(
-                    (v) => (
-
-                      <option
-                        key={v}
-                        value={v}
-                      >
-
-                        {v}
-
-                      </option>
-                    )
-                  )}
-
-                </select>
-
-              </div>
-
-
-              {/* DATE + QTY */}
-
-              <div className="grid grid-cols-2 gap-5">
-
-                {/* DATE */}
-
-                <div>
-
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-
-                    Issue Date
-
-                  </label>
-
-
-                  <input
-                    type="date"
-                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm transition-shadow"
-                    value={
-                      formData.issueDate
-                    }
-                    onChange={(e) =>
-
-                      setFormData({
-
-                        ...formData,
-
-                        issueDate:
-                          e.target.value
-                      })
-                    }
-                  />
-
-                </div>
-
-
-                {/* QTY */}
-
-                <div>
-
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-
-                    Quantity
-
-                  </label>
-
-
-                  <input
-                    type="number"
-                    min="1"
-                    max={availableStock}
-                    className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-black text-slate-800 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm transition-shadow text-center font-mono"
-                    value={formData.qty}
-                    onChange={(e) => {
-
-                      const val =
-                        Math.max(
-                          1,
-
-                          parseInt(
-                            e.target.value
-                          ) || 1
-                        );
-
-                      setFormData({
-
-                        ...formData,
-
-                        qty:
-                          Math.min(
-                            val,
-                            availableStock
-                          )
-                      });
-                    }}
-                  />
-
-
-                  <p className="text-[9px] text-slate-400 mt-1 font-semibold text-right max-w-full truncate px-1">
-
-                    Max available:
-                    {' '}
-                    {availableStock}
-
-                  </p>
-
-                </div>
-
-              </div>
-
-
-              {/* PRICE */}
-
-              <div>
-
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-
-                  Price (Per Unit)
-
-                </label>
-
-
-                <input
-                  type="number"
-                  placeholder="e.g. 500"
-                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm transition-shadow font-mono"
-                  value={formData.price}
-                  onChange={(e) =>
-
-                    setFormData({
-
-                      ...formData,
-
-                      price:
-                        e.target.value
-                    })
-                  }
-                />
-
-              </div>
-
-
-              {/* ODOMETER */}
-
-              <div>
-
-                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-
-                  Odometer Reading (km)
-
-                </label>
-
-
-                <input
-                  type="number"
-                  placeholder="e.g. 54000"
-                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-700 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 shadow-sm transition-shadow font-mono"
-                  value={
-                    formData.odometer
-                  }
-                  onChange={(e) =>
-
-                    setFormData({
-
-                      ...formData,
-
-                      odometer:
-                        e.target.value
-                    })
-                  }
-                />
-
-              </div>
-
-            </div>
-
-
-            {/* ====================================================== */}
-            {/* FOOTER */}
-            {/* ====================================================== */}
-
-            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-white">
-
-              <button
-                onClick={onClose}
-                className="px-5 py-2.5 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-50 rounded-xl transition-colors"
-              >
-
-                Cancel
-
-              </button>
-
-
-              <button
-                onClick={handleSubmit}
-                disabled={availableStock <= 0}
-                className="px-6 py-2.5 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 transition-colors shadow-sm shadow-blue-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-
-                Confirm Issue
-
-              </button>
-
-            </div>
-
-          </motion.div>
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-200">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">Issue Item</h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {item.part_name}
+              <span className="mx-1.5 text-slate-300">—</span>
+              <span className={`font-bold ${available <= 5 ? 'text-red-500' : available <= 15 ? 'text-amber-500' : 'text-emerald-600'}`}>
+                {available} available
+              </span>
+            </p>
+          </div>
+          <button onClick={onClose} disabled={loading}
+            className="text-slate-400 hover:text-slate-600 transition disabled:opacity-40">
+            <X className="h-5 w-5" />
+          </button>
         </div>
-      )}
 
-    </AnimatePresence>
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
+
+          {/* Error */}
+          {error && (
+            <div className="flex items-start gap-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">
+              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Truck Dropdown */}
+          <div ref={dropdownRef}>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">
+              Truck Number <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <button type="button" onClick={() => setDropdownOpen(o => !o)}
+                className={`w-full flex items-center justify-between rounded-xl border px-3 py-2.5 text-sm text-left transition focus:outline-none focus:ring-2 focus:ring-violet-500 ${selectedVehicle ? 'border-slate-200 text-slate-800' : 'border-slate-200 text-slate-400'}`}>
+                <span>{selectedVehicle ? selectedVehicle.vehicle_no : 'Select truck...'}</span>
+                {vehiclesLoading
+                  ? <Loader2 className="h-4 w-4 text-slate-400 animate-spin" />
+                  : <ChevronDown className={`h-4 w-4 text-slate-400 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} />
+                }
+              </button>
+
+              {dropdownOpen && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden">
+                  <div className="p-2 border-b border-slate-100">
+                    <div className="flex items-center gap-2 bg-slate-50 rounded-lg px-3 py-2">
+                      <Search className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <input
+                        autoFocus
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Search vehicle..."
+                        className="flex-1 bg-transparent text-xs text-slate-700 placeholder-slate-400 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="max-h-44 overflow-y-auto">
+                    {vehiclesLoading ? (
+                      <div className="py-6 text-center text-xs text-slate-400">Loading vehicles...</div>
+                    ) : filteredVehicles.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-slate-400">No vehicles found.</div>
+                    ) : (
+                      filteredVehicles.map(v => (
+                        <button key={v.id} type="button"
+                          onClick={() => { setSelectedVehicle(v); setDropdownOpen(false); setSearch(''); setError(''); }}
+                          className={`w-full text-left px-4 py-2.5 text-sm hover:bg-violet-50 transition ${selectedVehicle?.id === v.id ? 'bg-violet-50 text-violet-700 font-semibold' : 'text-slate-700'}`}>
+                          {v.vehicle_no}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Issue Date + Quantity */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Issue Date</label>
+              <input type="date" value={form.issue_date} onChange={e => set('issue_date', e.target.value)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Quantity <span className="text-red-500">*</span>
+              </label>
+              <input type="number" min="1" max={available} value={form.quantity}
+                onChange={e => set('quantity', e.target.value)} placeholder="0"
+                className={`w-full rounded-xl border px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500 ${isOverStock ? 'border-red-300 bg-red-50' : 'border-slate-200'}`} />
+              {isOverStock && (
+                <p className="text-[10px] text-red-500 mt-1">Exceeds available stock ({available})</p>
+              )}
+            </div>
+          </div>
+
+          {/* Price + Odometer */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Price Per Unit</label>
+              <input type="number" min="0" step="0.01" value={form.price_per_unit}
+                onChange={e => set('price_per_unit', e.target.value)} placeholder="0.00"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Odometer (km)</label>
+              <input type="number" min="0" value={form.odometer}
+                onChange={e => set('odometer', e.target.value)} placeholder="0"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} disabled={loading}
+              className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50">
+              Cancel
+            </button>
+            <button type="submit" disabled={loading || isOverStock}
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {loading ? 'Issuing...' : 'Confirm Issue'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

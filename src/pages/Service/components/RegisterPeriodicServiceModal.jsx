@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { X, Wrench, Package, Plus, Trash2, Loader2, Upload, Calculator } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
+import { X, Wrench, Package, Plus, Trash2, Loader2, Upload, Calculator, CheckCircle2 } from 'lucide-react';
+import { InventoryContext } from '../../../context/InventoryContext';
 
 const API = 'http://localhost:5001/api';
 
@@ -40,10 +41,31 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
   const [status, setStatus]               = useState('Reported');
   const [labourCost, setLabourCost]       = useState('');
   const [parts, setParts]                 = useState([]);
-  const [partForm, setPartForm]           = useState({ name: '', qty: '', cost: '', vendor: '' });
+  const [partForm, setPartForm]           = useState({ inventoryId: null, name: '', qty: '', cost: '', vendor: '', availableStock: null });
+  const [partSearch, setPartSearch]       = useState('');
+  const [showPartDropdown, setShowPartDropdown] = useState(false);
+  const [partErrors, setPartErrors]       = useState({});
   const [files, setFiles]                 = useState([]);
   const [errors, setErrors]               = useState({});
   const [saving, setSaving]               = useState(false);
+  const [successToast, setSuccessToast]   = useState('');
+
+  const { inventory, stockOut } = useContext(InventoryContext);
+
+  const filteredInventory = useMemo(() => {
+    if (!partSearch.trim()) return inventory.slice(0, 20);
+    const q = partSearch.toLowerCase();
+    return inventory.filter(i =>
+      i.name?.toLowerCase().includes(q) || i.partCode?.toLowerCase().includes(q)
+    ).slice(0, 20);
+  }, [inventory, partSearch]);
+
+  const handleSelectInventoryPart = (item) => {
+    setPartForm({ inventoryId: item.id, name: item.name, qty: '', cost: String(item.costPrice || ''), vendor: item.preferredVendor || '', availableStock: item.currentStock });
+    setPartSearch(item.name);
+    setShowPartDropdown(false);
+    setPartErrors({});
+  };
 
   const isKmBased    = SERVICE_INTERVALS[serviceType] !== null && serviceType !== '';
   const isReported   = status === 'Reported';
@@ -161,15 +183,57 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
       const res = await fetch(url, { method, body: fd });
       const data = await res.json();
       if (!res.ok) { alert(data.message || 'Save failed'); return; }
-      onClose();
+
+      // Deduct inventory stock on Completed (only on first-time completion)
+      const wasAlreadyCompleted = editData?.status === 'Completed';
+      if (status === 'Completed' && !wasAlreadyCompleted) {
+        const serviceId = data.id || editData?.id || null;
+        const inventoryParts = parts.filter(p => p.inventoryId);
+        const legacyParts = parts.filter(p => !p.inventoryId && p.name);
+
+        const resolvedLegacy = legacyParts.map(p => {
+          const match = inventory.find(i => i.name?.toLowerCase() === p.name?.toLowerCase());
+          return match ? { ...p, inventoryId: match.id, cost: p.cost || match.costPrice } : null;
+        }).filter(Boolean);
+
+        const allDeductable = [...inventoryParts, ...resolvedLegacy];
+        for (const part of allDeductable) {
+          const result = await stockOut({
+            partId: part.inventoryId,
+            qty: part.qty,
+            vehicleNumber: selectedTruck?.vehicle_no || '',
+            odometer: odometer || 0,
+            serviceId: serviceId ? String(serviceId) : '',
+            date: serviceDate || new Date().toISOString().split('T')[0],
+            serviceType: serviceType || 'Periodic Service',
+            costPerUnit: part.cost,
+            vendor: part.vendor || '',
+          });
+          if (!result?.success) {
+            console.warn('Stock deduction failed for part:', part.name, result?.error);
+          }
+        }
+        setSuccessToast('Service completed ✅ — Inventory updated');
+      } else {
+        setSuccessToast('Service saved ✅');
+      }
+      setTimeout(() => { setSuccessToast(''); onClose(); }, 2000);
     } catch { alert('Server error'); }
     finally { setSaving(false); }
   };
 
   const addPart = () => {
-    if (!partForm.name || !partForm.qty || !partForm.cost) return;
+    const errs = {};
+    if (!partForm.name.trim()) errs.name = 'Select a part from inventory';
+    if (!partForm.cost || Number(partForm.cost) <= 0) errs.cost = 'Cost required';
+    if (!partForm.qty || Number(partForm.qty) < 1) errs.qty = 'Qty must be at least 1';
+    if (partForm.availableStock !== null && Number(partForm.qty) > partForm.availableStock)
+      errs.qty = `Exceeds available stock (${partForm.availableStock} available)`;
+    if (Object.keys(errs).length) { setPartErrors(errs); return; }
     setParts(p => [...p, { ...partForm, qty: Number(partForm.qty), cost: Number(partForm.cost) }]);
-    setPartForm({ name: '', qty: '', cost: '', vendor: '' });
+    setPartForm({ inventoryId: null, name: '', qty: '', cost: '', vendor: '', availableStock: null });
+    setPartSearch('');
+    setPartErrors({});
   };
 
   if (!isOpen) return null;
@@ -363,17 +427,67 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
               <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                 Parts Used {isReported && <span className="text-orange-500 normal-case font-normal">— start service to add parts</span>}
               </p>
-              <input type="text" placeholder="Part name" value={partForm.name}
-                onChange={e => setPartForm(p => ({ ...p, name: e.target.value }))} className={F} />
+
+              {/* Inventory search */}
+              <div className="relative">
+                <input type="text" placeholder="Search inventory part..."
+                  value={partSearch}
+                  onChange={e => { setPartSearch(e.target.value); setShowPartDropdown(true); setPartForm(p => ({ ...p, inventoryId: null, name: e.target.value, availableStock: null })); setPartErrors(pe => ({ ...pe, name: undefined })); }}
+                  onFocus={() => setShowPartDropdown(true)}
+                  onBlur={() => setTimeout(() => setShowPartDropdown(false), 150)}
+                  className={`${F} ${partErrors.name ? 'border-red-400' : ''}`} />
+                {showPartDropdown && filteredInventory.length > 0 && (
+                  <div className="absolute z-20 top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto mt-1">
+                    {filteredInventory.map(item => (
+                      <button key={item.id} type="button" onMouseDown={() => handleSelectInventoryPart(item)}
+                        className="w-full text-left px-3 py-2 hover:bg-blue-50 flex items-center justify-between gap-2 text-sm border-b border-gray-100 last:border-0">
+                        <div>
+                          <p className="font-semibold text-gray-800">{item.name}</p>
+                          <p className="text-[10px] text-gray-400">{item.partCode} · {item.preferredVendor || '—'}</p>
+                        </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          item.currentStock === 0 ? 'bg-red-100 text-red-600' :
+                          item.currentStock <= item.minStock ? 'bg-amber-100 text-amber-700' :
+                          'bg-emerald-100 text-emerald-700'
+                        }`}>{item.currentStock} {item.unit}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {partErrors.name && <p className="text-xs text-red-500 mt-1">{partErrors.name}</p>}
+              </div>
+
+              {/* Stock badge */}
+              {partForm.availableStock !== null && (
+                <div className={`flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-lg ${
+                  partForm.availableStock === 0 ? 'bg-red-50 text-red-600' :
+                  partForm.availableStock <= 5 ? 'bg-amber-50 text-amber-700' :
+                  'bg-emerald-50 text-emerald-700'
+                }`}>
+                  <Package className="w-3 h-3" />
+                  Available stock: {partForm.availableStock}
+                  {partForm.availableStock === 0 && ' — Out of stock'}
+                </div>
+              )}
+
               <div className="grid grid-cols-3 gap-2">
-                <input type="number" placeholder="Cost ₹" value={partForm.cost}
-                  onChange={e => setPartForm(p => ({ ...p, cost: e.target.value }))} className={`${F} font-mono`} />
-                <input type="number" placeholder="Qty" value={partForm.qty}
-                  onChange={e => setPartForm(p => ({ ...p, qty: e.target.value }))} className={`${F} font-mono`} />
+                <div>
+                  <input type="number" placeholder="Cost ₹" value={partForm.cost}
+                    onChange={e => { setPartForm(p => ({ ...p, cost: e.target.value })); setPartErrors(pe => ({ ...pe, cost: undefined })); }}
+                    className={`${F} font-mono ${partErrors.cost ? 'border-red-400' : ''}`} />
+                  {partErrors.cost && <p className="text-xs text-red-500 mt-0.5">{partErrors.cost}</p>}
+                </div>
+                <div>
+                  <input type="number" placeholder="Qty" value={partForm.qty}
+                    onChange={e => { setPartForm(p => ({ ...p, qty: e.target.value })); setPartErrors(pe => ({ ...pe, qty: undefined })); }}
+                    className={`${F} font-mono ${partErrors.qty ? 'border-red-400' : ''}`} />
+                  {partErrors.qty && <p className="text-xs text-red-500 mt-0.5">{partErrors.qty}</p>}
+                </div>
                 <input type="text" placeholder="Vendor" value={partForm.vendor}
                   onChange={e => setPartForm(p => ({ ...p, vendor: e.target.value }))} className={F} />
               </div>
-              <button onClick={addPart} className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors">
+              <button onClick={addPart} disabled={partForm.availableStock === 0}
+                className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
                 <Plus className="w-4 h-4" /> Add Part
               </button>
             </div>
@@ -452,6 +566,12 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
             </button>
           </div>
         </div>
+
+        {successToast && (
+          <div className="absolute bottom-6 right-6 rounded-2xl bg-emerald-600 px-5 py-3 text-sm text-white shadow-lg flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" />{successToast}
+          </div>
+        )}
       </div>
     </div>
   );

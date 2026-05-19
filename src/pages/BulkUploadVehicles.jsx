@@ -1,7 +1,8 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
 import { FiUploadCloud, FiArrowLeft, FiCheckCircle, FiAlertCircle, FiX, FiDownload } from 'react-icons/fi';
+
+const getXLSX = () => import('xlsx');
 
 // ─── Column mapping (Excel header → database column) ─────────────────────
 const COL_MAP = {
@@ -42,7 +43,7 @@ const DISPLAY_COLS = [
 ];
 
 // ─── Parse Excel/CSV and map headers ─────────────────────────────────────
-function parseSheet(workbook) {
+function parseSheet(XLSX, workbook) {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
   if (raw.length < 2) return { rows: [], headerErrors: ['File appears empty or has no data rows.'] };
@@ -107,12 +108,13 @@ export default function BulkUploadVehicles() {
     }
     setFileName(file.name);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
+      const XLSX = await getXLSX();
       const data = new Uint8Array(e.target.result);
       const wb = XLSX.read(data, { type: 'array' });
-      const { rows, headerErrors: he } = parseSheet(wb);
+      const { rows, headerErrors: he } = parseSheet(XLSX, wb);
       setHeaderErrors(he);
-      if (he.length === 0) setPreview(validateRows(rows, new Set())); // existingNos can be fetched from API if needed
+      if (he.length === 0) setPreview(validateRows(rows, new Set()));
     };
     reader.readAsArrayBuffer(file);
   }, []);
@@ -156,7 +158,8 @@ export default function BulkUploadVehicles() {
   const validCount   = preview ? preview.filter(r => r._errors.length === 0).length : 0;
   const invalidCount = preview ? preview.filter(r => r._errors.length > 0).length : 0;
 
-  const downloadSample = () => {
+  const downloadSample = async () => {
+    const XLSX = await getXLSX();
     const ws = XLSX.utils.aoa_to_sheet([
       ['Truck Number', 'Type', 'Fuel Type', 'Vehicle Category', 'Body Type', 'Color', 'Odometer (km)', 'Chassis No', 'Engine No', 'Mfg Year'],
       ['MH 12 AB 1234', 'Trailer', 'Diesel', 'Heavy', 'Flatbed', 'White', '45000', 'CH123456789012345', 'EN12345678901234567890', '2021'],
