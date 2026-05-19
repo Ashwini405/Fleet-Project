@@ -69,8 +69,19 @@ function DynamicAxleLayout({ wheelConfig, mountedTyres, selectedPos, onSelect })
     );
   }
 
+  const POSITION_NORMALIZE = {
+    'frontleft': 'FL', 'front left': 'FL', 'front-left': 'FL',
+    'frontright': 'FR', 'front right': 'FR', 'front-right': 'FR',
+    'rearleft1': 'RL1', 'rear left 1': 'RL1', 'rearleft2': 'RL2', 'rear left 2': 'RL2',
+    'rearright1': 'RR1', 'rear right 1': 'RR1', 'rearright2': 'RR2', 'rear right 2': 'RR2',
+    'rearleft3': 'RL3', 'rearright3': 'RR3', 'rearleft4': 'RL4', 'rearright4': 'RR4',
+  };
   const tyreMap = {};
-  mountedTyres.forEach(t => { tyreMap[t.position] = t; });
+  mountedTyres.forEach(t => {
+    const key = (t.position || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    const pos = POSITION_NORMALIZE[key] || t.position;
+    tyreMap[pos] = t;
+  });
 
   return (
     <div className="flex flex-col items-center gap-1 w-full">
@@ -126,28 +137,68 @@ function DynamicAxleLayout({ wheelConfig, mountedTyres, selectedPos, onSelect })
 // ── TyresTab — full Tyres tab for VehicleDetails ──────────────────────────────
 function TyresTab({ vehicle }) {
   const [selectedPos, setSelectedPos] = useState(null);
+  const [mountedTyres, setMountedTyres] = useState([]);
 
-  // Use dummyTyres mapped to position for now; replace with API call when backend ready
-  const mountedTyres = [
-    { position: 'FL',  serial: 'MRF-10293', brand: 'MRF',     model: 'Steel Muscle', tread: '85%', km: '15,000' },
-    { position: 'FR',  serial: 'MRF-10294', brand: 'MRF',     model: 'Steel Muscle', tread: '82%', km: '15,000' },
-    { position: 'L1_OUTER', serial: 'APL-54921', brand: 'Apollo', model: 'EnduRace', tread: '60%', km: '45,000' },
-    { position: 'L1_INNER', serial: 'APL-54922', brand: 'Apollo', model: 'EnduRace', tread: '65%', km: '45,000' },
-    { position: 'R1_INNER', serial: 'JK-99210',  brand: 'JK Tyre', model: 'Jetway', tread: '70%', km: '30,000' },
-    { position: 'R1_OUTER', serial: 'JK-99211',  brand: 'JK Tyre', model: 'Jetway', tread: '35%', km: '60,000' },
-  ];
+  useEffect(() => {
+    if (!vehicle?.id) return;
+
+    fetch(`http://localhost:5001/api/tyres/vehicle/${vehicle.id}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data)) {
+          const formatted = data.data.map((t) => {
+            const runKm = Number(t.running_km || 0);
+            const expectedLife = Number(t.expected_life_km || 1);
+            const treadPct = Math.max(0, Math.round(100 - (runKm / expectedLife) * 100));
+            return {
+              position: t.tyre_position,
+              serial: t.tyre_number,
+              brand: t.brand,
+              model: t.model,
+              tread: `${t.remaining_tread_depth || treadPct}%`,
+              km: `${runKm}`
+            };
+          });
+          setMountedTyres(formatted);
+        }
+      })
+      .catch(err => {
+        console.error('Failed to fetch tyres:', err);
+      });
+  }, [vehicle]);
 
   const wheelConfig = vehicle.wheel_configuration;
   const layout = axleLayouts[wheelConfig];
   const allPositions = layout ? layout.axles.flatMap(a => [...a.left, ...a.right]) : [];
-  const tyreMap = {};
-  mountedTyres.forEach(t => { tyreMap[t.position] = t; });
 
-  const mounted  = mountedTyres.filter(t => allPositions.includes(t.position));
-  const healthy  = mounted.filter(t => parseInt(t.tread) > 70).length;
-  const warning  = mounted.filter(t => { const v = parseInt(t.tread); return v >= 40 && v <= 70; }).length;
+  // Normalize stored position to match layout posId
+  const POSITION_NORMALIZE = {
+    'frontleft': 'FL', 'front left': 'FL', 'front-left': 'FL',
+    'frontright': 'FR', 'front right': 'FR', 'front-right': 'FR',
+    'rearleft1': 'RL1', 'rear left 1': 'RL1', 'rear-left-1': 'RL1',
+    'rearleft2': 'RL2', 'rear left 2': 'RL2', 'rear-left-2': 'RL2',
+    'rearright1': 'RR1', 'rear right 1': 'RR1', 'rear-right-1': 'RR1',
+    'rearright2': 'RR2', 'rear right 2': 'RR2', 'rear-right-2': 'RR2',
+    'rearleft3': 'RL3', 'rearright3': 'RR3',
+    'rearleft4': 'RL4', 'rearright4': 'RR4',
+  };
+  const normalizePos = (pos) => {
+    if (!pos) return pos;
+    const key = pos.trim().toLowerCase().replace(/\s+/g, ' ');
+    return POSITION_NORMALIZE[key] || pos;
+  };
+
+  const tyreMap = {};
+  mountedTyres.forEach(t => {
+    const normalized = normalizePos(t.position);
+    tyreMap[normalized] = { ...t, position: normalized };
+  });
+
+  const mounted = mountedTyres.filter(t => allPositions.includes(t.position));
+  const healthy = mounted.filter(t => parseInt(t.tread) > 70).length;
+  const warning = mounted.filter(t => { const v = parseInt(t.tread); return v >= 40 && v <= 70; }).length;
   const critical = mounted.filter(t => parseInt(t.tread) < 40).length;
-  const empty    = allPositions.length - mounted.length;
+  const empty = allPositions.length - mounted.length;
 
   const selectedTyre = selectedPos ? tyreMap[selectedPos] : null;
 
@@ -169,11 +220,11 @@ function TyresTab({ vehicle }) {
       {/* Stats bar */}
       <div className="flex flex-wrap gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl shadow-sm text-xs">
         {[['Total Slots', allPositions.length, 'bg-slate-100 text-slate-700'],
-          ['Mounted', mounted.length, 'bg-indigo-50 text-indigo-700'],
-          ['Empty', empty, 'bg-orange-50 text-orange-700'],
-          ['Healthy', healthy, 'bg-green-50 text-green-700'],
-          ['Warning', warning, 'bg-amber-50 text-amber-700'],
-          ['Critical', critical, 'bg-red-50 text-red-700'],
+        ['Mounted', mounted.length, 'bg-indigo-50 text-indigo-700'],
+        ['Empty', empty, 'bg-orange-50 text-orange-700'],
+        ['Healthy', healthy, 'bg-green-50 text-green-700'],
+        ['Warning', warning, 'bg-amber-50 text-amber-700'],
+        ['Critical', critical, 'bg-red-50 text-red-700'],
         ].map(([label, val, cls]) => (
           <div key={label} className="flex items-center gap-1.5">
             <span className="font-semibold text-slate-700">{label}:</span>
@@ -200,15 +251,14 @@ function TyresTab({ vehicle }) {
 
           {/* Selected tyre detail card */}
           {selectedPos && (
-            <div className={`rounded-xl border-2 p-4 ${
-              selectedTyre
+            <div className={`rounded-xl border-2 p-4 ${selectedTyre
                 ? `${TREAD_COLOR(parseInt(selectedTyre.tread)).badge.split(' ').map(c => c.startsWith('border') ? c : '').filter(Boolean).join(' ')} bg-white shadow-sm`
                 : 'border-dashed border-indigo-300 bg-indigo-50/50'
-            }`}>
+              }`}>
               {selectedTyre ? (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[['Position', selectedPos], ['Serial', selectedTyre.serial], ['Brand', selectedTyre.brand],
-                    ['Model', selectedTyre.model], ['Tread', selectedTyre.tread], ['KM Run', selectedTyre.km],
+                  ['Model', selectedTyre.model], ['Tread', selectedTyre.tread], ['KM Run', selectedTyre.km],
                   ].map(([k, v]) => (
                     <div key={k}>
                       <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{k}</div>
@@ -673,7 +723,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
               </div>
               {(() => {
                 let positions = [];
-                try { positions = vehicle.axle_positions ? JSON.parse(vehicle.axle_positions) : []; } catch {}
+                try { positions = vehicle.axle_positions ? JSON.parse(vehicle.axle_positions) : []; } catch { }
                 return positions.length > 0 ? (
                   <div className="mt-4 pt-4 border-t border-slate-200">
                     <p className="text-xs font-bold uppercase tracking-widest text-slate-400 mb-2">

@@ -71,25 +71,59 @@ export default function AllTyresTab() {
         : []
     );
         return {
-          id: tyre.tyre_number,
-          serialNo: tyre.serial_no,
-          make: tyre.brand,
-          model: tyre.model,
-          size: tyre.tyre_size,
-          material: tyre.material_type,
-          truckId: tyre.vehicle_id,
-          truckNo: tyre.vehicle_number || 'N/A',
-          position: tyre.tyre_position,
-          fittedDate: tyre.date_of_issue,
-          fittedOdo: Number(tyre.fitted_odometer || 0),
-          presentOdo: Number(tyre.running_km || 0) + Number(tyre.fitted_odometer || 0),
-          expectedLife: Number(tyre.expected_life_km || 0),
-          health: tyre.tyre_health,
-          vendor: tyre.vendor_name,
-          invoiceNo: tyre.invoice_number,
-          tyreCost: tyre.tyre_cost,
-          files,
-        };
+  id: tyre.tyre_number,
+  serialNo: tyre.serial_no,
+
+  make: tyre.brand,
+  brand: tyre.brand,
+
+  model: tyre.model,
+
+  size: tyre.tyre_size,
+  tyre_size: tyre.tyre_size,
+
+  material: tyre.material_type,
+  material_type: tyre.material_type,
+
+  truckId: tyre.vehicle_id,
+  truckNo: tyre.vehicle_number || 'N/A',
+  vehicle_number: tyre.vehicle_number || 'N/A',
+
+  position: tyre.tyre_position,
+  tyre_position: tyre.tyre_position,
+
+  fittedDate: tyre.date_of_issue,
+  date_of_issue: tyre.date_of_issue,
+
+  purchase_date: tyre.purchase_date,
+
+  fittedOdo: Number(tyre.fitted_odometer || 0),
+  fitted_odometer: Number(tyre.fitted_odometer || 0),
+
+  presentOdo: Number(tyre.running_km || 0) + Number(tyre.fitted_odometer || 0),
+
+  running_km: Number(tyre.running_km || 0),
+
+  expectedLife: Number(tyre.expected_life_km || 0),
+  expected_life_km: Number(tyre.expected_life_km || 0),
+
+  health: tyre.tyre_health,
+  tyre_health: tyre.tyre_health,
+
+  vendor: tyre.vendor_name,
+  vendor_name: tyre.vendor_name,
+
+  invoiceNo: tyre.invoice_number,
+
+  tyreCost: tyre.tyre_cost,
+  tyre_cost: tyre.tyre_cost,
+
+  status: tyre.status,
+
+  tyre_files: files,
+
+  files,
+};
       });
       setActiveTyres(formatted);
       console.log('FORMATTED TYRES:', formatted);
@@ -132,13 +166,34 @@ export default function AllTyresTab() {
   };
 
   // Remove handler (temporarily without DB call – you can implement later)
-  const handleRemoveConfirm = (tyreId, removalData) => {
-    // TODO: call API to mark tyre as removed
-    // removeTyre(tyreId, removalData);
+  const handleRemoveConfirm = async (tyreId, removalData) => {
+
+  try {
+
+    await axios.post(
+      'http://localhost:5001/api/old-tyres',
+      removalData
+    );
+
     setRemovingTyre(null);
-    push(`${tyreId} removed → Old Tyres Stock (demo)`, 'warning');
-    fetchTyres(); // refresh list
-  };
+
+    push(
+      `${tyreId} moved to Old Tyres Stock`,
+      'warning'
+    );
+
+    fetchTyres();
+
+  } catch (error) {
+
+    console.log('REMOVE TYRE ERROR:', error);
+
+    push(
+      'Failed to remove tyre',
+      'error'
+    );
+  }
+};
 
   // Filtering
   const norm = search.startsWith('TYRE-') ? search.slice(5) : search;
@@ -327,10 +382,7 @@ export default function AllTyresTab() {
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition-all hover:-translate-y-px hover:shadow-md active:scale-95 shadow-sm whitespace-nowrap">
                             <Eye className="w-3.5 h-3.5 opacity-80" /> View
                           </button>
-                          <button onClick={() => setRemovingTyre(tyre)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-orange-300 hover:bg-orange-50 text-orange-600 text-xs font-bold transition-all hover:-translate-y-px hover:shadow-sm active:scale-95 whitespace-nowrap">
-                            <MinusCircle className="w-3.5 h-3.5" /> Remove
-                          </button>
+                          
                         </div>
                       </td>
                     </motion.tr>

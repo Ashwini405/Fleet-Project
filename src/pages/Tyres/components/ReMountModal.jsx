@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, RefreshCw, ChevronDown, AlertCircle, CheckCircle, ArrowRight, User, FileText } from 'lucide-react';
-import { dummyTrucks } from '../data/dummyData';
 import { getLayout, POSITION_LABELS } from '../data/vehicleLayouts';
 import { useTyreLifecycle } from '../index';
 
+const API_URL = 'http://localhost:5001';
 const today = () => new Date().toISOString().split('T')[0];
 
 const inputCls = (err) =>
@@ -33,44 +33,112 @@ function Field({ label, required, children }) {
 }
 
 export default function ReMountModal({ tyre, onClose, onSuccess }) {
-  const { activeTyres, remountTyre } = useTyreLifecycle();
+  const { activeTyres } = useTyreLifecycle(); // keep only activeTyres, remountTyre removed
 
-  const [truckId, setTruckId]       = useState('');
-  const [placement, setPlacement]   = useState('');
+  const [truckId, setTruckId] = useState('');
+  const [placement, setPlacement] = useState('');
   const [fittedDate, setFittedDate] = useState(today());
-  const [fittedOdo, setFittedOdo]   = useState('');
+  const [fittedOdo, setFittedOdo] = useState('');
   const [technician, setTechnician] = useState('');
-  const [notes, setNotes]           = useState('');
-  const [errors, setErrors]         = useState({});
-  const [done, setDone]             = useState(false);
+  const [notes, setNotes] = useState('');
+  const [errors, setErrors] = useState({});
+  const [done, setDone] = useState(false);
+  const [vehicles, setVehicles] = useState([]);
+  const [loading, setLoading] = useState(false);
 
-  const selectedTruck  = dummyTrucks.find(t => t.id === truckId);
-  const currentOdo     = selectedTruck?.currentOdo ?? 0;
-  const layout         = selectedTruck ? getLayout(selectedTruck.vehicleType) : null;
-
+  // Fetch vehicles from database
   useEffect(() => {
-    if (selectedTruck) { setFittedOdo(String(currentOdo)); setPlacement(''); }
+    const fetchVehicles = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/vehicles`);
+        const result = await response.json();
+
+        console.log('VEHICLE API RESULT:', result);
+
+        setVehicles(
+          result.data ||
+          result.vehicles ||
+          result ||
+          []
+        );
+
+      } catch (error) {
+        console.error('FETCH VEHICLES ERROR:', error);
+      }
+    };
+    fetchVehicles();
+  }, []);
+
+  const selectedTruck = vehicles.find(t => String(t.id) === String(truckId));
+  console.log('VEHICLES:', vehicles);
+console.log('SELECTED TRUCK:', selectedTruck);
+  const currentOdo = selectedTruck?.current_odometer ?? selectedTruck?.currentOdo ?? 0;
+  const layout = selectedTruck
+  ? getLayout(
+      selectedTruck.type ||
+      selectedTruck.vehicle_type ||
+      selectedTruck.vehicleType
+    )
+  : null;
+
+  // Update fitted odometer when truck changes
+  useEffect(() => {
+    if (selectedTruck) {
+      setFittedOdo(String(currentOdo));
+      setPlacement('');
+    }
   }, [truckId]);
 
+  // Count currently mounted tyres on this vehicle (using activeTyres from context)
   const occupiedPositions = truckId
-    ? activeTyres.filter(t => t.truckNo === truckId).map(t => t.position)
-    : [];
+  ? activeTyres
+      .filter(t =>
+        String(t.truckNo) === String(selectedTruck?.vehicle_no) ||
+        String(t.truckNo) === String(selectedTruck?.id) ||
+        String(t.vehicle_number) === String(selectedTruck?.vehicle_no)
+      )
+      .map(t => reversePositionMap[t.position] || t.position)
+  : [];
 
-  const mountedCount  = occupiedPositions.length;
-  const truckCapacity = selectedTruck?.totalTyres ?? 0;
-  const truckFull     = truckCapacity > 0 && mountedCount >= truckCapacity;
+  const normalizePosition = (pos) => {
+  const map = {
+    FL: 'frontleft',
+    FR: 'frontright',
+    FL2: 'frontleft2',
+    FR2: 'frontright2',
 
-  // All positions from layout, only empty ones
+    AL1LO: 'axle1leftouter',
+    AL1LI: 'axle1leftinner',
+    AR1LI: 'axle1rightinner',
+    AR1LO: 'axle1rightouter',
+
+    AL2LO: 'axle2leftouter',
+    AL2LI: 'axle2leftinner',
+    AR2LI: 'axle2rightinner',
+    AR2LO: 'axle2rightouter',
+  };
+
+  return map[pos] || pos;
+};
+
+  const mountedCount = occupiedPositions.length;
+  const truckCapacity = selectedTruck?.total_tyres ?? 0;
+  const truckFull = truckCapacity > 0 && mountedCount >= truckCapacity;
+
   const allPositions = layout
     ? layout.axles.flatMap(a => [...a.left, ...a.right])
     : [];
   const emptyPositions = allPositions.filter(p => !occupiedPositions.includes(p));
 
-  const treadPct = tyre?.remainingTread ?? 100;
+  const treadPct = Number(
+    tyre?.remaining_tread_percent ||
+    tyre?.remainingTread ||
+    100
+  );
 
   const validate = () => {
     const e = {};
-    if (!truckId)   e.truckId   = 'Select a vehicle';
+    if (!truckId) e.truckId = 'Select a vehicle';
     else if (truckFull) e.truckId = `Vehicle is full (${mountedCount}/${truckCapacity})`;
     if (!placement) e.placement = 'Select an axle position';
     else if (occupiedPositions.includes(placement)) e.placement = 'Position already occupied';
@@ -82,15 +150,47 @@ export default function ReMountModal({ tyre, onClose, onSuccess }) {
     return e;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
-    remountTyre(tyre.tyreNo, { truckId, placement, fittedDate, fittedOdo: parseInt(fittedOdo) });
-    setDone(true);
+    if (Object.keys(e).length) {
+      setErrors(e);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const payload = {
+        tyre_number: tyre.tyreNo || tyre.tyre_number || tyre.id,
+        vehicle_id: selectedTruck?.id || null,
+        vehicle_number: selectedTruck?.vehicle_no || selectedTruck?.id || '',
+        tyre_position: normalizePosition(placement), 
+        fitted_odometer: Number(fittedOdo),
+        date_of_issue: fittedDate,
+        running_km: tyre.runningKm || 0,
+        status: 'Mounted'
+      };
+
+      const response = await fetch(`${API_URL}/api/tyres/mount`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setDone(true);
+      } else {
+        alert(result.message || 'Failed to re-mount tyre');
+      }
+    } catch (error) {
+      console.error('REMOUNT ERROR:', error);
+      alert('Server Error – could not re-mount tyre');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => {
-    if (done && onSuccess) onSuccess(tyre.tyreNo);
+    if (done && onSuccess) onSuccess(tyre.tyreNo || tyre.old_tyre_number || tyre.tyre_number);
     setTruckId(''); setPlacement(''); setFittedDate(today());
     setFittedOdo(''); setTechnician(''); setNotes('');
     setErrors({}); setDone(false);
@@ -102,7 +202,7 @@ export default function ReMountModal({ tyre, onClose, onSuccess }) {
   if (!tyre) return null;
 
   const treadColor = treadPct <= 20 ? 'text-red-600' : treadPct <= 40 ? 'text-orange-500' : 'text-emerald-600';
-  const treadBar   = treadPct <= 20 ? 'bg-red-500'   : treadPct <= 40 ? 'bg-orange-500'   : 'bg-emerald-500';
+  const treadBar = treadPct <= 20 ? 'bg-red-500' : treadPct <= 40 ? 'bg-orange-500' : 'bg-emerald-500';
 
   return (
     <AnimatePresence>
@@ -139,7 +239,9 @@ export default function ReMountModal({ tyre, onClose, onSuccess }) {
               </motion.div>
               <div>
                 <p className="text-base font-black text-slate-800">Tyre Re-Mounted Successfully</p>
-                <p className="text-xs text-slate-400 mt-1">{tyre.tyreNo} → {truckId} · {POSITION_LABELS[placement] || placement}</p>
+                <p className="text-xs text-slate-400 mt-1">
+                  {tyre.tyreNo || tyre.old_tyre_number || tyre.tyre_number} → {selectedTruck?.vehicle_no || truckId} · {POSITION_LABELS[placement] || placement}
+                </p>
               </div>
               <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400 bg-slate-50 rounded-xl px-4 py-2 border border-slate-100">
                 <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded-full ring-1 ring-blue-200">Old Stock</span>
@@ -160,7 +262,7 @@ export default function ReMountModal({ tyre, onClose, onSuccess }) {
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-black text-slate-800 font-mono">{tyre.tyreNo}</span>
+                        <span className="text-sm font-black text-slate-800 font-mono">{tyre.tyreNo || tyre.old_tyre_number || tyre.tyre_number}</span>
                         <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full ring-1 ring-blue-300">Reusable</span>
                       </div>
                       <p className="text-xs text-slate-500 mt-0.5">{tyre.make} {tyre.model} · {tyre.tyreSize}</p>
@@ -207,12 +309,17 @@ export default function ReMountModal({ tyre, onClose, onSuccess }) {
                     <select value={truckId} onChange={e => set(setTruckId, 'truckId')(e.target.value)}
                       className={`w-full pl-3.5 pr-9 h-[40px] bg-white border rounded-xl text-sm font-medium text-slate-800 appearance-none focus:outline-none focus:ring-2 transition-all cursor-pointer ${errors.truckId ? 'border-red-300 focus:ring-red-100' : 'border-slate-200 focus:border-blue-500 focus:ring-blue-100'}`}>
                       <option value="">Select Vehicle</option>
-                      {dummyTrucks.map(t => {
-                        const cnt  = activeTyres.filter(a => a.truckNo === t.id).length;
-                        const full = cnt >= t.totalTyres;
+                      {vehicles.map(t => {
+                        const cnt = activeTyres.filter(a =>
+                          String(a.truckNo) === String(t.vehicle_no) ||
+                          String(a.truckNo) === String(t.id) ||
+                          String(a.vehicle_number) === String(t.vehicle_no)
+                        ).length;
+                        const full = cnt >= (t.total_tyres || 0);
                         return (
                           <option key={t.id} value={t.id} disabled={full}>
-                            {t.id} — {t.model}{full ? ' (Full)' : ` (${cnt}/${t.totalTyres} slots)`}
+                            {t.vehicle_no || t.id} — {t.make_brand || t.model || 'Vehicle'}
+                            {full ? ' (Full)' : ` (${cnt}/${t.total_tyres || 0} slots)`}
                           </option>
                         );
                       })}
@@ -243,11 +350,10 @@ export default function ReMountModal({ tyre, onClose, onSuccess }) {
                           return (
                             <button key={posId} type="button"
                               onClick={() => { setPlacement(posId); setErrors(p => ({ ...p, placement: '' })); }}
-                              className={`rounded-xl border-2 px-2 py-2.5 text-center transition-all duration-150 ${
-                                isSelected
+                              className={`rounded-xl border-2 px-2 py-2.5 text-center transition-all duration-150 ${isSelected
                                   ? 'border-blue-500 bg-blue-50 shadow-md shadow-blue-100'
                                   : 'border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50/50'
-                              }`}>
+                                }`}>
                               {isSelected && (
                                 <CheckCircle className="w-3 h-3 text-blue-500 mx-auto mb-1" />
                               )}
@@ -319,10 +425,11 @@ export default function ReMountModal({ tyre, onClose, onSuccess }) {
                 className="h-10 px-5 text-sm font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
                 Cancel
               </button>
-              <button onClick={handleSubmit} disabled={treadPct < 20}
+              <button onClick={handleSubmit} disabled={treadPct < 20 || loading}
                 className="h-10 px-6 text-sm font-extrabold text-white rounded-xl flex items-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                 style={{ background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)' }}>
-                <RefreshCw className="w-4 h-4" /> Confirm Re-Mount
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Processing...' : 'Confirm Re-Mount'}
               </button>
             </div>
           )}

@@ -1,7 +1,18 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Activity, MapPin, FileText, Clock, AlertTriangle, CheckCircle, Info } from 'lucide-react';
-import { layoutPositions } from '../data/dummyData';
+
+// Static positions – no longer imported from dummyData
+const layoutPositions = [
+  { id: 'FL', label: 'Front Left' },
+  { id: 'FR', label: 'Front Right' },
+  { id: 'RL', label: 'Rear Left' },
+  { id: 'RR', label: 'Rear Right' },
+  { id: 'RLO', label: 'Rear Left Outer' },
+  { id: 'RLI', label: 'Rear Left Inner' },
+  { id: 'RRO', label: 'Rear Right Outer' },
+  { id: 'RRI', label: 'Rear Right Inner' }
+];
 
 const posLabel = (id) => layoutPositions.find(p => p.id === id)?.label ?? id ?? '—';
 
@@ -60,16 +71,40 @@ function fmtDate(d) {
 export default function OldTyreDetailsModal({ tyre, onClose }) {
   if (!tyre) return null;
 
-  const st          = STATUS_STYLE[tyre.status] || STATUS_STYLE.OLD_STOCK;
-  const statusLabel = STATUS_LABELS[tyre.status] || tyre.status;
-  const tread       = tyre.remainingTread != null ? `${tyre.remainingTread}%` : '—';
-  const removedDate = tyre.removedDate || tyre.entryDate || '—';
-  const rec         = recommendation(tyre);
+  // ── Map database fields to the structure expected by this component ──
+  const mappedTyre = {
+    tyreNo: tyre.old_tyre_number || tyre.tyre_number || tyre.tyreNo || tyre.id,
+    make: tyre.brand || tyre.make || '—',
+    model: tyre.model || '—',
+    tyreSize: tyre.tyre_size || tyre.tyreSize || '—',
+    material: tyre.material_type || tyre.material || '—',
+    runningKm: Number(tyre.running_km || tyre.runningKm || 0),
+    expectedLife: Number(tyre.expected_life_km || tyre.expectedLife || 0),
+    remainingTread: Number(tyre.remaining_tread_percent || tyre.remainingTread || 0),
+    storeLocation: tyre.store_location || tyre.storeLocation || '—',
+    vehicleNo: tyre.vehicle_number || tyre.vehicleNo || '—',
+    lastPosition: tyre.last_position || tyre.lastPosition || '—',
+    removalReason: tyre.removal_reason || tyre.removalReason || '—',
+    removedDate: tyre.removed_date || tyre.removedDate || tyre.entryDate || '—',
+    condition: tyre.tyre_health || tyre.condition || '—',
+    notes: tyre.notes || '',
+    status: tyre.tyre_status || tyre.status || 'OLD_STOCK',
+    purchaseDate: tyre.purchase_date || tyre.purchaseDate || null,
+    fittedDate: tyre.date_of_issue || tyre.fittedDate || null,
+  };
 
-  const treadColor = tyre.remainingTread != null
-    ? tyre.remainingTread <= 10  ? 'text-red-600'
-    : tyre.remainingTread <= 40  ? 'text-orange-500'
-    : 'text-emerald-600'
+  const st = STATUS_STYLE[mappedTyre.status] || STATUS_STYLE.OLD_STOCK;
+  const statusLabel = STATUS_LABELS[mappedTyre.status] || mappedTyre.status;
+  const tread = mappedTyre.remainingTread != null ? `${mappedTyre.remainingTread}%` : '—';
+  const removedDate = mappedTyre.removedDate || '—';
+  const rec = recommendation(mappedTyre);
+
+  const treadColor = mappedTyre.remainingTread != null
+    ? mappedTyre.remainingTread <= 10
+      ? 'text-red-600'
+      : mappedTyre.remainingTread <= 40
+        ? 'text-orange-500'
+        : 'text-emerald-600'
     : 'text-gray-400';
 
   return (
@@ -96,7 +131,7 @@ export default function OldTyreDetailsModal({ tyre, onClose }) {
                 </span>
               </div>
               <p className="text-[11px] text-blue-400 font-semibold tracking-widest mt-0.5 font-mono uppercase">
-                {tyre.tyreNo}
+                {mappedTyre.tyreNo}
               </p>
             </div>
             <button onClick={onClose}
@@ -126,7 +161,7 @@ export default function OldTyreDetailsModal({ tyre, onClose }) {
                 </div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Final Ran KM</p>
                 <p className="text-xl font-black text-gray-800 leading-none font-mono">
-                  {(tyre.runningKm || 0).toLocaleString()}
+                  {(mappedTyre.runningKm || 0).toLocaleString()}
                   <span className="text-xs font-bold text-gray-400 ml-1">km</span>
                 </p>
               </div>
@@ -156,13 +191,13 @@ export default function OldTyreDetailsModal({ tyre, onClose }) {
                 <h4 className="text-sm font-bold text-slate-800">Full Specification</h4>
               </div>
               <div className="px-5 py-1">
-                <SpecRow label="Tyre Number"    value={tyre.tyreNo} />
-                <SpecRow label="Brand"          value={tyre.make} />
-                <SpecRow label="Model"          value={tyre.model} />
-                <SpecRow label="Tyre Size"      value={tyre.tyreSize} />
-                <SpecRow label="Material"       value={tyre.material} />
-                <SpecRow label="Expected Life"  value={tyre.expectedLife ? `${tyre.expectedLife.toLocaleString()} km` : '—'} />
-                <SpecRow label="Store Location" value={tyre.storeLocation} />
+                <SpecRow label="Tyre Number"    value={mappedTyre.tyreNo} />
+                <SpecRow label="Brand"          value={mappedTyre.make} />
+                <SpecRow label="Model"          value={mappedTyre.model} />
+                <SpecRow label="Tyre Size"      value={mappedTyre.tyreSize} />
+                <SpecRow label="Material"       value={mappedTyre.material} />
+                <SpecRow label="Expected Life"  value={mappedTyre.expectedLife ? `${mappedTyre.expectedLife.toLocaleString()} km` : '—'} />
+                <SpecRow label="Store Location" value={mappedTyre.storeLocation} />
               </div>
             </div>
 
@@ -173,12 +208,12 @@ export default function OldTyreDetailsModal({ tyre, onClose }) {
                 <h4 className="text-sm font-bold text-slate-800">Removal Details</h4>
               </div>
               <div className="px-5 py-1">
-                <SpecRow label="Removed Vehicle"  value={tyre.vehicleNo} />
-                <SpecRow label="Last Position"    value={tyre.lastPosition ? posLabel(tyre.lastPosition) : '—'} />
-                <SpecRow label="Removal Reason"   value={tyre.removalReason} />
+                <SpecRow label="Removed Vehicle"  value={mappedTyre.vehicleNo} />
+                <SpecRow label="Last Position"    value={mappedTyre.lastPosition ? posLabel(mappedTyre.lastPosition) : '—'} />
+                <SpecRow label="Removal Reason"   value={mappedTyre.removalReason} />
                 <SpecRow label="Removed Date"     value={removedDate} />
-                <SpecRow label="Tyre Condition"   value={tyre.condition} />
-                {tyre.notes && <SpecRow label="Remarks" value={tyre.notes} />}
+                <SpecRow label="Tyre Condition"   value={mappedTyre.condition} />
+                {mappedTyre.notes && <SpecRow label="Remarks" value={mappedTyre.notes} />}
               </div>
             </div>
 
@@ -189,7 +224,7 @@ export default function OldTyreDetailsModal({ tyre, onClose }) {
                 {LIFECYCLE_STEPS.map((step, i) => {
                   const isLast    = i === LIFECYCLE_STEPS.length - 1;
                   const isCurrent = isLast;
-                  const dates     = getLifecycleDates(tyre);
+                  const dates     = getLifecycleDates(mappedTyre);
                   const date      = fmtDate(dates[i]);
                   return (
                     <React.Fragment key={step}>

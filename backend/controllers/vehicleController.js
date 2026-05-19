@@ -19,9 +19,17 @@ const getVehicles = async (req, res) => {
         v.initial_odometer,
 
         v.make_brand,
-        v.fuel_type,
-        v.model_year,
-        v.body_type,
+v.fuel_type,
+v.model_year,
+v.body_type,
+
+v.wheel_configuration,
+v.total_tyres,
+v.axle_count,
+v.layout_type,
+v.spare_tyre_count,
+v.default_tyre_size,
+v.axle_positions,
 
         v.gps_device_id,
         v.fastag_id,

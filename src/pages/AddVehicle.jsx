@@ -31,14 +31,14 @@ const InputGroup = ({ label, name, type = "text", placeholder, formData, handleC
   );
 };
 
-const SelectGroup = ({ label, name, options, formData, handleChange }) => (
+const SelectGroup = ({ label, name, options, formData, handleChange, error }) => (
   <div>
     <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
     <select
       name={name}
       value={formData[name]}
       onChange={handleChange}
-      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors"
+      className={`w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors ${error ? 'border-red-300' : 'border-slate-200'}`}
     >
       <option value="" disabled>Select {label}</option>
       {options.map(opt => (
@@ -47,6 +47,7 @@ const SelectGroup = ({ label, name, options, formData, handleChange }) => (
         </option>
       ))}
     </select>
+    {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
   </div>
 );
 
@@ -290,8 +291,11 @@ export default function AddVehicle() {
       value = value.toUpperCase();
     }
 
-    // Block negative values for numeric fields
-    const noNegativeFields = ["modelYear", "mileage", "gvw", "ulw", "initialOdometer"];
+    // Block negative values for numeric fields (including tyre/axle fields)
+    const noNegativeFields = [
+      "modelYear", "mileage", "gvw", "ulw", "initialOdometer",
+      "totalTyres", "axleCount", "spareTyreCount"
+    ];
     if (noNegativeFields.includes(name) && Number(value) < 0) {
       setFormErrors(prev => ({ ...prev, [name]: "Negative values are not allowed" }));
       return;
@@ -401,6 +405,16 @@ export default function AddVehicle() {
     if (!formData.makeBrand) errors.makeBrand = "Make/Brand is required";
     if (!formData.fuelType) errors.fuelType = "Fuel type is required";
     if (!formData.modelYear) errors.modelYear = "Model year is required";
+
+    // Tyre & axle configuration validations (CHANGE 2)
+    if (!formData.wheelConfiguration)
+      errors.wheelConfiguration = "Wheel configuration is required";
+    if (!formData.totalTyres)
+      errors.totalTyres = "Total tyres is required";
+    if (!formData.axleCount)
+      errors.axleCount = "Axle count is required";
+    if (!formData.layoutType)
+      errors.layoutType = "Layout type is required";
 
     if (formData.engineNumber && formData.engineNumber.length > 20) {
       errors.engineNumber = "Engine number cannot exceed 20 characters";
@@ -660,18 +674,56 @@ export default function AddVehicle() {
             </div>
           </section>
 
-          {/* Section 9 - Tyre & Axle Configuration */}
+          {/* Section 9 - Tyre & Axle Configuration (CHANGES 3-7 applied) */}
           <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
             <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
               <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">9</div>
               Tyre &amp; Axle Configuration
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <SelectGroup label="Wheel Configuration" name="wheelConfiguration" options={['4 Wheeler','6 Wheeler','8 Wheeler','10 Wheeler','12 Wheeler','14 Wheeler','18 Wheeler Trailer']} formData={formData} handleChange={handleChange} />
-              <InputGroup label="Total Tyres" name="totalTyres" type="number" placeholder="e.g. 6" formData={formData} handleChange={handleChange} />
-              <InputGroup label="Axle Count" name="axleCount" type="number" placeholder="e.g. 3" formData={formData} handleChange={handleChange} />
-              <SelectGroup label="Layout Type" name="layoutType" options={['4x2','6x2','6x4','8x4','10x4','Trailer Layout']} formData={formData} handleChange={handleChange} />
-              <InputGroup label="Spare Tyre Count" name="spareTyreCount" type="number" placeholder="e.g. 1" formData={formData} handleChange={handleChange} />
+              <SelectGroup
+                label="Wheel Configuration"
+                name="wheelConfiguration"
+                options={['4 Wheeler','6 Wheeler','8 Wheeler','10 Wheeler','12 Wheeler','14 Wheeler','18 Wheeler Trailer']}
+                formData={formData}
+                handleChange={handleChange}
+                error={formErrors.wheelConfiguration}
+              />
+              <InputGroup
+                label="Total Tyres"
+                name="totalTyres"
+                type="number"
+                placeholder="e.g. 6"
+                formData={formData}
+                handleChange={handleChange}
+                error={formErrors.totalTyres}
+              />
+              <InputGroup
+                label="Axle Count"
+                name="axleCount"
+                type="number"
+                placeholder="e.g. 3"
+                formData={formData}
+                handleChange={handleChange}
+                error={formErrors.axleCount}
+              />
+              <SelectGroup
+                label="Layout Type"
+                name="layoutType"
+                options={['4x2','6x2','6x4','8x4','10x4','Trailer Layout']}
+                formData={formData}
+                handleChange={handleChange}
+                error={formErrors.layoutType}
+              />
+              <InputGroup
+                label="Spare Tyre Count"
+                name="spareTyreCount"
+                type="number"
+                placeholder="e.g. 1"
+                formData={formData}
+                handleChange={handleChange}
+                error={formErrors.spareTyreCount}
+              />
               <InputGroup label="Default Tyre Size" name="defaultTyreSize" placeholder="e.g. 295/80R22.5" formData={formData} handleChange={handleChange} />
             </div>
 

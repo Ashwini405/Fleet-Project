@@ -1,23 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, AlertTriangle, CheckCircle, AlertCircle, MinusCircle } from 'lucide-react';
-import { dummyTrucks, layoutPositions } from '../data/dummyData';
+import { layoutPositions } from '../data/dummyData'; // only static positions, no truck data
 
 const today = () => new Date().toISOString().split('T')[0];
 
-const REASONS    = ['Worn Out','Puncture','Sidewall Damage','Rotation','Retreading','Burst','Preventive Replacement'];
-const CONDITIONS = ['Good','Medium','Poor','Critical'];
+const REASONS = ['Worn Out', 'Puncture', 'Sidewall Damage', 'Rotation', 'Retreading', 'Burst', 'Preventive Replacement'];
+const CONDITIONS = ['Good', 'Medium', 'Poor', 'Critical'];
 const NEXT_ACTIONS = [
-  { value: 'Move To Old Stock',   label: 'Move To Old Stock',   color: 'text-slate-700  bg-slate-100  ring-slate-300'  },
-  { value: 'Send For Retreading', label: 'Send For Retreading', color: 'text-amber-700  bg-amber-50   ring-amber-300'  },
-  { value: 'Scrap Tyre',          label: 'Scrap Tyre',          color: 'text-red-700    bg-red-50     ring-red-300'    },
-  { value: 'Reusable Spare',      label: 'Reusable Spare',      color: 'text-blue-700   bg-blue-50    ring-blue-300'   },
+  { value: 'Move To Old Stock', label: 'Move To Old Stock', color: 'text-slate-700  bg-slate-100  ring-slate-300' },
+  { value: 'Send For Retreading', label: 'Send For Retreading', color: 'text-amber-700  bg-amber-50   ring-amber-300' },
+  { value: 'Scrap Tyre', label: 'Scrap Tyre', color: 'text-red-700    bg-red-50     ring-red-300' },
+  { value: 'Reusable Spare', label: 'Reusable Spare', color: 'text-blue-700   bg-blue-50    ring-blue-300' },
 ];
 const ACTION_LOCATION = {
-  'Move To Old Stock':   'Warehouse Stock',
+  'Move To Old Stock': 'Warehouse Stock',
   'Send For Retreading': 'Retreading Area',
-  'Scrap Tyre':          'Scrap Yard',
-  'Reusable Spare':      'Reusable Storage',
+  'Scrap Tyre': 'Scrap Yard',
+  'Reusable Spare': 'Reusable Storage',
 };
 const posLabel = (id) => layoutPositions.find(p => p.id === id)?.label ?? id;
 
@@ -58,21 +58,41 @@ function Err({ msg }) {
   );
 }
 
-export default function RemoveTyreModal({ tyre, onConfirm, onClose }) {
-  const truck      = dummyTrucks.find(t => t.id === tyre?.truckNo);
-  const truckOdo   = truck?.currentOdo ?? 0;
-  const runningKm  = tyre ? tyre.presentOdo - tyre.fittedOdo : 0;
-  const health     = tyre ? calcHealth(runningKm, tyre.expectedLife) : 'Good';
+export default function RemoveTyreModal({ tyre, onClose }) {
+  const [loading, setLoading] = useState(false);
+  const [truck, setTruck] = useState(null);
+
+  // Fetch vehicle data from database based on tyre's truck number
+  useEffect(() => {
+    const fetchVehicle = async () => {
+      if (!tyre?.truckNo) return;
+      try {
+        const res = await fetch('http://localhost:5001/api/vehicles');
+        const data = await res.json();
+        if (data.success) {
+          const foundTruck = data.data.find(t => t.vehicle_no === tyre.truckNo);
+          setTruck(foundTruck || null);
+        }
+      } catch (error) {
+        console.error('Error fetching vehicle:', error);
+      }
+    };
+    fetchVehicle();
+  }, [tyre]);
+
+  const truckOdo = truck?.currentOdo ?? 0;
+  const runningKm = tyre ? tyre.presentOdo - tyre.fittedOdo : 0;
+  const health = tyre ? calcHealth(runningKm, tyre.expectedLife) : 'Good';
 
   const [form, setForm] = useState({
-    removalDate:    today(),
-    currentOdo:     String(truckOdo),
-    reason:         '',
-    condition:      '',
+    removalDate: today(),
+    currentOdo: String(truckOdo),
+    reason: '',
+    condition: '',
     remainingTread: '',
-    nextAction:     '',
-    storeLocation:  '',
-    notes:          '',
+    nextAction: '',
+    storeLocation: '',
+    notes: '',
   });
   const [errors, setErrors] = useState({});
 
@@ -88,26 +108,120 @@ export default function RemoveTyreModal({ tyre, onConfirm, onClose }) {
   };
 
   const finalRunningKm = Math.max(0, (parseInt(form.currentOdo) || 0) - (tyre?.fittedOdo ?? 0));
-  const overLife       = tyre && finalRunningKm > tyre.expectedLife;
-  const lowTread       = form.remainingTread !== '' && parseInt(form.remainingTread) < 10;
+  const overLife = tyre && finalRunningKm > tyre.expectedLife;
+  const lowTread = form.remainingTread !== '' && parseInt(form.remainingTread) < 10;
 
   const validate = () => {
     const e = {};
-    if (!form.removalDate)                                          e.removalDate  = 'Required';
-    else if (form.removalDate > today())                            e.removalDate  = 'Cannot be a future date';
-    if (!form.currentOdo)                                           e.currentOdo   = 'Required';
-    else if (parseInt(form.currentOdo) < (tyre?.fittedOdo ?? 0))   e.currentOdo   = `Must be ≥ fitted ODO (${tyre?.fittedOdo?.toLocaleString()} km)`;
-    if (!form.reason)      e.reason      = 'Select a reason';
-    if (!form.condition)   e.condition   = 'Select condition';
-    if (!form.nextAction)  e.nextAction  = 'Select next action';
+    if (!form.removalDate) e.removalDate = 'Required';
+    else if (form.removalDate > today()) e.removalDate = 'Cannot be a future date';
+    if (!form.currentOdo) e.currentOdo = 'Required';
+    else if (parseInt(form.currentOdo) < (tyre?.fittedOdo ?? 0)) e.currentOdo = `Must be ≥ fitted ODO (${tyre?.fittedOdo?.toLocaleString()} km)`;
+    if (!form.reason) e.reason = 'Select a reason';
+    if (!form.condition) e.condition = 'Select condition';
+    if (!form.nextAction) e.nextAction = 'Select next action';
     if (!form.storeLocation) e.storeLocation = 'Select store location';
     return e;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const e = validate();
-    if (Object.keys(e).length) { setErrors(e); return; }
-    onConfirm(tyre.id, { ...form, currentOdo: parseInt(form.currentOdo) });
+    if (Object.keys(e).length) {
+      setErrors(e);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      // 1. Insert into old_tyres table
+      const oldTyrePayload = {
+        old_tyre_number: tyre.id,
+        brand: tyre.make,
+        model: tyre.model,
+        tyre_size:
+
+          tyre.tyreSize ||
+
+          tyre.size ||
+
+          '',
+        material_type:
+
+          tyre.material ||
+
+          '',
+        vehicle_id: truck?.id || null,
+        vehicle_number: tyre.truckNo,
+        last_position: tyre.position,
+        removed_date: form.removalDate,
+        removal_reason: form.reason,
+        running_km: finalRunningKm,
+        expected_life_km:
+
+          tyre.expectedLife ||
+
+          0,
+        remaining_tread_percent: form.remainingTread || 0,
+        tyre_status:
+          form.nextAction === 'Scrap Tyre'
+            ? 'SCRAP'
+            : form.nextAction === 'Send For Retreading'
+              ? 'RETREADING'
+              : form.nextAction === 'Reusable Spare'
+                ? 'REUSABLE'
+                : 'OLD_STOCK',
+        store_location: form.storeLocation,
+        notes: form.notes,
+      };
+
+      const oldTyreRes = await fetch('http://localhost:5001/api/old-tyres', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(oldTyrePayload),
+      });
+      const oldTyreData = await oldTyreRes.json();
+      if (!oldTyreData.success) {
+        alert('Failed to move tyre to old stock');
+        return;
+      }
+
+      // 2. Update the tyre record (clear assignment, set status to 'Removed')
+      const removePayload = {
+  tyre_number: tyre.id,
+
+  status: 'Removed',
+
+  vehicle_id: 0,
+
+  vehicle_number: '',
+
+  tyre_position: '',
+
+  fitted_odometer: 0,
+
+  date_of_issue: null,
+
+  running_km: finalRunningKm,
+};
+
+      const removeRes = await fetch('http://localhost:5001/api/tyres/mount', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(removePayload),
+      });
+      const removeData = await removeRes.json();
+      if (removeData.success) {
+        onClose();
+      } else {
+        alert('Failed to clear tyre assignment');
+      }
+    } catch (error) {
+      console.error('Remove tyre error:', error);
+      alert('Server error – please try again');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (!tyre) return null;
@@ -158,15 +272,15 @@ export default function RemoveTyreModal({ tyre, onConfirm, onClose }) {
 
           {/* Tyre summary */}
           <div className="bg-slate-50 rounded-2xl border border-slate-100 p-4 grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <SummaryItem label="Tyre No"        value={tyre.id}                          mono />
-            <SummaryItem label="Truck"          value={tyre.truckNo} />
-            <SummaryItem label="Position"       value={posLabel(tyre.position)} />
-            <SummaryItem label="Brand / Model"  value={`${tyre.make} ${tyre.model}`} />
-            <SummaryItem label="Mounted Date"   value={tyre.fittedDate} />
-            <SummaryItem label="Fitted ODO"     value={`${tyre.fittedOdo.toLocaleString()} km`} mono />
-            <SummaryItem label="Present ODO"    value={`${tyre.presentOdo.toLocaleString()} km`} mono />
-            <SummaryItem label="Running KM"     value={`${runningKm.toLocaleString()} km`} mono />
-            <SummaryItem label="Health"         value={health} />
+            <SummaryItem label="Tyre No" value={tyre.id} mono />
+            <SummaryItem label="Truck" value={tyre.truckNo} />
+            <SummaryItem label="Position" value={posLabel(tyre.position)} />
+            <SummaryItem label="Brand / Model" value={`${tyre.make} ${tyre.model}`} />
+            <SummaryItem label="Mounted Date" value={tyre.fittedDate} />
+            <SummaryItem label="Fitted ODO" value={`${tyre.fittedOdo.toLocaleString()} km`} mono />
+            <SummaryItem label="Present ODO" value={`${tyre.presentOdo.toLocaleString()} km`} mono />
+            <SummaryItem label="Running KM" value={`${runningKm.toLocaleString()} km`} mono />
+            <SummaryItem label="Health" value={health} />
           </div>
 
           {/* Smart warnings */}
@@ -244,7 +358,7 @@ export default function RemoveTyreModal({ tyre, onConfirm, onClose }) {
                 </select>
               </div>
               {form.nextAction && (
-                <span className={`mt-1.5 inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ring-1 ${NEXT_ACTIONS.find(a=>a.value===form.nextAction)?.color}`}>
+                <span className={`mt-1.5 inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ring-1 ${NEXT_ACTIONS.find(a => a.value === form.nextAction)?.color}`}>
                   {form.nextAction}
                 </span>
               )}
@@ -255,7 +369,7 @@ export default function RemoveTyreModal({ tyre, onConfirm, onClose }) {
               <div className="relative">
                 <select value={form.storeLocation} onChange={e => set('storeLocation', e.target.value)} className={selectCls(errors.storeLocation)}>
                   <option value="">Select Location</option>
-                  {['Scrap Yard','Retreading Area','Warehouse Stock','Reusable Storage'].map(l => <option key={l}>{l}</option>)}
+                  {['Scrap Yard', 'Retreading Area', 'Warehouse Stock', 'Reusable Storage'].map(l => <option key={l}>{l}</option>)}
                 </select>
               </div>
               <Err msg={errors.storeLocation} />
@@ -277,10 +391,11 @@ export default function RemoveTyreModal({ tyre, onConfirm, onClose }) {
             Cancel
           </button>
           <button onClick={handleSubmit}
+            disabled={loading}
             className="h-10 px-6 text-sm font-extrabold text-white rounded-xl flex items-center gap-2
-              transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5"
+              transition-all duration-200 shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed"
             style={{ background: 'linear-gradient(135deg, #ea580c 0%, #dc2626 100%)' }}>
-            <MinusCircle className="w-4 h-4" /> Confirm Removal
+            <MinusCircle className="w-4 h-4" /> {loading ? 'Removing...' : 'Confirm Removal'}
           </button>
         </div>
       </motion.div>
