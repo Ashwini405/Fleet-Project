@@ -6,42 +6,15 @@ const inventoryController = require('../controllers/inventoryController');
 const multer = require('multer');
 const path = require('path');
 
-
-// ✅ STORAGE
 const storage = multer.diskStorage({
-
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-
+  destination: (req, file, cb) => { cb(null, 'uploads/'); },
   filename: (req, file, cb) => {
-
-    cb(
-      null,
-      Date.now() +
-      '-' +
-      Math.round(Math.random() * 1E9) +
-      path.extname(file.originalname)
-    );
+    cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname));
   }
 });
 
+const upload = multer({ storage, fileFilter: (req, file, cb) => cb(null, true) });
 
-// ✅ FILE FILTER
-const fileFilter = (req, file, cb) => {
-
-  cb(null, true);
-};
-
-
-// ✅ UPLOAD
-const upload = multer({
-  storage,
-  fileFilter
-});
-
-
-// ✅ MULTIPLE FILES
 const uploadFields = upload.fields([
   { name: 'part_image', maxCount: 1 },
   { name: 'files', maxCount: 10 }
@@ -49,141 +22,41 @@ const uploadFields = upload.fields([
 
 
 // ======================================================
-// ✅ INVENTORY ROUTES
+// SPECIFIC NAMED ROUTES  (must come before /:id wildcards)
 // ======================================================
 
+// Stock movements
+router.post('/stock-in',          inventoryController.stockInPart);
+router.post('/stock-out',         inventoryController.stockOutPart);
+router.get('/movement-history',   inventoryController.getMovementHistory);
+router.get('/issue-history',      inventoryController.getIssueHistory);
 
-// ✅ CREATE PART
-router.post(
-  '/',
-  uploadFields,
-  inventoryController.createPart
-);
+// Purchase orders
+router.get('/purchase-orders',                    inventoryController.getPurchaseOrders);
+router.post('/purchase-orders',                   inventoryController.createPurchaseOrder);
+router.put('/purchase-orders/:id/hold',          inventoryController.holdPurchaseOrder);
+router.put('/purchase-orders/:id/order',   inventoryController.orderPurchaseOrder);
+router.put('/purchase-orders/:id/approve',        inventoryController.approvePurchaseOrder);
+router.put('/purchase-orders/:id/reject',         inventoryController.rejectPurchaseOrder);
+router.put('/purchase-orders/:id/receive',        inventoryController.receivePurchaseOrder);
 
+// Vendors
+router.get('/vendors',   inventoryController.getVendors);
+router.post('/vendors',  inventoryController.createVendor);
 
-// ✅ GET ALL PARTS
-router.get(
-  '/',
-  inventoryController.getAllParts
-);
-
-
-// ✅ GET PART BY ID
-
-
-
-// ✅ UPDATE PART
-router.put(
-  '/:id',
-  uploadFields,
-  inventoryController.updatePart
-);
-
-
-// ✅ DELETE PART
-router.delete(
-  '/:id',
-  inventoryController.deletePart
-);
+// Warehouses
+router.get('/warehouses',  inventoryController.getWarehouses);
+router.post('/warehouses', inventoryController.createWarehouse);
 
 
 // ======================================================
-// ✅ STOCK IN ROUTE (NEW)
+// GENERIC CRUD  (/:id wildcards — must come LAST)
 // ======================================================
 
-router.post(
-  '/stock-in',
-  inventoryController.stockInPart
-);
-
-router.post(
-  '/stock-out',
-  inventoryController.stockOutPart
-);
-
-router.get(
-  '/movement-history',
-  inventoryController.getMovementHistory
-);
-
-router.get(
-  '/issue-history',
-  inventoryController.getIssueHistory
-);
-
-
-
-// ======================================================
-// ✅ PURCHASE ORDER ROUTES
-// ======================================================
-
-// GET ALL PURCHASE ORDERS
-router.get(
-  '/purchase-orders',
-  inventoryController.getPurchaseOrders
-);
-
-
-// APPROVE PURCHASE ORDER
-router.put(
-  '/purchase-orders/:id/approve',
-  inventoryController.approvePurchaseOrder
-);
-
-
-// REJECT PURCHASE ORDER
-router.put(
-  '/purchase-orders/:id/reject',
-  inventoryController.rejectPurchaseOrder
-);
-
-
-// RECEIVE PURCHASE ORDER
-router.put(
-  '/purchase-orders/:id/receive',
-  inventoryController.receivePurchaseOrder
-);
-
-// ======================================================
-// ✅ VENDOR ROUTES
-// ======================================================
-
-
-// ✅ GET ALL VENDORS
-router.get(
-  '/vendors',
-  inventoryController.getVendors
-);
-
-
-// ✅ CREATE VENDOR
-router.post(
-  '/vendors',
-  inventoryController.createVendor
-);
-
-
-// ======================================================
-// ✅ WAREHOUSE ROUTES
-// ======================================================
-
-
-// ✅ GET ALL WAREHOUSES
-router.get(
-  '/warehouses',
-  inventoryController.getWarehouses
-);
-
-
-// ✅ CREATE WAREHOUSE
-router.post(
-  '/warehouses',
-  inventoryController.createWarehouse
-);
-
-router.get(
-  '/:id',
-  inventoryController.getPartById
-);
+router.get('/',    inventoryController.getAllParts);
+router.post('/',   uploadFields, inventoryController.createPart);
+router.get('/:id', inventoryController.getPartById);
+router.put('/:id', uploadFields, inventoryController.updatePart);
+router.delete('/:id', inventoryController.deletePart);
 
 module.exports = router;

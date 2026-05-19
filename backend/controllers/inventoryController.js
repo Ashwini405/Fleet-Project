@@ -824,6 +824,28 @@ exports.getIssueHistory = async (req, res) => {
 };
 
 
+// ── Status map ────────────────────────────────────────
+const STATUS_MAP = {
+  0: 'Pending Approval',
+  1: 'Approved',
+  2: 'Rejected',
+  3: 'Ordered',
+  4: 'Received',
+};
+
+function labelToId(label) {
+  const entry = Object.entries(STATUS_MAP).find(
+    ([, v]) => v.toLowerCase() === (label || '').toLowerCase()
+  );
+  return entry ? Number(entry[0]) : 0;
+}
+
+function isoDate(val) {
+  if (!val) return null;
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+
 // ======================================================
 // ✅ GET PURCHASE ORDERS
 // ======================================================
@@ -833,173 +855,238 @@ exports.getPurchaseOrders = async (req, res) => {
   try {
 
     const [rows] = await db.query(
-
-      `SELECT *
-       FROM inventory_purchase_orders
-       ORDER BY created_at DESC`
+      `SELECT * FROM inventory_purchase_orders ORDER BY created_at DESC`
     );
 
-
-    // ✅ PARSE ITEMS JSON
-    const formatted = rows.map((po) => ({
-
-      ...po,
-
-      items:
+    const formatted = rows.map((po) => {
+      const rawItems =
         typeof po.items === 'string'
           ? JSON.parse(po.items || '[]')
-          : po.items || []
-    }));
+          : po.items || [];
 
+      const items = rawItems.map((item) => ({
+        partId:   item.part_id   ?? item.partId   ?? null,
+        partName: item.partName  || item.name     || item.item_name || '',
+        qty:      item.qty       ?? item.quantity ?? 0,
+        notes:    item.notes     || '',
+        cost:     item.cost      ?? item.price    ?? 0,
+      }));
 
-    res.json({
+      // Derive status_id — prefer stored column, fall back to label
+      const status_id =
+        po.status_id != null
+          ? Number(po.status_id)
+          : labelToId(po.status);
 
-      success: true,
-      count: formatted.length,
-      data: formatted
+      const status_label = STATUS_MAP[status_id] || 'Pending Approval';
+
+      return {
+        id:              po.id,
+        po_number:       po.po_number || `PO-${po.id}`,
+        vendor:          po.vendor    || '',
+        status_id,
+        status_label,
+        total_amount:    Number(po.total_amount || 0),
+        requested_by:    po.requested_by    || '',
+        requested_date:  isoDate(po.requested_date  || po.created_at),
+        approver_name:   po.approver_name   || '',
+        approval_comment:po.approval_comment|| '',
+        approval_date:   isoDate(po.approval_date),
+        ordered_at:      isoDate(po.ordered_at),
+        expected_delivery: isoDate(po.expected_delivery),
+        created_at:      isoDate(po.created_at),
+        items,
+      };
     });
+
+    res.json({ success: true, count: formatted.length, data: formatted });
 
   } catch (error) {
-
-    console.error(
-      'GET PURCHASE ORDERS ERROR:',
-      error
-    );
-
-    res.status(500).json({
-
-      success: false,
-      message: 'Server Error'
-    });
+    console.error('GET PURCHASE ORDERS ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
 
 
 // ======================================================
-// ✅ APPROVE PURCHASE ORDER
+// ✅ APPROVE PURCHASE ORDER  (status_id = 1)
 // ======================================================
 
 exports.approvePurchaseOrder = async (req, res) => {
-
   try {
-
     const { id } = req.params;
+    const { approver_name, approval_comment } = req.body;
+
+    if (!approval_comment || !approval_comment.trim()) {
+      return res.status(400).json({ success: false, message: 'Approval comment is required.' });
+    }
 
     await db.query(
-
       `UPDATE inventory_purchase_orders
-       SET status = 'Approved'
+       SET status = 'Approved', status_id = 1,
+           approver_name = ?, approval_comment = ?, approval_date = NOW()
        WHERE id = ?`,
-
-      [id]
+      [approver_name || 'Admin', approval_comment.trim(), id]
     );
 
-
-    res.json({
-
-      success: true,
-      message:
-        'Purchase order approved'
-    });
-
+    res.json({ success: true, message: 'Purchase order approved.' });
   } catch (error) {
-
-    console.error(
-      'APPROVE PO ERROR:',
-      error
-    );
-
-    res.status(500).json({
-
-      success: false,
-      message: 'Server Error'
-    });
+    console.error('APPROVE PO ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
 
 
 // ======================================================
-// ✅ REJECT PURCHASE ORDER
+// ✅ REJECT PURCHASE ORDER  (status_id = 2)
 // ======================================================
 
 exports.rejectPurchaseOrder = async (req, res) => {
-
   try {
-
     const { id } = req.params;
+    const { approver_name, approval_comment } = req.body;
+
+    if (!approval_comment || !approval_comment.trim()) {
+      return res.status(400).json({ success: false, message: 'Rejection reason is required.' });
+    }
 
     await db.query(
-
       `UPDATE inventory_purchase_orders
-       SET status = 'Rejected'
+       SET status = 'Rejected', status_id = 2,
+           approver_name = ?, approval_comment = ?, approval_date = NOW()
        WHERE id = ?`,
-
-      [id]
+      [approver_name || 'Admin', approval_comment.trim(), id]
     );
 
-
-    res.json({
-
-      success: true,
-      message:
-        'Purchase order rejected'
-    });
-
+    res.json({ success: true, message: 'Purchase order rejected.' });
   } catch (error) {
-
-    console.error(
-      'REJECT PO ERROR:',
-      error
-    );
-
-    res.status(500).json({
-
-      success: false,
-      message: 'Server Error'
-    });
+    console.error('REJECT PO ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
 
 
 // ======================================================
-// ✅ RECEIVE PURCHASE ORDER
+// ✅ HOLD PURCHASE ORDER  (status_id stays 0, saves comment)
+// ======================================================
+
+exports.holdPurchaseOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { approver_name, approval_comment } = req.body;
+
+    if (!approval_comment || !approval_comment.trim()) {
+      return res.status(400).json({ success: false, message: 'Reason for hold is required.' });
+    }
+
+    await db.query(
+      `UPDATE inventory_purchase_orders
+       SET approver_name = ?, approval_comment = ?, approval_date = NOW()
+       WHERE id = ?`,
+      [approver_name || 'Admin', approval_comment.trim(), id]
+    );
+
+    res.json({ success: true, message: 'Purchase order kept pending with note.' });
+  } catch (error) {
+    console.error('HOLD PO ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+
+// ======================================================
+// ✅ MARK ORDERED  (status_id = 3)
+// ======================================================
+
+exports.orderPurchaseOrder = async (req, res) => {
+  try {
+    await db.query(
+      `UPDATE inventory_purchase_orders
+       SET status = 'Ordered', status_id = 3, ordered_at = NOW()
+       WHERE id = ?`,
+      [req.params.id]
+    );
+    res.json({ success: true, message: 'Status updated to Ordered.' });
+  } catch (error) {
+    console.error('ORDER PO ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+
+// ======================================================
+// ✅ CREATE PURCHASE ORDER  (status_id = 0)
+// ======================================================
+
+exports.createPurchaseOrder = async (req, res) => {
+  try {
+    const { vendor, part_id, item_name, quantity, expected_delivery, notes, requested_by, requested_date } = req.body;
+
+    if (!vendor || !item_name || !quantity) {
+      return res.status(400).json({ success: false, message: 'Vendor, item and quantity are required.' });
+    }
+
+    const requestDate = requested_date || new Date().toISOString().slice(0, 10);
+    const datePart    = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const po_number   = `PO-${datePart}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const items = [{ part_id: part_id || null, partName: item_name, qty: Number(quantity), notes: notes || '' }];
+
+    await db.query(
+      `INSERT INTO inventory_purchase_orders
+         (po_number, vendor, total_amount, expected_delivery, status, status_id, items, requested_by, requested_date)
+       VALUES (?, ?, 0.00, ?, 'Pending Approval', 0, ?, ?, ?)`,
+      [po_number, vendor, expected_delivery || null, JSON.stringify(items), requested_by || 'Supervisor', requestDate]
+    );
+
+    res.status(201).json({ success: true, message: 'Purchase order created.', po_number });
+  } catch (error) {
+    console.error('CREATE PO ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+
+// ======================================================
+// ✅ RECEIVE PURCHASE ORDER  (status_id = 4, stocks in)
 // ======================================================
 
 exports.receivePurchaseOrder = async (req, res) => {
-
   try {
-
     const { id } = req.params;
 
+    const [rows] = await db.query(
+      `SELECT * FROM inventory_purchase_orders WHERE id = ?`, [id]
+    );
+    if (!rows.length) return res.status(404).json({ success: false, message: 'PO not found.' });
+
+    const po = rows[0];
+
     await db.query(
-
-      `UPDATE inventory_purchase_orders
-       SET status = 'Received'
-       WHERE id = ?`,
-
-      [id]
+      `UPDATE inventory_purchase_orders SET status = 'Received', status_id = 4 WHERE id = ?`, [id]
     );
 
+    const items  = typeof po.items === 'string' ? JSON.parse(po.items || '[]') : po.items || [];
+    const item   = items[0] || {};
+    const partId = item.part_id || item.partId || null;
+    const qty    = Number(item.qty ?? item.quantity ?? 0);
 
-    res.json({
+    if (partId && qty > 0) {
+      await db.query(
+        `UPDATE inventory_parts SET current_stock = current_stock + ?, updated_at = NOW() WHERE id = ?`,
+        [qty, partId]
+      );
+      await db.query(
+        `INSERT INTO inventory_stock_movements (part_id, movement_type, quantity, vendor, movement_date)
+         VALUES (?, 'Stock In', ?, ?, NOW())`,
+        [partId, qty, po.vendor || '']
+      );
+    }
 
-      success: true,
-      message:
-        'Purchase order received'
-    });
-
+    res.json({ success: true, message: 'Purchase order received and stock updated.' });
   } catch (error) {
-
-    console.error(
-      'RECEIVE PO ERROR:',
-      error
-    );
-
-    res.status(500).json({
-
-      success: false,
-      message: 'Server Error'
-    });
+    console.error('RECEIVE PO ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
 

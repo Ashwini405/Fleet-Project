@@ -606,65 +606,72 @@ export function InventoryProvider({ children }) {
 
 
   // ✅ PURCHASE ORDER ACTIONS
-  // ✅ APPROVE PURCHASE ORDER
-  const approvePO = async (poId) => {
-
+  const approvePO = async (poId, approver_name, approval_comment) => {
     try {
-
       await axios.put(
-        `http://localhost:5001/api/inventory/purchase-orders/${poId}/approve`
+        `http://localhost:5001/api/inventory/purchase-orders/${poId}/approve`,
+        { approver_name, approval_comment }
       );
-
       await fetchPurchaseOrders();
-
+      return { success: true };
     } catch (error) {
-
-      console.error(
-        'APPROVE PO ERROR:',
-        error
-      );
+      console.error('APPROVE PO ERROR:', error);
+      return { success: false, error: error.response?.data?.message || error.message };
     }
   };
 
-
-  // ✅ REJECT PURCHASE ORDER
-  const rejectPO = async (poId) => {
-
+  const rejectPO = async (poId, approver_name, approval_comment) => {
     try {
-
       await axios.put(
-        `http://localhost:5001/api/inventory/purchase-orders/${poId}/reject`
+        `http://localhost:5001/api/inventory/purchase-orders/${poId}/reject`,
+        { approver_name, approval_comment }
       );
-
       await fetchPurchaseOrders();
-
+      return { success: true };
     } catch (error) {
-
-      console.error(
-        'REJECT PO ERROR:',
-        error
-      );
+      console.error('REJECT PO ERROR:', error);
+      return { success: false, error: error.response?.data?.message || error.message };
     }
   };
 
+  const holdPO = async (poId, approver_name, approval_comment) => {
+    try {
+      await axios.put(
+        `http://localhost:5001/api/inventory/purchase-orders/${poId}/hold`,
+        { approver_name, approval_comment }
+      );
+      await fetchPurchaseOrders();
+      return { success: true };
+    } catch (error) {
+      console.error('HOLD PO ERROR:', error);
+      return { success: false, error: error.response?.data?.message || error.message };
+    }
+  };
 
-  // ✅ RECEIVE PURCHASE ORDER
+  const orderPO = async (poId) => {
+    try {
+      await axios.put(
+        `http://localhost:5001/api/inventory/purchase-orders/${poId}/order`
+      );
+      await fetchPurchaseOrders();
+      return { success: true };
+    } catch (error) {
+      console.error('ORDER PO ERROR:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   const receivePO = async (poId) => {
-
     try {
-
       await axios.put(
         `http://localhost:5001/api/inventory/purchase-orders/${poId}/receive`
       );
-
       await fetchPurchaseOrders();
-
+      await fetchInventory();
+      return { success: true };
     } catch (error) {
-
-      console.error(
-        'RECEIVE PO ERROR:',
-        error
-      );
+      console.error('RECEIVE PO ERROR:', error);
+      return { success: false, error: error.message };
     }
   };
 
@@ -739,7 +746,7 @@ export function InventoryProvider({ children }) {
     );
 
     const pendingPOs = purchaseOrders.filter(
-      (p) => p.status === 'Pending'
+      (p) => p.status_id === 0
     ).length;
 
     const activeVendors = new Set(
@@ -790,6 +797,8 @@ export function InventoryProvider({ children }) {
 
         approvePO,
         rejectPO,
+        holdPO,
+        orderPO,
         receivePO,
 
         exportInventoryReport,
