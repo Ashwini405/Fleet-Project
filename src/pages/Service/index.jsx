@@ -4,6 +4,7 @@ import { Wrench, Settings2, Clock } from 'lucide-react';
 import PeriodicServiceTab from './components/PeriodicServiceTab';
 import RepairWorksTab from './components/RepairWorksTab';
 import ServiceHistoryTab from './components/ServiceHistoryTab';
+import RemindersTab from './components/RemindersTab';
 
 export default function ServiceModule() {
   const [topModule, setTopModule] = useState('SERVICE');
@@ -104,12 +105,8 @@ export default function ServiceModule() {
             )}
 
             {topModule === 'REMINDERS' && (
-              <motion.div key="reminders" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex items-center justify-center text-gray-500">
-                 <div className="text-center">
-                    <Clock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-gray-700">Service Reminders</h3>
-                    <p className="text-sm mt-2">Reminders and notifications features are under development.</p>
-                 </div>
+              <motion.div key="reminders" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full">
+                <RemindersTab />
               </motion.div>
             )}
           </AnimatePresence>

@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { 
   ArrowLeft, Truck, Wrench, Calendar, Clock, MapPin, FileText, 
-  Package, DollarSign, Image, File, CheckCircle, AlertCircle 
+  Package, DollarSign, Image, File, CheckCircle, AlertCircle, Pencil
 } from 'lucide-react';
+import RegisterPeriodicServiceModal from './RegisterPeriodicServiceModal';
 
 const DetailPeriodicService = () => {
   const { id } = useParams();
@@ -11,27 +12,21 @@ const DetailPeriodicService = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
-  useEffect(() => {
-    const fetchService = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await fetch(`http://localhost:5001/api/services/${id}`);
-        const result = await response.json();
-        if (!response.ok || !result.success) {
-          throw new Error(result.message || 'Unable to load service details');
-        }
-        setData(result.data);
-      } catch (err) {
-        console.error('Error loading service details:', err);
-        setError(err.message || 'Failed to load service details');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchService();
-  }, [id]);
+  const fetchService = async () => {
+    setLoading(true); setError(null);
+    try {
+      const response = await fetch(`http://localhost:5001/api/services/${id}`);
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.message || 'Unable to load');
+      setData(result.data);
+    } catch (err) {
+      setError(err.message || 'Failed to load');
+    } finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchService(); }, [id]);
 
   if (loading) {
     return (
@@ -91,9 +86,19 @@ const DetailPeriodicService = () => {
       </button>
 
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Periodic Service Details</h1>
-        <p className="text-slate-500 mt-1">Complete service and maintenance record</p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Periodic Service Details</h1>
+          <p className="text-slate-500 mt-1">Complete service and maintenance record</p>
+        </div>
+        {data.status !== 'Completed' && (
+          <button
+            onClick={() => setIsEditOpen(true)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white rounded-xl text-sm font-bold shadow-sm hover:bg-teal-700 transition-colors"
+          >
+            <Pencil className="w-4 h-4" /> Update Service
+          </button>
+        )}
       </div>
 
       {/* Overview Cards */}
@@ -331,6 +336,12 @@ const DetailPeriodicService = () => {
           <p className="text-sm text-slate-500">No documents attached to this service.</p>
         </div>
       )}
+
+      <RegisterPeriodicServiceModal
+        isOpen={isEditOpen}
+        onClose={() => { setIsEditOpen(false); fetchService(); }}
+        editData={data}
+      />
     </div>
   );
 };

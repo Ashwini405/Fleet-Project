@@ -51,6 +51,15 @@ getById: async (id) => {
 
 
 
+  // ✅ UPDATE
+  update: async (id, data) => {
+    const [result] = await db.query(
+      'UPDATE repair_services SET ? WHERE id = ?',
+      [data, id]
+    );
+    return result;
+  },
+
   // ✅ DELETE
   delete: async (id) => {
     const [result] = await db.query(

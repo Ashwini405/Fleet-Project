@@ -1,44 +1,42 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 
-const CATEGORIES = ['Spares', 'Tubes', 'Lubricants', 'Others'];
-const empty = {
-  category: 'Spares',
-  item_name: '',
-  brand: '',
-  serial_number: '',
-  quantity: '',
-  date_of_entry: new Date().toISOString().split('T')[0],
-};
-
-export default function AddItemModal({ isOpen, onClose, onSuccess }) {
-  const [form, setForm] = useState(empty);
+export default function EditItemModal({ isOpen, item, onClose, onSuccess }) {
+  const [form, setForm] = useState({ item_name: '', brand: '', quantity: '', serial_number: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (item) {
+      setForm({
+        item_name: item.part_name || '',
+        brand: item.brand || '',
+        quantity: item.current_stock ?? '',
+        serial_number: item.sku || '',
+      });
+      setError('');
+    }
+  }, [item]);
+
+  if (!isOpen || !item) return null;
 
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.item_name.trim()) return setError('Item name is required.');
-    if (!form.quantity || Number(form.quantity) <= 0) return setError('Enter a valid quantity.');
+    if (form.quantity === '' || Number(form.quantity) < 0) return setError('Enter a valid quantity.');
     setError('');
     setLoading(true);
     try {
       const body = new FormData();
       body.append('part_name', form.item_name.trim());
-      body.append('category', form.category);
       body.append('brand', form.brand.trim());
-      body.append('sku', form.serial_number.trim());
       body.append('current_stock', form.quantity);
-      body.append('opening_stock', form.quantity);
-      body.append('expiry_date', form.date_of_entry);
-      const res = await fetch('http://localhost:5001/api/inventory', { method: 'POST', body });
+      body.append('sku', form.serial_number.trim());
+      const res = await fetch(`http://localhost:5001/api/inventory/${item.id}`, { method: 'PUT', body });
       const data = await res.json();
-      if (!data.success) throw new Error(data.message || 'Failed to add item.');
-      setForm(empty);
+      if (!data.success) throw new Error(data.message || 'Failed to update item.');
       onSuccess();
     } catch (err) {
       setError(err.message);
@@ -47,14 +45,13 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }) {
     }
   };
 
-  const handleClose = () => { if (loading) return; setForm(empty); setError(''); onClose(); };
+  const handleClose = () => { if (loading) return; setError(''); onClose(); };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-200">
-
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="text-base font-bold text-slate-800">Add Inventory Item</h2>
+          <h2 className="text-base font-bold text-slate-800">Edit Item</h2>
           <button onClick={handleClose} disabled={loading} className="text-slate-400 hover:text-slate-600 transition disabled:opacity-40">
             <X className="h-5 w-5" />
           </button>
@@ -64,14 +61,6 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }) {
           {error && (
             <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2.5">{error}</p>
           )}
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Item Category</label>
-            <select value={form.category} onChange={e => set('category', e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
-              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-            </select>
-          </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">
@@ -89,25 +78,19 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }) {
               className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Serial Number</label>
-            <input value={form.serial_number} onChange={e => set('serial_number', e.target.value)}
-              placeholder="e.g. SN-00123"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
-          </div>
-
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">
                 Quantity <span className="text-red-500">*</span>
               </label>
-              <input type="number" min="1" value={form.quantity} onChange={e => set('quantity', e.target.value)}
+              <input type="number" min="0" value={form.quantity} onChange={e => set('quantity', e.target.value)}
                 placeholder="0"
                 className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Date of Entry</label>
-              <input type="date" value={form.date_of_entry} onChange={e => set('date_of_entry', e.target.value)}
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Serial Number</label>
+              <input value={form.serial_number} onChange={e => set('serial_number', e.target.value)}
+                placeholder="e.g. SN-00123"
                 className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
             </div>
           </div>
@@ -120,7 +103,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }) {
             <button type="submit" disabled={loading}
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition disabled:opacity-60">
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {loading ? 'Adding...' : 'Add Item'}
+              {loading ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </form>

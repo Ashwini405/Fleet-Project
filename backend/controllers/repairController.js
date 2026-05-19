@@ -25,6 +25,7 @@ const createRepair = async (req, res) => {
 
     const repairData = {
       ...data,
+      service_date: data.service_date ? data.service_date.split('T')[0] : null,
       repair_start_time: data.repair_start_time || data.repair_start || null,
       repair_end_time: data.repair_end_time || data.repair_end || null,
       parts: JSON.stringify(parts),
@@ -143,38 +144,51 @@ const getRepairById = async (req, res) => {
 const updateRepair = async (req, res) => {
   try {
     const { id } = req.params;
+    const body = req.body;
 
-    const data = req.body;
+    const parts = (() => {
+      try { return JSON.parse(body.parts || '[]'); } catch { return []; }
+    })();
+    const partsTotal = parts.reduce((sum, p) => sum + (Number(p.qty) * Number(p.costPerUnit) || 0), 0);
+    const totalCost = partsTotal + (Number(body.labour_cost) || 0);
 
-    if (data.parts) {
-      try {
-        const parts = JSON.parse(data.parts);
-        const partsTotal = parts.reduce((sum, p) => sum + (Number(p.qty) * Number(p.costPerUnit) || 0), 0);
-        data.parts_total = partsTotal;
-        data.total_cost = partsTotal + (Number(data.labour_cost) || 0);
-        data.parts = JSON.stringify(parts);
-      } catch { /* keep original */ }
-    }
+    const data = {
+      vehicle_id:         body.vehicle_id,
+      issue_description:  body.issue_description,
+      breakdown_type:     body.breakdown_type,
+      vehicle_condition:  body.vehicle_condition,
+      breakdown_location: body.breakdown_location,
+      reported_by:        body.reported_by,
+      priority:           body.priority,
+      service_date:       body.service_date ? body.service_date.split('T')[0] : null,
+      odometer:           body.odometer || null,
+      garage:             body.garage || null,
+      repair_start_time:  body.repair_start_time || null,
+      repair_end_time:    body.repair_end_time || null,
+      downtime:           body.downtime || null,
+      repair_notes:       body.repair_notes || null,
+      status:             body.status,
+      labour_cost:        Number(body.labour_cost) || 0,
+      parts:              JSON.stringify(parts),
+      parts_total:        partsTotal,
+      total_cost:         totalCost,
+    };
 
     if (req.files && req.files.length > 0) {
       data.files = JSON.stringify(
         req.files.map(file => ({ file_name: file.filename, file_type: file.mimetype }))
       );
+    } else if (body.files) {
+      data.files = body.files;
     }
 
     await Repair.update(id, data);
 
-    res.json({
-      success: true,
-      message: "Updated successfully"
-    });
+    res.json({ success: true, message: 'Updated successfully' });
 
   } catch (error) {
-    console.error("UPDATE ERROR:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server Error"
-    });
+    console.error('UPDATE ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
 
