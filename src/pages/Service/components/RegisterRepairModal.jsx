@@ -61,6 +61,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   const [status, setStatus] = useState('Reported');
   const [repairNotes, setRepairNotes] = useState('');
   const [labourCost, setLabourCost] = useState(0);
+  const [inspectionId, setInspectionId] = useState(null);
+  const [inspectionDefectId, setInspectionDefectId] = useState(null);
 
   const [parts, setParts] = useState([]);
   const [newPart, setNewPart] = useState({ inventoryId: null, name: '', costPerUnit: '', qty: '1', vendor: '', availableStock: null });
@@ -115,6 +117,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       setStatus(logData.status || 'Reported');
       setRepairNotes(logData.repair_notes || '');
       setLabourCost(logData.labour_cost || 0);
+      setInspectionId(logData.inspection_id || null);
+      setInspectionDefectId(logData.inspection_defect_id || null);
       setParts(
         Array.isArray(logData.parts)
           ? logData.parts
@@ -144,6 +148,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       setStatus('Reported');
       setRepairNotes('');
       setLabourCost(0);
+      setInspectionId(null);
+      setInspectionDefectId(null);
       setParts([]);
       setFiles([]);
       setErrors({});
@@ -325,10 +331,38 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
 
   const grandTotal = totalBill + (breakdownType === 'Tyre' ? Number(tyreWorkflow.total_tyre_cost || 0) : 0);
 
-  const isSaveDisabled = !issueDescription.trim()
-    || !priority
-    || !truck
-    || (isUnderRepair && (!date || !odometer || Number(odometer) < previousOdometer));
+  const saveDisabledReason = useMemo(() => {
+    if (!issueDescription.trim()) return 'Enter issue description';
+    if (!priority) return 'Select priority';
+    if (!truck) return 'Select vehicle';
+    if (!isReported && !date) return 'Select repair date';
+    if (!isReported && !odometer) return 'Enter odometer reading';
+    if (!isReported && hasSelectedTruck && odometer && Number(odometer) < previousOdometer) {
+      return `Odometer must be at least ${previousOdometer.toLocaleString()} KM`;
+    }
+    if (isUnderRepair && !garage) return 'Select garage / mechanic';
+    if (isUnderRepair && !repairStartTime) return 'Enter repair start time';
+    if (isCompleted && !repairNotes.trim()) return 'Enter repair notes';
+    if (isCompleted && grandTotal <= 0) return 'Add labour or parts cost';
+    return '';
+  }, [
+    issueDescription,
+    priority,
+    truck,
+    isReported,
+    date,
+    odometer,
+    hasSelectedTruck,
+    previousOdometer,
+    isUnderRepair,
+    garage,
+    repairStartTime,
+    isCompleted,
+    repairNotes,
+    grandTotal,
+  ]);
+
+  const isSaveDisabled = Boolean(saveDisabledReason);
 
   // ─── SAVE TO BACKEND ─────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -359,6 +393,9 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
 
       repair_notes: repairNotes,
       status: status,
+
+      inspection_id: inspectionId || null,
+      inspection_defect_id: inspectionDefectId || null,
 
       labour_cost: labourCost,
       parts_total: partsTotal,
@@ -1123,13 +1160,20 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
               <button onClick={onClose} disabled={savingInventory} className="rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50">
                 Cancel
               </button>
-              <button
-                onClick={handleSave}
-                disabled={isSaveDisabled || savingInventory}
-                className="rounded-full bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60 flex items-center gap-2"
-              >
-                {savingInventory ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Repair'}
-              </button>
+              <div className="flex flex-col items-end gap-1">
+                <button
+                  onClick={handleSave}
+                  disabled={isSaveDisabled || savingInventory}
+                  className="rounded-full bg-orange-600 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60 flex items-center gap-2"
+                >
+                  {savingInventory ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</> : 'Save Repair'}
+                </button>
+                {isSaveDisabled && (
+                  <p className="max-w-56 text-right text-[11px] font-medium text-orange-600">
+                    {saveDisabledReason}
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

@@ -1068,19 +1068,40 @@ exports.receivePurchaseOrder = async (req, res) => {
 
     const items  = typeof po.items === 'string' ? JSON.parse(po.items || '[]') : po.items || [];
     const item   = items[0] || {};
-    const partId = item.part_id || item.partId || null;
+    let   partId = item.part_id || item.partId || null;
     const qty    = Number(item.qty ?? item.quantity ?? 0);
+    const itemName = item.partName || item.name || item.item_name || '';
 
-    if (partId && qty > 0) {
-      await db.query(
-        `UPDATE inventory_parts SET current_stock = current_stock + ?, updated_at = NOW() WHERE id = ?`,
-        [qty, partId]
-      );
-      await db.query(
-        `INSERT INTO inventory_stock_movements (part_id, movement_type, quantity, vendor, movement_date)
-         VALUES (?, 'Stock In', ?, ?, NOW())`,
-        [partId, qty, po.vendor || '']
-      );
+    if (qty > 0) {
+      // If no part_id, check if a part with this name already exists, else create it
+      if (!partId && itemName) {
+        const [existing] = await db.query(
+          `SELECT id FROM inventory_parts WHERE LOWER(part_name) = LOWER(?) LIMIT 1`,
+          [itemName]
+        );
+        if (existing.length) {
+          partId = existing[0].id;
+        } else {
+          const [inserted] = await db.query(
+            `INSERT INTO inventory_parts (part_name, category, current_stock, opening_stock, preferred_vendor, created_by)
+             VALUES (?, 'Others', 0, 0, ?, 'PO Auto')`,
+            [itemName, po.vendor || '']
+          );
+          partId = inserted.insertId;
+        }
+      }
+
+      if (partId) {
+        await db.query(
+          `UPDATE inventory_parts SET current_stock = current_stock + ?, updated_at = NOW() WHERE id = ?`,
+          [qty, partId]
+        );
+        await db.query(
+          `INSERT INTO inventory_stock_movements (part_id, movement_type, quantity, vendor, movement_date)
+           VALUES (?, 'Stock In', ?, ?, NOW())`,
+          [partId, qty, po.vendor || '']
+        );
+      }
     }
 
     res.json({ success: true, message: 'Purchase order received and stock updated.' });

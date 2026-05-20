@@ -5,12 +5,13 @@ import EditItemModal     from './components/EditItemModal';
 import IssueItemModal    from './components/IssueItemModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
 import CreatePOModal     from './components/CreatePOModal';
+import BatteryInventory  from './components/BatteryInventory';
 import {
   Plus, Package, ClipboardList, Loader2,
   Search, Pencil, Trash2, ShoppingCart, CheckCircle2, X,
 } from 'lucide-react';
 
-const CATEGORIES  = ['Spares', 'Tubes', 'Lubricants', 'Others'];
+const CATEGORIES  = ['Spares', 'Batteries', 'Tubes', 'Lubricants', 'Electrical', 'Others'];
 const PAGE_TABS   = ['Inventory', 'Purchase Orders'];
 const API         = 'http://localhost:5001/api';
 
@@ -290,7 +291,7 @@ export default function PartsModule() {
                 </select>
               </div>
 
-              {pageTab === 'Inventory' ? (
+              {pageTab === 'Inventory' && activeCategory !== 'Batteries' ? (
                 <button onClick={() => setIsAddOpen(true)}
                   className="shrink-0 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-700 active:scale-95 transition shadow-sm">
                   <Plus className="h-4 w-4" />
@@ -347,7 +348,7 @@ export default function PartsModule() {
                     className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition
                       ${activeCategory === cat ? 'bg-violet-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}>
                     {cat}
-                    {categoryCounts[cat] > 0 && (
+                    {cat !== 'Batteries' && categoryCounts[cat] > 0 && (
                       <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold leading-none
                         ${activeCategory === cat ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-500'}`}>
                         {categoryCounts[cat]}
@@ -356,16 +357,25 @@ export default function PartsModule() {
                   </button>
                 ))}
               </div>
-              <div className="relative sm:ml-auto w-full sm:w-56">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-                <input value={search} onChange={e => setSearch(e.target.value)}
-                  placeholder="Search item name..."
-                  className="w-full rounded-xl border border-slate-200 pl-8 pr-3 py-2 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-slate-50" />
-              </div>
+              {activeCategory !== 'Batteries' && (
+                <div className="relative sm:ml-auto w-full sm:w-56">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                  <input value={search} onChange={e => setSearch(e.target.value)}
+                    placeholder="Search item name..."
+                    className="w-full rounded-xl border border-slate-200 pl-8 pr-3 py-2 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-slate-50" />
+                </div>
+              )}
             </div>
 
+            {/* Batteries sub-module */}
+            {activeCategory === 'Batteries' && (
+              <div className="px-5 pb-5">
+                <BatteryInventory showToast={showToast} />
+              </div>
+            )}
+
             {/* Inventory table */}
-            <div className="overflow-x-auto pb-2">
+            <div className={`overflow-x-auto pb-2 ${activeCategory === 'Batteries' ? 'hidden' : ''}`}>
               <table className="w-full text-sm min-w-120">
                 <thead>
                   <tr className="border-b border-slate-100">
@@ -431,8 +441,8 @@ export default function PartsModule() {
             </div>
           </div>
 
-          {/* Issued Parts History card */}
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
+          {/* Issued Parts History card — hidden on Batteries tab */}
+          {activeCategory !== 'Batteries' && <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
             <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100">
               <ClipboardList className="h-4 w-4 text-violet-600" />
               <h2 className="text-sm font-bold text-slate-800">Issued Parts History</h2>
@@ -483,7 +493,7 @@ export default function PartsModule() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </div>}
         </div>
       )}
 
@@ -623,13 +633,19 @@ export default function PartsModule() {
                             <td className="px-5 py-3.5">
                               <div className="flex flex-wrap items-center justify-end gap-1.5">
 
-                                {/* sid=0: Pending Approval → Approve | Reject */}
+                                {/* sid=0: canReview → Approve | (Pending if not held) | Reject */}
                                 {sid === 0 && canReviewPO && (
                                   <>
                                     <button onClick={() => openCommentModal(po, 'approve')} disabled={isActing}
                                       className="rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-50">
                                       Approve
                                     </button>
+                                    {!po.approval_comment && (
+                                      <button onClick={() => openCommentModal(po, 'hold')} disabled={isActing}
+                                        className="rounded-xl bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100 border border-amber-200 transition disabled:opacity-50">
+                                        Pending
+                                      </button>
+                                    )}
                                     <button onClick={() => openCommentModal(po, 'reject')} disabled={isActing}
                                       className="rounded-xl bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100 transition disabled:opacity-50">
                                       Reject
@@ -640,19 +656,16 @@ export default function PartsModule() {
                                   <span className="text-xs text-amber-600 font-semibold">Waiting approval</span>
                                 )}
 
-                                {/* sid=1: Approved → Mark Ordered */}
-                                {sid === 1 && canReviewPO && (
+                                {/* sid=1: Approved → Mark Ordered (all roles) */}
+                                {sid === 1 && (
                                   <button onClick={() => updatePOStatus(po.id, 'order')} disabled={isActing}
                                     className="rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition disabled:opacity-50">
                                     {isActing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Mark Ordered'}
                                   </button>
                                 )}
-                                {sid === 1 && !canReviewPO && (
-                                  <span className="text-xs text-emerald-600 font-semibold">Approved</span>
-                                )}
 
-                                {/* sid=3: Ordered → Mark Received */}
-                                {sid === 3 && canReviewPO && (
+                                {/* sid=3: Ordered → Mark Received (all roles) */}
+                                {sid === 3 && (
                                   <button onClick={() => updatePOStatus(po.id, 'receive')} disabled={isActing}
                                     className="inline-flex items-center gap-1.5 rounded-xl bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100 transition disabled:opacity-50">
                                     {isActing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><CheckCircle2 className="h-3.5 w-3.5" />Mark Received</>}

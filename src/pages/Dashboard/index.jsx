@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
+import { AlertTriangle, ClipboardX, TimerReset, Truck, Wrench } from "lucide-react";
 import { mockDashboardData } from "./mockData";
 
 import { DashboardHeader, DashboardFilters } from "./components/HeaderFilters";
@@ -12,12 +13,27 @@ import { ShedStockWidget, RecentPurchasesWidget } from "./components/InventoryWi
 
 const fade = { initial: { opacity: 0, y: 16 }, animate: { opacity: 1, y: 0 } };
 
+const alertConfig = [
+  { key: 'vehicles_failed_inspection', label: 'Vehicles Failed Inspection', icon: ClipboardX, color: 'bg-red-50 text-red-700 border-red-100' },
+  { key: 'pending_repairs', label: 'Pending Repairs', icon: Wrench, color: 'bg-amber-50 text-amber-700 border-amber-100' },
+  { key: 'vehicles_under_repair', label: 'Vehicles Under Repair', icon: Truck, color: 'bg-blue-50 text-blue-700 border-blue-100' },
+  { key: 'critical_tyre_issues', label: 'Critical Tyre Issues', icon: AlertTriangle, color: 'bg-rose-50 text-rose-700 border-rose-100' },
+  { key: 'overdue_services', label: 'Overdue Services', icon: TimerReset, color: 'bg-purple-50 text-purple-700 border-purple-100' },
+];
+
 export default function Dashboard() {
   const [data, setData] = useState(null);
+  const [maintenanceAlerts, setMaintenanceAlerts] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     setTimeout(() => { setData(mockDashboardData); setLoading(false); }, 800);
+    fetch('http://localhost:5001/api/dashboard/maintenance-alerts')
+      .then(res => res.json())
+      .then(payload => {
+        if (payload.success) setMaintenanceAlerts(payload.data);
+      })
+      .catch(err => console.error('Dashboard alerts fetch failed:', err));
   }, []);
 
   if (loading) {
@@ -35,6 +51,22 @@ export default function Dashboard() {
     <div className="w-full max-w-7xl mx-auto pb-10 space-y-6">
       <DashboardHeader />
       <DashboardFilters />
+
+      <motion.div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4" {...fade} transition={{ duration: 0.35 }}>
+        {alertConfig.map(({ key, label, icon: Icon, color }) => (
+          <div key={key} className={`rounded-2xl border p-4 shadow-sm ${color}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-70">{label}</p>
+                <p className="mt-2 text-3xl font-black">{maintenanceAlerts?.[key] ?? 0}</p>
+              </div>
+              <div className="rounded-2xl bg-white/75 p-3">
+                <Icon className="h-5 w-5" />
+              </div>
+            </div>
+          </div>
+        ))}
+      </motion.div>
 
       {/* Row 1 — Fleet Status (full width) + Inspection + Issues */}
       <motion.div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5" {...fade} transition={{ duration: 0.4 }}>

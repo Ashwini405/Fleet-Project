@@ -4,6 +4,7 @@ import CreatePlanModal from '../components/CreatePlanModal';
 
 export default function PlansTab({ plansData, setPlansData }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingPlan, setEditingPlan] = useState(null);
   const [loading, setLoading] = useState(false);
 
   // Fetch all inspection plans from the backend
@@ -37,9 +38,20 @@ export default function PlansTab({ plansData, setPlansData }) {
     fetchPlans();
   }, []);
 
-  // After creating a new plan, refresh the list
-  const handleAddPlan = () => {
+  // After creating or updating a plan, refresh the list
+  const handleRefreshPlans = () => {
     fetchPlans();
+  };
+
+  const handleEditPlan = (plan) => {
+    setEditingPlan(plan);
+    setIsModalOpen(true);
+  };
+
+  const getScheduleLabel = (plan) => {
+    if (plan.frequency) return plan.frequency;
+    if (plan.schedule_type) return plan.schedule_type;
+    return 'Recurring';
   };
 
   return (
@@ -52,7 +64,10 @@ export default function PlansTab({ plansData, setPlansData }) {
             <p className="text-xs text-slate-500 font-medium mt-1">Configure compliance checks and operational maintenance routines.</p>
          </div>
          <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              setEditingPlan(null);
+              setIsModalOpen(true);
+            }}
             className="flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-800 rounded-xl text-xs font-bold shadow-sm hover:bg-slate-50 transition-colors"
          >
             <Plus className="w-4 h-4 text-blue-600" /> Create New Plan
@@ -88,7 +103,7 @@ export default function PlansTab({ plansData, setPlansData }) {
                      </span>
                      <h3 className="text-lg font-black text-slate-800 tracking-tight leading-tight">{plan.title}</h3>
                   </div>
-                  <button className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                  <button onClick={() => handleEditPlan(plan)} title="Edit Plan" className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
                      <Settings className="w-5 h-5" />
                   </button>
                </div>
@@ -125,9 +140,9 @@ export default function PlansTab({ plansData, setPlansData }) {
                <div className="pt-4 border-t border-slate-100 flex justify-between items-center relative z-10 mt-auto">
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Automated Schedule</p>
-                    <p className="text-sm font-bold text-slate-800 mt-0.5">Recurring</p>
+                    <p className="text-sm font-bold text-slate-800 mt-0.5">{getScheduleLabel(plan)}</p>
                   </div>
-                  <button className="text-xs font-bold text-blue-600 group-hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
+                  <button onClick={() => handleEditPlan(plan)} className="text-xs font-bold text-blue-600 group-hover:bg-blue-50 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1">
                      Edit Plan <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                </div>
@@ -139,8 +154,12 @@ export default function PlansTab({ plansData, setPlansData }) {
 
       <CreatePlanModal 
          isOpen={isModalOpen}
-         onClose={() => setIsModalOpen(false)}
-         onAddPlan={handleAddPlan}
+         onClose={() => {
+           setIsModalOpen(false);
+           setEditingPlan(null);
+         }}
+         onSave={handleRefreshPlans}
+         planData={editingPlan}
       />
 
     </div>

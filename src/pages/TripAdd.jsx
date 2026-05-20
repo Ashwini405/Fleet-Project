@@ -465,6 +465,11 @@ export default function TripAdd() {
     if (!form.loadWeight || +form.loadWeight <= 0) err.loadWeight = 'Load weight must be greater than 0';
     if (!form.customerName) err.customerName = 'Customer name is required';
     if (!form.startOdometer) err.startOdometer = 'Start odometer reading is required';
+    if (vehicleAvailability?.blockedByInspection) {
+      err.truckNo = vehicleAvailability.message || 'Vehicle unavailable due to critical inspection defects';
+    } else if (vehicleAvailability && !vehicleAvailability.available) {
+      err.truckNo = vehicleAvailability.message || 'Vehicle is not available for trip assignment';
+    }
 
     if (form.startOdometer && +form.startOdometer <= form.lastOdometer) {
       err.startOdometer = `Must be greater than last recorded KM (${(form.lastOdometer || 0).toLocaleString()})`;
@@ -495,7 +500,7 @@ export default function TripAdd() {
 
     setErrors(err);
     return Object.keys(err).length === 0;
-  }, [form, odometerDelta]);
+  }, [form, odometerDelta, vehicleAvailability]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -638,8 +643,9 @@ export default function TripAdd() {
 
     const isOdometerValid = form.startOdometer && +form.startOdometer > form.lastOdometer;
     const isLoadWeightValid = form.loadWeight && +form.loadWeight > 0;
-    return hasRequiredFields && isOdometerValid && isLoadWeightValid && Object.keys(errors).length === 0;
-  }, [form, errors]);
+    const isVehicleAvailable = !vehicleAvailability || vehicleAvailability.available;
+    return hasRequiredFields && isOdometerValid && isLoadWeightValid && isVehicleAvailable && Object.keys(errors).length === 0;
+  }, [form, errors, vehicleAvailability]);
 
   // ─── Submit handler (POST to backend) ────────────────────────────────────
   const buildTripPayload = (status) => ({
@@ -950,10 +956,22 @@ export default function TripAdd() {
                   ))}
                 </select>
                 {vehicleAvailability && form.truckNo && (
-                  vehicleAvailability.available && vehicleAvailability.vehicleStatus === 'Active' ? (
+                  vehicleAvailability.available && (vehicleAvailability.vehicleStatus || '').toLowerCase() === 'active' ? (
                     <div className="mt-1.5 flex items-center gap-1.5 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                       <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
                       Vehicle is available and ready for assignment
+                    </div>
+                  ) : vehicleAvailability.blockedByInspection ? (
+                    <div className="mt-1.5 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-1">
+                      <div className="flex items-center gap-1.5 text-red-700 font-semibold">
+                        <span className="w-2 h-2 rounded-full bg-red-500 shrink-0" />
+                        Vehicle unavailable due to critical inspection defects
+                      </div>
+                      {(vehicleAvailability.blockingDefects || []).slice(0, 3).map(defect => (
+                        <div key={defect.id} className="pl-3.5 text-red-600">
+                          {defect.issue_type || 'Inspection defect'} ({defect.status})
+                        </div>
+                      ))}
                     </div>
                   ) : !vehicleAvailability.available ? (
                     <div className="mt-1.5 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-0.5">

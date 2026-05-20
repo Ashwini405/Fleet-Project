@@ -1,5 +1,6 @@
 const Trip = require('../models/tripModel');
 const db = require('../config/db');
+const lifecycle = require('../services/maintenanceLifecycleService');
 
 
 // ✅ CREATE TRIP
@@ -14,6 +15,24 @@ const createTrip = async (req, res) => {
         'SELECT vehicle_status, vehicle_no FROM vehicles WHERE id = ?',
         [tripData.vehicle_id]
       );
+      const [blockingDefects] = await db.query(
+        `
+          SELECT id, issue_type, severity, priority, status
+          FROM inspection_defects
+          WHERE vehicle_id = ?
+            AND status IN ('Open', 'In Progress')
+        `,
+        [tripData.vehicle_id]
+      );
+      const criticalDefects = blockingDefects.filter(lifecycle.isCriticalDefect);
+
+      if (criticalDefects.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vehicle unavailable due to critical inspection defects'
+        });
+      }
+
       if (vehicle?.vehicle_status === 'under_repair') {
         return res.status(400).json({
           success: false,
