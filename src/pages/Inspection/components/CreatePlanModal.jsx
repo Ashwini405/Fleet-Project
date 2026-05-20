@@ -133,7 +133,9 @@ const Toast = ({ message, onClose }) => {
 // ============================================================
 // Main Component
 // ============================================================
-export default function CreatePlanModal({ isOpen, onClose, onAddPlan }) {
+export default function CreatePlanModal({ isOpen, onClose, onAddPlan, onSave, planData }) {
+  const isEditing = Boolean(planData?.id);
+
   // Plan-level state - only fields matching database schema
   const [fd, setFd] = useState({
     title: '',
@@ -165,6 +167,62 @@ export default function CreatePlanModal({ isOpen, onClose, onAddPlan }) {
   const [errors, setErrors] = useState({});
   const [toastMessage, setToastMessage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (isEditing) {
+      setFd({
+        title: planData.title || '',
+        planType: planData.plan_type || planData.type || '',
+        description: planData.description || '',
+        scheduleType: planData.schedule_type || '',
+        frequency: planData.frequency || '',
+        priority: planData.priority || ''
+      });
+      const planItems = planData.checklist_items || planData.items || [];
+      setItems(Array.isArray(planItems) ? planItems.map(item => ({
+        id: item.id || `item-${Date.now()}-${Math.random()}`,
+        desc: item.desc || item.description || item || '',
+        type: item.type || 'Pass / Fail',
+        required: item.required !== undefined ? item.required : true,
+        severity: item.severity || 'Medium',
+        category: item.category || 'General',
+        requireCommentOnFail: item.requireCommentOnFail || false,
+        requirePhoto: item.requirePhoto || false,
+        expectedValue: item.expectedValue || '',
+        minValue: item.minValue || '',
+        maxValue: item.maxValue || '',
+        unit: item.unit || ''
+      })) : []);
+      setErrors({});
+      setToastMessage(null);
+    } else {
+      setFd({
+        title: '',
+        planType: '',
+        description: '',
+        scheduleType: '',
+        frequency: '',
+        priority: ''
+      });
+      setItems([{
+        id: 'item-1',
+        desc: '',
+        type: 'Pass / Fail',
+        required: true,
+        severity: 'Medium',
+        category: 'General',
+        requireCommentOnFail: false,
+        requirePhoto: false,
+        expectedValue: '',
+        minValue: '',
+        maxValue: '',
+        unit: ''
+      }]);
+      setErrors({});
+      setToastMessage(null);
+    }
+  }, [isOpen, planData, isEditing]);
 
   // ------------------------------------------------------------
   // Pure validity check (no state updates) for button disable
@@ -279,7 +337,7 @@ export default function CreatePlanModal({ isOpen, onClose, onAddPlan }) {
     try {
       const validItems = items.filter(i => i.desc.trim() !== '');
       const payload = {
-        plan_number: `PLAN-${Date.now()}`,
+        plan_number: isEditing ? (planData.plan_number || `PLAN-${Date.now()}`) : `PLAN-${Date.now()}`,
         title: fd.title,
         plan_type: fd.planType,
         description: fd.description,
@@ -290,8 +348,12 @@ export default function CreatePlanModal({ isOpen, onClose, onAddPlan }) {
         total_checkpoints: validItems.length
       };
 
-      const response = await fetch('http://localhost:5001/api/inspection-plans', {
-        method: 'POST',
+      const url = isEditing
+        ? `http://localhost:5001/api/inspection-plans/${planData.id}`
+        : 'http://localhost:5001/api/inspection-plans';
+      const method = isEditing ? 'PUT' : 'POST';
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json'
         },
@@ -301,9 +363,9 @@ export default function CreatePlanModal({ isOpen, onClose, onAddPlan }) {
       const data = await response.json();
 
       if (data.success) {
-        // Call the parent callback if provided
-        if (onAddPlan) {
-          onAddPlan(payload);
+        const callback = onSave || onAddPlan;
+        if (callback) {
+          callback();
         }
         onClose();
       } else {
@@ -335,11 +397,11 @@ export default function CreatePlanModal({ isOpen, onClose, onAddPlan }) {
           {/* HEADER */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0 bg-white">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
+                      <div className="w-9 h-9 rounded-xl bg-blue-100 flex items-center justify-center">
                 <CalendarCheck2 className="w-5 h-5 text-blue-600" />
               </div>
               <div>
-                <h2 className="text-lg font-black text-slate-800">Create Inspection Plan</h2>
+                <h2 className="text-lg font-black text-slate-800">{isEditing ? 'Edit Inspection Plan' : 'Create Inspection Plan'}</h2>
                 <p className="text-xs text-slate-400">Configure inspection plan, schedule and dynamic checklist</p>
               </div>
             </div>
@@ -460,7 +522,7 @@ export default function CreatePlanModal({ isOpen, onClose, onAddPlan }) {
             <div className="flex items-center gap-3">
               <button onClick={handleSubmit} disabled={!isFormValid || isSubmitting}
                 className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-                <CalendarCheck2 className="w-4 h-4" /> {isSubmitting ? 'Creating...' : 'Create Plan'}
+                <CalendarCheck2 className="w-4 h-4" /> {isSubmitting ? (isEditing ? 'Saving...' : 'Creating...') : (isEditing ? 'Save Changes' : 'Create Plan')}
               </button>
             </div>
           </div>

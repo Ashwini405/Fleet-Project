@@ -1,18 +1,147 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, CheckCircle2, AlertTriangle, Printer } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, CheckCircle2, AlertTriangle, Printer, Wrench, ExternalLink, Activity, Eye } from 'lucide-react';
+import RegisterRepairModal from '../../Service/components/RegisterRepairModal';
 
 export default function ViewInspectionModal({ isOpen, onClose, inspectionData }) {
-  if (!isOpen || !inspectionData) return null;
+  const navigate = useNavigate();
+  const [isRepairModalOpen, setIsRepairModalOpen] = useState(false);
+  const [repairLogData, setRepairLogData] = useState(null);
+  const [vehicles, setVehicles] = useState([]);
+  const [isCreatingDefect, setIsCreatingDefect] = useState(false);
+  const [defectError, setDefectError] = useState('');
 
-  const isPassed = inspectionData.status === 'Passed';
+  const isPassed = inspectionData?.status?.toString().toLowerCase() === 'passed';
+  const isFailed = inspectionData?.status?.toString().toLowerCase() === 'failed';
   // Use the rawData from the API (attached in InspectionModule) or fallback to inspectionData directly
-  const raw = inspectionData.rawData || inspectionData;
+  const raw = inspectionData?.rawData || inspectionData || {};
   const checklist = raw?.checklist_results
     ? (typeof raw.checklist_results === 'string'
         ? JSON.parse(raw.checklist_results)
         : raw.checklist_results)
     : [];
+
+  const normalizedChecklist = checklist.map(item => ({
+    ...item,
+    status: (item.status || item.result || '').toString(),
+  }));
+
+  const failedItems = normalizedChecklist.filter(item => {
+    const status = (item.status || '').toString().toLowerCase();
+    return status === 'fail' || status === 'failed';
+  });
+
+  const issueDescription = failedItems.length > 0
+    ? `Inspection failed for: ${failedItems.map(item => item.item_name || item.name || item.desc || item.description || 'Unknown').filter(Boolean).join(', ')}`
+    : '';
+
+  const defects = raw?.defects || [];
+  const primaryDefect = defects[0] || null;
+  const repairId = primaryDefect?.repair_id || inspectionData?.repairId || raw?.repair_id || null;
+  const repairStatus = primaryDefect?.repair_status || inspectionData?.repairStatus || raw?.repair_status || null;
+  const defectStatus = primaryDefect?.status || inspectionData?.defectStatus || raw?.defect_status || null;
+  const repairCompletedDate = primaryDefect?.repair_completed_date || inspectionData?.repairCompletedDate || raw?.repair_completed_date || null;
+  const recommendations = raw?.recommendations || inspectionData?.recommendations || [];
+
+  const detectBreakdownType = (text) => {
+    if (!text) return 'General';
+    const normalized = text.toString().toLowerCase();
+    if (/(tyre|wheel|tread|air|puncture)/.test(normalized)) return 'Tyre';
+    if (/(engine|oil|coolant)/.test(normalized)) return 'Engine';
+    if (/brake/.test(normalized)) return 'Brake';
+    if (/(battery|light|electrical)/.test(normalized)) return 'Electrical';
+    return 'General';
+  };
+
+  const defectPriority = failedItems.some(item => {
+    const label = (item.severity || item.status || item.result || '').toString().toLowerCase();
+    return label.includes('critical') || label.includes('failed');
+  }) ? 'High' : 'Medium';
+
+  const matchedVehicle = useMemo(() => {
+    if (!inspectionData) return null;
+    const id = inspectionData.vehicle_id || inspectionData.vehicleId;
+    if (id) return vehicles.find(v => Number(v.id) === Number(id));
+    const lookup = inspectionData.vehicle || inspectionData.vehicle_number || inspectionData.vehicle_no;
+    return vehicles.find(v => v.vehicle_no === lookup || v.vehicle_no === (lookup || '').toString());
+  }, [vehicles, inspectionData]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch('http://localhost:5001/api/vehicles')
+      .then(res => res.json())
+      .then(data => setVehicles(data.data || []))
+      .catch(() => setVehicles([]));
+  }, [isOpen]);
+
+  if (!isOpen || !inspectionData) return null;
+
+  const buildRepairPrefill = async (defect) => {
+    const vehicleId = defect.vehicle_id || matchedVehicle?.id || null;
+    const vehicleNo = defect.vehicle_no || matchedVehicle?.vehicle_no || inspectionData.vehicle || inspectionData.vehicle_number || inspectionData.vehicle_no || '';
+
+    setRepairLogData({
+      vehicle_id: vehicleId,
+      vehicle_no: vehicleNo,
+      inspection_id: inspectionData.id,
+      inspection_date: raw?.inspection_date || raw?.date || inspectionData.date || inspectionData.inspection_date || null,
+      odometer: raw?.odometer || inspectionData.odometer || inspectionData.odometer_reading || '',
+      reportedBy: inspectionData.inspector || inspectionData.inspector_name || inspectionData.reported_by || 'Inspector',
+      priority: defect.priority || defectPriority,
+      issueDescription: defect.description || issueDescription,
+      breakdownType: defect.breakdown_type || detectBreakdownType(issueDescription),
+      inspection_defect_id: defect.id,
+      vehicleCondition: 'Running',
+      repair_notes: 'Created from failed inspection checkpoint(s)',
+    });
+    setIsRepairModalOpen(true);
+  };
+
+  const handleCreateRepairWork = async () => {
+    if (!failedItems.length) return;
+    setIsCreatingDefect(true);
+    setDefectError('');
+
+    const payload = {
+      inspection_id: inspectionData.id,
+      vehicle_id: inspectionData.vehicle_id || matchedVehicle?.id,
+      vehicle_no: inspectionData.vehicle || inspectionData.vehicle_number || inspectionData.vehicle_no || matchedVehicle?.vehicle_no || null,
+      issue_type: failedItems.map(item => item.item_name || item.name || item.desc || item.description || 'Failed checkpoint').filter(Boolean).join(', '),
+      severity: defectPriority === 'High' ? 'Failed' : 'Warning',
+      breakdown_type: detectBreakdownType(issueDescription),
+      priority: defectPriority,
+      description: issueDescription,
+      status: 'Open',
+      reported_by: inspectionData.inspector || inspectionData.inspector_name || 'Inspector',
+      inspection_date: raw?.inspection_date || raw?.date || inspectionData.date || inspectionData.inspection_date || null,
+    };
+
+    try {
+      const res = await fetch('http://localhost:5001/api/inspection-defects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDefectError(data.message || 'Could not create defect record');
+        return;
+      }
+      await buildRepairPrefill(data.data);
+    } catch (err) {
+      setDefectError('Could not create defect record');
+      console.error(err);
+    } finally {
+      setIsCreatingDefect(false);
+    }
+  };
+
+  const openRepair = () => {
+    if (!repairId) return;
+    onClose();
+    navigate(`/repair/${repairId}`);
+  };
 
   return (
     <AnimatePresence>
@@ -63,6 +192,84 @@ export default function ViewInspectionModal({ isOpen, onClose, inspectionData })
                   </div>
                </div>
             </div>
+
+            {isFailed && failedItems.length > 0 && (
+              <div className="mb-8 rounded-3xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-bold">FAILED INSPECTION</p>
+                    <p className="mt-1 text-xs text-red-600">Vehicle failed {failedItems.length} checkpoint{failedItems.length > 1 ? 's' : ''}. Create repair work to trigger the maintenance workflow.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {repairId ? (
+                      <>
+                        <button
+                          onClick={openRepair}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors rounded-2xl shadow-sm"
+                        >
+                          <Eye className="w-4 h-4" />
+                          View Repair
+                        </button>
+                        <button
+                          onClick={openRepair}
+                          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-blue-700 bg-white border border-blue-200 hover:bg-blue-50 transition-colors rounded-2xl shadow-sm"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                          Open Repair
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={handleCreateRepairWork}
+                        disabled={isCreatingDefect}
+                        className="inline-flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition-colors rounded-2xl shadow-sm disabled:cursor-not-allowed disabled:bg-red-300"
+                      >
+                        <Wrench className="w-4 h-4" />
+                        {isCreatingDefect ? 'Preparing Repair...' : 'Create Repair Work'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {defectError && <p className="mt-3 text-xs text-red-700">{defectError}</p>}
+                {(defectStatus || repairId || recommendations.length > 0) && (
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div className="rounded-2xl bg-white border border-red-100 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-red-400">Defect</p>
+                      <p className="mt-1 text-sm font-black text-red-900">{defectStatus || 'Open'}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white border border-red-100 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-red-400">Repair ID</p>
+                      <p className="mt-1 text-sm font-black text-red-900">{repairId ? `REP-${repairId}` : 'Not created'}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white border border-red-100 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-red-400">Repair Progress</p>
+                      <p className="mt-1 text-sm font-black text-red-900">{repairStatus || 'Pending'}</p>
+                    </div>
+                    <div className="rounded-2xl bg-white border border-red-100 p-3">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-red-400">Completion Date</p>
+                      <p className="mt-1 text-sm font-black text-red-900">
+                        {repairCompletedDate ? new Date(repairCompletedDate).toLocaleDateString() : 'Open'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                {repairId && (
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-white px-3 py-2 text-xs font-bold text-slate-700 border border-red-100">
+                    <Activity className="w-4 h-4 text-blue-600" />
+                    Track Repair Status: {repairStatus || 'Repair Created'}
+                  </div>
+                )}
+                {recommendations.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {recommendations.map((item) => (
+                      <span key={item} className="rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700">
+                        Suggested: {item}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Info Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6 mb-8">
@@ -140,6 +347,11 @@ export default function ViewInspectionModal({ isOpen, onClose, inspectionData })
           </div>
         </motion.div>
       </div>
+      <RegisterRepairModal
+        isOpen={isRepairModalOpen}
+        onClose={() => setIsRepairModalOpen(false)}
+        logData={repairLogData}
+      />
     </AnimatePresence>
   );
 }

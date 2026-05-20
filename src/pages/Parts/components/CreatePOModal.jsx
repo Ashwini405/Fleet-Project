@@ -137,14 +137,19 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
               Item <span className="text-red-500">*</span>
             </label>
             <select value={form.part_id} onChange={handlePartSelect}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white mb-2">
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
               <option value="">— Select from inventory (optional) —</option>
               {parts.map(p => (
                 <option key={p.id} value={p.id}>{p.part_name} ({p.category})</option>
               ))}
             </select>
+            <div className="flex items-center gap-2 my-2">
+              <div className="flex-1 h-px bg-slate-200" />
+              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">or type manually</span>
+              <div className="flex-1 h-px bg-slate-200" />
+            </div>
             <input value={form.item_name} onChange={e => set('item_name', e.target.value)}
-              placeholder="Or type item name manually"
+              placeholder="e.g. Engine Oil, Brake Pads, Air Filter…"
               className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
           </div>
 

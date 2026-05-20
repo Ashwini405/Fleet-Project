@@ -60,8 +60,15 @@ export default function InspectionModule() {
           id: item.inspection_number,
           date: new Date(item.inspection_date).toLocaleDateString(),
           vehicle: item.vehicle_number,
+          vehicle_id: item.vehicle_id,
           inspector: item.inspector_name,
           status: item.inspection_status,
+          defectStatus: item.defect_status,
+          repairId: item.repair_id,
+          repairStatus: item.repair_status,
+          repairProgress: item.repair_progress,
+          repairCompletedDate: item.repair_completed_date,
+          recommendations: item.recommendations || [],
           rawData: item
         }));
         setHistoryData(formatted);
@@ -90,6 +97,11 @@ export default function InspectionModule() {
     fetchPlans();
     fetchInspections();
     fetchVehicles();
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(fetchInspections, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleAddNewInspection = (newRecord) => {
@@ -150,7 +162,7 @@ export default function InspectionModule() {
               )}
               {activeTab === 'History' && (
                 <motion.div key="History" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} transition={{ duration: 0.2 }}>
-                   <HistoryTab historyData={historyData} onViewReport={setViewingInspection} />
+                   <HistoryTab historyData={historyData} vehiclesData={vehiclesData} onViewReport={setViewingInspection} />
                 </motion.div>
               )}
               {activeTab === 'Plans' && (
@@ -178,7 +190,10 @@ export default function InspectionModule() {
       
       <ViewInspectionModal 
          isOpen={!!viewingInspection}
-         onClose={() => setViewingInspection(null)}
+         onClose={() => {
+           setViewingInspection(null);
+           fetchInspections();
+         }}
          inspectionData={viewingInspection}
       />
 

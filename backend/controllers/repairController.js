@@ -1,4 +1,35 @@
 const Repair = require('../models/repairModel');
+const lifecycle = require('../services/maintenanceLifecycleService');
+
+const buildRepairData = (source, totals) => ({
+  vehicle_id: source.vehicle_id,
+  vehicle_no: source.vehicle_no || null,
+  model: source.model || null,
+  driver_name: source.driver_name || null,
+  previous_odometer: source.previous_odometer || null,
+  issue_description: source.issue_description,
+  breakdown_type: source.breakdown_type || null,
+  vehicle_condition: source.vehicle_condition || null,
+  breakdown_location: source.breakdown_location || null,
+  reported_by: source.reported_by || null,
+  priority: source.priority || null,
+  service_date: source.service_date ? source.service_date.split('T')[0] : null,
+  odometer: source.odometer || null,
+  garage: source.garage || null,
+  repair_start_time: source.repair_start_time || source.repair_start || null,
+  repair_end_time: source.repair_end_time || source.repair_end || null,
+  downtime: source.downtime || null,
+  repair_notes: source.repair_notes || null,
+  status: source.status || 'Reported',
+  inspection_id: source.inspection_id || null,
+  inspection_defect_id: source.inspection_defect_id || null,
+  completed_date: source.status === 'Completed' ? new Date() : null,
+  labour_cost: Number(source.labour_cost) || 0,
+  parts: totals.parts,
+  parts_total: totals.partsTotal,
+  total_cost: totals.totalCost,
+  files: source.files || null,
+});
 
 // ✅ CREATE REPAIR
 const createRepair = async (req, res) => {
@@ -23,15 +54,11 @@ const createRepair = async (req, res) => {
 
     const totalCost = partsTotal + (Number(data.labour_cost) || 0);
 
-    const repairData = {
-      ...data,
-      service_date: data.service_date ? data.service_date.split('T')[0] : null,
-      repair_start_time: data.repair_start_time || data.repair_start || null,
-      repair_end_time: data.repair_end_time || data.repair_end || null,
+    const repairData = buildRepairData(data, {
       parts: JSON.stringify(parts),
-      parts_total: partsTotal,
-      total_cost: totalCost
-    };
+      partsTotal,
+      totalCost
+    });
 
     // 🔥 FIX FILES
     if (req.files && req.files.length > 0) {
@@ -44,6 +71,11 @@ const createRepair = async (req, res) => {
     }
 
     const result = await Repair.create(repairData);
+
+    await lifecycle.syncRepairLifecycle({
+      ...repairData,
+      id: result.insertId,
+    });
 
     res.status(201).json({
       success: true,
@@ -154,6 +186,10 @@ const updateRepair = async (req, res) => {
 
     const data = {
       vehicle_id:         body.vehicle_id,
+      vehicle_no:         body.vehicle_no || null,
+      model:              body.model || null,
+      driver_name:        body.driver_name || null,
+      previous_odometer:  body.previous_odometer || null,
       issue_description:  body.issue_description,
       breakdown_type:     body.breakdown_type,
       vehicle_condition:  body.vehicle_condition,
@@ -168,6 +204,9 @@ const updateRepair = async (req, res) => {
       downtime:           body.downtime || null,
       repair_notes:       body.repair_notes || null,
       status:             body.status,
+      inspection_id:      body.inspection_id || null,
+      inspection_defect_id: body.inspection_defect_id || null,
+      completed_date:     body.status === 'Completed' ? new Date() : null,
       labour_cost:        Number(body.labour_cost) || 0,
       parts:              JSON.stringify(parts),
       parts_total:        partsTotal,
@@ -183,6 +222,8 @@ const updateRepair = async (req, res) => {
     }
 
     await Repair.update(id, data);
+
+    await lifecycle.syncRepairLifecycle({ ...data, id });
 
     res.json({ success: true, message: 'Updated successfully' });
 

@@ -5,6 +5,7 @@ import PeriodicServiceTab from './components/PeriodicServiceTab';
 import RepairWorksTab from './components/RepairWorksTab';
 import ServiceHistoryTab from './components/ServiceHistoryTab';
 import RemindersTab from './components/RemindersTab';
+import PartsModule from '../Parts/index.jsx';
 
 export default function ServiceModule() {
   const [topModule, setTopModule] = useState('SERVICE');
@@ -27,7 +28,7 @@ export default function ServiceModule() {
              {/* We can put global action buttons here if needed, or leave it cleaner */}
              <div className="flex gap-2 md:gap-4 items-center overflow-x-auto hide-scrollbar">
                  {/* Top center buttons representing the mockup (Service, Parts, Reminders) */}
-                 <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-sm shadow-slate-200/50 flex-shrink-0">
+                 <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-sm shadow-slate-200/50 shrink-0">
                    <button 
                      onClick={() => setTopModule('SERVICE')}
                      className={`flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all ${topModule === 'SERVICE' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
@@ -95,12 +96,8 @@ export default function ServiceModule() {
             )}
 
             {topModule === 'PARTS' && (
-              <motion.div key="parts" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full flex items-center justify-center text-gray-500">
-                 <div className="text-center">
-                    <Settings2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-gray-700">Parts Inventory Management</h3>
-                    <p className="text-sm mt-2">Parts module features are under development.</p>
-                 </div>
+              <motion.div key="parts" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full">
+                <PartsModule />
               </motion.div>
             )}
 

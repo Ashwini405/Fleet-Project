@@ -8,7 +8,9 @@ const {
 
   getInspectionPlans,
 
-  getInspectionPlanById
+  getInspectionPlanById,
+
+  updateInspectionPlan
 
 } = require('../controllers/inspectionPlanController');
 
@@ -22,6 +24,19 @@ router.post(
   '/',
 
   createInspectionPlan
+
+);
+
+
+// ======================================================
+// UPDATE PLAN
+// ======================================================
+
+router.put(
+
+  '/:id',
+
+  updateInspectionPlan
 
 );
 

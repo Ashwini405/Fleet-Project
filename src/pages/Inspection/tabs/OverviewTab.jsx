@@ -1,6 +1,49 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 
+const getResolutionState = (record) => {
+  if (record.status === 'Passed') {
+    return {
+      label: 'No Issue',
+      detail: 'Inspection passed',
+      cls: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    };
+  }
+
+  const defectStatus = (record.defectStatus || '').toLowerCase();
+  const repairStatus = (record.repairStatus || '').toLowerCase();
+
+  if (defectStatus === 'resolved' || repairStatus === 'completed') {
+    return {
+      label: 'Repair Done',
+      detail: record.repairId ? `REP-${record.repairId} completed` : 'Issue resolved',
+      cls: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    };
+  }
+
+  if (defectStatus === 'in progress' || repairStatus === 'under repair' || repairStatus === 'in progress') {
+    return {
+      label: 'Under Repair',
+      detail: record.repairId ? `REP-${record.repairId} in progress` : 'Repair in progress',
+      cls: 'bg-amber-50 text-amber-700 border-amber-100',
+    };
+  }
+
+  if (record.repairId) {
+    return {
+      label: 'Repair Created',
+      detail: `REP-${record.repairId} ${record.repairStatus || 'created'}`,
+      cls: 'bg-blue-50 text-blue-700 border-blue-100',
+    };
+  }
+
+  return {
+    label: 'Needs Repair',
+    detail: record.defectStatus || 'Open defect',
+    cls: 'bg-red-50 text-red-700 border-red-100',
+  };
+};
+
 export default function OverviewTab({ historyData, vehiclesData, onViewReport }) {
   const [filterVehicle, setFilterVehicle] = useState('All');
 
@@ -67,13 +110,16 @@ export default function OverviewTab({ historyData, vehiclesData, onViewReport })
               <thead>
                 <tr className="border-b border-slate-100/50 bg-white text-slate-400 text-[9px] font-bold uppercase tracking-widest">
                   <th className="py-4 px-6 w-1/4">Date / ID</th>
-                  <th className="py-4 px-6 w-1/4">Vehicle</th>
-                  <th className="py-4 px-6 w-1/4">Status / Inspector</th>
-                  <th className="py-4 px-6 w-1/4 text-right">Action</th>
+                  <th className="py-4 px-6">Vehicle</th>
+                  <th className="py-4 px-6">Status / Inspector</th>
+                  <th className="py-4 px-6">Issue / Repair</th>
+                  <th className="py-4 px-6 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filteredHistory.map((record, index) => (
+                {filteredHistory.map((record, index) => {
+                  const resolution = getResolutionState(record);
+                  return (
                    <motion.tr 
                       key={record.id}
                       initial={{ opacity: 0, y: 5 }}
@@ -95,6 +141,14 @@ export default function OverviewTab({ historyData, vehiclesData, onViewReport })
                            {record.status}
                         </span>
                       </td>
+                     <td className="py-4 px-6">
+                        <span className={`inline-flex rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest ${resolution.cls}`}>
+                           {resolution.label}
+                        </span>
+                        <span className="mt-1 block text-[10px] font-semibold text-slate-400">
+                           {resolution.detail}
+                        </span>
+                      </td>
                      <td className="py-4 px-6 text-right">
                         <button 
                            onClick={(e) => { e.stopPropagation(); onViewReport(record); }}
@@ -104,10 +158,11 @@ export default function OverviewTab({ historyData, vehiclesData, onViewReport })
                         </button>
                       </td>
                    </motion.tr>
-                ))}
+                  );
+                })}
                 {filteredHistory.length === 0 && (
                    <tr>
-                     <td colSpan={4} className="py-12 px-6 text-center text-slate-400 font-medium text-sm">
+                     <td colSpan={5} className="py-12 px-6 text-center text-slate-400 font-medium text-sm">
                         No completed inspections found for '{filterVehicle}'
                       </td>
                    </tr>

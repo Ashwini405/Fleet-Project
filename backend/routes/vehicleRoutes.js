@@ -12,6 +12,8 @@ const {
   getVehicleByNumber,
   uploadDocument,
   checkAvailability,
+  getVehicleHealthScore,
+  getVehicleMaintenanceTimeline,
   updateVehicleStatus
 } = require('../controllers/vehicleController');
 
@@ -52,10 +54,14 @@ router.get('/by-number/:vehicle_no', getVehicleByNumber);
 // ===================== CHECK AVAILABILITY =====================
 router.get('/availability/:vehicle_no', checkAvailability);
 
+// ===================== VEHICLE HEALTH SCORE =====================
+router.get('/:id/health', getVehicleHealthScore);
+
+// ===================== MAINTENANCE TIMELINE =====================
+router.get('/:id/maintenance-timeline', getVehicleMaintenanceTimeline);
 
 // ===================== UPDATE VEHICLE STATUS (repair / active) =====================
 router.patch('/:id/status', updateVehicleStatus);
-
 
 // ===================== GET VEHICLE BY ID =====================
 router.get('/:id', getVehicleById);

@@ -190,6 +190,47 @@ const getInspectionPlanById = async (req, res) => {
 
 };
 
+const updateInspectionPlan = async (req, res) => {
+  try {
+    const planId = req.params.id;
+    const existing = await InspectionPlanModel.getInspectionPlanById(planId);
+
+    if (!existing) {
+      return res.status(404).json({ success: false, message: 'Inspection Plan Not Found' });
+    }
+
+    const {
+      title,
+      plan_type,
+      description,
+      schedule_type,
+      frequency,
+      priority,
+      checklist_items,
+      total_checkpoints
+    } = req.body;
+
+    const data = {
+      title,
+      plan_type,
+      description,
+      schedule_type,
+      frequency,
+      priority,
+      checklist_items,
+      total_checkpoints
+    };
+
+    await InspectionPlanModel.updateInspectionPlan(planId, data);
+    const updated = await InspectionPlanModel.getInspectionPlanById(planId);
+
+    res.status(200).json({ success: true, data: updated });
+  } catch (error) {
+    console.error('UPDATE INSPECTION PLAN ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
 
 module.exports = {
 
@@ -197,6 +238,8 @@ module.exports = {
 
   getInspectionPlans,
 
-  getInspectionPlanById
+  getInspectionPlanById,
+
+  updateInspectionPlan
 
 };
