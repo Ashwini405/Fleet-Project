@@ -1,6 +1,6 @@
 
 import React, { useState, lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, useSearchParams } from "react-router-dom";
 import { Menu } from "lucide-react";
 import Sidebar from "./layout/Sidebar";
 import { DUMMY_VEHICLES } from "./pages/vehicleData";
@@ -48,42 +48,77 @@ function PageLoader() {
   );
 }
 
-export default function App() {
+function InnerApp() {
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [vehicles, setVehicles] = useState(DUMMY_VEHICLES);
 
-  return (
-    <BrowserRouter>
-      <NotificationProvider>
-        <div className="flex">
-          {/* Mobile overlay */}
-          <div
-            className={`fixed inset-0 bg-black/40 z-40 lg:hidden transition-opacity duration-300 ${mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-            onClick={() => setMobileOpen(false)}
-          />
+  const allowedNotificationRoots = ['/tyres', '/fuel', '/staff'];
+  const showNotificationBell = allowedNotificationRoots.some(root => location.pathname.startsWith(root));
+  const isTyresPage = location.pathname.startsWith('/tyres');
+  const activeTyresTab = searchParams.get('tab') || 'active';
+  const setActiveTyresTab = (tab) => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('tab', tab);
+    setSearchParams(nextParams);
+  };
 
-          {/* Sidebar */}
-          <div className={`fixed lg:sticky top-0 h-screen z-50 transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-            <Sidebar onClose={() => setMobileOpen(false)} />
+  return (
+    <div className="flex">
+      {/* Mobile overlay */}
+      <div
+        className={`fixed inset-0 bg-black/40 z-40 lg:hidden transition-opacity duration-300 ${mobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setMobileOpen(false)}
+      />
+
+      {/* Sidebar */}
+      <div className={`fixed lg:sticky top-0 h-screen z-50 transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+        <Sidebar onClose={() => setMobileOpen(false)} />
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 min-h-screen bg-gray-100 flex flex-col min-w-0">
+
+        {/* Top bar — desktop bell + mobile hamburger */}
+        <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-30">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 lg:hidden">
+              <Menu className="w-5 h-5" />
+            </button>
+            <span className="text-indigo-600 font-black text-lg lg:hidden">🚛 Fleet</span>
           </div>
 
-          {/* Main content */}
-          <div className="flex-1 min-h-screen bg-gray-100 flex flex-col min-w-0">
-
-            {/* Top bar — desktop bell + mobile hamburger */}
-            <div className="flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200 sticky top-0 z-30">
-              <div className="flex items-center gap-3">
-                <button onClick={() => setMobileOpen(true)} className="p-2 rounded-lg text-gray-600 hover:bg-gray-100 lg:hidden">
-                  <Menu className="w-5 h-5" />
-                </button>
-                <span className="text-indigo-600 font-black text-lg lg:hidden">🚛 Fleet</span>
+          {isTyresPage && (
+            <div className="flex-1 flex justify-center">
+              <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 shadow-sm">
+                {[
+                  { id: 'active', label: 'Active Tyres' },
+                  { id: 'stock', label: 'In Stock Tyres' },
+                  { id: 'old', label: 'Old Tyres Stock' },
+                  { id: 'individual', label: 'Individual Vehicle' },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTyresTab(tab.id)}
+                    className={`relative px-5 py-2 text-xs font-bold rounded-full transition-all ${activeTyresTab === tab.id ? 'text-white' : 'text-slate-500 hover:text-slate-800'}`}
+                  >
+                    {activeTyresTab === tab.id && (
+                      <div className="absolute inset-0 bg-slate-900 rounded-full shadow-md" />
+                    )}
+                    <span className="relative z-10">{tab.label}</span>
+                  </button>
+                ))}
               </div>
-              <NotificationBell />
             </div>
+          )}
 
-            <InventoryProvider>
-              <div className="flex-1 p-4 md:p-6">
-                <Suspense fallback={<PageLoader />}>
+          {showNotificationBell && <NotificationBell />}
+        </div>
+
+        <InventoryProvider>
+          <div className="flex-1 p-4 md:p-6">
+            <Suspense fallback={<PageLoader />}>
                   <Routes>
                     <Route path="/" element={<Dashboard />} />
                     <Route path="/vehicles" element={<VehicleMaster vehicles={vehicles} setVehicles={setVehicles} />} />
@@ -123,10 +158,15 @@ export default function App() {
             </InventoryProvider>
           </div>
         </div>
+      );
+    }
 
-        {/* Global critical popup — rendered outside main layout */}
-        <CriticalPopup />
-      </NotificationProvider>
-    </BrowserRouter>
-  );
-}
+    export default function App() {
+      return (
+        <BrowserRouter>
+          <NotificationProvider>
+            <InnerApp />
+          </NotificationProvider>
+        </BrowserRouter>
+      );
+    }
