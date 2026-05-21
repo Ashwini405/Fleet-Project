@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { CircleDot, AlertTriangle, Wrench, Package, ArrowRightLeft, Trash2, RotateCcw } from 'lucide-react';
-import { generateAxlePositions } from '../../axlePositionGenerator';
-import { posLabel } from '../../Tyres/data/axleLayouts';
+import { CircleDot, ArrowRightLeft, Trash2 } from 'lucide-react';
 
 const API = 'http://localhost:5001/api';
 
@@ -24,10 +22,25 @@ function calcHealth(treadPct) {
   return 'Critical';
 }
 
+const POSITION_NORMALIZE = {
+  'frontleft': 'FL', 'front left': 'FL', 'front-left': 'FL',
+  'frontright': 'FR', 'front right': 'FR', 'front-right': 'FR',
+  'rearleft1': 'RL1', 'rear left 1': 'RL1', 'rear-left-1': 'RL1',
+  'rearleft2': 'RL2', 'rear left 2': 'RL2', 'rear-left-2': 'RL2',
+  'rearright1': 'RR1', 'rear right 1': 'RR1', 'rear-right-1': 'RR1',
+  'rearright2': 'RR2', 'rear right 2': 'RR2', 'rear-right-2': 'RR2',
+  'rearleft3': 'RL3', 'rearright3': 'RR3',
+  'rearleft4': 'RL4', 'rearright4': 'RR4',
+};
+const normalizePos = (pos) => {
+  if (!pos) return pos;
+  return POSITION_NORMALIZE[pos.trim().toLowerCase().replace(/\s+/g, ' ')] || pos.toUpperCase();
+};
+
 export default function TyreServiceWorkflow({ vehicleId, vehicleNo, currentOdometer, onChange }) {
   const [mountedTyres, setMountedTyres]         = useState([]);
   const [replacements, setReplacements]         = useState({ inventory: [], reusable: [] });
-  const [vehicleConfig, setVehicleConfig]       = useState('');
+  const [loadingTyres, setLoadingTyres]         = useState(false);
 
   // Form state
   const [axlePosition, setAxlePosition]         = useState('');
@@ -42,19 +55,19 @@ export default function TyreServiceWorkflow({ vehicleId, vehicleNo, currentOdome
   const [tyreReplaceCost, setTyreReplaceCost]   = useState(0);
   const [retreadingCost, setRetreadingCost]     = useState(0);
 
-  // Fetch mounted tyres + vehicle config
+  // Fetch mounted tyres
   useEffect(() => {
     if (!vehicleId) return;
+    setLoadingTyres(true);
+    setMountedTyres([]);
+    setAxlePosition('');
+    setSelectedOldTyre(null);
 
     fetch(`${API}/tyres/mounted/${vehicleId}`)
       .then(r => r.json())
       .then(d => setMountedTyres(d.data || []))
-      .catch(() => {});
-
-    fetch(`${API}/vehicles/${vehicleId}`)
-      .then(r => r.json())
-      .then(d => setVehicleConfig(d.data?.type || ''))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoadingTyres(false));
 
     fetch(`${API}/tyres/available-replacements`)
       .then(r => r.json())
@@ -62,13 +75,10 @@ export default function TyreServiceWorkflow({ vehicleId, vehicleNo, currentOdome
       .catch(() => {});
   }, [vehicleId]);
 
-  // Axle positions from vehicle config
-  const axlePositions = useMemo(() => generateAxlePositions(vehicleConfig), [vehicleConfig]);
-
   // Auto-select tyre when position changes
   useEffect(() => {
     if (!axlePosition) { setSelectedOldTyre(null); return; }
-    const tyre = mountedTyres.find(t => t.tyre_position === axlePosition) || null;
+    const tyre = mountedTyres.find(t => normalizePos(t.tyre_position) === axlePosition) || null;
     setSelectedOldTyre(tyre);
   }, [axlePosition, mountedTyres]);
 
@@ -143,14 +153,16 @@ export default function TyreServiceWorkflow({ vehicleId, vehicleNo, currentOdome
             value={axlePosition}
             onChange={e => setAxlePosition(e.target.value)}
             className={FIELD}
+            disabled={loadingTyres}
           >
-            <option value="">-- Select Position --</option>
-            {axlePositions.length > 0
-              ? axlePositions.map(pos => (
-                  <option key={pos} value={pos}>{posLabel(pos)} ({pos})</option>
-                ))
-              : <option disabled>No positions — vehicle config missing</option>
-            }
+            <option value="">
+              {loadingTyres ? 'Loading...' : mountedTyres.length === 0 ? 'No tyres mounted' : '-- Select Position --'}
+            </option>
+            {mountedTyres.map(t => (
+              <option key={t.id} value={normalizePos(t.tyre_position)}>
+                {normalizePos(t.tyre_position)} — {t.tyre_number} ({t.brand})
+              </option>
+            ))}
           </select>
         </div>
         <div>

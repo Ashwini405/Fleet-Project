@@ -53,9 +53,19 @@ const getAllTyres = async (req, res) => {
 const getMountedTyresByVehicle = async (req, res) => {
   try {
     const { vehicleId } = req.params;
-    const [rows] = await db.query(
-      `SELECT * FROM tyres WHERE vehicle_id = ? AND status = 'Mounted' ORDER BY tyre_position ASC`,
+
+    const [vRows] = await db.query(
+      `SELECT vehicle_no FROM vehicles WHERE id = ?`,
       [vehicleId]
+    );
+    const vehicleNumber = vRows[0]?.vehicle_no || null;
+
+    const [rows] = await db.query(
+      `SELECT * FROM tyres
+       WHERE status = 'Mounted'
+       AND (vehicle_id = ? OR vehicle_number = ?)
+       ORDER BY tyre_position ASC`,
+      [vehicleId, vehicleNumber]
     );
     res.json({ success: true, data: rows });
   } catch (error) {
