@@ -267,12 +267,28 @@ const getTyresByVehicle = async (vehicleId) => {
   return rows;
 };
 
+const removeTyre = async (data) => {
+  const [result] = await db.query(
+    `UPDATE tyres
+     SET status = 'Removed',
+         vehicle_id = NULL,
+         vehicle_number = '',
+         tyre_position = '',
+         fitted_odometer = 0,
+         date_of_issue = NULL
+     WHERE tyre_number = ?`,
+    [data.tyre_number]
+  );
+  return result;
+};
+
 module.exports = {
 
   createTyre,
   getAllTyres,
   getInStockTyres,
   mountTyre,
+  removeTyre,
   getTyresByVehicle
 
 };

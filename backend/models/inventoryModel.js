@@ -180,4 +180,20 @@ const Inventory = {
 
 };
 
+
+// ✅ GET INVENTORY BY VEHICLE NUMBER
+getInventoryByVehicle: async (vehicleNumber) => {
+
+  const [rows] = await db.query(
+    `
+    SELECT *
+    FROM inventory_issue_history
+    WHERE vehicle_number = ?
+    ORDER BY created_at DESC
+    `,
+    [vehicleNumber]
+  );
+
+  return rows;
+}
 module.exports = Inventory;

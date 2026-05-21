@@ -1341,3 +1341,61 @@ exports.createWarehouse = async (req, res) => {
     });
   }
 };
+
+
+// ======================================================
+// ✅ GET INVENTORY BY VEHICLE NUMBER
+// ======================================================
+
+exports.getInventoryByVehicle = async (req, res) => {
+
+  try {
+
+    const { vehicleNumber } = req.params;
+
+    const [rows] = await db.query(
+
+      `
+      SELECT
+
+        h.*,
+        p.part_name,
+        p.category,
+        p.brand
+
+      FROM inventory_issue_history h
+
+      LEFT JOIN inventory_parts p
+      ON h.part_id = p.id
+
+      WHERE h.vehicle_number = ?
+
+      ORDER BY h.created_at DESC
+      `,
+
+      [vehicleNumber]
+    );
+
+    res.json({
+
+      success: true,
+      count: rows.length,
+      data: rows
+
+    });
+
+  } catch (error) {
+
+    console.error(
+      'GET VEHICLE INVENTORY ERROR:',
+      error
+    );
+
+    res.status(500).json({
+
+      success: false,
+      message: 'Server Error'
+
+    });
+  }
+};

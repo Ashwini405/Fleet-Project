@@ -371,11 +371,22 @@ const getTyresByVehicle = async (req, res) => {
   }
 };
 
+const removeTyre = async (req, res) => {
+  try {
+    await TyreModel.removeTyre(req.body);
+    res.status(200).json({ success: true, message: 'Tyre Removed Successfully' });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
 module.exports = {
   createTyre,
   getAllTyres,
   getInStockTyres,
   mountTyre,
+  removeTyre,
   getTyresByVehicle,
   getMountedTyresByVehicle,
   getAvailableReplacementTyres,

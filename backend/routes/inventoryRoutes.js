@@ -54,6 +54,10 @@ router.post('/warehouses', inventoryController.createWarehouse);
 // ======================================================
 
 router.get('/',    inventoryController.getAllParts);
+router.get(
+  '/vehicle/:vehicleNumber',
+  inventoryController.getInventoryByVehicle
+);
 router.post('/',   uploadFields, inventoryController.createPart);
 router.get('/:id', inventoryController.getPartById);
 router.put('/:id', uploadFields, inventoryController.updatePart);

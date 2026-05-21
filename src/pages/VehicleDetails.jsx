@@ -348,12 +348,6 @@ const dummyBatteries = [
   { id: 3, serial: "BAT-78903", brand: "Luminous", model: "ToughX", installDate: "15 Sep 2022", expiryDate: "15 Sep 2024", status: "Expiring" }
 ];
 
-const dummyInventory = [
-  { id: 1, itemName: "Hydraulic Jack 10T", category: "Tools", quantity: 1, assignedDate: "10 Jan 2023", condition: "Good" },
-  { id: 2, itemName: "Spare Wheel Tube", category: "Tubes", quantity: 2, assignedDate: "15 Sep 2022", condition: "Average" },
-  { id: 3, itemName: "Warning Triangle", category: "Tools", quantity: 2, assignedDate: "22 May 2021", condition: "Damaged" }
-];
-
 const tabs = ['Overview', 'Service History', 'Tyres', 'Documents', 'Battery Details', 'Truck Inventory'];
 
 export default function VehicleDetails({ vehicles: propVehicles }) {
@@ -361,6 +355,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
   const navigate = useNavigate();
   const [vehicle, setVehicle] = useState(null);
   const [serviceHistory, setServiceHistory] = useState([]);
+  const [inventoryData, setInventoryData] = useState([]);
 
   useEffect(() => {
     fetch(`http://localhost:5001/api/vehicles/${id}`)
@@ -381,6 +376,22 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
         if (data.success) {
           setServiceHistory(data.data || []);
         }
+      });
+  }, [vehicle]);
+
+  useEffect(() => {
+    if (!vehicle?.vehicle_no) return;
+
+    fetch(`http://localhost:5001/api/inventory/vehicle/${vehicle.vehicle_no}`)
+      .then(res => res.json())
+      .then(data => {
+        console.log('INVENTORY API:', data);
+        if (data.success) {
+          setInventoryData(data.data || []);
+        }
+      })
+      .catch(err => {
+        console.log(err);
       });
   }, [vehicle]);
 
@@ -1000,26 +1011,26 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {dummyInventory.map((item) => (
+                    {inventoryData.map((item) => (
                       <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4 font-medium text-slate-900">{item.itemName}</td>
+                        <td className="px-6 py-4 font-medium text-slate-900">{item.part_name}</td>
                         <td className="px-6 py-4">
                           <span className="inline-flex px-2 py-1 rounded bg-slate-100 text-slate-600 font-medium text-xs border border-slate-200">
                             {item.category}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-center font-medium text-slate-900">{item.quantity}</td>
-                        <td className="px-6 py-4 text-slate-700">{item.assignedDate}</td>
+                        <td className="px-6 py-4 text-slate-700">{new Date(item.issue_date).toLocaleDateString('en-IN')}</td>
                         <td className="px-6 py-4 text-right">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${item.condition === 'Good' ? 'bg-green-50 text-green-700 border-green-200' :
-                            item.condition === 'Average' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${item.service_type === 'Good' ? 'bg-green-50 text-green-700 border-green-200' :
+                            item.service_type === 'Average' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                               'bg-red-50 text-red-700 border-red-200'
                             }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${item.condition === 'Good' ? 'bg-green-500' :
-                              item.condition === 'Average' ? 'bg-amber-500' :
+                            <span className={`w-1.5 h-1.5 rounded-full ${item.service_type === 'Good' ? 'bg-green-500' :
+                              item.service_type === 'Average' ? 'bg-amber-500' :
                                 'bg-red-500'
                               }`}></span>
-                            {item.condition}
+                            {item.service_type || 'Issued'}
                           </span>
                         </td>
                       </tr>

@@ -205,7 +205,7 @@ export default function RemoveTyreModal({ tyre, onClose }) {
   running_km: finalRunningKm,
 };
 
-      const removeRes = await fetch('http://localhost:5001/api/tyres/mount', {
+      const removeRes = await fetch('http://localhost:5001/api/tyres/remove', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(removePayload),
