@@ -592,16 +592,19 @@ export default function NewInspectionModal({ isOpen, onClose }) {
                       </label>
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none z-10" />
-                        <select
+                        <input
+                          type="text"
                           value={inspector}
                           onChange={e => setInspector(e.target.value)}
-                          className="w-full"
-                        >
-                          <option value={inspector}>
-                            {inspector || 'No Supervisor Assigned'}
-                          </option>
-                        </select>
+                          placeholder="Enter inspector name"
+                          className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm font-semibold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-sm placeholder-slate-300"
+                        />
                       </div>
+                      {selectedVehicle?.assigned_supervisor && (
+                        <p className="text-[10px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Auto-filled from vehicle supervisor
+                        </p>
+                      )}
                     </div>
                   </div>
 

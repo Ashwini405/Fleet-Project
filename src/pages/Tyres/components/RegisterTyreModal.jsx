@@ -667,10 +667,11 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
                     <Select
                       value={form.truckId}
                       error={errors.truckId}
+                      disabled={!isMounted}
                       onChange={e => set('truckId', e.target.value)}
                     >
                       <option value="">{isMounted ? 'Select Vehicle' : 'Select Mounted to assign'}</option>
-                      {vehicles.map(v => {
+                      {isMounted && vehicles.map(v => {
                         const mounted = activeTyres.filter(a => a.vehicle_id === v.id && a.status === 'Mounted').length;
                         const totalTyres = Number(v.total_tyres || 0);
                         const full = totalTyres > 0 && mounted >= totalTyres;

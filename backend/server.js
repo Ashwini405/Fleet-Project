@@ -24,9 +24,28 @@ const tyreRoutes = require('./routes/tyreRoutes');
 const oldTyreRoutes = require('./routes/oldTyreRoutes');
 const batteryRoutes = require('./routes/batteryRoutes');
 const inspectionDefectRoutes = require('./routes/inspectionDefectRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 
 const app = express();
+
+// Auto-create tyre_notifications table if not exists
+require('./config/db').query(`
+  CREATE TABLE IF NOT EXISTS tyre_notifications (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    notification_id VARCHAR(60)  NOT NULL UNIQUE,
+    vehicle_number  VARCHAR(50),
+    tyre_id         VARCHAR(60),
+    axle_position   VARCHAR(30),
+    incident_type   VARCHAR(60)  NOT NULL,
+    severity        ENUM('Low','Medium','High','Critical') NOT NULL DEFAULT 'Medium',
+    priority        ENUM('Low','Normal','High','Urgent')   NOT NULL DEFAULT 'Normal',
+    message         TEXT         NOT NULL,
+    status          ENUM('Unread','Read') NOT NULL DEFAULT 'Unread',
+    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+`).then(() => console.log('tyre_notifications table ready'))
+  .catch(e => console.error('tyre_notifications table error:', e.message));
 
 
 // 🔥 MIDDLEWARE
@@ -74,6 +93,7 @@ app.use(
   oldTyreRoutes
 );
 app.use('/api/batteries', batteryRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {
