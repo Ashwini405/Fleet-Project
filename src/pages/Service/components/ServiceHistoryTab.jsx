@@ -8,6 +8,8 @@ export default function ServiceHistoryTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterTruck, setFilterTruck] = useState("all");
   const [filterType, setFilterType] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   
   const [periodicLogs, setPeriodicLogs] = useState([]);
   const [repairLogs, setRepairLogs] = useState([]);
@@ -67,8 +69,11 @@ export default function ServiceHistoryTab() {
     const matchesSearch = (log.garage || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (log.truckNo || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesTruck = filterTruck === 'all' || log.truckNo === filterTruck;
-    const matchesType = filterType === 'all' || log.generalType === filterType;
-    return matchesSearch && matchesTruck && matchesType;
+    const matchesType  = filterType === 'all' || log.generalType === filterType;
+    const logDate      = log.date ? log.date.split('T')[0] : '';
+    const matchesFrom  = !fromDate || logDate >= fromDate;
+    const matchesTo    = !toDate   || logDate <= toDate;
+    return matchesSearch && matchesTruck && matchesType && matchesFrom && matchesTo;
   });
 
   return (
@@ -105,20 +110,29 @@ export default function ServiceHistoryTab() {
               {vehicles.map(v => (
                 <option key={v.id} value={v.vehicle_no}>{v.vehicle_no}</option>
               ))}
-            询
             </select>
           </div>
           <div className="w-full md:w-40">
             <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">From Date</label>
-            <input type="date" className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
+            <input
+              type="date"
+              value={fromDate}
+              onChange={e => setFromDate(e.target.value)}
+              className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            />
           </div>
           <div className="w-full md:w-40">
             <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">To Date</label>
-            <input type="date" className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500" />
+            <input
+              type="date"
+              value={toDate}
+              onChange={e => setToDate(e.target.value)}
+              className="w-full p-2.5 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            />
           </div>
           <div>
             <button 
-               onClick={() => { setFilterTruck('all'); setFilterType('all'); setSearchTerm(''); }}
+               onClick={() => { setFilterTruck('all'); setFilterType('all'); setSearchTerm(''); setFromDate(''); setToDate(''); }}
                className="px-4 py-2.5 bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg text-sm font-bold transition-colors shadow-sm h-[42px]"
             >
               Clear Filters

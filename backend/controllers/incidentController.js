@@ -1,4 +1,10 @@
 const db = require('../config/db');
+const { createNotification } = require('./notificationController');
+
+const TYRE_INCIDENT_TYPES = [
+  'Tyre Burst', 'Puncture', 'Low Tyre Pressure',
+  'Sidewall Damage', 'Uneven Wear', 'Overheating', 'Tyre Issue'
+];
 
 
 // ======================================================
@@ -237,14 +243,21 @@ const createIncident = async (req, res) => {
 
 
     res.status(201).json({
-
       success: true,
-
       message: 'Incident created successfully',
-
       incidentId: result.insertId
-
     });
+
+    // Auto-generate tyre notification for tyre-related incidents
+    if (TYRE_INCIDENT_TYPES.includes(data.type)) {
+      createNotification({
+        vehicle_number: data.vehicle_no,
+        tyre_id:        null,
+        axle_position:  data.tyre_position || null,
+        incident_type:  data.type,
+        severity:       data.severity || null,
+      }).catch(err => console.error('Notification create error:', err));
+    }
 
   } catch (error) {
 
@@ -439,48 +452,43 @@ const deleteIncident = async (req, res) => {
   }
 };
 
-const updateIncidentStatus = async (
-  req,
-  res
-) => {
-
+const updateIncidentStatus = async (req, res) => {
   try {
+    const { incident_status } = req.body;
+    const { id } = req.params;
 
-    await db.query(
-
-      `UPDATE incidents
-       SET incident_status = ?
-       WHERE id = ?`,
-
-      [
-
-        req.body.incident_status,
-
-        req.params.id
-
-      ]
+    // Fetch incident before updating to get current status + details
+    const [[incident]] = await db.query(
+      'SELECT * FROM incidents WHERE id = ?', [id]
     );
 
-    res.status(200).json({
+    await db.query(
+      'UPDATE incidents SET incident_status = ? WHERE id = ?',
+      [incident_status, id]
+    );
 
-      success: true,
+    res.status(200).json({ success: true, message: 'Status updated successfully' });
 
-      message:
-        'Status updated successfully'
-
-    });
+    // Fire resolved notification if status changed to Resolved or Completed
+    if (
+      incident &&
+      incident.incident_status !== incident_status &&
+      (incident_status === 'Resolved' || incident_status === 'Completed') &&
+      TYRE_INCIDENT_TYPES.includes(incident.incident_type)
+    ) {
+      createNotification({
+        vehicle_number: incident.vehicle_no,
+        tyre_id:        `RESOLVED-${incident.incident_number}`,
+        axle_position:  incident.tyre_position || null,
+        incident_type:  incident.incident_type,
+        severity:       'Low',
+        message:        `✅ Issue Resolved: ${incident.incident_type} on Truck ${incident.vehicle_no} — ${incident.incident_number} marked as ${incident_status}`,
+      }).catch(err => console.error('Resolution notification error:', err));
+    }
 
   } catch (error) {
-
     console.error(error);
-
-    res.status(500).json({
-
-      success: false,
-
-      message: 'Server Error'
-
-    });
+    res.status(500).json({ success: false, message: 'Server Error' });
   }
 };
 

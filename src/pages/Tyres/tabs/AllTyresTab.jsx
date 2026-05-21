@@ -147,17 +147,11 @@ export default function AllTyresTab() {
     }
   };
 
-  // QR scan handler
-  const handleQRScan = (val) => {
-    setIsScannerOpen(false);
-    const serial = val.startsWith('TYRE-') ? val.slice(5) : val;
-    const found = activeTyres.find(t => t.id === serial);
-    if (found) {
-      openTyre(found);
-      push('Tyre found via QR scan', 'success');
-    } else {
-      push('No tyre found for scanned QR', 'error');
-    }
+  // QR scan handler — receives full raw DB tyre object from QRScannerModal
+  const handleTyreFound = (foundTyre) => {
+    // Pass raw DB object directly — TyreDatasheetModal maps all fields internally
+    setViewingTyre(foundTyre);
+    push(`Tyre ${foundTyre.tyre_number || foundTyre.old_tyre_number} found via QR scan`, 'success');
   };
 
   const openTyre = (tyre) => {
@@ -466,7 +460,7 @@ export default function AllTyresTab() {
         }}
       />
       <TyreDatasheetModal isOpen={!!viewingTyre} onClose={() => setViewingTyre(null)} tyreData={viewingTyre} />
-      <QRScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onScan={handleQRScan} />
+      <QRScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onTyreFound={handleTyreFound} />
       <AnimatePresence>
         {removingTyre && <RemoveTyreModal tyre={removingTyre} onConfirm={handleRemoveConfirm} onClose={() => setRemovingTyre(null)} />}
       </AnimatePresence>

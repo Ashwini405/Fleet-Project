@@ -58,13 +58,13 @@ function MountModal({ tyre, onClose, onMounted }) {
     }
   };
 
-  const selectedVehicle = vehicles.find(v => v.id === truckId);
-  const fittedOdo = selectedVehicle?.odometer ?? 0;
-  const mountedCount = truckId ? activeTyres.filter(t => t.vehicle_id === truckId).length : 0;
+  const selectedVehicle = vehicles.find(v => String(v.id) === String(truckId));
+  const fittedOdo = selectedVehicle?.current_odometer ?? selectedVehicle?.odometer ?? 0;
+  const mountedCount = truckId ? activeTyres.filter(t => String(t.vehicle_id) === String(truckId)).length : 0;
   const truckCapacity = selectedVehicle?.total_tyres ?? 0;
   const truckFull = truckCapacity > 0 && mountedCount >= truckCapacity;
   const occupiedPos = truckId
-    ? activeTyres.filter(t => t.vehicle_id === truckId).map(t => t.tyre_position)
+    ? activeTyres.filter(t => String(t.vehicle_id) === String(truckId)).map(t => t.tyre_position)
     : [];
 
   const validate = () => {
@@ -87,18 +87,25 @@ function MountModal({ tyre, onClose, onMounted }) {
 
     setLoading(true);
     try {
-      await axios.put(`http://localhost:5001/api/tyres/mount/${tyre.dbId}`, {
+      const res = await axios.put('http://localhost:5001/api/tyres/mount', {
+        tyre_number: tyre.id,
         vehicle_id: truckId,
+        vehicle_number: selectedVehicle?.vehicle_no || '',
         tyre_position: placement,
         date_of_issue: fittedDate,
         fitted_odometer: fittedOdo,
+        running_km: 0,
         status: 'Mounted',
       });
-      onMounted?.(tyre.id);
-      onClose();
+      if (res.data.success) {
+        onMounted?.(tyre.id);
+        onClose();
+      } else {
+        alert(res.data.message || 'Mount failed');
+      }
     } catch (error) {
       console.log('Mount error:', error);
-      // Optionally show error toast
+      alert('Could not connect to server');
     } finally {
       setLoading(false);
     }
@@ -600,8 +607,14 @@ export default function InStockTab() {
         {mountingTyre && (
           <MountModal
             tyre={mountingTyre}
-            onClose={() => setMountingTyre(null)}
-            onMounted={id => push(`${id} mounted successfully`, 'success')}
+            onClose={() => {
+              setMountingTyre(null);
+              fetchStockTyres();
+            }}
+            onMounted={id => {
+              push(`✅ Tyre ${id} mounted successfully!`, 'success');
+              fetchStockTyres();
+            }}
           />
         )}
       </AnimatePresence>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Activity, History, FileText, Edit2, ArchiveX, Printer, Paperclip, Package, MapPin } from 'lucide-react';
+import { X, Activity, History, FileText, Paperclip, Package, MapPin } from 'lucide-react';
 import TyreQRCard from './TyreQRCard';
 
 // Static positions – no longer imported from dummyData
@@ -17,6 +17,16 @@ const layoutPositions = [
 
 const positionLabel = (id) =>
   layoutPositions.find(p => p.id === id)?.label ?? id;
+
+/* ── Date formatter ────────────────────────────────────────────────────────────────────────────── */
+function formatDate(val) {
+  if (!val) return '—';
+  try {
+    return new Date(val).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch {
+    return val;
+  }
+}
 
 /* ── Stock age helper ──────────────────────────────────────────────────────── */
 function storedSince(purchaseDate) {
@@ -112,15 +122,15 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
     tyreSize: tyreData.tyre_size || tyreData.tyreSize,
     material: tyreData.material_type || tyreData.material,
     health: tyreData.tyre_health || tyreData.health || 'Good',
-    runningKm: Number(tyreData.running_km || tyreData.runningKm || 0),
+    runningKm: Number(tyreData.running_km ?? tyreData.runningKm ?? 0),
     expectedLife: Number(tyreData.expected_life_km || tyreData.expectedLife || 0),
     fittedOdo: Number(tyreData.fitted_odometer || tyreData.fittedOdo || 0),
     presentOdo: Number(tyreData.fitted_odometer || tyreData.fittedOdo || 0) +
-                Number(tyreData.running_km || tyreData.runningKm || 0),
+                Number(tyreData.running_km ?? tyreData.runningKm ?? 0),
     truckNo: tyreData.vehicle_number || tyreData.truckNo || '—',
     position: tyreData.tyre_position || tyreData.position || '—',
-    fittedDate: tyreData.date_of_issue || tyreData.fittedDate || tyreData.purchase_date || '',
-    purchaseDate: tyreData.purchase_date || tyreData.purchaseDate || '',
+    fittedDate: formatDate(tyreData.date_of_issue || tyreData.fittedDate || ''),
+    purchaseDate: formatDate(tyreData.purchase_date || tyreData.purchaseDate || ''),
     vendor: tyreData.vendor_name || tyreData.vendor || '',
     cost: Number(tyreData.tyre_cost || tyreData.cost || 0),
     status: tyreData.status || tyreData.tyre_status || 'In Stock',
@@ -200,10 +210,6 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
               </p>
             </div>
             <div className="flex items-center gap-1">
-              <HeaderBtn icon={Edit2}    label="Edit Tyre" />
-              <HeaderBtn icon={ArchiveX} label="Move to Old Stock" />
-              <HeaderBtn icon={Printer}  label="Print Report" />
-              <div className="w-px h-4 bg-white/20 mx-1.5" />
               <HeaderBtn icon={X} label="Close" onClick={onClose} rounded />
             </div>
           </div>
@@ -315,7 +321,7 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
 
                 {/* QR */}
                 <div>
-                  <TyreQRCard tyreId={mappedTyre.id} />
+                  <TyreQRCard tyre={tyreData} />
                 </div>
 
                 {/* Left column — always visible */}
@@ -357,9 +363,9 @@ export default function TyreDatasheetModal({ isOpen, onClose, tyreData }) {
                 {/* Mounted-only operational mini cards */}
                 {!isStock && (
                   <div className="md:col-start-2 md:col-span-2 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <MiniCard label="Fitted ODO"   value={mappedTyre.fittedOdo  ? `${mappedTyre.fittedOdo.toLocaleString()} km`  : '—'} />
-                    <MiniCard label="Present ODO"  value={mappedTyre.presentOdo ? `${mappedTyre.presentOdo.toLocaleString()} km` : '—'} />
-                    <MiniCard label="Running KM"   value={mappedTyre.runningKm  ? `${mappedTyre.runningKm.toLocaleString()} km`  : '—'} accent />
+                    <MiniCard label="Fitted ODO"   value={mappedTyre.fittedOdo  != null ? `${mappedTyre.fittedOdo.toLocaleString()} km`  : '—'} />
+                    <MiniCard label="Present ODO"  value={mappedTyre.presentOdo != null ? `${mappedTyre.presentOdo.toLocaleString()} km` : '—'} />
+                    <MiniCard label="Running KM"   value={mappedTyre.runningKm  != null ? `${mappedTyre.runningKm.toLocaleString()} km`  : '—'} accent />
                     <MiniCard label="Mounted Date" value={mappedTyre.fittedDate || '—'} />
                   </div>
                 )}

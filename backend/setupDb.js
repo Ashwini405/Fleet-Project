@@ -76,6 +76,24 @@ async function createTable() {
     `;
     await db.query(inspectionDefectsQuery);
     console.log("Table 'inspection_defects' created successfully!");
+
+    // Create tyre_notifications table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS tyre_notifications (
+        id              INT AUTO_INCREMENT PRIMARY KEY,
+        notification_id VARCHAR(60)  NOT NULL UNIQUE,
+        vehicle_number  VARCHAR(50),
+        tyre_id         VARCHAR(60),
+        axle_position   VARCHAR(30),
+        incident_type   VARCHAR(60)  NOT NULL,
+        severity        ENUM('Low','Medium','High','Critical') NOT NULL DEFAULT 'Medium',
+        priority        ENUM('Low','Normal','High','Urgent')   NOT NULL DEFAULT 'Normal',
+        message         TEXT         NOT NULL,
+        status          ENUM('Unread','Read') NOT NULL DEFAULT 'Unread',
+        created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log("Table 'tyre_notifications' created successfully!");
   } catch (error) {
     console.error("Error creating table:", error);
   } finally {
