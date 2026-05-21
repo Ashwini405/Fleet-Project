@@ -45,7 +45,7 @@ export default function NotificationBell() {
     <div className="relative" ref={panelRef}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="relative p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-600"
+        className="relative inline-flex items-center justify-center p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-600"
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
