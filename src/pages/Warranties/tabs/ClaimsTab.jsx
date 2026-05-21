@@ -280,7 +280,7 @@ export default function ClaimsTab({ onAdd, onView }) {
             <tr className="border-b-2 border-slate-100 bg-white">
               {COLS.map(col => (
                 <th key={col.key}
-                  className="py-4 px-5 text-xs font-black text-green-700 uppercase tracking-wider whitespace-nowrap">
+                  className="py-4 px-5 text-xs font-black text-slate-900 uppercase tracking-wider whitespace-nowrap">
                   {col.label}
                 </th>
               ))}
