@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CircleDot, AlertTriangle, Wrench, Package, ArrowRightLeft, Trash2, RotateCcw } from 'lucide-react';
-import { generateAxlePositions } from '../../axlePositionGenerator';
-import { posLabel } from '../../Tyres/data/axleLayouts';
 
 const API = 'http://localhost:5001/api';
 
@@ -27,7 +25,7 @@ function calcHealth(treadPct) {
 export default function TyreServiceWorkflow({ vehicleId, vehicleNo, currentOdometer, onChange }) {
   const [mountedTyres, setMountedTyres]         = useState([]);
   const [replacements, setReplacements]         = useState({ inventory: [], reusable: [] });
-  const [vehicleConfig, setVehicleConfig]       = useState('');
+  const [loadingTyres, setLoadingTyres]         = useState(false);
 
   // Form state
   const [axlePosition, setAxlePosition]         = useState('');
@@ -42,28 +40,25 @@ export default function TyreServiceWorkflow({ vehicleId, vehicleNo, currentOdome
   const [tyreReplaceCost, setTyreReplaceCost]   = useState(0);
   const [retreadingCost, setRetreadingCost]     = useState(0);
 
-  // Fetch mounted tyres + vehicle config
+  // Fetch mounted tyres
   useEffect(() => {
     if (!vehicleId) return;
+    setLoadingTyres(true);
+    setMountedTyres([]);
+    setAxlePosition('');
+    setSelectedOldTyre(null);
 
     fetch(`${API}/tyres/mounted/${vehicleId}`)
       .then(r => r.json())
       .then(d => setMountedTyres(d.data || []))
-      .catch(() => {});
-
-    fetch(`${API}/vehicles/${vehicleId}`)
-      .then(r => r.json())
-      .then(d => setVehicleConfig(d.data?.type || ''))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoadingTyres(false));
 
     fetch(`${API}/tyres/available-replacements`)
       .then(r => r.json())
       .then(d => setReplacements(d.data || { inventory: [], reusable: [] }))
       .catch(() => {});
   }, [vehicleId]);
-
-  // Axle positions from vehicle config
-  const axlePositions = useMemo(() => generateAxlePositions(vehicleConfig), [vehicleConfig]);
 
   // Auto-select tyre when position changes
   useEffect(() => {
@@ -143,14 +138,16 @@ export default function TyreServiceWorkflow({ vehicleId, vehicleNo, currentOdome
             value={axlePosition}
             onChange={e => setAxlePosition(e.target.value)}
             className={FIELD}
+            disabled={loadingTyres}
           >
-            <option value="">-- Select Position --</option>
-            {axlePositions.length > 0
-              ? axlePositions.map(pos => (
-                  <option key={pos} value={pos}>{posLabel(pos)} ({pos})</option>
-                ))
-              : <option disabled>No positions — vehicle config missing</option>
-            }
+            <option value="">
+              {loadingTyres ? 'Loading...' : mountedTyres.length === 0 ? 'No tyres mounted' : '-- Select Position --'}
+            </option>
+            {mountedTyres.map(t => (
+              <option key={t.id} value={t.tyre_position}>
+                {t.tyre_position} — {t.tyre_number} ({t.brand})
+              </option>
+            ))}
           </select>
         </div>
         <div>
