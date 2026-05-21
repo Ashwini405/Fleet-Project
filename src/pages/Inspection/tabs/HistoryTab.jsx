@@ -1,6 +1,14 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { DownloadCloud, Search, AlertCircle } from 'lucide-react';
+import { DownloadCloud, AlertCircle } from 'lucide-react';
+
+const defectBadgeClass = (status) => {
+  const value = (status || '').toLowerCase();
+  if (value === 'resolved') return 'bg-emerald-100 text-emerald-700';
+  if (value === 'in progress') return 'bg-amber-100 text-amber-700';
+  if (value === 'open') return 'bg-red-100 text-red-700';
+  return 'bg-slate-100 text-slate-500';
+};
 
 export default function HistoryTab({ historyData, vehiclesData, onViewReport }) {
   const [filterVehicle, setFilterVehicle] = useState('All');
@@ -56,6 +64,8 @@ export default function HistoryTab({ historyData, vehiclesData, onViewReport }) 
                <th className="py-4 px-6">Vehicle / Plan</th>
                <th className="py-4 px-6">Inspector</th>
                <th className="py-4 px-6">Result</th>
+               <th className="py-4 px-6">Defect</th>
+               <th className="py-4 px-6">Repair</th>
                <th className="py-4 px-6 text-right">Action</th>
               </tr>
            </thead>
@@ -91,6 +101,21 @@ export default function HistoryTab({ historyData, vehiclesData, onViewReport }) 
                         {record.status}
                      </span>
                    </td>
+                  <td className="py-4 px-6">
+                     <span className={`inline-flex px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${defectBadgeClass(record.defectStatus)}`}>
+                        {record.defectStatus || 'No Defect'}
+                     </span>
+                   </td>
+                  <td className="py-4 px-6">
+                     {record.repairId ? (
+                       <div className="text-xs">
+                         <p className="font-black text-slate-800">REP-{record.repairId}</p>
+                         <p className="text-[10px] font-bold text-slate-400 uppercase">{record.repairStatus || 'Created'}</p>
+                       </div>
+                     ) : (
+                       <span className="text-xs text-slate-400">Not created</span>
+                     )}
+                   </td>
                   <td className="py-4 px-6 text-right">
                      <span className="text-xs font-bold text-slate-400 group-hover:text-blue-600 transition-colors">
                         Read Report &rarr;
@@ -101,7 +126,7 @@ export default function HistoryTab({ historyData, vehiclesData, onViewReport }) 
              
              {filteredHistory.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="py-20 px-6 text-center text-slate-400">
+                  <td colSpan={8} className="py-20 px-6 text-center text-slate-400">
                      <AlertCircle className="w-8 h-8 mx-auto mb-3 opacity-20" />
                      <p className="text-sm font-semibold">No inspection logs match the applied filters.</p>
                    </td>

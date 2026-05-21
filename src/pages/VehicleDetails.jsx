@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
-import { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import BatteryTab from './BatteryTab';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiEdit2, FiMapPin, FiUser, FiActivity, FiSearch, FiPlus, FiX, FiUploadCloud, FiEye, FiDownload } from 'react-icons/fi';
-import { DUMMY_VEHICLES } from './vehicleData';
 import { axleLayouts, posLabel, AXLE_TYPE_STYLES } from './Tyres/data/axleLayouts';
 
 // ── Health helpers ────────────────────────────────────────────────────────────
@@ -342,13 +341,7 @@ function TyresTab({ vehicle }) {
   );
 }
 
-const dummyBatteries = [
-  { id: 1, serial: "BAT-78901", brand: "Exide", model: "Xpress Heavy Duty", installDate: "10 Jan 2023", expiryDate: "10 Jan 2026", status: "Good" },
-  { id: 2, serial: "BAT-78902", brand: "Amaron", model: "Pro CV", installDate: "22 May 2021", expiryDate: "22 May 2024", status: "Expired" },
-  { id: 3, serial: "BAT-78903", brand: "Luminous", model: "ToughX", installDate: "15 Sep 2022", expiryDate: "15 Sep 2024", status: "Expiring" }
-];
-
-const tabs = ['Overview', 'Service History', 'Tyres', 'Documents', 'Battery Details', 'Truck Inventory'];
+const tabs = ['Overview', 'Service History', 'Timeline', 'Tyres', 'Documents', 'Battery Details', 'Truck Inventory'];
 
 export default function VehicleDetails({ vehicles: propVehicles }) {
   const { id } = useParams();
@@ -356,6 +349,8 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
   const [vehicle, setVehicle] = useState(null);
   const [serviceHistory, setServiceHistory] = useState([]);
   const [inventoryData, setInventoryData] = useState([]);
+  const [healthScore, setHealthScore] = useState(null);
+  const [maintenanceTimeline, setMaintenanceTimeline] = useState([]);
 
   useEffect(() => {
     fetch(`http://localhost:5001/api/vehicles/${id}`)
@@ -377,6 +372,20 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
           setServiceHistory(data.data || []);
         }
       });
+
+    fetch(`http://localhost:5001/api/vehicles/${vehicle.id}/health`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setHealthScore(data.data);
+      })
+      .catch(err => console.error('Vehicle health fetch failed:', err));
+
+    fetch(`http://localhost:5001/api/vehicles/${vehicle.id}/maintenance-timeline`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) setMaintenanceTimeline(data.data || []);
+      })
+      .catch(err => console.error('Vehicle timeline fetch failed:', err));
   }, [vehicle]);
 
   useEffect(() => {
@@ -503,45 +512,6 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
 
   if (!vehicle) return <div>Loading...</div>;
 
-  const handleUploadDocument = async () => {
-    try {
-      const formData = new FormData();
-
-      formData.append("vehicle_id", vehicle.id);
-      formData.append("type", docForm.type);
-      formData.append("validity", docForm.validUntil);
-
-      if (docForm.file) {
-        formData.append("file", docForm.file);
-      }
-
-      const res = await fetch("http://localhost:5001/api/vehicles/upload-document", {
-        method: "POST",
-        body: formData
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        alert("Document uploaded successfully");
-
-        // 🔥 refresh
-        const updated = await fetch(`http://localhost:5001/api/vehicles/${vehicle.id}`);
-        const updatedData = await updated.json();
-
-        if (updatedData.success) {
-          setVehicle(updatedData.data);
-        }
-
-        setIsUploadDocModalOpen(false);
-      }
-
-    } catch (err) {
-      console.error(err);
-      alert("Upload failed");
-    }
-  };
-
   return (
     <div className="font-sans text-slate-800">
 
@@ -613,6 +583,40 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
 
         {activeTab === 'Overview' && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 md:gap-8">
+
+            {healthScore && (
+              <div className="col-span-1 md:col-span-2 xl:col-span-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-5">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-widest text-emerald-700">Vehicle Health Score</p>
+                    <div className="mt-2 flex items-end gap-3">
+                      <span className="text-4xl font-black text-emerald-950">{healthScore.score}%</span>
+                      <span className="mb-1 rounded-full bg-white px-3 py-1 text-xs font-black text-emerald-700 border border-emerald-100">
+                        {healthScore.label}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    <div className="rounded-xl bg-white p-3 border border-emerald-100">
+                      <p className="font-bold text-slate-400 uppercase">Pending Repairs</p>
+                      <p className="mt-1 text-lg font-black text-slate-900">{healthScore.repairStats?.pending_repairs || 0}</p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3 border border-emerald-100">
+                      <p className="font-bold text-slate-400 uppercase">Critical Defects</p>
+                      <p className="mt-1 text-lg font-black text-slate-900">{healthScore.defectStats?.critical || 0}</p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3 border border-emerald-100">
+                      <p className="font-bold text-slate-400 uppercase">Tyre Issues</p>
+                      <p className="mt-1 text-lg font-black text-slate-900">{healthScore.defectStats?.critical_tyre || 0}</p>
+                    </div>
+                    <div className="rounded-xl bg-white p-3 border border-emerald-100">
+                      <p className="font-bold text-slate-400 uppercase">Overdue Services</p>
+                      <p className="mt-1 text-lg font-black text-slate-900">{healthScore.serviceStats?.overdue_services || 0}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Basic Information */}
             <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
@@ -775,6 +779,50 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
           </div>
         )}
 
+        {activeTab === 'Timeline' && (
+          <div className="animate-in fade-in duration-200">
+            <div className="mb-6">
+              <h2 className="text-lg font-bold text-slate-900">Unified Maintenance Timeline</h2>
+              <p className="text-sm text-slate-500">Inspections, defects, repairs, periodic services, and tyre changes sorted by latest date.</p>
+            </div>
+            <div className="space-y-3">
+              {maintenanceTimeline.map((event, index) => (
+                <div key={`${event.event_type}-${event.reference_id}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="rounded-full bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-indigo-700">
+                          {event.event_type}
+                        </span>
+                        {event.status && (
+                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
+                            {event.status}
+                          </span>
+                        )}
+                        {event.reference_id && (
+                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                            {event.reference_id}
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-2 text-sm font-black text-slate-900">{event.title || 'Maintenance event'}</p>
+                      {event.description && <p className="mt-1 text-xs text-slate-500">{event.description}</p>}
+                    </div>
+                    <p className="text-xs font-bold text-slate-400">
+                      {event.event_time ? new Date(event.event_time).toLocaleString() : 'No date'}
+                    </p>
+                  </div>
+                </div>
+              ))}
+              {maintenanceTimeline.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-slate-200 p-10 text-center text-sm font-semibold text-slate-400">
+                  No maintenance events recorded yet.
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Service History Tab */}
         {activeTab === 'Service History' && (
           <div className="flex flex-col h-full animate-in fade-in duration-200">
@@ -929,58 +977,8 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
 
         {/* Battery Details Tab */}
         {activeTab === 'Battery Details' && (
-          <div className="flex flex-col h-full animate-in fade-in duration-200">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-slate-800 tracking-tight">Battery Tracking</h2>
-              <button
-                onClick={() => setIsAddBatteryModalOpen(true)}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center shadow-sm sticky top-4"
-              >
-                <FiPlus className="w-5 h-5 mr-1.5" />
-                Add Battery
-              </button>
-            </div>
-
-            <div className="bg-white border flex-1 border-slate-200 rounded-xl shadow-sm overflow-hidden text-sm">
-              <div className="overflow-x-auto h-full">
-                <table className="w-full text-left whitespace-nowrap">
-                  <thead className="bg-slate-50/80 text-slate-500 text-xs uppercase font-semibold tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="px-6 py-4 rounded-tl-xl whitespace-nowrap">Battery ID / Serial</th>
-                      <th className="px-6 py-4 whitespace-nowrap">Make & Model</th>
-                      <th className="px-6 py-4 whitespace-nowrap">Install Date</th>
-                      <th className="px-6 py-4 whitespace-nowrap">Warranty Expiry</th>
-                      <th className="px-6 py-4 text-right rounded-tr-xl whitespace-nowrap">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {dummyBatteries.map((battery) => (
-                      <tr key={battery.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4 font-medium text-slate-900">{battery.serial}</td>
-                        <td className="px-6 py-4">
-                          <div className="text-slate-800 font-medium">{battery.brand}</div>
-                          <div className="text-[11px] text-slate-500">{battery.model}</div>
-                        </td>
-                        <td className="px-6 py-4 text-slate-700">{battery.installDate}</td>
-                        <td className="px-6 py-4 text-slate-700">{battery.expiryDate}</td>
-                        <td className="px-6 py-4 text-right">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${battery.status === 'Good' ? 'bg-green-50 text-green-700 border-green-200' :
-                            battery.status === 'Expiring' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                              'bg-red-50 text-red-700 border-red-200'
-                            }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${battery.status === 'Good' ? 'bg-green-500' :
-                              battery.status === 'Expiring' ? 'bg-amber-500' :
-                                'bg-red-500'
-                              }`}></span>
-                            {battery.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <div className="animate-in fade-in duration-200">
+            <BatteryTab vehicle={vehicle} />
           </div>
         )}
 

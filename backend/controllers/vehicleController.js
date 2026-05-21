@@ -1,5 +1,6 @@
 const Vehicle = require('../models/vehicleModel');
 const db = require('../config/db'); // imported once for reuse
+const lifecycle = require('../services/maintenanceLifecycleService');
 
 // @desc    Get all vehicles
 // @route   GET /api/vehicles
@@ -294,13 +295,26 @@ const checkAvailability = async (req, res) => {
       [vehicle.id]
     );
 
-    const isAvailable = activeTrips.length === 0;
+    const [blockingDefects] = await db.query(
+      `
+        SELECT id, issue_type, severity, priority, status
+        FROM inspection_defects
+        WHERE vehicle_id = ?
+          AND status IN ('Open', 'In Progress')
+      `,
+      [vehicle.id]
+    );
+    const criticalDefects = blockingDefects.filter(lifecycle.isCriticalDefect);
+    const isAvailable = activeTrips.length === 0 && criticalDefects.length === 0 && vehicle.vehicle_status !== 'under_repair';
 
     res.json({
       success: true,
       available: isAvailable,
       activeTrip: activeTrips[0] || null,
-      vehicleStatus: vehicle.vehicle_status
+      vehicleStatus: vehicle.vehicle_status,
+      blockedByInspection: criticalDefects.length > 0,
+      blockingDefects: criticalDefects,
+      message: criticalDefects.length > 0 ? 'Vehicle unavailable due to critical inspection defects' : null
     });
   } catch (error) {
     console.error(error);
@@ -308,7 +322,46 @@ const checkAvailability = async (req, res) => {
   }
 };
 
-// 📄 UPLOAD DOCUMENT (unchanged)
+// � VEHICLE HEALTH SCORE
+const getVehicleHealthScore = async (req, res) => {
+  try {
+    const health = await lifecycle.getVehicleHealth(req.params.id);
+    if (!health) {
+      return res.status(404).json({ success: false, message: 'Vehicle not found' });
+    }
+
+    res.json({
+      success: true,
+      data: health
+    });
+  } catch (error) {
+    console.error('getVehicleHealthScore error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// 📈 MAINTENANCE TIMELINE
+const getVehicleMaintenanceTimeline = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const vehicle = await Vehicle.getById(id);
+    if (!vehicle) {
+      return res.status(404).json({ success: false, message: 'Vehicle not found' });
+    }
+
+    const rows = await lifecycle.getVehicleTimeline(id);
+
+    res.json({
+      success: true,
+      data: rows
+    });
+  } catch (error) {
+    console.error('getVehicleMaintenanceTimeline error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// �📄 UPLOAD DOCUMENT (unchanged)
 const uploadDocument = async (req, res) => {
   try {
     const { vehicle_id, type, validity } = req.body;
@@ -412,5 +465,7 @@ module.exports = {
   getVehicleByNumber,
   uploadDocument,
   checkAvailability,
+  getVehicleHealthScore,
+  getVehicleMaintenanceTimeline,
   updateVehicleStatus
 };

@@ -27,6 +27,7 @@ export default function HistoryTab({ onView }) {
   const [dateTo, setDateTo] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [showFilters, setShowFilters] = useState(true);
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -102,10 +103,11 @@ export default function HistoryTab({ onView }) {
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
 
       {/* ── TOP FILTER BAR ── */}
-      <div className="flex flex-wrap items-end justify-between gap-4 px-5 py-4 border-b border-slate-100 bg-slate-50">
-        <div className="flex flex-wrap items-end gap-3">
+      {showFilters && (
+        <div className="flex flex-wrap items-end justify-between gap-4 px-5 py-4 border-b border-slate-100 bg-slate-50">
+          <div className="flex flex-wrap items-end gap-3">
 
-          {/* Status */}
+            {/* Status */}
           <div className="flex flex-col gap-1">
             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</span>
             <div className="relative">
@@ -194,6 +196,7 @@ export default function HistoryTab({ onView }) {
           Report Incident
         </button>
       </div>
+      )}
 
       {/* ── SEARCH ROW ── */}
       <div className="flex items-center justify-end gap-3 px-5 py-3 border-b border-slate-100">
@@ -207,9 +210,13 @@ export default function HistoryTab({ onView }) {
             className="pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-indigo-500 shadow-sm w-60"
           />
         </div>
-        <button className="flex items-center gap-2 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-indigo-600 bg-white hover:bg-slate-50 shadow-sm transition-colors">
+        <button
+          onClick={() => setShowFilters(prev => !prev)}
+          className="flex items-center gap-2 border border-slate-200 rounded-xl px-4 py-2 text-xs font-bold text-indigo-600 bg-white hover:bg-slate-50 shadow-sm transition-colors"
+          title={showFilters ? 'Hide filters' : 'Show filters'}
+        >
           <SlidersHorizontal className="w-4 h-4" />
-          Filters
+          {showFilters ? 'Hide Filters' : 'Show Filters'}
         </button>
       </div>
 
