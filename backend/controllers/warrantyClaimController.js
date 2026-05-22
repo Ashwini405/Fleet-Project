@@ -34,6 +34,8 @@ const createWarrantyClaim = async (req, res) => {
 
     const data = {
       ...body,
+      claim_date:   body.submit_date || body.claim_date,
+      claim_status: body.claim_status || 'Submitted',
       item_photos,
       invoice_copy,
       warranty_card_copy,
@@ -190,9 +192,27 @@ const updateWarrantyClaim = async (req, res) => {
   }
 };
 
+// ======================================================
+// UPDATE CLAIM STATUS ONLY
+// ======================================================
+
+const updateClaimStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { claim_status } = req.body;
+    if (!claim_status) return res.status(400).json({ success: false, message: 'claim_status is required' });
+    await WarrantyClaimModel.updateClaimStatus(id, claim_status);
+    res.json({ success: true, message: 'Status updated' });
+  } catch (error) {
+    console.error('UPDATE CLAIM STATUS ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
 module.exports = {
   createWarrantyClaim,
   getWarrantyClaims,
   getWarrantyClaimById,
-  updateWarrantyClaim
+  updateWarrantyClaim,
+  updateClaimStatus
 };

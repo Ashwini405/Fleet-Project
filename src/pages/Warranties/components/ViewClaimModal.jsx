@@ -1,496 +1,210 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-   X,
-   Shield,
-   FileText,
-   List,
-   AlertCircle,
-   Building2,
-   Paperclip,
-   ClipboardCheck,
-   Calendar,
-   Phone,
-   Truck,
-   Printer,
-   ArrowLeft,
-   Pencil
-} from 'lucide-react';
-import AddClaimModal from './AddClaimModal';
+import { X, ShieldCheck, FileText, Eye, ChevronDown } from 'lucide-react';
 
-// ── Category badge colors ─────────────────────────────────────────────────────
+const CLAIM_STATUSES = ['Submitted', 'Under Review', 'Approved', 'Rejected', 'Resolved', 'Pending Parts'];
+
 const catStyles = {
-   Battery: 'bg-blue-100   text-blue-700',
-   Tyres: 'bg-indigo-100 text-indigo-700',
-   Parts: 'bg-orange-100 text-orange-600',
-   Lubricants: 'bg-purple-100 text-purple-700',
-   Engine: 'bg-red-100    text-red-700',
-   Electrical: 'bg-yellow-100 text-yellow-700',
-   Brakes: 'bg-pink-100   text-pink-700',
-   Other: 'bg-slate-100  text-slate-600',
+  Battery:      'bg-blue-100   text-blue-700',
+  Tyres:        'bg-indigo-100 text-indigo-700',
+  Engine:       'bg-red-100    text-red-700',
+  Electrical:   'bg-yellow-100 text-yellow-700',
+  Brakes:       'bg-pink-100   text-pink-700',
+  'AC System':  'bg-cyan-100   text-cyan-700',
+  Suspension:   'bg-lime-100   text-lime-700',
+  'Fuel System':'bg-amber-100  text-amber-700',
+  Other:        'bg-slate-100  text-slate-600',
 };
 
 const statusStyles = {
-   'Submitted': 'bg-blue-50   text-blue-600   border border-blue-200',
-   'Under Review': 'bg-purple-50 text-purple-600 border border-purple-200',
-   'Approved': 'bg-green-50  text-green-600  border border-green-200',
-   'Rejected': 'bg-red-50    text-red-500    border border-red-200',
-   'Resolved': 'bg-teal-50   text-teal-600   border border-teal-200',
-   'Pending Parts': 'bg-orange-50 text-orange-500 border border-orange-200',
-   'Draft': 'bg-slate-100 text-slate-500  border border-slate-200',
+  'Submitted':    'bg-blue-50   text-blue-600   border border-blue-200',
+  'Under Review': 'bg-purple-50 text-purple-600 border border-purple-200',
+  'Approved':     'bg-green-50  text-green-600  border border-green-200',
+  'Rejected':     'bg-red-50    text-red-500    border border-red-200',
+  'Resolved':     'bg-teal-50   text-teal-600   border border-teal-200',
+  'Pending Parts':'bg-orange-50 text-orange-500 border border-orange-200',
+  'Draft':        'bg-slate-100 text-slate-500  border border-slate-200',
 };
 
-const priorityStyles = {
-   High: 'bg-red-50    text-red-600   border border-red-200',
-   Medium: 'bg-orange-50 text-orange-500 border border-orange-200',
-   Low: 'bg-green-50  text-green-600  border border-green-200',
+const formatDate = (d) => {
+  if (!d) return '—';
+  try { return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  catch { return '—'; }
 };
 
-// ── Section header ────────────────────────────────────────────────────────────
-const SectionHead = ({ icon: Icon, num, title, iconBg = 'bg-green-100', iconColor = 'text-green-700' }) => (
-   <div className="flex items-center gap-2 mb-4">
-      <div className={`w-6 h-6 rounded-lg ${iconBg} flex items-center justify-center shrink-0`}>
-         <Icon className={`w-3.5 h-3.5 ${iconColor}`} />
-      </div>
-      <span className="text-xs font-black text-slate-700 uppercase tracking-widest">
-         {num}. {title}
-      </span>
-   </div>
-);
-
-// ── Read-only field ───────────────────────────────────────────────────────────
-const ReadField = ({ label, children, className = '' }) => (
-   <div className={className}>
-      {label && (
-         <p className="text-xs font-bold text-slate-600 mb-1.5">{label}</p>
-      )}
-      <div className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 bg-white shadow-sm min-h-[42px] flex items-center">
-         {children}
-      </div>
-   </div>
-);
-
-// ── View file box (dynamic based on real file arrays) ─────────────────────
-const ViewFileBox = ({
-   label,
-   linkText,
-   hint,
-   file,
-   color = 'text-green-600',
-   icon: Icon = Paperclip
-}) => (
-   <div className="border border-slate-200 rounded-xl p-4 text-center bg-white flex flex-col items-center gap-1.5">
-      <p className="text-xs font-bold text-slate-700">{label}</p>
-      {file ? (
-         <a
-            href={`http://localhost:5001/uploads/${file}`}
-            target="_blank"
-            rel="noreferrer"
-            className={`flex items-center gap-1.5 ${color} hover:underline`}
-         >
-            <Icon className="w-4 h-4" />
-            <span className="text-xs font-bold">{linkText}</span>
-         </a>
-      ) : (
-         <div className="flex items-center gap-1.5 text-slate-400">
-            <Icon className="w-4 h-4" />
-            <span className="text-xs font-bold">No File</span>
-         </div>
-      )}
-      <p className="text-[10px] text-slate-400">{hint}</p>
-   </div>
-);
-
-// Helper to safely format dates
-const formatDate = (dateStr) => {
-   if (!dateStr) return '—';
-   const d = new Date(dateStr);
-   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB');
-};
-
-// ── Safe parser for file fields (handles arrays, JSON strings, or raw filenames)
 const safeParse = (value) => {
-   try {
-      if (!value) return [];
-      if (Array.isArray(value)) return value;
-      return JSON.parse(value);
-   } catch {
-      return [value];
-   }
+  try {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    return JSON.parse(value);
+  } catch { return [value]; }
 };
+
+const SectionTitle = ({ children }) => (
+  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-100">{children}</p>
+);
+
+const Field = ({ label, children }) => (
+  <div>
+    <p className="text-xs font-semibold text-slate-500 mb-1">{label}</p>
+    <div className="border border-slate-200 rounded-lg px-3 py-2 bg-slate-50 text-sm font-medium text-slate-700 min-h-[36px] flex items-center">
+      {children || <span className="text-slate-300">—</span>}
+    </div>
+  </div>
+);
 
 export default function ViewClaimModal({ isOpen, onClose, itemData, onUpdated }) {
-   const [editOpen, setEditOpen] = React.useState(false);
+  const [status,  setStatus]  = useState(null); // null = use itemData value
+  const [saving,  setSaving]  = useState(false);
 
-   if (!isOpen) return null;
+  if (!isOpen || !itemData) return null;
 
-   // Use the actual backend data – no fallback, no dummy values
-   const d = itemData || {};
+  const d           = itemData;
+  const currentStatus = status ?? (d.claim_status || 'Submitted');
+  const itemPhotos  = safeParse(d.item_photos);
 
-   // Map database fields to the display structure expected by the UI
-   const claim = {
-      id: d.claim_number,
-      warrantyRef: d.warranty_number,
-      warrantyDisplay: `${d.warranty_number || ''} - ${d.item_title || ''}`,
-      warrantyStatus: d.warranty_status,
-      claimEligible: d.claim_available,
-      item: d.item_title,
-      category: d.category,
-      brand: d.brand,
-      model: d.model,
-      serial: d.serial_no,
-      vehicle: d.vehicle_no,
-      warrantyType: d.warranty_type,
-      warrantyPeriod: d.warranty_period ? `${d.warranty_period} Months` : '—',
-      vendorName: d.vendor_name,
-      contactNumber: d.vendor_contact_number,
-      claimAmount: d.claim_available_amount,
-      claimUsed: d.claim_used_amount,
-      claimDate: formatDate(d.claim_date),
-      issueType: d.issue_type,
-      priority: d.priority,
-      complaintNumber: d.complaint_number,
-      complaintDocket: d.complaint_docket,
-      issueDescription: d.issue_description,
-      vendorContactPerson: d.vendor_contact_person,
-      vendorContactNumber: d.communication_contact_number,
-      dateSentToVendor: formatDate(d.date_sent_to_vendor),
-      expectedResolutionDate: formatDate(d.expected_resolution_date),
-      vendorRemarks: d.vendor_remarks,
-      claimStatus: d.claim_status,
-      assignedTo: d.assigned_to,
-      internalNotes: d.internal_notes,
-      // File arrays – safely parsed
-      itemPhotos: safeParse(d.item_photos),
-      invoiceCopy: safeParse(d.invoice_copy),
-      warrantyCardCopy: safeParse(d.warranty_card_copy),
-      complaintReport: safeParse(d.complaint_report),
-      additionalDocuments: safeParse(d.additional_documents),
-   };
+  const handleStatusChange = async (newStatus) => {
+    setStatus(newStatus);
+    setSaving(true);
+    try {
+      const res  = await fetch(`http://localhost:5001/api/warranty-claims/${d.id}/status`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ claim_status: newStatus }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.message || 'Failed to update status');
+        setStatus(d.claim_status); // revert
+      } else {
+        onUpdated?.();
+      }
+    } catch {
+      alert('Server Error');
+      setStatus(d.claim_status);
+    } finally {
+      setSaving(false);
+    }
+  };
 
-   return (
-      <>
-         <AnimatePresence>
-            <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-               <motion.div
-                  initial={{ opacity: 0, scale: 0.96, y: 12 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.96, y: 12 }}
-                  transition={{ duration: 0.18 }}
-                  className="w-full max-w-4xl bg-white rounded-2xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden"
-               >
-
-                  {/* ── HEADER ───────────────────────────────────────────────────── */}
-                  <div className="bg-[#1a4731] px-6 py-4 flex items-center justify-between shrink-0">
-                     <div>
-                        <h2 className="text-base font-black text-white">Warranty Claim Details</h2>
-                        <p className="text-xs text-green-300 mt-0.5">View warranty claim information and tracking details</p>
-                     </div>
-                     <button
-                        onClick={onClose}
-                        className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-                     >
-                        <X className="w-4 h-4 text-white" />
-                     </button>
-                  </div>
-
-                  {/* ── SCROLLABLE BODY ───────────────────────────────────────────── */}
-                  <div className="flex-1 overflow-y-auto bg-white px-6 py-5 space-y-5">
-
-                     {/* ══ 1. WARRANTY SELECTION ════════════════════════════════════ */}
-                     <div className="border border-slate-100 rounded-2xl px-5 py-4 shadow-sm">
-                        <SectionHead icon={Shield} num={1} title="Warranty Selection" />
-                        <div className="grid grid-cols-4 gap-4 items-end">
-                           <div className="col-span-2">
-                              <ReadField label="Warranty Selected">
-                                 <span className="text-slate-700 font-medium">{claim.warrantyDisplay}</span>
-                              </ReadField>
-                           </div>
-                           <ReadField label="Warranty ID">
-                              <span className="font-semibold">{claim.warrantyRef}</span>
-                           </ReadField>
-                           <div className="flex items-end gap-3">
-                              <div className="flex-1">
-                                 <p className="text-xs font-bold text-slate-600 mb-1.5">Warranty Status</p>
-                                 <div className="border border-slate-200 rounded-lg px-3 py-2.5 bg-white shadow-sm">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold ${claim.warrantyStatus === 'Active'
-                                          ? 'bg-green-50 text-green-600 border border-green-200'
-                                          : 'bg-red-50 text-red-500 border border-red-200'
-                                       }`}>
-                                       {claim.warrantyStatus || '—'}
-                                    </span>
-                                 </div>
-                              </div>
-                              <div className="flex-1">
-                                 <p className="text-xs font-bold text-slate-600 mb-1.5">Claim Eligible</p>
-                                 <div className="border border-slate-200 rounded-lg px-3 py-2.5 bg-white shadow-sm">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold ${claim.claimEligible === 'Yes'
-                                          ? 'bg-green-50 text-green-600 border border-green-200'
-                                          : 'bg-red-50 text-red-500 border border-red-200'
-                                       }`}>
-                                       {claim.claimEligible || '—'}
-                                    </span>
-                                 </div>
-                              </div>
-                           </div>
-                        </div>
-                     </div>
-
-                     {/* ══ 2. ITEM INFORMATION ══════════════════════════════════════ */}
-                     <div className="border border-slate-100 rounded-2xl px-5 py-4 shadow-sm">
-                        <SectionHead icon={FileText} num={2} title="Item Information (From Warranty)" />
-
-                        <div className="grid grid-cols-4 gap-4 mb-3">
-                           <ReadField label="Item Title">
-                              <span>{claim.item || '—'}</span>
-                           </ReadField>
-                           <div>
-                              <p className="text-xs font-bold text-slate-600 mb-1.5">Category</p>
-                              <div className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-white shadow-sm min-h-[42px] flex items-center">
-                                 <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase ${catStyles[claim.category] || catStyles.Other}`}>
-                                    {claim.category || 'Other'}
-                                 </span>
-                              </div>
-                           </div>
-                           <ReadField label="Brand">
-                              <span>{claim.brand || '—'}</span>
-                           </ReadField>
-                           <ReadField label="Model">
-                              <span>{claim.model || '—'}</span>
-                           </ReadField>
-                        </div>
-
-                        <div className="grid grid-cols-4 gap-4 mb-3">
-                           <ReadField label="Serial Number">
-                              <span className="font-mono text-sm">{claim.serial || '—'}</span>
-                           </ReadField>
-                           <ReadField label="Vehicle">
-                              <Truck className="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0" />
-                              <span className="font-bold">{claim.vehicle || '—'}</span>
-                           </ReadField>
-                           <ReadField label="Warranty Type">
-                              <span>{claim.warrantyType || '—'}</span>
-                           </ReadField>
-                           <ReadField label="Warranty Period">
-                              <span className="text-xs">{claim.warrantyPeriod}</span>
-                           </ReadField>
-                        </div>
-
-                        <div className="grid grid-cols-4 gap-4">
-                           <ReadField label="Vendor / Supplier">
-                              <span>{claim.vendorName || '—'}</span>
-                           </ReadField>
-                           <ReadField label="Contact Number">
-                              <Phone className="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0" />
-                              <span>{claim.contactNumber || '—'}</span>
-                           </ReadField>
-                           <ReadField label="Claim Available Amount (₹)">
-                              <span>{claim.claimAmount || '0.00'}</span>
-                           </ReadField>
-                           <ReadField label="Claim Already Used (₹)">
-                              <span>{claim.claimUsed || '0.00'}</span>
-                           </ReadField>
-                        </div>
-                     </div>
-
-                     {/* ══ 3 & 4 SPLIT ══════════════════════════════════════════════ */}
-                     <div className="grid grid-cols-2 gap-4">
-
-                        {/* 3. CLAIM INFORMATION */}
-                        <div className="border border-slate-100 rounded-2xl px-5 py-4 shadow-sm">
-                           <SectionHead icon={List} num={3} title="Claim Information" iconBg="bg-blue-100" iconColor="text-blue-600" />
-                           <div className="space-y-3">
-                              <div className="grid grid-cols-2 gap-3">
-                                 <ReadField label="Claim ID">
-                                    <span className="font-bold">{claim.id || '—'}</span>
-                                 </ReadField>
-                                 <ReadField label="Claim Date">
-                                    <Calendar className="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0" />
-                                    <span>{claim.claimDate}</span>
-                                 </ReadField>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                 <ReadField label="Issue Type">
-                                    <span>{claim.issueType || '—'}</span>
-                                 </ReadField>
-                                 <div>
-                                    <p className="text-xs font-bold text-slate-600 mb-1.5">Priority</p>
-                                    <div className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-white shadow-sm min-h-[42px] flex items-center">
-                                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold ${priorityStyles[claim.priority] || priorityStyles.Low}`}>
-                                          {claim.priority || 'Low'}
-                                       </span>
-                                    </div>
-                                 </div>
-                              </div>
-                              <div className="grid grid-cols-2 gap-3">
-                                 <ReadField label="Complaint Number">
-                                    <span className="font-mono">{claim.complaintNumber || '—'}</span>
-                                 </ReadField>
-                                 <ReadField label="Complaint Docket / Reference">
-                                    <span className="font-mono">{claim.complaintDocket || '—'}</span>
-                                 </ReadField>
-                              </div>
-                           </div>
-                        </div>
-
-                        {/* 4. ISSUE DESCRIPTION */}
-                        <div className="border border-slate-100 rounded-2xl px-5 py-4 shadow-sm">
-                           <SectionHead icon={AlertCircle} num={4} title="Issue Description" iconBg="bg-red-100" iconColor="text-red-500" />
-                           <div>
-                              <p className="text-xs font-bold text-slate-600 mb-1.5">Describe the issue in detail</p>
-                              <div className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 bg-white shadow-sm min-h-[148px] leading-relaxed">
-                                 {claim.issueDescription || '—'}
-                              </div>
-                           </div>
-                        </div>
-                     </div>
-
-                     {/* ══ 5. VENDOR COMMUNICATION ═══════════════════════════════════ */}
-                     <div className="border border-slate-100 rounded-2xl px-5 py-4 shadow-sm">
-                        <SectionHead icon={Building2} num={5} title="Vendor Communication" />
-                        <div className="grid grid-cols-4 gap-4 mb-3">
-                           <ReadField label="Vendor Contact Person">
-                              <span>{claim.vendorContactPerson || '—'}</span>
-                           </ReadField>
-                           <ReadField label="Contact Number">
-                              <Phone className="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0" />
-                              <span>{claim.vendorContactNumber || '—'}</span>
-                           </ReadField>
-                           <ReadField label="Date Sent to Vendor">
-                              <Calendar className="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0" />
-                              <span>{claim.dateSentToVendor}</span>
-                           </ReadField>
-                           <ReadField label="Expected Resolution Date">
-                              <Calendar className="w-3.5 h-3.5 text-slate-400 mr-1.5 shrink-0" />
-                              <span>{claim.expectedResolutionDate}</span>
-                           </ReadField>
-                        </div>
-                        <div>
-                           <p className="text-xs font-bold text-slate-600 mb-1.5">Communication / Remarks</p>
-                           <div className="w-full border border-slate-200 rounded-lg px-3 py-3 text-sm font-medium text-slate-700 bg-white shadow-sm min-h-[52px] leading-relaxed">
-                              {claim.vendorRemarks || '—'}
-                           </div>
-                        </div>
-                     </div>
-
-                     {/* ══ 6. ATTACHMENTS (dynamic based on real file arrays) ════════ */}
-                     <div className="border border-slate-100 rounded-2xl px-5 py-4 shadow-sm">
-                        <SectionHead icon={Paperclip} num={6} title="Attachments" />
-                        <div className="grid grid-cols-5 gap-3">
-                           <ViewFileBox
-                              label="Item Photos"
-                              file={claim.itemPhotos?.[0]}
-                              linkText={`View Files (${claim.itemPhotos?.length || 0})`}
-                              hint="Uploaded Item Photos"
-                           />
-                           <ViewFileBox
-                              label="Invoice Copy"
-                              file={claim.invoiceCopy?.[0]}
-                              linkText="View Invoice"
-                              hint="Invoice Attachment"
-                           />
-                           <ViewFileBox
-                              label="Warranty Card Copy"
-                              file={claim.warrantyCardCopy?.[0]}
-                              linkText="View Warranty Card"
-                              hint="Warranty Attachment"
-                           />
-                           <ViewFileBox
-                              label="Complaint Report"
-                              file={claim.complaintReport?.[0]}
-                              linkText="View Complaint Report"
-                              hint="Complaint Report"
-                           />
-                           <ViewFileBox
-                              label="Additional Documents"
-                              file={claim.additionalDocuments?.[0]}
-                              linkText={`View Documents (${claim.additionalDocuments?.length || 0})`}
-                              hint="Additional Uploads"
-                           />
-                        </div>
-                     </div>
-
-                     {/* ══ 7. CLAIM STATUS & ASSIGNMENT ══════════════════════════════ */}
-                     <div className="border border-slate-100 rounded-2xl px-5 py-4 shadow-sm">
-                        <SectionHead icon={ClipboardCheck} num={7} title="Claim Status & Assignment" />
-                        <div className="grid grid-cols-3 gap-4">
-                           <div className="space-y-3">
-                              <div>
-                                 <p className="text-xs font-bold text-slate-600 mb-1.5">Claim Status</p>
-                                 <div className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-white shadow-sm min-h-[42px] flex items-center">
-                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-lg text-xs font-bold ${statusStyles[claim.claimStatus] || statusStyles.Draft}`}>
-                                       {claim.claimStatus || 'Draft'}
-                                    </span>
-                                 </div>
-                              </div>
-                              <ReadField label="Assigned To">
-                                 <span>{claim.assignedTo || '—'}</span>
-                              </ReadField>
-                           </div>
-                           <div className="col-span-2">
-                              <p className="text-xs font-bold text-slate-600 mb-1.5">Internal Notes</p>
-                              <div className="w-full border border-slate-200 rounded-lg px-3 py-3 text-sm font-medium text-slate-700 bg-white shadow-sm min-h-[96px] leading-relaxed">
-                                 {claim.internalNotes || '—'}
-                              </div>
-                           </div>
-                        </div>
-                     </div>
-
-                  </div>
-
-                  {/* ── FOOTER ───────────────────────────────────────────────────── */}
-                  <div className="bg-white border-t border-slate-100 px-6 py-4 flex items-center justify-between shrink-0">
-                     <button
-                        onClick={onClose}
-                        className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
-                     >
-                        Close
-                     </button>
-                     <div className="flex items-center gap-3">
-                        <button
-                           onClick={() => setEditOpen(true)}
-                           className="flex items-center gap-2 px-5 py-2.5 border border-blue-200 rounded-xl text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 shadow-sm transition-colors"
-                        >
-                           <Pencil className="w-4 h-4" />
-                           Edit Claim
-                        </button>
-                        <button
-                           onClick={() => window.print()}
-                           className="flex items-center gap-2 px-5 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 bg-white hover:bg-slate-50 shadow-sm transition-colors"
-                        >
-                           <Printer className="w-4 h-4" /> Print Claim
-                        </button>
-                        <button
-                           onClick={onClose}
-                           className="flex items-center gap-2 px-5 py-2.5 bg-[#1a4731] hover:bg-[#153d28] text-white rounded-xl text-sm font-bold shadow-sm transition-colors"
-                        >
-                           <ArrowLeft className="w-4 h-4" /> Back to Claims
-                        </button>
-                     </div>
-                  </div>
-
-               </motion.div>
+  return (
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 10 }}
+          transition={{ duration: 0.16 }}
+          className="w-full max-w-2xl bg-white rounded-2xl shadow-xl flex flex-col max-h-[92vh] overflow-hidden"
+        >
+          {/* Header */}
+          <div className="bg-[#1a4731] px-5 py-4 flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
+                <ShieldCheck className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-white">Claim Details</h2>
+                <p className="text-[11px] text-green-300 font-mono mt-0.5">{d.claim_number || '—'}</p>
+              </div>
             </div>
-         </AnimatePresence>
+            <button onClick={onClose}
+              className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+              <X className="w-4 h-4 text-white" />
+            </button>
+          </div>
 
-         {/* Edit modal (reuses AddClaimModal in edit mode) */}
-         <AddClaimModal
-            isOpen={editOpen}
-            onClose={() => setEditOpen(false)}
-            isEdit={true}
-            editData={{
+          {/* Body */}
+          <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 bg-white">
 
-               ...itemData,
+            {/* Status changer */}
+            <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Claim Status</span>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold ${statusStyles[currentStatus] || statusStyles.Draft}`}>
+                  {currentStatus}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {saving && <span className="text-[11px] text-slate-400 font-medium">Saving...</span>}
+                <div className="relative">
+                  <select
+                    value={currentStatus}
+                    onChange={e => handleStatusChange(e.target.value)}
+                    disabled={saving}
+                    className="appearance-none border border-slate-200 rounded-lg pl-3 pr-8 py-1.5 text-xs font-bold text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 cursor-pointer disabled:opacity-50"
+                  >
+                    {CLAIM_STATUSES.map(s => <option key={s}>{s}</option>)}
+                  </select>
+                  <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+                </div>
+              </div>
+            </div>
 
-               id: itemData.dbId
+            {/* Claim Details */}
+            <div>
+              <SectionTitle>Claim Details</SectionTitle>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Warranty Ref">{d.warranty_number}</Field>
+                <Field label="Category">
+                  {d.category && (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wide ${catStyles[d.category] || catStyles.Other}`}>
+                      {d.category}
+                    </span>
+                  )}
+                </Field>
+                <Field label="Serial Number">
+                  <span className="font-mono text-xs">{d.serial_no}</span>
+                </Field>
+                <Field label="Submit Date">{formatDate(d.claim_date || d.submit_date)}</Field>
+                <Field label="Complaint Number">{d.complaint_number}</Field>
+                <Field label="Complaint Docket">{d.complaint_docket}</Field>
+                <Field label="Date Sent to Vendor">{formatDate(d.date_sent_to_vendor)}</Field>
+              </div>
 
-            }}
-            onSubmit={() => {
-               setEditOpen(false);
-               onClose();
-               if (onUpdated) onUpdated();
-            }}
-         />
-      </>
-   );
+              <div className="mt-3">
+                <p className="text-xs font-semibold text-slate-500 mb-1">Issue Description</p>
+                <div className="border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-50 text-sm text-slate-700 min-h-[72px] leading-relaxed">
+                  {d.issue_description || <span className="text-slate-300">No description provided.</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Attachments */}
+            <div>
+              <SectionTitle>Attachments</SectionTitle>
+              {itemPhotos.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {itemPhotos.map((photo, i) => (
+                    <div key={i} className="border border-slate-200 rounded-xl p-3 bg-white flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-slate-400 shrink-0" />
+                        <span className="text-xs text-slate-600 font-medium truncate">{photo}</span>
+                      </div>
+                      <a href={`http://localhost:5001/uploads/${photo}`} target="_blank" rel="noreferrer"
+                        className="flex items-center gap-1 text-xs font-semibold text-green-700 hover:text-green-800 shrink-0">
+                        <Eye className="w-3.5 h-3.5" /> View
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="border border-slate-200 rounded-xl p-4 text-center bg-slate-50">
+                  <p className="text-xs text-slate-400 font-medium">No photos uploaded</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="border-t border-slate-100 px-5 py-3 flex justify-end bg-white shrink-0">
+            <button onClick={onClose}
+              className="px-5 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+              Close
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    </AnimatePresence>
+  );
 }

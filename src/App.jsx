@@ -54,7 +54,7 @@ function InnerApp() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [vehicles, setVehicles] = useState(DUMMY_VEHICLES);
 
-  const allowedNotificationRoots = ['/tyres', '/fuel', '/staff'];
+  const allowedNotificationRoots = ['/tyres'];
   const showNotificationBell = allowedNotificationRoots.some(root => location.pathname.startsWith(root));
   const isTyresPage = location.pathname.startsWith('/tyres');
   const activeTyresTab = searchParams.get('tab') || 'active';

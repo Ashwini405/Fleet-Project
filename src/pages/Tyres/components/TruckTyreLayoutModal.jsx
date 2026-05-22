@@ -269,6 +269,25 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
             runningKm: Number(tyre.running_km || 0)
           }));
         setActiveTyres(mountedTyres);
+
+        // Fetch tyre activity timeline for this vehicle
+        try {
+          const activityResponse = await fetch(`${API_URL}/api/tyres/activity/${truckData.id}`);
+          const activityData = await activityResponse.json();
+          if (activityData.success) {
+            const formatted = activityData.data.map(item => ({
+              id: item.id,
+              tyreNo: item.tyre_number,
+              type: item.activity_type,
+              position: item.tyre_position,
+              timestamp: item.created_at
+            }));
+            // setRecentActivity will be available in component state
+            if (typeof setRecentActivity === 'function') setRecentActivity(formatted);
+          }
+        } catch (err) {
+          console.error('Error fetching tyre activities:', err);
+        }
       }
     } catch (error) {
       console.error('Error fetching tyres:', error);
@@ -302,7 +321,7 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
     return tyreTruck === targetTruck;
   });
 
-  const recentActivity = []; // Backend pending – will be replaced with real API call later
+  const [recentActivity, setRecentActivity] = useState([]);
   const layout =
     axleLayouts[
     truckData.wheelConfiguration ||
@@ -597,18 +616,7 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
                 </div>
               </div>
 
-              {/* Quick Actions */}
-              <div>
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Quick Actions</p>
-                <div className="flex flex-col gap-1.5">
-                  <button className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 border border-gray-200 text-gray-700 font-bold text-[10px] rounded-lg hover:bg-gray-100 transition-colors w-full active:scale-95">
-                    <RefreshCcw className="w-3 h-3" /> Rotate Tyres
-                  </button>
-                  <button className="flex items-center gap-2 px-2.5 py-1.5 bg-slate-50 border border-gray-200 text-gray-700 font-bold text-[10px] rounded-lg hover:bg-gray-100 transition-colors w-full active:scale-95">
-                    <Gauge className="w-3 h-3" /> Log Pressure Check
-                  </button>
-                </div>
-              </div>
+             
 
               {/* Activity Timeline */}
               <div className="flex-1 min-h-0">

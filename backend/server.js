@@ -24,13 +24,17 @@ const tyreRoutes = require('./routes/tyreRoutes');
 const oldTyreRoutes = require('./routes/oldTyreRoutes');
 const batteryRoutes = require('./routes/batteryRoutes');
 const inspectionDefectRoutes = require('./routes/inspectionDefectRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
-const dashboardRoutes = require('./routes/dashboardRoutes');
+const notificationRoutes          = require('./routes/notificationRoutes');
+const warrantyNotificationRoutes  = require('./routes/warrantyNotificationRoutes');
+const dashboardRoutes             = require('./routes/dashboardRoutes');
+const { startWarrantyExpiryChecker } = require('./services/warrantyExpiryChecker');
 
 const app = express();
 
-// Auto-create tyre_notifications table if not exists
-require('./config/db').query(`
+const db = require('./config/db');
+
+// Auto-create tyre_notifications table
+db.query(`
   CREATE TABLE IF NOT EXISTS tyre_notifications (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     notification_id VARCHAR(60)  NOT NULL UNIQUE,
@@ -46,6 +50,27 @@ require('./config/db').query(`
   )
 `).then(() => console.log('tyre_notifications table ready'))
   .catch(e => console.error('tyre_notifications table error:', e.message));
+
+// Auto-create warranty_notifications table
+db.query(`
+  CREATE TABLE IF NOT EXISTS warranty_notifications (
+    id               INT AUTO_INCREMENT PRIMARY KEY,
+    warranty_id      INT          NOT NULL,
+    warranty_number  VARCHAR(60),
+    vehicle_no       VARCHAR(50),
+    category         VARCHAR(60),
+    title            VARCHAR(255) NOT NULL,
+    message          TEXT         NOT NULL,
+    severity         ENUM('Low','Medium','High','Critical') NOT NULL DEFAULT 'Medium',
+    milestone_days   INT          NOT NULL DEFAULT 0,
+    is_read          BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+`).then(() => {
+  console.log('warranty_notifications table ready');
+  // Start cron AFTER table is confirmed ready
+  startWarrantyExpiryChecker();
+}).catch(e => console.error('warranty_notifications table error:', e.message));
 
 
 // 🔥 MIDDLEWARE
@@ -93,8 +118,9 @@ app.use(
   oldTyreRoutes
 );
 app.use('/api/batteries', batteryRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/notifications',         notificationRoutes);
+app.use('/api/warranty-notifications', warrantyNotificationRoutes);
+app.use('/api/dashboard',             dashboardRoutes);
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {
   res.send('Fleet Management Backend is running...');

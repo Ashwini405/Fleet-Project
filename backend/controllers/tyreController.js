@@ -152,35 +152,104 @@ const processTyreService = async (req, res) => {
     }
 
     // ── B. CREATE OLD TYRE RECORD ──────────────────────────────────────────
-    if (old_tyre_id && old_tyre_decision) {
-      const statusMap = {
-        'Move To Old Stock': 'Old Stock',
-        'Send To Retreading': 'Retreading',
-        'Mark As Scrap': 'Scrap',
-        'Keep As Reusable': 'Reusable',
-      };
+    if (
+  old_tyre_id &&
+  (
+    old_tyre_decision ||
+    action_taken === 'Replace Tyre'
+  )
+) {
 
-      // Get old tyre details
-      const [[tyre]] = await conn.query(`SELECT * FROM tyres WHERE id = ?`, [old_tyre_id]);
+  const statusMap = {
+    'Move To Old Stock': 'Old Stock',
+    'Send To Retreading': 'Retreading',
+    'Mark As Scrap': 'Scrap',
+    'Keep As Reusable': 'Reusable',
+  };
 
-      await conn.query(
-        `INSERT INTO old_tyres
-         (old_tyre_number, brand, model, tyre_size, material_type, vehicle_id, vehicle_number,
-          last_position, removed_date, removal_reason, running_km, expected_life_km,
-          remaining_tread_percent, tyre_status, store_location, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          old_tyre_number || tyre?.tyre_number,
-          tyre?.brand, tyre?.model, tyre?.tyre_size, tyre?.material_type,
-          vehicle_id, vehicle_no, axle_position, today,
-          issue_type, current_running_km || 0, tyre?.expected_life_km || 0,
-          current_tread_percent || 0,
-          statusMap[old_tyre_decision] || 'Old Stock',
-          old_tyre_store_location || null,
-          `Removed via repair service. Action: ${action_taken}`
-        ]
-      );
-    }
+  const [[tyre]] = await conn.query(
+    `SELECT * FROM tyres WHERE id = ?`,
+    [old_tyre_id]
+  );
+
+  await conn.query(
+    `
+    INSERT INTO old_tyres
+    (
+      old_tyre_number,
+      brand,
+      model,
+      tyre_size,
+      material_type,
+      vehicle_id,
+      vehicle_number,
+      last_position,
+      removed_date,
+      removal_reason,
+      running_km,
+      expected_life_km,
+      remaining_tread_percent,
+      tyre_status,
+      store_location,
+      notes
+    )
+    VALUES
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    [
+      old_tyre_number || tyre?.tyre_number,
+      tyre?.brand,
+      tyre?.model,
+      tyre?.tyre_size,
+      tyre?.material_type,
+
+      vehicle_id,
+      vehicle_no,
+
+      axle_position,
+
+      today,
+
+      issue_type,
+
+      current_running_km || 0,
+
+      tyre?.expected_life_km || 0,
+
+      current_tread_percent || 0,
+
+      statusMap[old_tyre_decision] || 'Reusable',
+
+      old_tyre_store_location || 'Reusable Storage',
+
+      `Removed via tyre replacement`
+    ]
+  );
+
+  // Log activity: tyre replaced (old tyre)
+  if (tyre) {
+    await conn.query(
+      `
+      INSERT INTO tyre_activity_history
+      (
+        tyre_number,
+        vehicle_number,
+        activity_type,
+        tyre_position,
+        remarks
+      )
+      VALUES (?, ?, ?, ?, ?)
+      `,
+      [
+        tyre.tyre_number,
+        tyre.vehicle_number,
+        'replaced',
+        tyre.tyre_position,
+        'Tyre replaced with new tyre'
+      ]
+    );
+  }
+}
 
     // ── C. MOUNT REPLACEMENT TYRE ──────────────────────────────────────────
     if (action_taken === 'Replace Tyre' && replacement_tyre_id) {
@@ -341,6 +410,28 @@ const mountTyre = async (req, res) => {
 
     });
 
+    // Log activity: tyre mounted
+    await db.query(
+      `
+      INSERT INTO tyre_activity_history
+      (
+        tyre_number,
+        vehicle_number,
+        activity_type,
+        tyre_position,
+        remarks
+      )
+      VALUES (?, ?, ?, ?, ?)
+      `,
+      [
+        tyre_number,
+        vehicle_number,
+        'mounted',
+        tyre_position,
+        'Tyre mounted to vehicle'
+      ]
+    );
+
     res.status(200).json({
 
       success: true,
@@ -383,8 +474,49 @@ const getTyresByVehicle = async (req, res) => {
 
 const removeTyre = async (req, res) => {
   try {
+    // fetch tyre details before clearing assignment
+    const { tyre_number } = req.body;
+    const [rows] = await db.query(`SELECT * FROM tyres WHERE tyre_number = ?`, [tyre_number]);
+    const tyre = rows[0];
+
     await TyreModel.removeTyre(req.body);
+
+    // Log activity: tyre removed
+    if (tyre) {
+      await db.query(
+        `
+        INSERT INTO tyre_activity_history
+        (
+          tyre_number,
+          vehicle_number,
+          activity_type,
+          tyre_position,
+          remarks
+        )
+        VALUES (?, ?, ?, ?, ?)
+        `,
+        [
+          tyre.tyre_number,
+          tyre.vehicle_number,
+          'removed',
+          tyre.tyre_position,
+          'Tyre removed from vehicle'
+        ]
+      );
+    }
+
     res.status(200).json({ success: true, message: 'Tyre Removed Successfully' });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// GET TYRE ACTIVITIES BY VEHICLE
+const getTyreActivitiesByVehicle = async (req, res) => {
+  try {
+    const data = await TyreModel.getTyreActivitiesByVehicle(req.params.vehicleNumber);
+    res.status(200).json({ success: true, data });
   } catch (error) {
     console.log(error);
     res.status(500).json({ success: false, message: 'Server Error' });
@@ -402,4 +534,5 @@ module.exports = {
   getAvailableReplacementTyres,
   processTyreService,
   getTyreServiceHistory,
+  getTyreActivitiesByVehicle,
 };

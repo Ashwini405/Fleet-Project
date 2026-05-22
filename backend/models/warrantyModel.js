@@ -183,10 +183,59 @@ const getWarrantyById = async (id) => {
 };
 
 
+// ======================================================
+// UPDATE WARRANTY
+// ======================================================
+
+const updateWarranty = async (id, data) => {
+
+  const [result] = await db.query(
+
+    `UPDATE warranties SET
+      category       = ?,
+      brand          = ?,
+      model          = ?,
+      serial_no      = ?,
+      vehicle_id     = ?,
+      vehicle_no     = ?,
+      odometer       = ?,
+      start_date     = ?,
+      end_date       = ?,
+      warranty_period = ?,
+      warranty_status = ?,
+      item_description = ?,
+      warranty_card  = COALESCE(?, warranty_card),
+      invoice_file   = COALESCE(?, invoice_file)
+    WHERE id = ?`,
+
+    [
+      data.category,
+      data.brand,
+      data.model,
+      data.serial_no,
+      data.vehicle_id || null,
+      data.vehicle_no,
+      data.odometer || null,
+      data.start_date || null,
+      data.end_date   || null,
+      data.warranty_period,
+      data.warranty_status,
+      data.item_description,
+      data.warranty_card  || null,
+      data.invoice_file   || null,
+      id
+    ]
+  );
+
+  return result;
+};
+
+
 module.exports = {
 
   createWarranty,
   getWarranties,
-  getWarrantyById
+  getWarrantyById,
+  updateWarranty
 
 };

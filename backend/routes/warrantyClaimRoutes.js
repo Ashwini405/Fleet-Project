@@ -5,12 +5,11 @@ const router = express.Router();
 const upload = require('../config/multer');
 
 const {
-
   createWarrantyClaim,
   getWarrantyClaims,
   getWarrantyClaimById,
-  updateWarrantyClaim
-
+  updateWarrantyClaim,
+  updateClaimStatus
 } = require('../controllers/warrantyClaimController');
 
 
@@ -154,5 +153,7 @@ router.put(
 
 );
 
+
+router.patch('/:id/status', updateClaimStatus);
 
 module.exports = router;
