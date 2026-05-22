@@ -179,26 +179,36 @@ const mountTyre = async (data) => {
   if (stockRows.length > 0) {
     // Mount directly from stock
     const [result] = await db.query(
-      `UPDATE tyres
-       SET status = 'Mounted',
-           vehicle_id = ?,
-           vehicle_number = ?,
-           tyre_position = ?,
-           date_of_issue = ?,
-           fitted_odometer = ?,
-           running_km = ?,
-           tyre_health = 'Good'
-       WHERE tyre_number = ?`,
-      [
-        data.vehicle_id,
-        data.vehicle_number,
-        data.tyre_position,
-        data.date_of_issue,
-        data.fitted_odometer,
-        stockRows[0].running_km || 0,
-        data.tyre_number
-      ]
-    );
+  `UPDATE tyres
+   SET status = ?,
+       vehicle_id = ?,
+       vehicle_number = ?,
+       tyre_position = ?,
+       date_of_issue = ?,
+       fitted_odometer = ?,
+       running_km = ?,
+       tyre_health = ?
+   WHERE tyre_number = ?`,
+  [
+    data.status,
+
+    data.status === 'Removed' ? null : data.vehicle_id,
+
+    data.status === 'Removed' ? '' : data.vehicle_number,
+
+    data.status === 'Removed' ? '' : data.tyre_position,
+
+    data.status === 'Removed' ? null : data.date_of_issue,
+
+    data.status === 'Removed' ? 0 : data.fitted_odometer,
+
+    stockRows[0].running_km || 0,
+
+    data.status === 'Removed' ? 'Removed' : 'Good',
+
+    data.tyre_number
+  ]
+);
     return result;
   }
 
@@ -215,26 +225,36 @@ const mountTyre = async (data) => {
   const oldTyre = oldTyreRows[0];
 
   const [result] = await db.query(
-    `UPDATE tyres
-     SET status = 'Mounted',
-         vehicle_id = ?,
-         vehicle_number = ?,
-         tyre_position = ?,
-         date_of_issue = ?,
-         fitted_odometer = ?,
-         running_km = ?,
-         tyre_health = 'Good'
-     WHERE tyre_number = ?`,
-    [
-      data.vehicle_id,
-      data.vehicle_number,
-      data.tyre_position,
-      data.date_of_issue,
-      data.fitted_odometer,
-      oldTyre.running_km || 0,
-      oldTyre.old_tyre_number
-    ]
-  );
+  `UPDATE tyres
+   SET status = ?,
+       vehicle_id = ?,
+       vehicle_number = ?,
+       tyre_position = ?,
+       date_of_issue = ?,
+       fitted_odometer = ?,
+       running_km = ?,
+       tyre_health = ?
+   WHERE tyre_number = ?`,
+  [
+    data.status,
+
+    data.status === 'Removed' ? null : data.vehicle_id,
+
+    data.status === 'Removed' ? '' : data.vehicle_number,
+
+    data.status === 'Removed' ? '' : data.tyre_position,
+
+    data.status === 'Removed' ? null : data.date_of_issue,
+
+    data.status === 'Removed' ? 0 : data.fitted_odometer,
+
+    oldTyre.running_km || 0,
+
+    data.status === 'Removed' ? 'Removed' : 'Good',
+
+    oldTyre.old_tyre_number
+  ]
+);
 
   await db.query(
     `DELETE FROM old_tyres WHERE old_tyre_number = ?`,
@@ -267,6 +287,22 @@ const getTyresByVehicle = async (vehicleId) => {
   return rows;
 };
 
+const getTyreActivitiesByVehicle = async (vehicleNumber) => {
+
+  const [rows] = await db.query(
+    `
+    SELECT *
+    FROM tyre_activity_history
+    WHERE vehicle_number = ?
+    ORDER BY created_at DESC
+    `,
+    [vehicleNumber]
+  );
+
+  return rows;
+
+};
+
 const removeTyre = async (data) => {
   const [result] = await db.query(
     `UPDATE tyres
@@ -289,6 +325,7 @@ module.exports = {
   getInStockTyres,
   mountTyre,
   removeTyre,
-  getTyresByVehicle
+  getTyresByVehicle,
+  getTyreActivitiesByVehicle
 
 };

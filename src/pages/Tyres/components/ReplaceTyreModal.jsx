@@ -151,29 +151,44 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
       }
 
       // Old tyres (only reusable ones)
-      const oldRes = await fetch('http://localhost:5001/api/old-tyres');
-      const oldData = await oldRes.json();
-      if (oldData.success) {
-        const unique = [];
-        const seen = new Set();
-        oldData.data.forEach(t => {
-          if (t.tyre_status !== 'REUSABLE') return;
-          if (seen.has(t.old_tyre_number)) return;
-          seen.add(t.old_tyre_number);
-          unique.push({
-            id: t.old_tyre_number,
-            make: t.brand,
-            model: t.model,
-            tyreSize: t.tyre_size,
-            material: t.material_type,
-            runningKm: Number(t.running_km || 0),
-            remainingTread: Number(t.remaining_tread_percent || 0),
-            _source: 'old',
-            _status: 'REUSABLE',
-          });
-        });
-        setOldTyres(unique);
-      }
+      // Old tyres (Reusable + Old Stock)
+const oldRes = await fetch('http://localhost:5001/api/old-tyres');
+const oldData = await oldRes.json();
+
+if (oldData.success) {
+
+  const unique = [];
+  const seen = new Set();
+
+  oldData.data.forEach(t => {
+
+    // allow reusable + old stock tyres
+    if (
+      t.tyre_status !== 'REUSABLE' &&
+      t.tyre_status !== 'OLD_STOCK'
+    ) return;
+
+    if (seen.has(t.old_tyre_number)) return;
+
+    seen.add(t.old_tyre_number);
+
+    unique.push({
+      id: t.old_tyre_number,
+      make: t.brand,
+      model: t.model,
+      tyreSize: t.tyre_size,
+      material: t.material_type,
+      runningKm: Number(t.running_km || 0),
+      remainingTread: Number(t.remaining_tread_percent || 0),
+      _source: 'old',
+      _status: 'REUSABLE',
+    });
+
+  });
+
+  setOldTyres(unique);
+}
+      
     } catch (error) {
       console.error('Fetch tyres error:', error);
     }
@@ -325,59 +340,55 @@ export default function ReplaceTyreModal({ isOpen, onClose, truckData, positionI
         notes: removeForm.notes,
       };
 
+      // 1. Insert old tyre record
       const oldRes = await fetch('http://localhost:5001/api/old-tyres', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(oldTyrePayload),
       });
-      if (!(await oldRes.json()).success) {
+      const oldData = await oldRes.json();
+      if (!oldData.success) {
         alert('Failed to move old tyre to old stock');
+        setLoading(false);
         return;
       }
 
-      // 2. Remove current tyre (set status to 'In Stock' and clear all assignment fields)
-      await fetch('http://localhost:5001/api/tyres/mount', {
+      // 2. Remove current tyre from vehicle
+      const removeRes = await fetch('http://localhost:5001/api/tyres/remove', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tyre_number: currentTyre.id,
-          status: 'In Stock',
-          vehicle_id: null,
-          vehicle_number: '',
-          tyre_position: '',
-          fitted_odometer: 0,
-          date_of_issue: null,
-          running_km: currentRunningKm,
         }),
       });
+      const removeData = await removeRes.json();
+      if (!removeData.success) {
+        alert('Failed to remove current tyre from vehicle');
+        setLoading(false);
+        return;
+      }
 
       // 3. Mount the replacement tyre
-      await fetch('http://localhost:5001/api/tyres/mount', {
+      const mountRes = await fetch('http://localhost:5001/api/tyres/mount', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           tyre_number: selectedReplacement.id,
           status: 'Mounted',
-          vehicle_id:
-
-  truckData.vehicleId ||
-
-  truckData.vehicle_id ||
-
-  null,          // backend will resolve vehicle_id from vehicle_number
-          vehicle_number:
-
-  truckData.vehicle_no ||
-
-  truckData.truckNo ||
-
-  truckData.id,
+          vehicle_id: truckData.vehicleId || truckData.vehicle_id || null,
+          vehicle_number: truckData.vehicle_no || truckData.truckNo || truckData.id,
           tyre_position: positionId,
           fitted_odometer: mountForm.fittedOdo,
           date_of_issue: mountForm.mountedDate,
           running_km: 0,
         }),
       });
+      const mountData = await mountRes.json();
+      if (!mountData.success) {
+        alert('Failed to mount replacement tyre');
+        setLoading(false);
+        return;
+      }
 
       setDone(true);
 

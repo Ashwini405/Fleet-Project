@@ -181,32 +181,31 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
     try {
       setLoading(true);
       const payload = {
-        tyre_number: selectedTyre.id,
-        vehicle_number:
 
-  truckData.vehicle_no
+  tyre_number: selectedTyre.id,
 
-    ? truckData.vehicle_no
+  vehicle_number:
+    truckData.id ||
+    truckData.vehicle_no ||
+    truckData.registration_number ||
+    truckData.truck_number ||
+    '',
 
-    : truckData.registration_number
+  vehicle_id:
+    truckData.vehicle_id ||
+    truckData.vehicleId ||
+    null,
 
-    ? truckData.registration_number
+  tyre_position: positionId || '',
 
-    : truckData.truck_number
+  fitted_odometer: parseInt(fittedOdo),
 
-    ? truckData.truck_number
+  date_of_issue: mountedDate,
 
-    : '',
-        vehicle_id:
-          truckData.vehicle_id ||
-          truckData.vehicleId ||
-          null,
-        tyre_position: positionId || '',
-        fitted_odometer: parseInt(fittedOdo),
-        date_of_issue: mountedDate,
-        running_km: 0,
-        status: 'Mounted'
-      };
+  running_km: 0,
+
+  status: 'Mounted'
+};
 
       console.log('MOUNT PAYLOAD:', payload);
       const response = await fetch('http://localhost:5001/api/tyres/mount', {

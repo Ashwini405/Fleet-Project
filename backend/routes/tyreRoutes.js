@@ -12,6 +12,7 @@ const {
   getAvailableReplacementTyres,
   processTyreService,
   getTyreServiceHistory,
+  getTyreActivitiesByVehicle,
 } = require('../controllers/tyreController');
 
 router.post('/', upload.array('tyre_files', 20), createTyre);
@@ -24,5 +25,6 @@ router.get('/mounted/:vehicleId', getMountedTyresByVehicle);
 router.get('/available-replacements', getAvailableReplacementTyres);
 router.post('/service', processTyreService);
 router.get('/history/:tyreNumber', getTyreServiceHistory);
+router.get('/activity/:vehicleNumber', getTyreActivitiesByVehicle);
 
 module.exports = router;
