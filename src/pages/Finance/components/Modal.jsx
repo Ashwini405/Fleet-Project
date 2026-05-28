@@ -1,32 +1,34 @@
 import React from "react";
-import { FiX } from "react-icons/fi";
+import { X } from "lucide-react";
 
-export default function Modal({ isOpen, onClose, title, children }) {
+export default function Modal({ isOpen, onClose, title, children, maxWidth = "max-w-lg" }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm transition-opacity">
-      <div 
-        className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform transition-all"
-        style={{ animation: "modalSlideIn 0.3s ease-out" }}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div
+        className={`bg-white rounded-2xl shadow-2xl w-full ${maxWidth} overflow-hidden`}
+        style={{ animation: "modalIn 0.22s ease-out" }}
       >
-        <div className="flex justify-between items-center p-5 border-b border-gray-100">
-          <h3 className="text-lg font-bold text-gray-800">{title}</h3>
-          <button 
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h3 className="text-base font-bold text-gray-800">{title}</h3>
+          <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
           >
-            <FiX size={20} />
+            <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="p-6">
-          {children}
-        </div>
+
+        {/* Body */}
+        <div className="p-5">{children}</div>
       </div>
+
       <style>{`
-        @keyframes modalSlideIn {
-          from { opacity: 0; transform: translateY(20px) scale(0.95); }
-          to { opacity: 1; transform: translateY(0) scale(1); }
+        @keyframes modalIn {
+          from { opacity: 0; transform: translateY(16px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0)    scale(1);    }
         }
       `}</style>
     </div>

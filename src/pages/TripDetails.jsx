@@ -6,6 +6,7 @@ import {
   FiTruck, FiPlay, FiStopCircle, FiPlusCircle, FiDroplet, FiLock,
   FiNavigation, FiRefreshCw, FiChevronRight, FiX, FiTrash2
 } from 'react-icons/fi';
+import TripFinanceSummary from './TripOverview/TripFinanceSummary';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmt(dt) {
@@ -640,6 +641,9 @@ export default function TripDetails() {
 
       {/* ── Stepper ── */}
       <TripStepper status={mappedTrip.status} />
+
+      {/* ── Finance Summary ── */}
+      <TripFinanceSummary tripId={mappedTrip.id} />
 
       {/* ── Planned-only notice (hide execution sections) ── */}
       {mappedTrip.status === 'Planned' && (
