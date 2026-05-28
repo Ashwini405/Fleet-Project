@@ -1,15 +1,267 @@
 import React, { useState, useMemo } from "react";
-import { TrendingDown, Plus, ArrowLeft, Eye } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  TrendingDown,
+  Plus,
+  ArrowLeft,
+  Eye,
+  Fuel,
+  Wrench,
+  CircleDot,
+  BatteryCharging,
+  UserRound,
+  Utensils,
+  Route,
+  MoreHorizontal,
+  Link2,
+  ArrowRight,
+  Landmark,
+  Gauge,
+  ClipboardList,
+  ShieldCheck,
+  WalletCards,
+  MapPinned,
+} from "lucide-react";
 import Modal from "../components/Modal";
-import { dummyExpense, dummyTrucks } from "../data/dummyData";
+import { dummyExpense, dummyTrucks, dummyTrips } from "../data/dummyData";
 
 const EXPENSE_CATEGORIES = [
-  "Fuel", "Toll", "Driver Salary", "Food/Allowance",
-  "Maintenance", "Service", "Tyres", "Battery", "Other",
+  "Fuel",
+  "Maintenance",
+  "Tyres",
+  "Batteries",
+  "Driver Salary",
+  "Food Allowance",
+  "Toll",
+  "Miscellaneous",
 ];
 
-const labelCls = "block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1.5";
-const inputCls = "w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400 transition-colors";
+const MODULE_CONFIG = {
+  Fuel: {
+    title: "Fuel Expense Details",
+    module: "Fuel Module",
+    target: "Fuel Expense",
+    color: "orange",
+    icon: Fuel,
+    fields: [
+      { key: "fuelStation", label: "Fuel Station", type: "text", placeholder: "e.g. HP Petrol Pump, Pune" },
+      { key: "litresFilled", label: "Litres Filled", type: "number", placeholder: "e.g. 62" },
+      { key: "mileage", label: "Mileage", type: "text", placeholder: "e.g. 4.8 km/l" },
+      { key: "fuelRef", label: "Fuel Reference Number", type: "text", placeholder: "e.g. FUEL-2023-0108" },
+    ],
+    signals: [
+      { icon: Fuel, label: "Source Record", value: "Fuel Log" },
+      { icon: Gauge, label: "Operational Check", value: "Litres + mileage" },
+      { icon: Landmark, label: "Finance Posting", value: "Diesel expense" },
+    ],
+  },
+  Maintenance: {
+    title: "Service & Maintenance Details",
+    module: "Service Module",
+    target: "Maintenance Expense",
+    color: "red",
+    icon: Wrench,
+    fields: [
+      { key: "serviceType", label: "Service Type", type: "select", options: ["General Service", "Oil Change", "Brake Work", "Engine Repair"] },
+      { key: "workshopName", label: "Workshop Name", type: "text", placeholder: "e.g. Sai Motors Workshop" },
+      { key: "serviceRef", label: "Service Reference", type: "text", placeholder: "e.g. SRV-2023-0021" },
+      { key: "maintenanceNotes", label: "Maintenance Notes", type: "text", placeholder: "e.g. Brake pad and filter replacement" },
+    ],
+    signals: [
+      { icon: Wrench, label: "Source Record", value: "Service Job Card" },
+      { icon: ClipboardList, label: "Operational Check", value: "Workshop + service type" },
+      { icon: Landmark, label: "Finance Posting", value: "Repair expense" },
+    ],
+  },
+  Tyres: {
+    title: "Tyre Expense Details",
+    module: "Tyres Module",
+    target: "Tyre Expense",
+    color: "pink",
+    icon: CircleDot,
+    fields: [
+      { key: "tyreType", label: "Tyre Type", type: "select", options: ["New Tyre", "Retread Tyre", "Tube", "Puncture Repair"] },
+      { key: "replacementPosition", label: "Replacement Position", type: "text", placeholder: "e.g. Rear Left Outer" },
+      { key: "tyreVendor", label: "Vendor Name", type: "text", placeholder: "e.g. MRF Tyre House" },
+      { key: "tyreRef", label: "Tyre Reference", type: "text", placeholder: "e.g. TYR-2023-0044" },
+    ],
+    signals: [
+      { icon: CircleDot, label: "Source Record", value: "Tyre Asset Ledger" },
+      { icon: Route, label: "Operational Check", value: "Axle / position change" },
+      { icon: Landmark, label: "Finance Posting", value: "Tyre replacement cost" },
+    ],
+  },
+  Batteries: {
+    title: "Battery Expense Details",
+    module: "Batteries Module",
+    target: "Battery Expense",
+    color: "purple",
+    icon: BatteryCharging,
+    fields: [
+      { key: "batteryBrand", label: "Battery Brand", type: "text", placeholder: "e.g. Exide" },
+      { key: "warrantyPeriod", label: "Warranty Period", type: "text", placeholder: "e.g. 24 months" },
+      { key: "batteryVendor", label: "Vendor Name", type: "text", placeholder: "e.g. Power Auto Electricals" },
+      { key: "batteryRef", label: "Battery Reference", type: "text", placeholder: "e.g. BAT-2023-0017" },
+    ],
+    signals: [
+      { icon: BatteryCharging, label: "Source Record", value: "Battery Asset Register" },
+      { icon: ShieldCheck, label: "Operational Check", value: "Warranty tracking" },
+      { icon: Landmark, label: "Finance Posting", value: "Battery purchase cost" },
+    ],
+  },
+  "Driver Salary": {
+    title: "Driver Salary Details",
+    module: "Driver Management",
+    target: "Salary Expense",
+    color: "blue",
+    icon: UserRound,
+    fields: [
+      { key: "driverName", label: "Driver Name", type: "select", options: dummyTrucks.map((truck) => truck.driver) },
+      { key: "salaryMonth", label: "Salary Month", type: "month" },
+      { key: "salaryType", label: "Salary Type", type: "select", options: ["Monthly Salary", "Advance", "Bonus", "Settlement"] },
+    ],
+    signals: [
+      { icon: UserRound, label: "Source Record", value: "Driver Ledger" },
+      { icon: WalletCards, label: "Operational Check", value: "Payroll period" },
+      { icon: Landmark, label: "Finance Posting", value: "Salary payable" },
+    ],
+  },
+  "Food Allowance": {
+    title: "Driver Allowance Details",
+    module: "Trip Operations",
+    target: "Allowance Expense",
+    color: "yellow",
+    icon: Utensils,
+    fields: [
+      { key: "driverName", label: "Driver Name", type: "select", options: dummyTrucks.map((truck) => truck.driver) },
+      { key: "tripRef", label: "Trip Reference", type: "select", options: dummyTrips.map((trip) => trip.id) },
+      { key: "allowanceType", label: "Allowance Type", type: "select", options: ["Food", "Daily Bata", "Night Halt", "Loading Allowance"] },
+    ],
+    signals: [
+      { icon: Utensils, label: "Source Record", value: "Driver Allowance" },
+      { icon: ClipboardList, label: "Operational Check", value: "Trip-linked claim" },
+      { icon: Landmark, label: "Finance Posting", value: "Allowance expense" },
+    ],
+  },
+  Toll: {
+    title: "Toll Expense Details",
+    module: "Trips Module",
+    target: "Toll Expense",
+    color: "gray",
+    icon: Route,
+    fields: [
+      { key: "tripRef", label: "Trip Reference", type: "select", options: dummyTrips.map((trip) => trip.id) },
+      { key: "tollPlaza", label: "Toll Plaza", type: "text", placeholder: "e.g. NH-65 Toll Plaza" },
+      { key: "route", label: "Route", type: "select", options: dummyTrips.map((trip) => trip.route) },
+    ],
+    signals: [
+      { icon: Route, label: "Source Record", value: "Trip Route Cost" },
+      { icon: MapPinned, label: "Operational Check", value: "Plaza + route" },
+      { icon: Landmark, label: "Finance Posting", value: "Toll expense" },
+    ],
+  },
+};
+
+const TONE = {
+  orange: {
+    shell: "border-orange-200 bg-orange-50/50",
+    icon: "bg-orange-100 text-orange-700 border-orange-200",
+    text: "text-orange-700",
+    chip: "bg-orange-100 text-orange-700 border-orange-200",
+    ring: "focus:ring-orange-500/20 focus:border-orange-400",
+  },
+  red: {
+    shell: "border-red-200 bg-red-50/50",
+    icon: "bg-red-100 text-red-700 border-red-200",
+    text: "text-red-700",
+    chip: "bg-red-100 text-red-700 border-red-200",
+    ring: "focus:ring-red-500/20 focus:border-red-400",
+  },
+  pink: {
+    shell: "border-pink-200 bg-pink-50/50",
+    icon: "bg-pink-100 text-pink-700 border-pink-200",
+    text: "text-pink-700",
+    chip: "bg-pink-100 text-pink-700 border-pink-200",
+    ring: "focus:ring-pink-500/20 focus:border-pink-400",
+  },
+  purple: {
+    shell: "border-purple-200 bg-purple-50/50",
+    icon: "bg-purple-100 text-purple-700 border-purple-200",
+    text: "text-purple-700",
+    chip: "bg-purple-100 text-purple-700 border-purple-200",
+    ring: "focus:ring-purple-500/20 focus:border-purple-400",
+  },
+  blue: {
+    shell: "border-blue-200 bg-blue-50/50",
+    icon: "bg-blue-100 text-blue-700 border-blue-200",
+    text: "text-blue-700",
+    chip: "bg-blue-100 text-blue-700 border-blue-200",
+    ring: "focus:ring-blue-500/20 focus:border-blue-400",
+  },
+  yellow: {
+    shell: "border-yellow-200 bg-yellow-50/50",
+    icon: "bg-yellow-100 text-yellow-800 border-yellow-200",
+    text: "text-yellow-800",
+    chip: "bg-yellow-100 text-yellow-800 border-yellow-200",
+    ring: "focus:ring-yellow-500/20 focus:border-yellow-400",
+  },
+  gray: {
+    shell: "border-gray-200 bg-gray-50",
+    icon: "bg-gray-100 text-gray-700 border-gray-200",
+    text: "text-gray-700",
+    chip: "bg-gray-100 text-gray-700 border-gray-200",
+    ring: "focus:ring-gray-500/20 focus:border-gray-400",
+  },
+  neutral: {
+    shell: "border-gray-200 bg-white",
+    icon: "bg-gray-100 text-gray-600 border-gray-200",
+    text: "text-gray-700",
+    chip: "bg-gray-100 text-gray-700 border-gray-200",
+    ring: "focus:ring-red-500/20 focus:border-red-400",
+  },
+};
+
+const CATEGORY_TONE = {
+  Fuel: "orange",
+  Maintenance: "red",
+  Tyres: "pink",
+  Batteries: "purple",
+  "Driver Salary": "blue",
+  "Food Allowance": "yellow",
+  Toll: "gray",
+  Miscellaneous: "neutral",
+};
+
+const labelCls = "block text-[11px] font-extrabold text-gray-500 uppercase tracking-widest mb-1.5";
+const inputCls = "w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:ring-2 transition-colors";
+
+function normalizeCategory(category) {
+  const map = {
+    "Food/Allowance": "Food Allowance",
+    Battery: "Batteries",
+    Service: "Maintenance",
+    Other: "Miscellaneous",
+  };
+  return map[category] || category;
+}
+
+function getTone(category) {
+  return TONE[CATEGORY_TONE[category] || "neutral"];
+}
+
+function ExpenseCategoryBadge({ category }) {
+  const normalized = normalizeCategory(category);
+  const cfg = MODULE_CONFIG[normalized];
+  const tone = getTone(normalized);
+  const Icon = cfg?.icon || MoreHorizontal;
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold ${tone.chip}`}>
+      <Icon className="w-3 h-3" />
+      {normalized}
+    </span>
+  );
+}
 
 function DetailRow({ label, value }) {
   return (
@@ -20,20 +272,174 @@ function DetailRow({ label, value }) {
   );
 }
 
-/* ─── ADD EXPENSE FORM ────────────────────────────────────────────────────── */
+function DynamicField({ field, value, onChange, tone, index }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, delay: index * 0.04 }}
+    >
+      <label className={labelCls}>{field.label}</label>
+      {field.type === "select" ? (
+        <select value={value || ""} onChange={onChange} className={`${inputCls} ${tone.ring}`}>
+          <option value="">Select {field.label}</option>
+          {field.options.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type={field.type}
+          value={value || ""}
+          onChange={onChange}
+          placeholder={field.placeholder || ""}
+          className={`${inputCls} ${tone.ring}`}
+        />
+      )}
+    </motion.div>
+  );
+}
+
+function ErpFlowCard({ config, tone }) {
+  const Icon = config.icon;
+
+  return (
+    <div className="rounded-xl border border-white/70 bg-white/80 p-3 shadow-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${tone.icon}`}>
+          <Icon className="w-4 h-4" />
+          <span className="text-xs font-extrabold">{config.module}</span>
+        </div>
+        <ArrowRight className="w-4 h-4 text-gray-400" />
+        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-extrabold text-red-700">
+          {config.target}
+        </div>
+        <ArrowRight className="w-4 h-4 text-gray-400" />
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-extrabold text-slate-700">
+          Expense Finance Module
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModuleSignalGrid({ config, tone }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {config.signals.map((signal, index) => {
+        const Icon = signal.icon;
+
+        return (
+          <motion.div
+            key={signal.label}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2, delay: index * 0.05 }}
+            className="rounded-xl border border-white/80 bg-white p-3 shadow-sm"
+          >
+            <div className={`mb-2 flex h-8 w-8 items-center justify-center rounded-lg border ${tone.icon}`}>
+              <Icon className="w-4 h-4" />
+            </div>
+            <p className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">{signal.label}</p>
+            <p className="mt-1 text-xs font-extrabold text-gray-800">{signal.value}</p>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DynamicExpenseSection({ category, values, onChange }) {
+  const config = MODULE_CONFIG[category];
+  if (!config) return null;
+
+  const tone = getTone(category);
+  const Icon = config.icon;
+
+  return (
+    <AnimatePresence mode="wait">
+      <motion.section
+        key={category}
+        initial={{ opacity: 0, y: 12, height: 0 }}
+        animate={{ opacity: 1, y: 0, height: "auto" }}
+        exit={{ opacity: 0, y: -8, height: 0 }}
+        transition={{ duration: 0.25, ease: "easeOut" }}
+        className={`overflow-hidden rounded-2xl border ${tone.shell}`}
+      >
+        <div className="p-4 space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${tone.icon}`}>
+                <Icon className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className={`text-sm font-extrabold ${tone.text}`}>{config.title}</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  This expense is represented as an operational module-generated finance entry.
+                </p>
+              </div>
+            </div>
+            <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-extrabold ${tone.chip}`}>
+              Linked to {config.module}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-4">
+            <ErpFlowCard config={config} tone={tone} />
+            <ModuleSignalGrid config={config} tone={tone} />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {config.fields.map((field, index) => (
+              <DynamicField
+                key={field.key}
+                field={field}
+                value={values[field.key]}
+                onChange={(event) => onChange(field.key, event.target.value)}
+                tone={tone}
+                index={index}
+              />
+            ))}
+          </div>
+
+          <div className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 ${tone.chip}`}>
+            <Link2 className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-extrabold">Linked to {config.module}</p>
+              <p className="text-[11px] font-medium opacity-80">
+                UI-only ERP linkage preview. No backend sync or automation is triggered.
+              </p>
+            </div>
+          </div>
+        </div>
+      </motion.section>
+    </AnimatePresence>
+  );
+}
+
 function AddExpenseForm({ onBack }) {
   const [form, setForm] = useState({ truck: "", date: "", category: "", amount: "", desc: "" });
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const [moduleFields, setModuleFields] = useState({});
+  const tone = getTone(form.category);
+
+  const set = (key) => (event) => {
+    const value = event.target.value;
+    setForm((current) => ({ ...current, [key]: value }));
+    if (key === "category") setModuleFields({});
+  };
+
+  const setModuleField = (key, value) => {
+    setModuleFields((current) => ({ ...current, [key]: value }));
+  };
 
   return (
     <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-red-50/40">
         <div>
           <h2 className="flex items-center gap-2 text-base font-bold text-red-700">
             <TrendingDown className="w-4 h-4" /> Add Expense Entry
           </h2>
-          <p className="text-xs text-gray-500 mt-0.5">Record a new expense transaction</p>
+          <p className="text-xs text-gray-500 mt-0.5">Operational finance entry with ERP module visibility</p>
         </div>
         <button
           onClick={onBack}
@@ -43,65 +449,102 @@ function AddExpenseForm({ onBack }) {
         </button>
       </div>
 
-      <form
-        className="p-5 space-y-5"
-        onSubmit={e => { e.preventDefault(); onBack(); }}
-      >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Truck */}
-          <div>
-            <label className={labelCls}>Select Truck</label>
-            <select value={form.truck} onChange={set("truck")} className={inputCls} required>
-              <option value="">— Select Truck —</option>
-              {dummyTrucks.map(t => (
-                <option key={t.id} value={t.id}>{t.model} ({t.id})</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Date */}
-          <div>
-            <label className={labelCls}>Date</label>
-            <input type="date" value={form.date} onChange={set("date")} className={inputCls} required />
-          </div>
-
-          {/* Category */}
-          <div>
-            <label className={labelCls}>Category</label>
-            <select value={form.category} onChange={set("category")} className={inputCls} required>
-              <option value="">— Select Category —</option>
-              {EXPENSE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
-            </select>
-          </div>
-
-          {/* Amount */}
-          <div>
-            <label className={labelCls}>Amount (₹)</label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">₹</span>
-              <input
-                type="number" placeholder="0.00" min="0"
-                value={form.amount} onChange={set("amount")}
-                className={inputCls + " pl-7"} required
-              />
+      <form className="p-5 space-y-5 bg-slate-50/40" onSubmit={(event) => { event.preventDefault(); onBack(); }}>
+        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
+          <div className="flex items-center justify-between gap-3 border-b border-gray-100 pb-3">
+            <div>
+              <h3 className="text-sm font-extrabold text-gray-900">Common Finance Fields</h3>
+              <p className="text-xs text-gray-500 mt-0.5">These fields stay visible for every expense category.</p>
+            </div>
+            <div className="hidden sm:flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-extrabold text-red-700">
+              <Landmark className="w-4 h-4" />
+              Expense Finance Module
             </div>
           </div>
-        </div>
 
-        {/* Description */}
-        <div>
-          <label className={labelCls}>Description / Note</label>
-          <textarea
-            rows={3} placeholder="e.g. Diesel refill at Pune, NH-65 toll plaza..."
-            value={form.desc} onChange={set("desc")}
-            className={inputCls + " resize-none"}
-          />
-        </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Select Truck</label>
+              <select value={form.truck} onChange={set("truck")} className={`${inputCls} ${tone.ring}`} required>
+                <option value="">Select Truck</option>
+                {dummyTrucks.map((truck) => (
+                  <option key={truck.id} value={truck.id}>{truck.model} ({truck.id})</option>
+                ))}
+              </select>
+            </div>
 
-        {/* Actions */}
-        <div className="flex gap-3 pt-2 border-t border-gray-100">
+            <div>
+              <label className={labelCls}>Expense Category</label>
+              <select value={form.category} onChange={set("category")} className={`${inputCls} ${tone.ring}`} required>
+                <option value="">Select Category</option>
+                {EXPENSE_CATEGORIES.map((category) => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <DynamicExpenseSection category={form.category} values={moduleFields} onChange={setModuleField} />
+
+          {form.category === "Miscellaneous" && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500">
+                  <MoreHorizontal className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-gray-800">Miscellaneous Expense</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    No operational module linkage is shown for this category. Use the common finance fields only.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className={labelCls}>Date</label>
+              <input type="date" value={form.date} onChange={set("date")} className={`${inputCls} ${tone.ring}`} required />
+            </div>
+
+            <div>
+              <label className={labelCls}>Amount (Rs.)</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">Rs.</span>
+                <input
+                  type="number"
+                  placeholder="0.00"
+                  min="0"
+                  value={form.amount}
+                  onChange={set("amount")}
+                  className={`${inputCls} ${tone.ring} pl-11`}
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Description / Note</label>
+            <textarea
+              rows={3}
+              placeholder="e.g. Diesel refill at Pune, NH-65 toll plaza..."
+              value={form.desc}
+              onChange={set("desc")}
+              className={`${inputCls} ${tone.ring} resize-none`}
+            />
+          </div>
+        </section>
+
+        <div className="flex gap-3 pt-2">
           <button
-            type="button" onClick={onBack}
+            type="button"
+            onClick={onBack}
             className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold rounded-xl transition-colors"
           >
             Cancel
@@ -118,16 +561,15 @@ function AddExpenseForm({ onBack }) {
   );
 }
 
-/* ─── EXPENSE LOGS LIST ───────────────────────────────────────────────────── */
 export default function ExpenseTab({ selectedTruck, dateFrom, dateTo }) {
-  const [view,    setView]    = useState("list");
+  const [view, setView] = useState("list");
   const [viewTxn, setViewTxn] = useState(null);
 
   const filtered = useMemo(() => {
     let list = [...dummyExpense];
-    if (selectedTruck !== "All") list = list.filter(e => e.truckId === selectedTruck);
-    if (dateFrom) list = list.filter(e => e.date >= dateFrom);
-    if (dateTo)   list = list.filter(e => e.date <= dateTo);
+    if (selectedTruck !== "All") list = list.filter((expense) => expense.truckId === selectedTruck);
+    if (dateFrom) list = list.filter((expense) => expense.date >= dateFrom);
+    if (dateTo) list = list.filter((expense) => expense.date <= dateTo);
     return list.sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [selectedTruck, dateFrom, dateTo]);
 
@@ -135,8 +577,6 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo }) {
 
   return (
     <div className="space-y-4">
-
-      {/* ── Section header ── */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="flex items-center gap-2 text-base font-bold text-gray-900">
@@ -152,9 +592,7 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo }) {
         </button>
       </div>
 
-      {/* ── Table ── */}
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-        {/* Table head */}
         <div className="hidden md:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wide">
           <span>Truck</span>
           <span>Category</span>
@@ -167,12 +605,11 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo }) {
           <div className="py-14 text-center text-gray-400 text-sm">No expense records found for the selected filters.</div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {filtered.map(txn => (
+            {filtered.map((txn) => (
               <div
                 key={txn.id}
                 className="flex flex-col md:grid md:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 md:gap-4 items-start md:items-center px-5 py-4 hover:bg-gray-50/70 transition-colors"
               >
-                {/* Truck */}
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-xl bg-red-50 text-red-500 flex items-center justify-center shrink-0">
                     <TrendingDown className="w-4 h-4" />
@@ -183,25 +620,19 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo }) {
                   </div>
                 </div>
 
-                {/* Category */}
                 <div>
-                  <span className="inline-block px-2.5 py-1 bg-red-50 text-red-600 text-xs font-semibold rounded-lg border border-red-100">
-                    {txn.category}
-                  </span>
+                  <ExpenseCategoryBadge category={txn.category} />
                 </div>
 
-                {/* Date + desc */}
                 <div>
                   <p className="text-sm text-gray-700 font-medium">{txn.date}</p>
                   <p className="text-xs text-gray-400 italic mt-0.5 truncate max-w-[140px]">"{txn.desc}"</p>
                 </div>
 
-                {/* Amount */}
                 <p className="text-base font-extrabold text-red-500 md:text-right">
-                  −₹{txn.amount.toLocaleString()}
+                  -Rs. {txn.amount.toLocaleString("en-IN")}
                 </p>
 
-                {/* View */}
                 <button
                   onClick={() => setViewTxn(txn)}
                   className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
@@ -215,18 +646,17 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo }) {
         )}
       </div>
 
-      {/* ── Detail modal ── */}
       <Modal isOpen={!!viewTxn} onClose={() => setViewTxn(null)} title="Expense Transaction Details">
         {viewTxn && (
           <div>
             <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4">
               <p className="text-xs font-semibold text-gray-500 mb-0.5">Amount</p>
-              <p className="text-3xl font-extrabold text-red-500">−₹{viewTxn.amount.toLocaleString()}</p>
+              <p className="text-3xl font-extrabold text-red-500">-Rs. {viewTxn.amount.toLocaleString("en-IN")}</p>
             </div>
 
-            <DetailRow label="Date"        value={viewTxn.date} />
-            <DetailRow label="Category"    value={viewTxn.category} />
-            <DetailRow label="Vehicle"     value={`${viewTxn.truckModel} (${viewTxn.truckId})`} />
+            <DetailRow label="Date" value={viewTxn.date} />
+            <DetailRow label="Category" value={normalizeCategory(viewTxn.category)} />
+            <DetailRow label="Vehicle" value={`${viewTxn.truckModel} (${viewTxn.truckId})`} />
             <DetailRow label="Description" value={`"${viewTxn.desc}"`} />
 
             <div className="pt-4 flex justify-end">
