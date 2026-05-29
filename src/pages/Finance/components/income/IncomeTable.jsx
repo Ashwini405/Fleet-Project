@@ -17,7 +17,7 @@ export default function IncomeTable({ records, onView }) {
     );
   }
 
-  const total = records.reduce((s, r) => s + r.amount, 0);
+  const total = records.reduce((s, r) => s + Number(r.amount || 0), 0);
 
   return (
     <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">

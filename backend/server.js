@@ -28,6 +28,8 @@ const notificationRoutes          = require('./routes/notificationRoutes');
 const warrantyNotificationRoutes  = require('./routes/warrantyNotificationRoutes');
 const dashboardRoutes             = require('./routes/dashboardRoutes');
 const { startWarrantyExpiryChecker } = require('./services/warrantyExpiryChecker');
+const incomeRoutes =
+require('./routes/incomeRoutes');
 
 const app = express();
 
@@ -121,6 +123,11 @@ app.use('/api/batteries', batteryRoutes);
 app.use('/api/notifications',         notificationRoutes);
 app.use('/api/warranty-notifications', warrantyNotificationRoutes);
 app.use('/api/dashboard',             dashboardRoutes);
+app.use(
+  '/api/income',
+  incomeRoutes
+);
+
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {
   res.send('Fleet Management Backend is running...');

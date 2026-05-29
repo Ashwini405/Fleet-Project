@@ -23,13 +23,13 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
       if (dateFrom) { inc = inc.filter(i => i.date >= dateFrom); exp = exp.filter(e => e.date >= dateFrom); }
       if (dateTo)   { inc = inc.filter(i => i.date <= dateTo);   exp = exp.filter(e => e.date <= dateTo);   }
 
-      const totalIncome  = inc.reduce((s, i) => s + i.amount, 0);
-      const totalExpense = exp.reduce((s, e) => s + e.amount, 0);
+      const totalIncome  = inc.reduce((s, i) => s + Number(i.amount || 0), 0);
+      const totalExpense = exp.reduce((s, e) => s + Number(e.amount || 0), 0);
       const netProfit    = totalIncome - totalExpense;
 
       const history = [
-        ...inc.map(i => ({ ...i, _type: "income"  })),
-        ...exp.map(e => ({ ...e, _type: "expense" })),
+        ...inc.map(i => ({ ...i, _type: "income", amount: Number(i.amount || 0) })),
+        ...exp.map(e => ({ ...e, _type: "expense", amount: Number(e.amount || 0) })),
       ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
       return { ...truck, totalIncome, totalExpense, netProfit, history };

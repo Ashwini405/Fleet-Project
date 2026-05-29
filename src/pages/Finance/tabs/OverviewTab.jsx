@@ -34,11 +34,11 @@ export default function OverviewTab({ selectedTruck, dateFrom, dateTo }) {
     [selectedTruck, dateFrom, dateTo]
   );
 
-  const totalIncome  = inc.reduce((s, i) => s + i.amount, 0);
-  const totalExpense = exp.reduce((s, e) => s + e.amount, 0);
+  const totalIncome  = inc.reduce((s, i) => s + Number(i.amount || 0), 0);
+  const totalExpense = exp.reduce((s, e) => s + Number(e.amount || 0), 0);
   const netBalance   = totalIncome - totalExpense;
 
-  const recent = [...inc.map(i => ({ ...i, _type: "income" })), ...exp.map(e => ({ ...e, _type: "expense" }))]
+  const recent = [...inc.map(i => ({ ...i, _type: "income", amount: Number(i.amount || 0) })), ...exp.map(e => ({ ...e, _type: "expense", amount: Number(e.amount || 0) }))]
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 8);
 

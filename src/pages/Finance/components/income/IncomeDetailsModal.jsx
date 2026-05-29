@@ -151,7 +151,10 @@ function PaymentStatusPanel({ totalAmount, paidAmount, status }) {
 }
 
 function UpdatePaymentForm({ txn, onUpdate }) {
-  const remaining = Math.max(0, (txn.totalAmount || txn.amount) - (txn.paidAmount || 0));
+  const totalAmount = Number(txn.amount || 0);
+  const paidAmount = Number(txn.received_amount || 0);
+  const remaining = Math.max(0, totalAmount - paidAmount);
+  
   const [open, setOpen] = useState(false);
   const [newAmount, setNewAmount] = useState("");
   const [newRef, setNewRef] = useState("");
@@ -166,10 +169,15 @@ function UpdatePaymentForm({ txn, onUpdate }) {
     if (!newAmount && !markFull) return;
 
     const addedAmount = markFull ? remaining : amountNum;
-    const newPaid = (txn.paidAmount || 0) + addedAmount;
-    const newStatus = newPaid >= (txn.totalAmount || txn.amount) ? "Received" : "Partial";
+    const newPaid = paidAmount + addedAmount;
+    const newStatus = newPaid >= totalAmount ? "Received" : "Partial";
+    const newPending = Math.max(0, totalAmount - newPaid);
 
-    onUpdate({ paidAmount: newPaid, paymentStatus: newStatus });
+    onUpdate({
+      received_amount: newPaid,
+      pending_amount: newPending,
+      payment_status: newStatus,
+    });
     setSaved(true);
     setTimeout(() => {
       setSaved(false);
@@ -314,10 +322,10 @@ function UpdatePaymentForm({ txn, onUpdate }) {
 export default function IncomeDetailsModal({ txn, onClose, onUpdate }) {
   if (!txn) return null;
 
-  const totalAmount = txn.totalAmount || txn.amount;
-  const paidAmount = txn.paidAmount ?? txn.amount;
-  const isPartial = txn.paymentStatus === "Partial";
-  const isPending = txn.paymentStatus === "Pending";
+  const totalAmount = Number(txn.amount || 0);
+  const paidAmount = Number(txn.received_amount || 0);
+  const isPartial = txn.payment_status === "Partial";
+  const isPending = txn.payment_status === "Pending";
   const needsUpdate = isPartial || isPending;
 
   return (
@@ -344,7 +352,7 @@ export default function IncomeDetailsModal({ txn, onClose, onUpdate }) {
                     Income Transaction Details
                   </h3>
                   <p className="mt-1 truncate text-xs font-medium text-slate-400">
-                    {txn.type} / {txn.truckModel} ({txn.truckId})
+                    {txn.income_category} / {txn.vehicle_number}
                   </p>
                 </div>
               </div>
@@ -380,19 +388,19 @@ export default function IncomeDetailsModal({ txn, onClose, onUpdate }) {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4">
-                    <IncomeCategoryBadge category={txn.type} size="sm" />
+                    <IncomeCategoryBadge category={txn.income_category} size="sm" />
                     <span className="rounded-lg bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-600">
-                      {txn.truckId}
+                      {txn.vehicle_number}
                     </span>
                     <span className={`ml-auto rounded-full px-2.5 py-1 text-[10px] font-extrabold ${
-                      txn.paymentStatus === "Received"
+                      txn.payment_status === "Received"
                         ? "bg-emerald-100 text-emerald-700"
-                        : txn.paymentStatus === "Partial"
+                        : txn.payment_status === "Partial"
                           ? "bg-orange-100 text-orange-700"
                           : "bg-red-100 text-red-700"
                     }`}
                     >
-                      {txn.paymentStatus}
+                      {txn.payment_status}
                     </span>
                   </div>
                 </div>
@@ -400,49 +408,49 @@ export default function IncomeDetailsModal({ txn, onClose, onUpdate }) {
                 <PaymentStatusPanel
                   totalAmount={totalAmount}
                   paidAmount={paidAmount}
-                  status={txn.paymentStatus}
+                  status={txn.payment_status}
                 />
 
                 {needsUpdate && onUpdate && (
-                  <UpdatePaymentForm txn={{ ...txn, totalAmount, paidAmount }} onUpdate={onUpdate} />
+                  <UpdatePaymentForm txn={txn} onUpdate={onUpdate} />
                 )}
               </div>
 
               <div className="space-y-4">
                 <Section title="Transaction Details">
                   <div className="grid gap-3">
-                    <DetailItem icon={Calendar} label="Payment Date" value={txn.date} />
-                    <DetailItem icon={TrendingUp} label="Category" value={txn.type} />
-                    <DetailItem icon={MapPin} label="Place of Running" value={txn.route} />
+                    <DetailItem icon={Calendar} label="Payment Date" value={txn.payment_received_date} />
+                    <DetailItem icon={TrendingUp} label="Category" value={txn.income_category} />
+                    <DetailItem icon={MapPin} label="Place of Running" value={txn.place_of_running} />
                     <DetailItem
                       icon={Calendar}
                       label="Freight Range"
-                      value={txn.freightStart && txn.freightEnd ? `${txn.freightStart} to ${txn.freightEnd}` : null}
+                      value={txn.freight_start_date && txn.freight_end_date ? `${txn.freight_start_date} to ${txn.freight_end_date}` : null}
                       mono
                     />
-                    <DetailItem icon={Landmark} label="Bank Reference" value={txn.refNumber} mono />
-                    <DetailItem icon={Truck} label="Vehicle" value={`${txn.truckModel} (${txn.truckId})`} />
-                    <DetailItem icon={FileText} label="Description" value={txn.desc ? `"${txn.desc}"` : null} />
+                    <DetailItem icon={Landmark} label="Bank Reference" value={txn.bank_reference_number} mono />
+                    <DetailItem icon={Truck} label="Vehicle" value={txn.vehicle_number} />
+                    <DetailItem icon={FileText} label="Description" value={txn.description ? `"${txn.description}"` : null} />
                   </div>
                 </Section>
 
-                {(txn.linkedTrip || txn.linkedInvoice) && (
+                {(txn.trip_number || txn.linked_invoice_no) && (
                   <Section title="ERP Linked Records">
                     <div className="space-y-2">
-                      {txn.linkedTrip && (
+                      {txn.trip_number && (
                         <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">
                           <Link2 className="h-4 w-4 shrink-0" />
                           <Truck className="h-4 w-4 shrink-0" />
                           <span className="text-blue-600">Trip</span>
-                          <span className="ml-auto font-mono text-xs">{txn.linkedTrip}</span>
+                          <span className="ml-auto font-mono text-xs">{txn.trip_number}</span>
                         </div>
                       )}
-                      {txn.linkedInvoice && (
+                      {txn.linked_invoice_no && (
                         <div className="flex items-center gap-2 rounded-lg border border-teal-200 bg-teal-50 px-3 py-2 text-sm font-semibold text-teal-800">
                           <Link2 className="h-4 w-4 shrink-0" />
                           <UserCheck className="h-4 w-4 shrink-0" />
                           <span className="text-teal-600">Invoice</span>
-                          <span className="ml-auto font-mono text-xs">{txn.linkedInvoice}</span>
+                          <span className="ml-auto font-mono text-xs">{txn.linked_invoice_no}</span>
                         </div>
                       )}
                     </div>

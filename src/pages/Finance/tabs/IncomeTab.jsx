@@ -1,6 +1,5 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { dummyIncome } from "../data/dummyData";
 import IncomeLogs         from "../components/income/IncomeLogs";
 import IncomeTable        from "../components/income/IncomeTable";
 import AddIncomeForm      from "../components/income/AddIncomeForm";
@@ -9,16 +8,49 @@ import IncomeDetailsModal from "../components/income/IncomeDetailsModal";
 export default function IncomeTab({ selectedTruck, dateFrom, dateTo }) {
   const [view,    setView]    = useState("list");
   const [viewTxn, setViewTxn] = useState(null);
+  const [incomeList, setIncomeList] = useState([]);
 
-  // Local state copy so payment updates reflect immediately in the list
-  const [incomeList, setIncomeList] = useState(dummyIncome);
+  // ──────────────────────────────────────────────────────────────────────────
+  // FETCH INCOME ENTRIES FROM DATABASE
+  // ──────────────────────────────────────────────────────────────────────────
+  const fetchIncomeEntries = async () => {
+    try {
+      const res = await fetch("http://localhost:5001/api/income");
+      const data = await res.json();
+      if (data.success) {
+        setIncomeList(data.data || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch income entries:", error);
+    }
+  };
 
+  useEffect(() => {
+    fetchIncomeEntries();
+  }, []);
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // FILTERING & SORTING (using database field names)
+  // ──────────────────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let list = [...incomeList];
-    if (selectedTruck !== "All") list = list.filter(i => i.truckId === selectedTruck);
-    if (dateFrom) list = list.filter(i => i.date >= dateFrom);
-    if (dateTo)   list = list.filter(i => i.date <= dateTo);
-    return list.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    if (selectedTruck && selectedTruck !== "All") {
+      list = list.filter(i =>
+        String(i.vehicle_id) === String(selectedTruck) ||
+        String(i.vehicle_number) === String(selectedTruck)
+      );
+    }
+
+    if (dateFrom) {
+      list = list.filter(i => new Date(i.payment_received_date) >= new Date(dateFrom));
+    }
+
+    if (dateTo) {
+      list = list.filter(i => new Date(i.payment_received_date) <= new Date(dateTo));
+    }
+
+    return list.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }, [incomeList, selectedTruck, dateFrom, dateTo]);
 
   // Called from IncomeDetailsModal when user records additional payment

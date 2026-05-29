@@ -18,6 +18,23 @@ export default function Finance() {
   const [selectedTruck, setSelectedTruck] = useState("All");
   const [dateFrom,      setDateFrom]      = useState("");
   const [dateTo,        setDateTo]        = useState("");
+  const [vehicles,      setVehicles]      = useState([]);
+
+  // Fetch vehicles from database on mount
+  React.useEffect(() => {
+    const fetchVehicles = async () => {
+      try {
+        const res = await fetch('http://localhost:5001/api/vehicles');
+        const data = await res.json();
+        if (data.success) {
+          setVehicles(data.data || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch vehicles:', error);
+      }
+    };
+    fetchVehicles();
+  }, []);
 
   const sharedProps = { selectedTruck, dateFrom, dateTo };
 
@@ -70,6 +87,7 @@ export default function Finance() {
         selectedTruck={selectedTruck} setSelectedTruck={setSelectedTruck}
         dateFrom={dateFrom}           setDateFrom={setDateFrom}
         dateTo={dateTo}               setDateTo={setDateTo}
+        vehicles={vehicles}
       />
 
       {/* ── Tab content ── */}
