@@ -1,8 +1,7 @@
 import React from "react";
 import { SlidersHorizontal } from "lucide-react";
-import { dummyTrucks } from "../data/dummyData";
 
-export default function FilterBar({ selectedTruck, setSelectedTruck, dateFrom, setDateFrom, dateTo, setDateTo }) {
+export default function FilterBar({ selectedTruck, setSelectedTruck, dateFrom, setDateFrom, dateTo, setDateTo, vehicles = [] }) {
   const inputCls =
     "px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-colors";
 
@@ -19,8 +18,10 @@ export default function FilterBar({ selectedTruck, setSelectedTruck, dateFrom, s
         className={inputCls + " min-w-[160px]"}
       >
         <option value="All">All Trucks</option>
-        {dummyTrucks.map(t => (
-          <option key={t.id} value={t.id}>{t.model} ({t.id})</option>
+        {vehicles.map(v => (
+          <option key={v.id || v.vehicle_id} value={v.id || v.vehicle_id}>
+            {v.vehicle_no || v.name} {v.id ? `(${v.id})` : ''}
+          </option>
         ))}
       </select>
 

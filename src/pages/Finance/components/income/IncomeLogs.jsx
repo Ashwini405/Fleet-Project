@@ -18,8 +18,8 @@ function StatPill({ label, value, color }) {
 }
 
 export default function IncomeLogs({ records, onAdd }) {
-  const total      = records.reduce((s, r) => s + r.amount, 0);
-  const highest    = records.length ? Math.max(...records.map(r => r.amount)) : 0;
+  const total      = records.reduce((s, r) => s + Number(r.amount || 0), 0);
+  const highest    = records.length ? Math.max(...records.map(r => Number(r.amount || 0))) : 0;
   const avgAmount  = records.length ? Math.round(total / records.length) : 0;
   const count      = records.length;
 

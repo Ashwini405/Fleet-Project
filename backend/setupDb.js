@@ -86,12 +86,12 @@ async function createTable() {
         tyre_id         VARCHAR(60),
         axle_position   VARCHAR(30),
         incident_type   VARCHAR(60)  NOT NULL,
-        severity        ENUM('Low','Medium','High','Critical') NOT NULL DEFAULT 'Medium',
-        priority        ENUM('Low','Normal','High','Urgent')   NOT NULL DEFAULT 'Normal',
-        message         TEXT         NOT NULL,
+        severity        ENUM('Low','Medium','High','Crit
         status          ENUM('Unread','Read') NOT NULL DEFAULT 'Unread',
         created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
+      )ical') NOT NULL DEFAULT 'Medium',
+        priority        ENUM('Low','Normal','High','Urgent')   NOT NULL DEFAULT 'Normal',
+        message         TEXT         NOT NULL,
     `);
     console.log("Table 'tyre_notifications' created successfully!");
   } catch (error) {

@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   TrendingUp, ArrowLeft, MapPin, Calendar, CreditCard,
   Truck, FileText, ChevronDown, Key, RefreshCw, UserCheck,
   MoreHorizontal, Link2, CheckCircle2,
 } from "lucide-react";
-import { dummyTrucks, dummyTrips, dummyInvoices } from "../../data/dummyData";
 import IncomeCategoryBadge from "./IncomeCategoryBadge";
 
 const CATEGORIES   = ["Freight", "Return Load", "Client Payment", "Rental Income", "Miscellaneous"];
@@ -109,9 +108,11 @@ function AutoFillBadge({ trip }) {
     >
       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
       <span className="text-[11px] text-emerald-700 font-medium">
-        Auto-filled — <span className="font-bold">{trip.route}</span>
+        Auto-filled — <span className="font-bold">{trip.source} → {trip.destination}</span>
         <span className="mx-1 opacity-50">·</span>
-        <span className="font-mono">{trip.startDate} → {trip.endDate}</span>
+        <span className="font-mono">
+          {trip.start_time?.split("T")[0]} → {trip.eta?.split("T")[0]}
+        </span>
       </span>
     </motion.div>
   );
@@ -128,8 +129,42 @@ const EMPTY = {
 export default function AddIncomeForm({ onBack }) {
   const [form, setForm]       = useState(EMPTY);
   const [submitted, setSub]   = useState(false);
+  const [vehicles, setVehicles] = useState([]);
+  const [trips, setTrips] = useState([]);
+  const [invoices, setInvoices] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  // Fetch vehicles from database
+  const fetchVehicles = async () => {
+    try {
+      const res = await fetch('http://localhost:5001/api/vehicles');
+      const data = await res.json();
+      if (data.success) {
+        setVehicles(data.data || []);
+      }
+    } catch (error) {
+      console.log('Fetch vehicles error:', error);
+    }
+  };
+
+  // Fetch trips by vehicle ID
+  const fetchTripsByVehicle = async (vehicleId) => {
+    try {
+      const res = await fetch(`http://localhost:5001/api/income/vehicle-trips/${vehicleId}`);
+      const data = await res.json();
+      if (data.success) {
+        setTrips(data.data || []);
+      }
+    } catch (error) {
+      console.log('Fetch trips error:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchVehicles();
+  }, []);
 
   const onCategory = (val) => setForm(f => ({
     ...f, category: val,
@@ -138,18 +173,64 @@ export default function AddIncomeForm({ onBack }) {
   }));
 
   const onTrip = (id) => {
-    const t = dummyTrips.find(x => x.id === id);
-    setForm(f => ({ ...f, linkedTrip: id, route: t?.route ?? "", freightStart: t?.startDate ?? "", freightEnd: t?.endDate ?? "" }));
+    const t = trips.find(x => String(x.id) === String(id));
+    setForm(f => ({
+      ...f,
+      linkedTrip: id,
+      route: `${t?.source || ''} - ${t?.destination || ''}`,
+      freightStart: t?.start_time
+        ? t.start_time.split("T")[0]
+        : "",
+      freightEnd: t?.eta
+        ? t.eta.split("T")[0]
+        : "",
+    }));
   };
 
-  const onSubmit = e => {
+  const onSubmit = async (e) => {
     e.preventDefault();
-    setSub(true);
-    setTimeout(() => { setSub(false); onBack(); }, 1400);
+    try {
+      setLoading(true);
+      const payload = {
+        income_category: form.category,
+        vehicle_id: form.truck,
+        trip_id: form.linkedTrip || null,
+        place_of_running: form.route,
+        freight_start_date: form.freightStart,
+        freight_end_date: form.freightEnd,
+        amount: form.amount,
+        payment_received_date: form.paymentDate,
+        payment_status: form.paymentStatus,
+        bank_reference_number: form.refNumber,
+        description: form.desc,
+        rental_description: form.rentalDesc,
+        rental_start_date: form.rentalStart,
+        rental_end_date: form.rentalEnd,
+        linked_invoice_no: form.linkedInvoice
+      };
+
+      const res = await fetch('http://localhost:5001/api/income', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Income Added Successfully');
+        onBack();
+      } else {
+        alert(data.message || 'Failed to add income');
+      }
+    } catch (error) {
+      console.log('Submit error:', error);
+      alert('Server Error – please try again');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const truck      = dummyTrucks.find(t => t.id === form.truck);
-  const trip       = dummyTrips.find(t => t.id === form.linkedTrip);
+  const truck = vehicles.find(t => String(t.id) === String(form.truck));
+  const trip = trips.find(t => String(t.id) === String(form.linkedTrip));
   const isTripBased = TRIP_CATS.includes(form.category);
   const isClient    = form.category === "Client Payment";
   const isRental    = form.category === "Rental Income";
@@ -194,15 +275,30 @@ export default function AddIncomeForm({ onBack }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <F label="Select Truck" required>
             <Sel>
-              <select value={form.truck} onChange={e => set("truck", e.target.value)} className={sel} required>
+              <select
+                value={form.truck}
+                onChange={(e) => {
+                  const vehicleId = e.target.value;
+
+                  setTrips([]);
+                  set("linkedTrip", "");
+
+                  set("truck", vehicleId);
+                  fetchTripsByVehicle(vehicleId);
+                }}
+                className={sel}
+                required
+              >
                 <option value="">— Select Truck —</option>
-                {dummyTrucks.map(t => <option key={t.id} value={t.id}>{t.model} ({t.id})</option>)}
+                {vehicles.map(vehicle => (
+                  <option key={vehicle.id} value={vehicle.id}>{vehicle.vehicle_no}</option>
+                ))}
               </select>
             </Sel>
             {truck && (
               <p className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 mt-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-                {truck.driver} · {truck.route}
+                {truck.driver_name || "No Driver"} · {truck.vehicle_no}
               </p>
             )}
           </F>
@@ -244,7 +340,11 @@ export default function AddIncomeForm({ onBack }) {
             <Sel>
               <select value={form.linkedTrip} onChange={e => onTrip(e.target.value)} className={sel}>
                 <option value="">— Select Completed Trip —</option>
-                {dummyTrips.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                {trips.map((trip) => (
+                  <option key={trip.id} value={trip.id}>
+                    {trip.trip_id} - {trip.source} → {trip.destination}
+                  </option>
+                ))}
               </select>
             </Sel>
             {form.linkedTrip && (
@@ -290,7 +390,7 @@ export default function AddIncomeForm({ onBack }) {
             <Sel>
               <select value={form.linkedInvoice} onChange={e => set("linkedInvoice", e.target.value)} className={sel}>
                 <option value="">— Select Customer Invoice —</option>
-                {dummyInvoices.map(inv => <option key={inv.id} value={inv.id}>{inv.label}</option>)}
+                {invoices.map(inv => <option key={inv.id} value={inv.id}>{inv.label}</option>)}
               </select>
             </Sel>
             {form.linkedInvoice && (
@@ -394,11 +494,11 @@ export default function AddIncomeForm({ onBack }) {
             </button>
             <motion.button type="submit"
               whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }}
-              disabled={submitted}
+              disabled={loading}
               className="flex-1 py-2.5 text-white text-sm font-extrabold rounded-xl shadow-sm disabled:opacity-60 transition-all"
               style={{ background: "linear-gradient(135deg,#059669 0%,#047857 100%)" }}
             >
-              {submitted ? "Saving…" : "Save Income Entry"}
+              {loading ? "Saving…" : "Save Income Entry"}
             </motion.button>
           </div>
         </Slide>
