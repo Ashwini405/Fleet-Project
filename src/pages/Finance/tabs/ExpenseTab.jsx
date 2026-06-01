@@ -13,14 +13,7 @@ import {
   Utensils,
   Route,
   MoreHorizontal,
-  Link2,
-  ArrowRight,
   Landmark,
-  Gauge,
-  ClipboardList,
-  ShieldCheck,
-  WalletCards,
-  MapPinned,
 } from "lucide-react";
 import Modal from "../components/Modal";
 import { dummyExpense, dummyTrucks, dummyTrips } from "../data/dummyData";
@@ -38,126 +31,115 @@ const EXPENSE_CATEGORIES = [
 
 const MODULE_CONFIG = {
   Fuel: {
-    title: "Fuel Expense Details",
-    module: "Fuel Module",
-    target: "Fuel Expense",
+    title: "Fuel Expense",
+    description: "Record fuel purchases made for vehicle operations.",
+    badge: "Connected to Fuel Operations",
+    flowSteps: ["Fuel Refill", "Fuel Expense", "Finance Record"],
     color: "orange",
     icon: Fuel,
     fields: [
       { key: "fuelStation", label: "Fuel Station", type: "text", placeholder: "e.g. HP Petrol Pump, Pune" },
+      { key: "fuelDate", label: "Fuel Date", type: "date" },
       { key: "litresFilled", label: "Litres Filled", type: "number", placeholder: "e.g. 62" },
-      { key: "mileage", label: "Mileage", type: "text", placeholder: "e.g. 4.8 km/l" },
-      { key: "fuelRef", label: "Fuel Reference Number", type: "text", placeholder: "e.g. FUEL-2023-0108" },
-    ],
-    signals: [
-      { icon: Fuel, label: "Source Record", value: "Fuel Log" },
-      { icon: Gauge, label: "Operational Check", value: "Litres + mileage" },
-      { icon: Landmark, label: "Finance Posting", value: "Diesel expense" },
+      { key: "fuelCost", label: "Fuel Cost", type: "number", placeholder: "e.g. 12000" },
+      { key: "receiptNumber", label: "Receipt Number", type: "text", placeholder: "e.g. RCPT-2026-014" },
     ],
   },
   Maintenance: {
-    title: "Service & Maintenance Details",
-    module: "Service Module",
-    target: "Maintenance Expense",
+    title: "Maintenance Expense",
+    description: "Record workshop and repair expenses for vehicle maintenance.",
+    badge: "Connected to Maintenance Module",
+    flowSteps: ["Service Job Card", "Maintenance Expense", "Finance Record"],
     color: "red",
     icon: Wrench,
     fields: [
       { key: "serviceType", label: "Service Type", type: "select", options: ["General Service", "Oil Change", "Brake Work", "Engine Repair"] },
       { key: "workshopName", label: "Workshop Name", type: "text", placeholder: "e.g. Sai Motors Workshop" },
-      { key: "serviceRef", label: "Service Reference", type: "text", placeholder: "e.g. SRV-2023-0021" },
-      { key: "maintenanceNotes", label: "Maintenance Notes", type: "text", placeholder: "e.g. Brake pad and filter replacement" },
-    ],
-    signals: [
-      { icon: Wrench, label: "Source Record", value: "Service Job Card" },
-      { icon: ClipboardList, label: "Operational Check", value: "Workshop + service type" },
-      { icon: Landmark, label: "Finance Posting", value: "Repair expense" },
+      { key: "serviceDate", label: "Service Date", type: "date" },
+      { key: "serviceReference", label: "Service Reference", type: "text", placeholder: "e.g. SRV-2026-0021" },
+      { key: "repairNotes", label: "Repair Notes", type: "text", placeholder: "e.g. Brake pad and filter replacement" },
     ],
   },
   Tyres: {
-    title: "Tyre Expense Details",
-    module: "Tyres Module",
-    target: "Tyre Expense",
+    title: "Tyre Expense",
+    description: "Record tyre purchase and replacement expenses.",
+    badge: "Connected to Tyre Management",
+    flowSteps: ["Tyre Replacement", "Tyre Expense", "Finance Record"],
     color: "pink",
     icon: CircleDot,
     fields: [
-      { key: "tyreType", label: "Tyre Type", type: "select", options: ["New Tyre", "Retread Tyre", "Tube", "Puncture Repair"] },
-      { key: "replacementPosition", label: "Replacement Position", type: "text", placeholder: "e.g. Rear Left Outer" },
-      { key: "tyreVendor", label: "Vendor Name", type: "text", placeholder: "e.g. MRF Tyre House" },
-      { key: "tyreRef", label: "Tyre Reference", type: "text", placeholder: "e.g. TYR-2023-0044" },
-    ],
-    signals: [
-      { icon: CircleDot, label: "Source Record", value: "Tyre Asset Ledger" },
-      { icon: Route, label: "Operational Check", value: "Axle / position change" },
-      { icon: Landmark, label: "Finance Posting", value: "Tyre replacement cost" },
+      { key: "tyreBrand", label: "Tyre Brand", type: "text", placeholder: "e.g. MRF" },
+      { key: "tyrePosition", label: "Tyre Position", type: "text", placeholder: "e.g. Rear Left" },
+      { key: "vendor", label: "Vendor", type: "text", placeholder: "e.g. MRF Tyre House" },
+      { key: "invoiceNumber", label: "Invoice Number", type: "text", placeholder: "e.g. INV-2026-0055" },
+      { key: "warranty", label: "Warranty", type: "text", placeholder: "e.g. 18 months" },
     ],
   },
   Batteries: {
-    title: "Battery Expense Details",
-    module: "Batteries Module",
-    target: "Battery Expense",
+    title: "Battery Expense",
+    description: "Record battery purchase and replacement expenses.",
+    badge: "Connected to Battery Management",
+    flowSteps: ["Battery Replacement", "Battery Expense", "Finance Record"],
     color: "purple",
     icon: BatteryCharging,
     fields: [
       { key: "batteryBrand", label: "Battery Brand", type: "text", placeholder: "e.g. Exide" },
+      { key: "vendor", label: "Vendor", type: "text", placeholder: "e.g. Power Auto Electricals" },
+      { key: "invoiceNumber", label: "Invoice Number", type: "text", placeholder: "e.g. INV-2026-0099" },
       { key: "warrantyPeriod", label: "Warranty Period", type: "text", placeholder: "e.g. 24 months" },
-      { key: "batteryVendor", label: "Vendor Name", type: "text", placeholder: "e.g. Power Auto Electricals" },
-      { key: "batteryRef", label: "Battery Reference", type: "text", placeholder: "e.g. BAT-2023-0017" },
-    ],
-    signals: [
-      { icon: BatteryCharging, label: "Source Record", value: "Battery Asset Register" },
-      { icon: ShieldCheck, label: "Operational Check", value: "Warranty tracking" },
-      { icon: Landmark, label: "Finance Posting", value: "Battery purchase cost" },
     ],
   },
   "Driver Salary": {
-    title: "Driver Salary Details",
-    module: "Driver Management",
-    target: "Salary Expense",
+    title: "Driver Salary Expense",
+    description: "Record salary payments made to drivers.",
+    badge: "Connected to Staff Management",
+    flowSteps: ["Driver Management", "Salary Processing", "Finance Record"],
     color: "blue",
     icon: UserRound,
     fields: [
       { key: "driverName", label: "Driver Name", type: "select", options: dummyTrucks.map((truck) => truck.driver) },
       { key: "salaryMonth", label: "Salary Month", type: "month" },
       { key: "salaryType", label: "Salary Type", type: "select", options: ["Monthly Salary", "Advance", "Bonus", "Settlement"] },
-    ],
-    signals: [
-      { icon: UserRound, label: "Source Record", value: "Driver Ledger" },
-      { icon: WalletCards, label: "Operational Check", value: "Payroll period" },
-      { icon: Landmark, label: "Finance Posting", value: "Salary payable" },
+      { key: "paymentMode", label: "Payment Mode", type: "select", options: ["Cash", "Bank Transfer", "UPI", "Cheque", "Other"] },
     ],
   },
   "Food Allowance": {
-    title: "Driver Allowance Details",
-    module: "Trip Operations",
-    target: "Allowance Expense",
+    title: "Food Allowance Expense",
+    description: "Record daily allowances provided to drivers during trips.",
+    badge: "Connected to Trip Operations",
+    flowSteps: ["Trip Operations", "Driver Allowance", "Finance Record"],
     color: "yellow",
     icon: Utensils,
     fields: [
       { key: "driverName", label: "Driver Name", type: "select", options: dummyTrucks.map((truck) => truck.driver) },
-      { key: "tripRef", label: "Trip Reference", type: "select", options: dummyTrips.map((trip) => trip.id) },
+      { key: "linkedTrip", label: "Linked Trip", type: "select", options: dummyTrips.map((trip) => trip.id) },
+      { key: "allowanceDate", label: "Allowance Date", type: "date" },
       { key: "allowanceType", label: "Allowance Type", type: "select", options: ["Food", "Daily Bata", "Night Halt", "Loading Allowance"] },
-    ],
-    signals: [
-      { icon: Utensils, label: "Source Record", value: "Driver Allowance" },
-      { icon: ClipboardList, label: "Operational Check", value: "Trip-linked claim" },
-      { icon: Landmark, label: "Finance Posting", value: "Allowance expense" },
     ],
   },
   Toll: {
-    title: "Toll Expense Details",
-    module: "Trips Module",
-    target: "Toll Expense",
+    title: "Toll Expense",
+    description: "Record toll charges paid during trip operations.",
+    badge: "Connected to Trips Module",
+    flowSteps: ["Trip Route", "Toll Payment", "Finance Record"],
     color: "gray",
     icon: Route,
     fields: [
-      { key: "tripRef", label: "Trip Reference", type: "select", options: dummyTrips.map((trip) => trip.id) },
+      { key: "linkedTrip", label: "Linked Trip", type: "select", options: dummyTrips.map((trip) => trip.id) },
       { key: "tollPlaza", label: "Toll Plaza", type: "text", placeholder: "e.g. NH-65 Toll Plaza" },
-      { key: "route", label: "Route", type: "select", options: dummyTrips.map((trip) => trip.route) },
+      { key: "route", label: "Route", type: "text", placeholder: "e.g. Pune - Hyderabad" },
+      { key: "receiptNumber", label: "Receipt Number", type: "text", placeholder: "e.g. Toll-2026-080" },
     ],
-    signals: [
-      { icon: Route, label: "Source Record", value: "Trip Route Cost" },
-      { icon: MapPinned, label: "Operational Check", value: "Plaza + route" },
-      { icon: Landmark, label: "Finance Posting", value: "Toll expense" },
+  },
+  Miscellaneous: {
+    title: "Miscellaneous Expense",
+    description: "Record operational expenses that do not belong to any predefined category.",
+    badge: "Manual Expense Entry",
+    flowSteps: null,
+    color: "neutral",
+    icon: MoreHorizontal,
+    fields: [
+      { key: "expenseTitle", label: "Expense Title", type: "text", placeholder: "e.g. Parking fee, Stationary" },
     ],
   },
 };
@@ -300,55 +282,6 @@ function DynamicField({ field, value, onChange, tone, index }) {
   );
 }
 
-function ErpFlowCard({ config, tone }) {
-  const Icon = config.icon;
-
-  return (
-    <div className="rounded-xl border border-white/70 bg-white/80 p-3 shadow-sm">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${tone.icon}`}>
-          <Icon className="w-4 h-4" />
-          <span className="text-xs font-extrabold">{config.module}</span>
-        </div>
-        <ArrowRight className="w-4 h-4 text-gray-400" />
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-extrabold text-red-700">
-          {config.target}
-        </div>
-        <ArrowRight className="w-4 h-4 text-gray-400" />
-        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-extrabold text-slate-700">
-          Expense Finance Module
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ModuleSignalGrid({ config, tone }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-      {config.signals.map((signal, index) => {
-        const Icon = signal.icon;
-
-        return (
-          <motion.div
-            key={signal.label}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, delay: index * 0.05 }}
-            className="rounded-xl border border-white/80 bg-white p-3 shadow-sm"
-          >
-            <div className={`mb-2 flex h-8 w-8 items-center justify-center rounded-lg border ${tone.icon}`}>
-              <Icon className="w-4 h-4" />
-            </div>
-            <p className="text-[10px] font-extrabold uppercase tracking-widest text-gray-400">{signal.label}</p>
-            <p className="mt-1 text-xs font-extrabold text-gray-800">{signal.value}</p>
-          </motion.div>
-        );
-      })}
-    </div>
-  );
-}
-
 function DynamicExpenseSection({ category, values, onChange }) {
   const config = MODULE_CONFIG[category];
   if (!config) return null;
@@ -366,27 +299,20 @@ function DynamicExpenseSection({ category, values, onChange }) {
         transition={{ duration: 0.25, ease: "easeOut" }}
         className={`overflow-hidden rounded-2xl border ${tone.shell}`}
       >
-        <div className="p-4 space-y-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${tone.icon}`}>
+        <div className="p-5 space-y-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`flex h-11 w-11 items-center justify-center rounded-2xl border ${tone.icon}`}>
                 <Icon className="w-5 h-5" />
               </div>
               <div>
-                <h3 className={`text-sm font-extrabold ${tone.text}`}>{config.title}</h3>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  This expense is represented as an operational module-generated finance entry.
-                </p>
+                <h3 className={`text-base font-extrabold ${tone.text}`}>{config.title}</h3>
+                <p className="text-sm text-gray-600 mt-1">{config.description}</p>
               </div>
             </div>
-            <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-extrabold ${tone.chip}`}>
-              Linked to {config.module}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_1fr] gap-4">
-            <ErpFlowCard config={config} tone={tone} />
-            <ModuleSignalGrid config={config} tone={tone} />
+            <div className={`rounded-full border px-3 py-1.5 text-xs font-bold uppercase tracking-wide ${tone.chip}`}>
+              {config.badge}
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -401,16 +327,6 @@ function DynamicExpenseSection({ category, values, onChange }) {
               />
             ))}
           </div>
-
-          <div className={`flex items-start gap-2 rounded-xl border px-3 py-2.5 ${tone.chip}`}>
-            <Link2 className="w-4 h-4 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-extrabold">Linked to {config.module}</p>
-              <p className="text-[11px] font-medium opacity-80">
-                UI-only ERP linkage preview. No backend sync or automation is triggered.
-              </p>
-            </div>
-          </div>
         </div>
       </motion.section>
     </AnimatePresence>
@@ -418,8 +334,16 @@ function DynamicExpenseSection({ category, values, onChange }) {
 }
 
 function AddExpenseForm({ onBack }) {
-  const [form, setForm] = useState({ truck: "", date: "", category: "", amount: "", desc: "" });
+  const [form, setForm] = useState({ truck: "", category: "" });
   const [moduleFields, setModuleFields] = useState({});
+  const [sharedFields, setSharedFields] = useState({
+    expenseDate: "",
+    amount: "",
+    paymentMethod: "",
+    vendor: "",
+    description: "",
+    attachment: null,
+  });
   const tone = getTone(form.category);
 
   const set = (key) => (event) => {
@@ -432,14 +356,21 @@ function AddExpenseForm({ onBack }) {
     setModuleFields((current) => ({ ...current, [key]: value }));
   };
 
+  const setSharedField = (key) => (event) => {
+    const value = key === "attachment" ? event.target.files?.[0] || null : event.target.value;
+    setSharedFields((current) => ({ ...current, [key]: value }));
+  };
+
+  const categoryConfig = MODULE_CONFIG[form.category];
+
   return (
     <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-red-50/40">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-slate-50">
         <div>
-          <h2 className="flex items-center gap-2 text-base font-bold text-red-700">
-            <TrendingDown className="w-4 h-4" /> Add Expense Entry
+          <h2 className="flex items-center gap-2 text-base font-bold text-slate-900">
+            <TrendingDown className="w-4 h-4 text-slate-700" /> Add Expense Entry
           </h2>
-          <p className="text-xs text-gray-500 mt-0.5">Operational finance entry with ERP module visibility</p>
+          <p className="text-xs text-gray-500 mt-0.5">Category-driven expense capture with clear business flow.</p>
         </div>
         <button
           onClick={onBack}
@@ -450,16 +381,10 @@ function AddExpenseForm({ onBack }) {
       </div>
 
       <form className="p-5 space-y-5 bg-slate-50/40" onSubmit={(event) => { event.preventDefault(); onBack(); }}>
-        <section className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
-          <div className="flex items-center justify-between gap-3 border-b border-gray-100 pb-3">
-            <div>
-              <h3 className="text-sm font-extrabold text-gray-900">Common Finance Fields</h3>
-              <p className="text-xs text-gray-500 mt-0.5">These fields stay visible for every expense category.</p>
-            </div>
-            <div className="hidden sm:flex items-center gap-2 rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-extrabold text-red-700">
-              <Landmark className="w-4 h-4" />
-              Expense Finance Module
-            </div>
+        <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-5">
+          <div>
+            <h3 className="text-sm font-extrabold text-gray-900">Common Details</h3>
+            <p className="text-xs text-gray-500 mt-1">Select the truck and expense category before filling the workflow details.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -484,64 +409,109 @@ function AddExpenseForm({ onBack }) {
             </div>
           </div>
 
-          <DynamicExpenseSection category={form.category} values={moduleFields} onChange={setModuleField} />
-
-          {form.category === "Miscellaneous" && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="rounded-2xl border border-gray-200 bg-gray-50 p-4"
-            >
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-500">
-                  <MoreHorizontal className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-extrabold text-gray-800">Miscellaneous Expense</h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    No operational module linkage is shown for this category. Use the common finance fields only.
-                  </p>
-                </div>
-              </div>
-            </motion.div>
+          {form.category ? (
+            <DynamicExpenseSection category={form.category} values={moduleFields} onChange={setModuleField} />
+          ) : (
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-slate-50 p-6 text-sm text-gray-500">
+              Choose an expense category to continue. Each category has its own workflow, fields, and business context.
+            </div>
           )}
+        </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className={labelCls}>Date</label>
-              <input type="date" value={form.date} onChange={set("date")} className={`${inputCls} ${tone.ring}`} required />
+        {form.category && (
+          <section className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm space-y-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-extrabold text-gray-900">Finance Details</h3>
+                <p className="text-xs text-gray-500 mt-1">These fields are required for every expense record.</p>
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">
+                <Landmark className="w-4 h-4" /> Final Finance Record
+              </div>
             </div>
 
-            <div>
-              <label className={labelCls}>Amount (Rs.)</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">Rs.</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className={labelCls}>Expense Date</label>
                 <input
-                  type="number"
-                  placeholder="0.00"
-                  min="0"
-                  value={form.amount}
-                  onChange={set("amount")}
-                  className={`${inputCls} ${tone.ring} pl-11`}
+                  type="date"
+                  value={sharedFields.expenseDate}
+                  onChange={setSharedField("expenseDate")}
+                  className={`${inputCls} ${tone.ring}`}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className={labelCls}>Amount</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-semibold">Rs.</span>
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="0.00"
+                    value={sharedFields.amount}
+                    onChange={setSharedField("amount")}
+                    className={`${inputCls} ${tone.ring} pl-11`}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className={labelCls}>Payment Method</label>
+                <select
+                  value={sharedFields.paymentMethod}
+                  onChange={setSharedField("paymentMethod")}
+                  className={`${inputCls} ${tone.ring}`}
+                  required
+                >
+                  <option value="">Select Payment Method</option>
+                  <option value="Cash">Cash</option>
+                  <option value="Bank Transfer">Bank Transfer</option>
+                  <option value="UPI">UPI</option>
+                  <option value="Cheque">Cheque</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label className={labelCls}>Vendor / Payee</label>
+                <input
+                  type="text"
+                  placeholder="Vendor or payee name"
+                  value={sharedFields.vendor}
+                  onChange={setSharedField("vendor")}
+                  className={`${inputCls} ${tone.ring}`}
                   required
                 />
               </div>
             </div>
-          </div>
 
-          <div>
-            <label className={labelCls}>Description / Note</label>
-            <textarea
-              rows={3}
-              placeholder="e.g. Diesel refill at Pune, NH-65 toll plaza..."
-              value={form.desc}
-              onChange={set("desc")}
-              className={`${inputCls} ${tone.ring} resize-none`}
-            />
-          </div>
-        </section>
+            <div>
+              <label className={labelCls}>Description</label>
+              <textarea
+                rows={3}
+                placeholder="Enter expense purpose or notes"
+                value={sharedFields.description}
+                onChange={setSharedField("description")}
+                className={`${inputCls} ${tone.ring} resize-none`}
+                required
+              />
+            </div>
 
-        <div className="flex gap-3 pt-2">
+            <div>
+              <label className={labelCls}>Attachment Upload</label>
+              <input
+                type="file"
+                onChange={setSharedField("attachment")}
+                className={`${inputCls} ${tone.ring} cursor-pointer`}
+              />
+            </div>
+          </section>
+        )}
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             onClick={onBack}
@@ -551,7 +521,7 @@ function AddExpenseForm({ onBack }) {
           </button>
           <button
             type="submit"
-            className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
+            className="flex-1 sm:flex-initial px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl transition-colors shadow-sm"
           >
             Save Expense Entry
           </button>
