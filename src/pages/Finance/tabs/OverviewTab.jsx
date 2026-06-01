@@ -1,18 +1,27 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { TrendingUp, TrendingDown, Wallet, Eye, MapPin, Clock, CreditCard, Truck } from "lucide-react";
 import Card  from "../components/Card";
 import Modal from "../components/Modal";
-import { dummyIncome, dummyExpense } from "../data/dummyData";
 
 function applyFilters(incList, expList, selectedTruck, dateFrom, dateTo) {
   let inc = [...incList];
   let exp = [...expList];
+
   if (selectedTruck !== "All") {
-    inc = inc.filter(i => i.truckId === selectedTruck);
-    exp = exp.filter(e => e.truckId === selectedTruck);
+    inc = inc.filter(i => String(i.vehicle_id) === String(selectedTruck));
+    exp = exp.filter(e => String(e.vehicle_id) === String(selectedTruck));
   }
-  if (dateFrom) { inc = inc.filter(i => i.date >= dateFrom); exp = exp.filter(e => e.date >= dateFrom); }
-  if (dateTo)   { inc = inc.filter(i => i.date <= dateTo);   exp = exp.filter(e => e.date <= dateTo);   }
+
+  if (dateFrom) {
+    inc = inc.filter(i => new Date(i.payment_received_date) >= new Date(dateFrom));
+    exp = exp.filter(e => new Date(e.expense_date) >= new Date(dateFrom));
+  }
+
+  if (dateTo) {
+    inc = inc.filter(i => new Date(i.payment_received_date) <= new Date(dateTo));
+    exp = exp.filter(e => new Date(e.expense_date) <= new Date(dateTo));
+  }
+
   return { inc, exp };
 }
 
@@ -28,19 +37,97 @@ function DetailRow({ label, value, mono }) {
 
 export default function OverviewTab({ selectedTruck, dateFrom, dateTo }) {
   const [viewTxn, setViewTxn] = useState(null);
+  const [incomeList, setIncomeList] = useState([]);
+  const [expenseList, setExpenseList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch income from database
+  const fetchIncome = async () => {
+    try {
+      const res = await fetch("http://localhost:5001/api/income");
+      const data = await res.json();
+      if (data.success) {
+        setIncomeList(data.data || []);
+      }
+    } catch (error) {
+      console.error("Income fetch failed:", error);
+    }
+  };
+
+  // Fetch expenses from database
+  const fetchExpenses = async () => {
+    try {
+      const res = await fetch("http://localhost:5001/api/expenses");
+      const data = await res.json();
+      if (data.success) {
+        setExpenseList(data.data || []);
+      }
+    } catch (error) {
+      console.error("Expense fetch failed:", error);
+    }
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchIncome(), fetchExpenses()]);
+      setLoading(false);
+    };
+    loadData();
+  }, []);
 
   const { inc, exp } = useMemo(
-    () => applyFilters(dummyIncome, dummyExpense, selectedTruck, dateFrom, dateTo),
-    [selectedTruck, dateFrom, dateTo]
+    () => applyFilters(incomeList, expenseList, selectedTruck, dateFrom, dateTo),
+    [incomeList, expenseList, selectedTruck, dateFrom, dateTo]
   );
 
-  const totalIncome  = inc.reduce((s, i) => s + Number(i.amount || 0), 0);
+  const totalIncome = inc.reduce((s, i) => s + Number(i.amount || 0), 0);
   const totalExpense = exp.reduce((s, e) => s + Number(e.amount || 0), 0);
-  const netBalance   = totalIncome - totalExpense;
+  const netBalance = totalIncome - totalExpense;
 
-  const recent = [...inc.map(i => ({ ...i, _type: "income", amount: Number(i.amount || 0) })), ...exp.map(e => ({ ...e, _type: "expense", amount: Number(e.amount || 0) }))]
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
+  const recent = [
+    ...inc.map(i => ({
+      ...i,
+      _type: "income",
+      amount: Number(i.amount || 0),
+      displayDate: i.payment_received_date,
+    })),
+    ...exp.map(e => ({
+      ...e,
+      _type: "expense",
+      amount: Number(e.amount || 0),
+      displayDate: e.expense_date,
+    }))
+  ]
+    .sort((a, b) => new Date(b.displayDate) - new Date(a.displayDate))
     .slice(0, 8);
+
+  if (loading) {
+    return (
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+            <div className="h-6 bg-gray-200 rounded w-32"></div>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+            <div className="h-6 bg-gray-200 rounded w-32"></div>
+          </div>
+          <div className="bg-white rounded-2xl border border-gray-200 p-5 animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+            <div className="h-6 bg-gray-200 rounded w-32"></div>
+          </div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <div className="h-4 bg-gray-200 rounded w-32"></div>
+          </div>
+          <div className="py-14 text-center text-gray-400 text-sm">Loading transactions...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
@@ -78,14 +165,16 @@ export default function OverviewTab({ selectedTruck, dateFrom, dateTo }) {
                   {/* Category + date */}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-gray-800 truncate">
-                      {isInc ? txn.type : txn.category}
+                      {isInc ? txn.income_category : txn.expense_category}
                     </p>
-                    <p className="text-xs text-gray-400 mt-0.5">{txn.date} &nbsp;·&nbsp; {txn.truckId}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {txn.displayDate} &nbsp;·&nbsp; {txn.vehicle_number || "—"}
+                    </p>
                   </div>
 
                   {/* Description */}
                   <p className="hidden md:block text-xs text-gray-400 italic truncate max-w-[180px]">
-                    "{isInc ? txn.desc : txn.desc}"
+                    "{txn.description || "—"}"
                   </p>
 
                   {/* Amount */}
@@ -126,20 +215,22 @@ export default function OverviewTab({ selectedTruck, dateFrom, dateTo }) {
 
             {viewTxn._type === "income" ? (
               <>
-                <DetailRow label="Payment Received" value={viewTxn.date} />
-                <DetailRow label="Category"         value={viewTxn.type} />
-                <DetailRow label="Place of Running" value={viewTxn.route || "—"} />
-                <DetailRow label="Freight Range"    value={`${viewTxn.freightStart} → ${viewTxn.freightEnd}`} />
-                <DetailRow label="Bank Reference"   value={viewTxn.refNumber || "—"} mono />
-                <DetailRow label="Vehicle"          value={`${viewTxn.truckModel} (${viewTxn.truckId})`} />
-                <DetailRow label="Description"      value={`"${viewTxn.desc}"`} />
+                <DetailRow label="Payment Received" value={viewTxn.payment_received_date || "—"} />
+                <DetailRow label="Category"         value={viewTxn.income_category || "—"} />
+                <DetailRow label="Place of Running" value={viewTxn.place_of_running || "—"} />
+                <DetailRow label="Freight Range"    value={viewTxn.freight_start_date && viewTxn.freight_end_date ? `${viewTxn.freight_start_date} → ${viewTxn.freight_end_date}` : "—"} />
+                <DetailRow label="Bank Reference"   value={viewTxn.bank_reference_number || "—"} mono />
+                <DetailRow label="Vehicle"          value={viewTxn.vehicle_number || "—"} />
+                <DetailRow label="Description"      value={`"${viewTxn.description || "—"}"`} />
               </>
             ) : (
               <>
-                <DetailRow label="Date"        value={viewTxn.date} />
-                <DetailRow label="Category"    value={viewTxn.category} />
-                <DetailRow label="Vehicle"     value={`${viewTxn.truckModel} (${viewTxn.truckId})`} />
-                <DetailRow label="Description" value={`"${viewTxn.desc}"`} />
+                <DetailRow label="Date"        value={viewTxn.expense_date || "—"} />
+                <DetailRow label="Category"    value={viewTxn.expense_category || "—"} />
+                <DetailRow label="Payment Method" value={viewTxn.payment_method || "—"} />
+                <DetailRow label="Vendor/Payee" value={viewTxn.vendor_payee || "—"} />
+                <DetailRow label="Vehicle"     value={viewTxn.vehicle_number || "—"} />
+                <DetailRow label="Description" value={`"${viewTxn.description || "—"}"`} />
               </>
             )}
 

@@ -30,7 +30,8 @@ const dashboardRoutes             = require('./routes/dashboardRoutes');
 const { startWarrantyExpiryChecker } = require('./services/warrantyExpiryChecker');
 const incomeRoutes =
 require('./routes/incomeRoutes');
-
+const expenseRoutes =
+require("./routes/expenseRoutes");
 const app = express();
 
 const db = require('./config/db');
@@ -128,6 +129,11 @@ app.use(
   incomeRoutes
 );
 
+
+app.use(
+  "/api/expenses",
+  expenseRoutes
+);
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {
   res.send('Fleet Management Backend is running...');
