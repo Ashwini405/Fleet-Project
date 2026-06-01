@@ -1,7 +1,6 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { Truck, Eye, TrendingUp, TrendingDown, List } from "lucide-react";
 import Modal from "../components/Modal";
-import { dummyTrucks, dummyIncome, dummyExpense } from "../data/dummyData";
 
 function DetailRow({ label, value }) {
   return (
@@ -14,27 +13,125 @@ function DetailRow({ label, value }) {
 
 export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
   const [modalTruck, setModalTruck] = useState(null);
+  const [vehicles, setVehicles] = useState([]);
+  const [incomeList, setIncomeList] = useState([]);
+  const [expenseList, setExpenseList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch vehicles from database
+  const fetchVehicles = async () => {
+    try {
+      const res = await fetch("http://localhost:5001/api/vehicles");
+      const data = await res.json();
+      if (data.success) {
+        setVehicles(data.data || []);
+      }
+    } catch (error) {
+      console.error("Vehicle fetch failed:", error);
+    }
+  };
+
+  // Fetch income records from database
+  const fetchIncome = async () => {
+    try {
+      const res = await fetch("http://localhost:5001/api/income");
+      const data = await res.json();
+      if (data.success) {
+        setIncomeList(data.data || []);
+      }
+    } catch (error) {
+      console.error("Income fetch failed:", error);
+    }
+  };
+
+  // Fetch expense records from database
+  const fetchExpenses = async () => {
+    try {
+      const res = await fetch("http://localhost:5001/api/expenses");
+      const data = await res.json();
+      if (data.success) {
+        setExpenseList(data.data || []);
+      }
+    } catch (error) {
+      console.error("Expense fetch failed:", error);
+    }
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([fetchVehicles(), fetchIncome(), fetchExpenses()]);
+      setLoading(false);
+    };
+    loadData();
+  }, []);
 
   const truckStats = useMemo(() => {
-    return dummyTrucks.map(truck => {
-      let inc = dummyIncome.filter(i => i.truckId === truck.id);
-      let exp = dummyExpense.filter(e => e.truckId === truck.id);
+    return vehicles.map(vehicle => {
+      // Filter income by vehicle_id
+      let inc = incomeList.filter(i => String(i.vehicle_id) === String(vehicle.id));
+      // Filter expense by vehicle_id
+      let exp = expenseList.filter(e => String(e.vehicle_id) === String(vehicle.id));
 
-      if (dateFrom) { inc = inc.filter(i => i.date >= dateFrom); exp = exp.filter(e => e.date >= dateFrom); }
-      if (dateTo)   { inc = inc.filter(i => i.date <= dateTo);   exp = exp.filter(e => e.date <= dateTo);   }
+      // Apply date filters
+      if (dateFrom) {
+        inc = inc.filter(i => i.payment_received_date >= dateFrom);
+        exp = exp.filter(e => e.expense_date >= dateFrom);
+      }
+      if (dateTo) {
+        inc = inc.filter(i => i.payment_received_date <= dateTo);
+        exp = exp.filter(e => e.expense_date <= dateTo);
+      }
 
-      const totalIncome  = inc.reduce((s, i) => s + Number(i.amount || 0), 0);
+      const totalIncome = inc.reduce((s, i) => s + Number(i.amount || 0), 0);
       const totalExpense = exp.reduce((s, e) => s + Number(e.amount || 0), 0);
-      const netProfit    = totalIncome - totalExpense;
+      const netProfit = totalIncome - totalExpense;
 
+      // Combine income and expense for transaction history
       const history = [
-        ...inc.map(i => ({ ...i, _type: "income", amount: Number(i.amount || 0) })),
-        ...exp.map(e => ({ ...e, _type: "expense", amount: Number(e.amount || 0) })),
+        ...inc.map(i => ({
+          ...i,
+          _type: "income",
+          amount: Number(i.amount || 0),
+          title: i.income_category,
+          date: i.payment_received_date,
+        })),
+        ...exp.map(e => ({
+          ...e,
+          _type: "expense",
+          amount: Number(e.amount || 0),
+          title: e.expense_category,
+          date: e.expense_date,
+        })),
       ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
-      return { ...truck, totalIncome, totalExpense, netProfit, history };
-    }).filter(t => selectedTruck === "All" || t.id === selectedTruck);
-  }, [selectedTruck, dateFrom, dateTo]);
+      return {
+        ...vehicle,
+        totalIncome,
+        totalExpense,
+        netProfit,
+        history,
+      };
+    }).filter(
+      t => selectedTruck === "All" || String(t.id) === String(selectedTruck)
+    );
+  }, [vehicles, incomeList, expenseList, selectedTruck, dateFrom, dateTo]);
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div>
+          <h2 className="flex items-center gap-2 text-base font-bold text-gray-900">
+            <Truck className="w-4 h-4 text-blue-600" /> Fleet Performance
+          </h2>
+          <p className="text-xs text-gray-500 mt-0.5">Loading vehicle data...</p>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-8 text-center">
+          <div className="animate-pulse text-gray-400">Loading...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -59,7 +156,7 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
         </div>
 
         {truckStats.length === 0 ? (
-          <div className="py-14 text-center text-gray-400 text-sm">No truck records found.</div>
+          <div className="py-14 text-center text-gray-400 text-sm">No vehicle records found.</div>
         ) : (
           <div className="divide-y divide-gray-50">
             {truckStats.map(truck => (
@@ -73,8 +170,10 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
                     <Truck className="w-5 h-5" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-gray-900">{truck.model}</p>
-                    <p className="text-xs text-gray-400">{truck.id} &nbsp;·&nbsp; {truck.driver}</p>
+                    <p className="text-sm font-bold text-gray-900">{truck.vehicle_no}</p>
+                    <p className="text-xs text-gray-400">
+                      {truck.id} &nbsp;·&nbsp; {truck.driver_name || "No Driver"}
+                    </p>
                   </div>
                 </div>
 
@@ -127,12 +226,14 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
                 <Truck className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-base font-bold text-gray-900">{modalTruck.model}</p>
-                <p className="text-xs text-gray-500">{modalTruck.id} &nbsp;·&nbsp; Driver: {modalTruck.driver}</p>
+                <p className="text-base font-bold text-gray-900">{modalTruck.vehicle_no}</p>
+                <p className="text-xs text-gray-500">
+                  {modalTruck.id} &nbsp;·&nbsp; Driver: {modalTruck.driver_name || "No Driver"}
+                </p>
               </div>
             </div>
 
-            <DetailRow label="Assigned Route" value={modalTruck.route} />
+            <DetailRow label="Assigned Station" value={modalTruck.station_name || "Not Assigned"} />
 
             {/* P&L summary */}
             <div className="grid grid-cols-3 gap-3">
@@ -172,14 +273,12 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
                             {isInc ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                           </div>
                           <div>
-                            <p className="text-sm font-semibold text-gray-800">
-                              {isInc ? txn.type : txn.category}
-                            </p>
-                            <p className="text-xs text-gray-400">{txn.date}</p>
+                            <p className="text-sm font-semibold text-gray-800">{txn.title || "—"}</p>
+                            <p className="text-xs text-gray-400">{txn.date || "—"}</p>
                           </div>
                         </div>
                         <p className={`text-sm font-bold ${isInc ? "text-green-600" : "text-red-500"}`}>
-                          {isInc ? "+" : "−"}₹{txn.amount.toLocaleString()}
+                          {isInc ? "+" : "−"}₹{Math.abs(txn.amount).toLocaleString()}
                         </p>
                       </div>
                     );
