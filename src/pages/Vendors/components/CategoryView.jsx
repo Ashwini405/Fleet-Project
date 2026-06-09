@@ -36,7 +36,7 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
               onClick={() => setAddModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors whitespace-nowrap"
             >
-              <FiPlus /> Add Account
+              <FiPlus /> {category === 'garages' ? 'Add Garage' : 'Add Account'}
             </button>
          </div>
       </div>
@@ -53,7 +53,7 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
                     <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center border border-blue-100">
                        <FiBriefcase size={20} />
                     </div>
-                    <FiChevronRight className="text-gray-300 group-hover:text-blue-500 transition-colors" size={20} />
+                    <FiChevronRight className="text-gray-300 group-hover:text-blue-500 transition-colors" size={20} title="View Garage Ledger" />
                  </div>
                  
                  <h3 className="font-bold text-gray-800 text-lg mb-2">{vendor.name}</h3>
@@ -71,11 +71,26 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
                  </div>
               </div>
 
-              <div className="border-t border-gray-100 pt-4 flex justify-between items-center">
-                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Balance</span>
-                 <span className={`font-bold text-lg ${vendor.balance < 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    ₹{Math.abs(vendor.balance).toLocaleString()} {vendor.balance < 0 ? 'Cr' : 'Dr'}
+              <div className="border-t border-gray-100 pt-4 flex justify-between items-end">
+                 <span
+                   className="text-[10px] font-bold text-gray-400 uppercase tracking-widest cursor-help"
+                   title="Outstanding Balance = Amount currently payable to this garage after completed services, repairs, and payment adjustments."
+                 >
+                   Ledger Balance
                  </span>
+                 {vendor.balance === 0 ? (
+                   <div className="flex flex-col items-end">
+                     <span className="font-bold text-lg text-gray-400">₹0</span>
+                     <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">Settled</span>
+                   </div>
+                 ) : (
+                   <div className="flex flex-col items-end">
+                     <span className={`font-bold text-lg ${vendor.balance < 0 ? 'text-green-500' : 'text-red-500'}`}>
+                       ₹{Math.abs(vendor.balance).toLocaleString()} {vendor.balance < 0 ? 'Cr' : 'Dr'}
+                     </span>
+                     <span className="text-[10px] font-medium text-gray-400">Outstanding Payable</span>
+                   </div>
+                 )}
               </div>
            </div>
          ))}
@@ -87,7 +102,7 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
          )}
       </div>
 
-      <AddAccountModal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} categoryName={categoryName} />
+      <AddAccountModal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} categoryName={categoryName} category={category} />
     </div>
   );
 }
