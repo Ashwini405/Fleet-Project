@@ -85,7 +85,9 @@ export const dummyVendors = [
 
 export const dummyLedger = {
   "v2": [
-    { id: "t1", date: "2023-10-01", truckId: "AP02X1234", desc: "Engine Overhaul", debit: 45000, credit: 0 },
-    { id: "t2", date: "2023-10-03", truckId: "", desc: "Partial Payment", debit: 0, credit: 20000 }
+    { id: "t1", date: "2023-10-01", truckId: "AP02X1234", type: "Repair Work",      ref: "REP-0001", desc: "Engine Overhaul", debit: 45000 },
+    { id: "t2", date: "2023-10-10", truckId: "AP02X1234", type: "Periodic Service", ref: "SER-0005", desc: "Oil Change",       debit: 1300  }
   ]
 };
+
+// NOTE: Payment and Manual Adjustment types are reserved for the future Operational Payments module.
