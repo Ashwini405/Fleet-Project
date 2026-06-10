@@ -15,7 +15,7 @@ const buildRepairData = (source, totals) => ({
   priority: source.priority || null,
   service_date: source.service_date ? source.service_date.split('T')[0] : null,
   odometer: source.odometer || null,
-  garage: source.garage || null,
+  garage: source.garage_name || source.garage || null,
   repair_start_time: source.repair_start_time || source.repair_start || null,
   repair_end_time: source.repair_end_time || source.repair_end || null,
   downtime: source.downtime || null,
@@ -35,6 +35,8 @@ const buildRepairData = (source, totals) => ({
 const createRepair = async (req, res) => {
   try {
     const data = req.body;
+    console.log('REQ BODY:', data);
+    console.log('garage_id:', data.garage_id, '| garage_name:', data.garage_name);
 
     if (!data.vehicle_id) {
       return res.status(400).json({ success: false, message: "Vehicle is required" });
@@ -198,7 +200,7 @@ const updateRepair = async (req, res) => {
       priority:           body.priority,
       service_date:       body.service_date ? body.service_date.split('T')[0] : null,
       odometer:           body.odometer || null,
-      garage:             body.garage || null,
+      garage:             body.garage_name || body.garage || null,
       repair_start_time:  body.repair_start_time || null,
       repair_end_time:    body.repair_end_time || null,
       downtime:           body.downtime || null,

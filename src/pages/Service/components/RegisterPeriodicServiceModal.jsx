@@ -75,7 +75,13 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
   // Fetch vehicles + garages once
   useEffect(() => {
     fetch(`${API}/vehicles`).then(r => r.json()).then(d => setTrucks(d.data || []));
-    fetch(`${API}/garages`).then(r => r.json()).then(d => setGarages(d.data || [])).catch(() => {});
+    fetch(`${API}/vendors`)
+      .then(r => r.json())
+      .then(d => {
+        const all = d.data || [];
+        setGarages(all.filter(v => String(v.category).toLowerCase() === 'garages'));
+      })
+      .catch(() => {});
   }, []);
 
   // Fetch vehicle service status when truck selected
@@ -164,6 +170,10 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
     if (!validate()) return;
     setSaving(true);
     try {
+      const resolvedGarageName = garages.find(g => String(g.id) === String(garage))?.garage_name || '';
+      console.log('DEBUG garage state:', garage);
+      console.log('DEBUG garages list:', garages);
+      console.log('DEBUG resolvedGarageName:', resolvedGarageName);
       const fd = new FormData();
       fd.append('vehicle_id',       selectedTruck.id);
       fd.append('service_date',     serviceDate);
@@ -171,7 +181,8 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
       fd.append('interval_km',      intervalKm || '');
       fd.append('service_type',     serviceType);
       fd.append('status',           status);
-      fd.append('garage',           garage);
+      fd.append('garage_id',        garage || '');
+      fd.append('garage_name',      resolvedGarageName);
       fd.append('labour_cost',      labourCost || 0);
       fd.append('total_cost',       grandTotal);
       fd.append('work_description', workDescription);
@@ -376,7 +387,7 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
                 <label className={L}>Garage / Vendor {!isReported && <span className="text-red-500">*</span>}</label>
                 <select value={garage} onChange={e => setGarage(e.target.value)} className={F} disabled={isCompleted}>
                   <option value="">-- Select Garage --</option>
-                  {garages.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
+                  {garages.map(g => <option key={g.id} value={g.id}>{g.garage_name}</option>)}
                 </select>
                 {errors.garage && <p className="text-red-500 text-xs mt-1">{errors.garage}</p>}
                 {isReported && <p className="text-[11px] text-gray-400 mt-1">Optional for draft — required when In Progress</p>}

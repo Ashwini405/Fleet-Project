@@ -92,9 +92,12 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       .then(data => setVehicles(data.data || []))
       .catch(err => console.error('Vehicle fetch error:', err));
 
-    fetch('http://localhost:5001/api/garages')
+    fetch('http://localhost:5001/api/vendors')
       .then(res => res.json())
-      .then(data => setGarages(data.data || []))
+      .then(data => {
+        const all = data.data || [];
+        setGarages(all.filter(v => String(v.category).toLowerCase() === 'garages'));
+      })
       .catch(err => console.error('Garage fetch error:', err));
   }, []);
 
@@ -111,7 +114,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       setTruck(logData.vehicle_id?.toString() || '');
       setDate(logData.service_date ? logData.service_date.split('T')[0] : new Date().toISOString().split('T')[0]);
       setOdometer(logData.odometer || '');
-      setGarage(logData.garage || '');
+      setGarage(logData.garage_id?.toString() || logData.garage || '');
       setRepairStartTime(logData.repair_start_time ? logData.repair_start_time.slice(0, 5) : '');
       setRepairEndTime(logData.repair_end_time ? logData.repair_end_time.slice(0, 5) : '');
       setStatus(logData.status || 'Reported');
@@ -369,6 +372,11 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     if (!validate()) return;
     setSavingInventory(true);
 
+    const selectedGarage = garages.find(g => String(g.id) === String(garage));
+    console.log('Garage ID:', garage);
+    console.log('Selected Garage:', selectedGarage);
+    console.log('Garages List:', garages);
+
     const payload = {
       vehicle_id: truck,
       vehicle_no: selectedTruck?.vehicle_no || '',
@@ -385,7 +393,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
 
       service_date: date ? date.split('T')[0] : null,
       odometer: odometer || null,
-      garage: garage || null,
+      garage_id: garage || null,
+      garage_name: selectedGarage?.garage_name || selectedGarage?.name || '',
 
       repair_start_time: repairStartTime || null,
       repair_end_time: repairEndTime || null,
@@ -404,6 +413,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       parts: JSON.stringify(parts),
       files: JSON.stringify(files.map(f => ({ name: f.file?.name || f.name || f.file_name, type: f.file?.type || f.type || f.file_type, size: f.file?.size || f.size }))),
     };
+
+    console.log('Payload:', payload);
 
     try {
       const isEdit = Boolean(logData?.id);
@@ -798,7 +809,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                     >
                       <option value="">Select Service Provider</option>
                       {garages.map(g => (
-                        <option key={g.id} value={g.name}>{g.name}</option>
+                        <option key={g.id} value={g.id}>{g.garage_name}</option>
                       ))}
                     </select>
                     {errors.garage && <p className="text-xs text-red-600 mt-1">{errors.garage}</p>}

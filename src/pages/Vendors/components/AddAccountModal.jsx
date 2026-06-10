@@ -24,11 +24,12 @@ const makeEmpty = (prefill = '') => ({
   bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '',
 });
 
-export default function AddAccountModal({ isOpen, onClose, categoryName, category }) {
+export default function AddAccountModal({ isOpen, onClose, categoryName, category, onSuccess }) {
   const prefill = CATEGORY_MAP[category] || '';
   const [form, setForm]     = useState(() => makeEmpty(prefill));
   const [errors, setErrors] = useState({});
-  const [toast, setToast]   = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   if (!isOpen) return null;
 
@@ -48,28 +49,80 @@ export default function AddAccountModal({ isOpen, onClose, categoryName, categor
     return e;
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    setToast(true);
-    setTimeout(() => { setToast(false); setForm(makeEmpty(prefill)); setErrors({}); onClose(); }, 1500);
+  const handleClose = () => { 
+    setForm(makeEmpty(prefill)); 
+    setErrors({}); 
+    setError('');
+    onClose(); 
   };
 
-  const handleClose = () => { setForm(makeEmpty(prefill)); setErrors({}); onClose(); };
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length > 0) { 
+      setErrors(errs); 
+      return; 
+    }
+
+    setError('');
+    setLoading(true);
+
+    try {
+      const payload = {
+        category,
+        name: form.name,
+        mobile: form.mobile,
+        email: form.email,
+        address: form.address,
+        gst: form.gst,
+        openingBalance: form.openingBalance,
+        status: form.status,
+        bank_name: form.bankName === 'Others' ? form.customBank : form.bankName,
+        custom_bank_name: form.bankName === 'Others' ? form.customBank : '',
+        account_number_or_upi: form.accountNo || form.upi,
+        ifsc_code: form.ifsc,
+      };
+
+      const response = await fetch('http://localhost:5001/api/vendors', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        alert(`${categoryName || 'Vendor'} Created Successfully!`);
+        if (onSuccess) {
+          onSuccess(); // Refresh parent list
+        }
+        handleClose();
+      } else {
+        setError(data.message || 'Failed to create vendor');
+      }
+    } catch (error) {
+      console.error('Error creating vendor:', error);
+      setError('Server error – please try again');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm sm:max-w-lg overflow-hidden" style={{ animation: 'modalSlideIn 0.3s ease-out' }}>
-
         <div className="flex justify-between items-center p-5 bg-gray-900">
           <h3 className="text-sm font-bold text-white tracking-wide">Add {categoryName} Vendor</h3>
-          <button onClick={handleClose} className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"><FiX size={18} /></button>
+          <button onClick={handleClose} className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white transition-colors">
+            <FiX size={18} />
+          </button>
         </div>
 
-        {toast && (
-          <div className="flex items-center gap-2 px-5 py-3 bg-green-50 border-b border-green-100 text-green-700 text-sm font-semibold">
-            <FiCheckCircle size={16} /> Vendor created successfully
+        {error && (
+          <div className="text-sm text-red-600 bg-red-50 p-3 border-b border-red-100">
+            {error}
           </div>
         )}
 
@@ -185,8 +238,8 @@ export default function AddAccountModal({ isOpen, onClose, categoryName, categor
             </div>
 
             <div className="pt-2">
-              <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors">
-                Create Vendor
+              <button type="submit" disabled={loading} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                {loading ? 'Creating...' : 'Create Vendor'}
               </button>
             </div>
 
