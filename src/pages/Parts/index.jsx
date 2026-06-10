@@ -1,6 +1,81 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import AddItemModal      from './components/AddItemModal';
+
+// ── Payment Info Panel (read-only, derived from PO data) ─────────────────────
+function PaymentInfoPanel({ po }) {
+  const [showAllocations, setShowAllocations] = useState(false);
+  // Payments are recorded in Vendor Ledger — PO details show read-only derived info.
+  // Total paid = sum of Payment transactions whose ref matches this PO number.
+  // Since we have no cross-module state here, we show the PO amount and
+  // a clear read-only note directing users to Vendor Ledger for payment actions.
+  const total = Number(po.total_amount || 0);
+
+  // Derive paid amount from items if unit price available
+  const items = typeof po.items === 'string' ? (() => { try { return JSON.parse(po.items); } catch { return []; } })() : (po.items || []);
+  const calculatedTotal = items.reduce((s, i) => s + (Number(i.unitPrice || i.unit_price || 0) * Number(i.qty || i.quantity || 0)), 0);
+  const displayTotal = total || calculatedTotal;
+
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-2 font-bold">Payment Info</p>
+
+      {/* PO Amount */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-3">
+        <div className="divide-y divide-slate-100">
+          <div className="flex justify-between items-center px-3 py-2.5">
+            <span className="text-slate-400">PO Amount</span>
+            <span className="font-bold text-slate-800 text-xs">₹{displayTotal.toLocaleString('en-IN')}</span>
+          </div>
+          <div className="flex justify-between items-center px-3 py-2.5">
+            <span className="text-slate-400">Payment Status</span>
+            <span className="inline-flex items-center border rounded-full px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-500 border-slate-200">
+              See Vendor Ledger
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Read-only note */}
+      <div className="flex items-start gap-2 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5">
+        <span className="text-blue-400 text-xs mt-0.5">ℹ️</span>
+        <p className="text-[11px] text-blue-600 leading-relaxed">
+          Payment history and outstanding balance are managed in
+          <span className="font-bold"> Vendor Ledger → Record Payment</span>.
+          PO payments are matched by reference number.
+        </p>
+      </div>
+
+      {/* Allocation toggle */}
+      <button
+        onClick={() => setShowAllocations(v => !v)}
+        className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-slate-600 transition mt-2"
+      >
+        <span>{showAllocations ? '▾' : '▸'}</span>
+        Item Breakdown
+      </button>
+
+      {showAllocations && items.length > 0 && (
+        <div className="mt-1 space-y-1">
+          {items.map((item, i) => {
+            const name  = item.partName || item.name || '—';
+            const qty   = item.qty || item.quantity || 0;
+            const price = item.unitPrice || item.unit_price || 0;
+            return (
+              <div key={i} className="flex justify-between items-center bg-white border border-slate-100 rounded-lg px-2.5 py-1.5">
+                <div>
+                  <p className="text-[11px] font-semibold text-slate-700">{name}</p>
+                  <p className="text-[10px] text-slate-400">×{qty} @ ₹{Number(price).toLocaleString('en-IN')}</p>
+                </div>
+                <span className="text-[11px] font-bold text-slate-600">₹{(qty * price).toLocaleString('en-IN')}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 import EditItemModal     from './components/EditItemModal';
 import IssueItemModal    from './components/IssueItemModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
@@ -697,7 +772,7 @@ export default function PartsModule() {
                           {expanded && (
                             <tr className="bg-slate-50/80">
                               <td colSpan={9} className="px-6 py-4">
-                                <div className="grid gap-6 sm:grid-cols-3 text-xs">
+                                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 text-xs">
                                   <div>
                                     <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-2 font-bold">Item Details</p>
                                     <p className="font-semibold text-slate-800">{po.item_name || item0.partName || '—'}</p>
@@ -722,6 +797,7 @@ export default function PartsModule() {
                                       </span>
                                     </div>
                                   </div>
+                                  <PaymentInfoPanel po={po} />
                                 </div>
                               </td>
                             </tr>

@@ -1,9 +1,31 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useMemo } from 'react';
 import { InventoryContext } from '../../../context/InventoryContext';
 import {
   ShoppingCart, Building2, Package, Calendar,
-  Check, X, Truck, CheckCircle2, Clock, AlertCircle, PauseCircle
+  Check, X, Truck, CheckCircle2, Clock, AlertCircle, PauseCircle,
+  CreditCard, ChevronDown, ChevronUp,
 } from 'lucide-react';
+
+// ── Mock payment allocations per PO (frontend-only) ───
+const MOCK_PAYMENTS = {
+  'PO-2025-001': { paid: 6400,  allocations: [{ date: '19-May-2026', amount: 6400,  ref: 'PAY-001', method: 'Bank Transfer' }] },
+  'PO-2025-002': { paid: 32400, allocations: [{ date: '15-May-2026', amount: 20000, ref: 'PAY-002', method: 'Cheque' }, { date: '18-May-2026', amount: 12400, ref: 'PAY-003', method: 'Bank Transfer' }] },
+  'PO-2025-003': { paid: 19000, allocations: [{ date: '06-May-2026', amount: 19000, ref: 'PAY-004', method: 'UPI' }] },
+  'PO-2025-004': { paid: 0,     allocations: [] },
+  'PO-2025-005': { paid: 2700,  allocations: [{ date: '10-May-2026', amount: 2700,  ref: 'PAY-005', method: 'Cash' }] },
+};
+
+function getPaymentStatus(paid, total) {
+  if (paid <= 0)           return 'Unpaid';
+  if (paid >= total)       return 'Paid';
+  return 'Partially Paid';
+}
+
+const PAY_STATUS_STYLE = {
+  Paid:           'bg-emerald-100 text-emerald-700 border-emerald-200',
+  'Partially Paid': 'bg-amber-100 text-amber-700 border-amber-200',
+  Unpaid:         'bg-red-100 text-red-700 border-red-200',
+};
 
 // ── Status config ──────────────────────────────────────
 const STATUS = {
@@ -99,6 +121,77 @@ function CommentModal({ action, po, onConfirm, onClose }) {
   );
 }
 
+// ── Payment Info Panel ────────────────────────────────
+function PaymentInfoPanel({ po }) {
+  const [showAllocations, setShowAllocations] = useState(false);
+  const total   = Number(po.totalAmount || po.total_amount || 0);
+  const payment = MOCK_PAYMENTS[po.poNumber] ?? { paid: 0, allocations: [] };
+  const paid    = payment.paid;
+  const balance = Math.max(0, total - paid);
+  const status  = getPaymentStatus(paid, total);
+
+  return (
+    <div>
+      <p className="font-semibold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+        <CreditCard className="h-3 w-3" /> Payment Info
+      </p>
+
+      {/* Summary rows */}
+      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-2">
+        <div className="divide-y divide-slate-100">
+          <div className="flex justify-between items-center px-3 py-2">
+            <span className="text-slate-400">PO Amount</span>
+            <span className="font-semibold text-slate-800">₹{total.toLocaleString('en-IN')}</span>
+          </div>
+          <div className="flex justify-between items-center px-3 py-2">
+            <span className="text-slate-400">Paid Amount</span>
+            <span className="font-semibold text-emerald-600">₹{paid.toLocaleString('en-IN')}</span>
+          </div>
+          <div className="flex justify-between items-center px-3 py-2">
+            <span className="text-slate-400">Balance Amount</span>
+            <span className={`font-semibold ${balance > 0 ? 'text-red-500' : 'text-slate-400'}`}>
+              ₹{balance.toLocaleString('en-IN')}
+            </span>
+          </div>
+          <div className="flex justify-between items-center px-3 py-2">
+            <span className="text-slate-400">Payment Status</span>
+            <span className={`inline-flex items-center border rounded-full px-2 py-0.5 text-[10px] font-bold ${PAY_STATUS_STYLE[status]}`}>
+              {status}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Allocation history toggle */}
+      <button
+        onClick={() => setShowAllocations(v => !v)}
+        className="flex items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-slate-600 transition mb-1"
+      >
+        {showAllocations ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        Payment Allocations {payment.allocations.length > 0 && `(${payment.allocations.length})`}
+      </button>
+
+      {showAllocations && (
+        payment.allocations.length === 0 ? (
+          <p className="text-slate-400 text-[11px] italic">No payments recorded yet.</p>
+        ) : (
+          <div className="space-y-1">
+            {payment.allocations.map((a, i) => (
+              <div key={i} className="flex items-center justify-between bg-white border border-slate-100 rounded-lg px-2.5 py-2">
+                <div>
+                  <p className="text-[11px] font-semibold text-slate-700">{a.date}</p>
+                  <p className="text-[10px] text-slate-400">{a.method} · {a.ref}</p>
+                </div>
+                <span className="text-[11px] font-bold text-emerald-600">₹{a.amount.toLocaleString('en-IN')} Applied</span>
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
 // ── PO Card ────────────────────────────────────────────
 function POCard({ po, onAction }) {
   const [expanded, setExpanded] = useState(false);
@@ -176,7 +269,7 @@ function POCard({ po, onAction }) {
 
       {/* Expanded details */}
       {expanded && (
-        <div className="border-t border-slate-100 bg-slate-50 px-4 py-3 grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+        <div className="border-t border-slate-100 bg-slate-50 px-4 py-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
           <div>
             <p className="font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Items</p>
             {po.items?.length ? po.items.map((item, i) => (
@@ -216,6 +309,8 @@ function POCard({ po, onAction }) {
               {po.ordered_at     && <TimelineRow label="Ordered"   value={fmt(po.ordered_at)} />}
             </div>
           </div>
+
+          <PaymentInfoPanel po={po} />
         </div>
       )}
     </div>

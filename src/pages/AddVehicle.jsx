@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiSave, FiX, FiCheckCircle, FiUpload, FiFileText, FiImage } from 'react-icons/fi';
 import { generateAxlePositions } from './axlePositionGenerator';
+import { dummyVendors } from './Vendors/data/dummyData';
 
 const InputGroup = ({ label, name, type = "text", placeholder, formData, handleChange, disabled = false, error }) => {
   // Determine maxLength based on field name
@@ -186,7 +187,10 @@ export default function AddVehicle() {
     axleCount: '',
     layoutType: '',
     spareTyreCount: '',
-    defaultTyreSize: ''
+    defaultTyreSize: '',
+    dealerShowroom: '',
+    purchaseDate: '',
+    purchaseAmount: ''
   });
 
   const [files, setFiles] = useState({
@@ -210,6 +214,7 @@ export default function AddVehicle() {
   const [supervisors, setSupervisors] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [stations, setStations] = useState([]);
+  const [showrooms, setShowrooms] = useState([]);
 
   const isCLLApplicable = useMemo(
     () => ['Tanker', 'LPG', 'Milk Transport'].includes(formData.vehicleType),
@@ -252,6 +257,10 @@ export default function AddVehicle() {
       .then(res => res.json())
       .then(data => { if (data.success) setStations(data.data || []); })
       .catch(err => console.error('Error fetching stations:', err));
+
+    // Load showrooms from Vendor Ledger — Showroom Accounts
+    const showroomList = dummyVendors.filter(v => v.category === 'showrooms');
+    setShowrooms(showroomList);
   }, []);
 
   const handleFileChange = useCallback((e) => {
@@ -490,6 +499,9 @@ export default function AddVehicle() {
       formDataToSend.append("layout_type", formData.layoutType);
       formDataToSend.append("spare_tyre_count", formData.spareTyreCount);
       formDataToSend.append("default_tyre_size", formData.defaultTyreSize);
+      formDataToSend.append("dealer_showroom", formData.dealerShowroom);
+      formDataToSend.append("purchase_date", formData.purchaseDate);
+      formDataToSend.append("purchase_amount", formData.purchaseAmount);
       formDataToSend.append("axle_positions", JSON.stringify(axlePositions));
 
       if (files.insuranceDoc) formDataToSend.append("insurance_document", files.insuranceDoc);
@@ -577,6 +589,16 @@ export default function AddVehicle() {
               <SelectGroup label="Vehicle Category" name="vehicleCategory" options={['Owned', 'Rented', 'Lease']} formData={formData} handleChange={handleChange} />
               <InputGroup label="Make / Brand" name="makeBrand" placeholder="e.g. Tata, Ashok Leyland" formData={formData} handleChange={handleChange} error={formErrors.makeBrand} />
               <SelectGroup label="Fuel Type" name="fuelType" options={['Diesel', 'Petrol', 'CNG', 'EV']} formData={formData} handleChange={handleChange} error={formErrors.fuelType} />
+              <SelectGroup
+                label="Dealer / Showroom"
+                name="dealerShowroom"
+                options={showrooms.map(s => ({ label: s.name, value: s.name }))}
+                formData={formData}
+                handleChange={handleChange}
+                error={formErrors.dealerShowroom}
+              />
+              <InputGroup label="Purchase Date" name="purchaseDate" type="date" formData={formData} handleChange={handleChange} error={formErrors.purchaseDate} />
+              <InputGroup label="Purchase Amount (₹)" name="purchaseAmount" type="number" placeholder="e.g. 2500000" formData={formData} handleChange={handleChange} error={formErrors.purchaseAmount} />
               <InputGroup label="Model Year" name="modelYear" type="number" placeholder="YYYY" formData={formData} handleChange={handleChange} error={formErrors.modelYear} />
               <InputGroup label="Mileage (KM/L)" name="mileage" type="number" step="0.1" placeholder="e.g. 8.5" formData={formData} handleChange={handleChange} error={formErrors.mileage} />
               <InputGroup label="Tire Size" name="tireSize" placeholder="e.g. 295/80R22.5" formData={formData} handleChange={handleChange} />

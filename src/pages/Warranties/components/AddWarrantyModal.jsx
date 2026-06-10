@@ -82,7 +82,7 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
       category: '', brand: '', model: '', serialNo: '',
       vehicle_id: '', vehicle_no: '', odometer: '',
       startDate: '', endDate: '', warrantyPeriod: '',
-      description: '',
+      description: '', dealerShowroom: '',
    });
 
    const set = (f, v) => setFd(p => ({ ...p, [f]: v }));
@@ -106,6 +106,7 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
          vehicle_id: selected?.id || '',
          vehicle_no: selected?.vehicle_no || '',
          odometer: selected?.initial_odometer || '',
+         dealerShowroom: selected?.dealer_showroom || '',
       }));
    };
 
@@ -180,6 +181,14 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
                            <option value="">Select Vehicle</option>
                            {vehicles.map(v => <option key={v.id} value={v.id}>{v.vehicle_no}</option>)}
                         </Sel>
+                        {fd.vehicle_id && (
+                           <div>
+                              <Label>Dealer / Showroom</Label>
+                              <div className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-600">
+                                 {fd.dealerShowroom || <span className="text-slate-400 italic">Not recorded for this vehicle</span>}
+                              </div>
+                           </div>
+                        )}
                         <Sel label="Brand" required value={fd.brand} onChange={e => set('brand', e.target.value)} disabled={!fd.category}>
                            <option value="">{fd.category ? 'Select Brand' : 'Select category first'}</option>
                            {(BRANDS_BY_CATEGORY[fd.category] || []).map(b => <option key={b}>{b}</option>)}
