@@ -11,15 +11,7 @@ import VendorLedger   from './VendorLedger';
  *   *         → VendorLedger   (parts, fuel, tyres, oils, rta, etc.)
  */
 export default function LedgerView({ vendor, onBack }) {
-  if (!vendor) return null;
-
-  if (vendor.category === 'showrooms') {
-    return <ShowroomLedger vendor={vendor} onBack={onBack} />;
-  }
-  
-  if (vendor.category === 'garages') {
-    return <GarageLedger vendor={vendor} onBack={onBack} />;
-  }
-  
-  return <VendorLedger vendor={vendor} onBack={onBack} />;
+  if (vendor.category === 'showrooms') return <ShowroomLedger vendor={vendor} onBack={onBack} />;
+  if (vendor.category === 'garages')   return <GarageLedger   vendor={vendor} onBack={onBack} />;
+  return                                      <VendorLedger   vendor={vendor} onBack={onBack} />;
 }

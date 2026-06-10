@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FiSearch, FiPlus, FiBriefcase, FiPhone, FiMapPin, FiHome, FiChevronRight, FiEdit2, FiUser } from 'react-icons/fi';
+import { dummyVendors } from '../data/dummyData';
 import AddAccountModal from './AddAccountModal';
 import AddShowroomModal from './AddShowroomModal';
 import AddGarageModal from './AddGarageModal';
@@ -11,39 +12,12 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [editVendor, setEditVendor] = useState(null);
-  const [vendors, setVendors] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  // Fetch vendors from database
-  const fetchVendors = async () => {
-    try {
-      const response = await fetch("http://localhost:5001/api/vendors");
-      const data = await response.json();
-      if (data.success) {
-        setVendors(data.data || []);
-      }
-    } catch (error) {
-      console.error("Vendor fetch failed:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchVendors();
-  }, []);
-
-  // Filter vendors by category and search term
-  const filteredVendors = vendors.filter(v => {
+  const vendors = dummyVendors.filter(v => {
     if (v.category !== category) return false;
-    if (searchTerm && !v.garage_name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (searchTerm && !v.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
-
-  // Refresh vendors after adding new one
-  const handleVendorAdded = () => {
-    fetchVendors();
-  };
 
   const balanceLabel = isShowroom(category) ? 'Pending Warranty Amount' : 'Ledger Balance';
   const balanceTip   = isShowroom(category)
@@ -51,30 +25,6 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
     : 'Outstanding Balance = Amount currently payable to this vendor.';
   const addBtnLabel  = category === 'garages' ? 'Add Garage' : category === 'showrooms' ? 'Add Showroom' : 'Add Account';
   const ledgerTip    = isShowroom(category) ? 'View Showroom Purchase History' : 'View Ledger';
-
-  if (loading) {
-    return (
-      <div className="space-y-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-48 mb-4"></div>
-            <div className="h-4 bg-gray-200 rounded w-64"></div>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-pulse">
-              <div className="w-10 h-10 bg-gray-200 rounded-xl mb-4"></div>
-              <div className="h-6 bg-gray-200 rounded w-32 mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded w-28"></div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -106,7 +56,7 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredVendors.map(vendor => (
+        {vendors.map(vendor => (
           <div
             key={vendor.id}
             onClick={() => onVendorClick(vendor)}
@@ -132,16 +82,14 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
               </div>
 
               <div className="flex items-center justify-between mb-1">
-                <h3 className="font-bold text-gray-800 text-lg">{vendor.garage_name || vendor.name}</h3>
-                {vendor.status && (
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                    vendor.status === 'Inactive'
-                      ? 'bg-red-50 text-red-500 border-red-100'
-                      : 'bg-green-50 text-green-600 border-green-100'
-                  }`}>
-                    {vendor.status}
-                  </span>
-                )}
+                <h3 className="font-bold text-gray-800 text-lg">{vendor.name}</h3>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  vendor.status === 'Inactive'
+                    ? 'bg-red-50 text-red-500 border-red-100'
+                    : 'bg-green-50 text-green-600 border-green-100'
+                }`}>
+                  {vendor.status || 'Active'}
+                </span>
               </div>
               <p className="text-[11px] font-semibold text-blue-500 mb-3">
                 {vendor.vendorCategory || categoryName}
@@ -149,14 +97,13 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
 
               <div className="space-y-1.5 mb-6">
                 <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                  <FiPhone className="text-gray-400 shrink-0" /> {vendor.mobile_number || vendor.contact || "—"}
+                  <FiPhone className="text-gray-400 shrink-0" /> {vendor.contact}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                  <FiMapPin className="text-gray-400 shrink-0" /> {vendor.address_location || vendor.address || "—"}
+                  <FiMapPin className="text-gray-400 shrink-0" /> {vendor.address}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                  <FiHome className="text-gray-400 shrink-0" /> 
-                  {vendor.custom_bank_name || vendor.bank_name || vendor.bank || "Not provided"}
+                  <FiHome className="text-gray-400 shrink-0" /> {vendor.bank || 'Not provided'}
                 </div>
                 {isShowroom(category) && vendor.contactPerson && (
                   <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
@@ -230,7 +177,7 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
           </div>
         ))}
 
-        {filteredVendors.length === 0 && (
+        {vendors.length === 0 && (
           <div className="col-span-full py-12 text-center text-gray-500 bg-white rounded-2xl border border-gray-100 border-dashed">
             No vendors found in this category.
           </div>
@@ -244,7 +191,7 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
         <AddGarageModal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} />
       )}
       {category !== 'showrooms' && category !== 'garages' && (
-        <AddAccountModal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} categoryName={categoryName} category={category} onSuccess={handleVendorAdded} />
+        <AddAccountModal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} categoryName={categoryName} category={category} />
       )}
       <EditShowroomModal isOpen={!!editVendor} onClose={() => setEditVendor(null)} vendor={editVendor} />
     </div>
