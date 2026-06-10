@@ -2,31 +2,20 @@ import React, { useState } from 'react';
 import { FiX, FiHome, FiCheckCircle } from 'react-icons/fi';
 
 const BANK_OPTIONS = ['HDFC Bank','State Bank of India (SBI)','ICICI Bank','Axis Bank','Canara Bank','Union Bank','Indian Bank','Bank of Baroda','Others'];
-
-const VENDOR_CATEGORIES = [
-  'Parts & Spares','Tyres','Batteries','Lubricants',
-  'Garage','Fuel Station','Showroom','Other',
-];
-
-const CATEGORY_MAP = {
-  parts: 'Parts & Spares', tyres: 'Tyres', oils: 'Lubricants',
-  fuel:  'Fuel Station',   rta:   'Other',
-};
-
 const inputCls    = "w-full p-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm";
 const inputErrCls = "w-full p-3 bg-white border border-red-300 rounded-xl focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-300 text-sm";
 const labelCls    = "block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1";
 const labelOptCls = "block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1";
 
-const makeEmpty = (prefill = '') => ({
-  name: '', category: prefill, mobile: '', email: '', address: '', gst: '',
-  openingBalance: '0', status: 'Active',
+const EMPTY = {
+  name: '', mobile: '', email: '', address: '', status: 'Active',
+  contactPerson: '', designation: '',
   bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '',
-});
+  openingBalance: '0',
+};
 
-export default function AddAccountModal({ isOpen, onClose, categoryName, category }) {
-  const prefill = CATEGORY_MAP[category] || '';
-  const [form, setForm]     = useState(() => makeEmpty(prefill));
+export default function AddShowroomModal({ isOpen, onClose }) {
+  const [form, setForm]     = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [toast, setToast]   = useState(false);
 
@@ -39,12 +28,10 @@ export default function AddAccountModal({ isOpen, onClose, categoryName, categor
 
   const validate = () => {
     const e = {};
-    if (!form.name.trim())   e.name     = 'Vendor name is required';
-    if (!form.category)      e.category = 'Category is required';
-    if (!form.mobile.trim()) e.mobile   = 'Mobile number is required';
+    if (!form.name.trim())   e.name   = 'Showroom name is required';
+    if (!form.mobile.trim()) e.mobile = 'Mobile number is required';
     else if (!/^\d{10}$/.test(form.mobile.trim())) e.mobile = 'Enter a valid 10-digit mobile number';
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Enter a valid email address';
-    if (form.openingBalance !== '' && Number(form.openingBalance) < 0) e.openingBalance = 'Cannot be negative';
     return e;
   };
 
@@ -53,51 +40,39 @@ export default function AddAccountModal({ isOpen, onClose, categoryName, categor
     const errs = validate();
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
     setToast(true);
-    setTimeout(() => { setToast(false); setForm(makeEmpty(prefill)); setErrors({}); onClose(); }, 1500);
+    setTimeout(() => { setToast(false); setForm(EMPTY); setErrors({}); onClose(); }, 1500);
   };
 
-  const handleClose = () => { setForm(makeEmpty(prefill)); setErrors({}); onClose(); };
+  const handleClose = () => { setForm(EMPTY); setErrors({}); onClose(); };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm sm:max-w-lg overflow-hidden" style={{ animation: 'modalSlideIn 0.3s ease-out' }}>
 
         <div className="flex justify-between items-center p-5 bg-gray-900">
-          <h3 className="text-sm font-bold text-white tracking-wide">Add {categoryName} Vendor</h3>
+          <h3 className="text-sm font-bold text-white tracking-wide">Add New Showroom</h3>
           <button onClick={handleClose} className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"><FiX size={18} /></button>
         </div>
 
         {toast && (
           <div className="flex items-center gap-2 px-5 py-3 bg-green-50 border-b border-green-100 text-green-700 text-sm font-semibold">
-            <FiCheckCircle size={16} /> Vendor created successfully
+            <FiCheckCircle size={16} /> Showroom created successfully
           </div>
         )}
 
         <div className="p-6 max-h-[80vh] overflow-y-auto">
           <form className="space-y-6" onSubmit={handleSubmit} noValidate>
 
-            {/* Vendor Information */}
+            {/* Showroom Details */}
             <div>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Vendor Information</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Showroom Details</p>
               <div className="space-y-4">
-
                 <div>
-                  <label className={labelCls}>Vendor Name <span className="text-red-400">*</span></label>
+                  <label className={labelCls}>Showroom Name <span className="text-red-400">*</span></label>
                   <input type="text" value={form.name} onChange={e => set('name', e.target.value)}
-                    placeholder="e.g. Genuine Parts Co." className={errors.name ? inputErrCls : inputCls} />
+                    placeholder="e.g. Lakshmi Toyota" className={errors.name ? inputErrCls : inputCls} />
                   {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
                 </div>
-
-                <div>
-                  <label className={labelCls}>Vendor Category <span className="text-red-400">*</span></label>
-                  <select value={form.category} onChange={e => set('category', e.target.value)}
-                    className={(errors.category ? inputErrCls : inputCls) + ' text-gray-700'}>
-                    <option value="">Select Category</option>
-                    {VENDOR_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                  {errors.category && <p className="text-xs text-red-500 mt-1">{errors.category}</p>}
-                </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={labelCls}>Mobile Number <span className="text-red-400">*</span></label>
@@ -108,28 +83,15 @@ export default function AddAccountModal({ isOpen, onClose, categoryName, categor
                   <div>
                     <label className={labelOptCls}>Email Address</label>
                     <input type="email" value={form.email} onChange={e => set('email', e.target.value)}
-                      placeholder="e.g. vendor@example.com" className={errors.email ? inputErrCls : inputCls} />
+                      placeholder="e.g. info@showroom.com" className={errors.email ? inputErrCls : inputCls} />
                     {errors.email && <p className="text-xs text-red-500 mt-1">{errors.email}</p>}
                   </div>
                 </div>
-
-                <div>
-                  <label className={labelOptCls}>Address / Location</label>
-                  <input type="text" value={form.address} onChange={e => set('address', e.target.value)}
-                    placeholder="e.g. Auto Nagar, Hyderabad" className={inputCls} />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className={labelOptCls}>GST Number</label>
-                    <input type="text" value={form.gst} onChange={e => set('gst', e.target.value)}
-                      placeholder="e.g. 36AABCU9603R1ZX" className={inputCls} />
-                  </div>
-                  <div>
-                    <label className={labelOptCls}>Opening Balance (₹)</label>
-                    <input type="number" value={form.openingBalance} onChange={e => set('openingBalance', e.target.value)}
-                      min="0" placeholder="0" className={errors.openingBalance ? inputErrCls : inputCls} />
-                    {errors.openingBalance && <p className="text-xs text-red-500 mt-1">{errors.openingBalance}</p>}
+                    <label className={labelCls}>Address / Location <span className="text-red-400">*</span></label>
+                    <input type="text" value={form.address} onChange={e => set('address', e.target.value)}
+                      placeholder="e.g. Banjara Hills, Hyderabad" className={inputCls} />
                   </div>
                   <div>
                     <label className={labelCls}>Status</label>
@@ -139,7 +101,23 @@ export default function AddAccountModal({ isOpen, onClose, categoryName, categor
                     </select>
                   </div>
                 </div>
+              </div>
+            </div>
 
+            {/* Contact Person */}
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Contact Person (Optional)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelOptCls}>Contact Person Name</label>
+                  <input type="text" value={form.contactPerson} onChange={e => set('contactPerson', e.target.value)}
+                    placeholder="e.g. Ramesh Kumar" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelOptCls}>Designation</label>
+                  <input type="text" value={form.designation} onChange={e => set('designation', e.target.value)}
+                    placeholder="e.g. Sales Manager" className={inputCls} />
+                </div>
               </div>
             </div>
 
@@ -168,25 +146,35 @@ export default function AddAccountModal({ isOpen, onClose, categoryName, categor
                   <div>
                     <label className={labelOptCls}>Account Number</label>
                     <input type="text" value={form.accountNo} onChange={e => set('accountNo', e.target.value)}
-                      placeholder="e.g. 501002345678" className={inputCls} />
+                      placeholder="e.g. 1234567890" className={inputCls} />
                   </div>
                   <div>
                     <label className={labelOptCls}>IFSC Code</label>
                     <input type="text" value={form.ifsc} onChange={e => set('ifsc', e.target.value)}
-                      placeholder="e.g. HDFC0001234" className={inputCls} />
+                      placeholder="e.g. ICIC0001234" className={inputCls} />
                   </div>
                   <div>
                     <label className={labelOptCls}>UPI ID</label>
                     <input type="text" value={form.upi} onChange={e => set('upi', e.target.value)}
-                      placeholder="e.g. vendor@upi" className={inputCls} />
+                      placeholder="e.g. showroom@upi" className={inputCls} />
                   </div>
                 </div>
               </div>
             </div>
 
+            {/* Opening Balance */}
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Financial Details (Optional)</p>
+              <div>
+                <label className={labelOptCls}>Opening Balance (₹)</label>
+                <input type="number" value={form.openingBalance} onChange={e => set('openingBalance', e.target.value)}
+                  min="0" placeholder="0" className={inputCls} />
+              </div>
+            </div>
+
             <div className="pt-2">
               <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors">
-                Create Vendor
+                Create Showroom
               </button>
             </div>
 

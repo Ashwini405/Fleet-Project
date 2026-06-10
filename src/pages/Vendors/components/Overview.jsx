@@ -79,10 +79,13 @@ export default function Overview({ onVendorClick }) {
                   </td>
                   <td className="py-2 md:py-4 px-2 md:px-4 text-center">
                     <span className={`text-[9px] px-1 md:px-2 py-1 rounded font-bold uppercase tracking-widest ${
-                      vendor.status === 'Advance Paid' ? 'bg-green-50 text-green-600' :
-                      vendor.status === 'Payment Due' ? 'bg-red-50 text-red-600' : 'bg-gray-100 text-gray-500'
+                      vendor.status === 'Inactive'
+                        ? 'bg-gray-100 text-gray-400'
+                        : vendor.balance === 0
+                          ? 'bg-green-50 text-green-600'
+                          : 'bg-red-50 text-red-600'
                     }`}>
-                      {vendor.status}
+                      {vendor.status === 'Inactive' ? 'Inactive' : vendor.balance === 0 ? 'Settled' : 'Payment Due'}
                     </span>
                   </td>
                 </tr>
