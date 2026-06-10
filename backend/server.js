@@ -33,6 +33,10 @@ require('./routes/incomeRoutes');
 const expenseRoutes =
 require("./routes/expenseRoutes");
 const app = express();
+const vendorTransactionRoutes =
+require("./routes/vendorTransactionRoutes");
+const vendorRoutes =
+require("./routes/vendorRoutes");
 
 const db = require('./config/db');
 
@@ -133,6 +137,16 @@ app.use(
 app.use(
   "/api/expenses",
   expenseRoutes
+);
+
+app.use(
+  "/api/vendors",
+  vendorRoutes
+);
+
+app.use(
+  "/api/vendors",
+  vendorTransactionRoutes
 );
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {

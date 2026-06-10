@@ -1,18 +1,67 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FiSearch, FiPlus, FiBriefcase, FiPhone, FiMapPin, FiHome, FiChevronRight } from 'react-icons/fi';
-import { dummyVendors } from '../data/dummyData';
 import AddAccountModal from './AddAccountModal';
 
 export default function CategoryView({ category, categoryName, onVendorClick }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddModalOpen, setAddModalOpen] = useState(false);
+  const [vendors, setVendors] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch vendors from database
+  const fetchVendors = async () => {
+    try {
+      const response = await fetch("http://localhost:5001/api/vendors");
+      const data = await response.json();
+      if (data.success) {
+        setVendors(data.data || []);
+      }
+    } catch (error) {
+      console.error("Vendor fetch failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVendors();
+  }, []);
 
   // Filter vendors by category and search term
-  const vendors = dummyVendors.filter(v => {
+  const filteredVendors = vendors.filter(v => {
     if (v.category !== category) return false;
-    if (searchTerm && !v.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (searchTerm && !v.garage_name?.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
   });
+
+  // Refresh vendors after adding new one
+  const handleVendorAdded = () => {
+    fetchVendors();
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div className="animate-pulse">
+            <div className="h-8 bg-gray-200 rounded w-48 mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-64"></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-pulse">
+              <div className="w-10 h-10 bg-gray-200 rounded-xl mb-4"></div>
+              <div className="h-6 bg-gray-200 rounded w-32 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-28"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -42,7 +91,7 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-         {vendors.map(vendor => (
+         {filteredVendors.map(vendor => (
            <div 
               key={vendor.id} 
               onClick={() => onVendorClick(vendor)}
@@ -56,53 +105,47 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
                     <FiChevronRight className="text-gray-300 group-hover:text-blue-500 transition-colors" size={20} title="View Garage Ledger" />
                  </div>
                  
-                 <h3 className="font-bold text-gray-800 text-lg mb-2">{vendor.name}</h3>
+                 <h3 className="font-bold text-gray-800 text-lg mb-2">{vendor.garage_name}</h3>
                  
                  <div className="space-y-1.5 mb-6">
                     <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                       <FiPhone className="text-gray-400 shrink-0" /> {vendor.contact}
+                       <FiPhone className="text-gray-400 shrink-0" /> {vendor.mobile_number || "—"}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                       <FiMapPin className="text-gray-400 shrink-0" /> {vendor.address}
+                       <FiMapPin className="text-gray-400 shrink-0" /> {vendor.address_location || "—"}
                     </div>
                     <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                       <FiHome className="text-gray-400 shrink-0" /> {vendor.bank || "Not provided"}
+                       <FiHome className="text-gray-400 shrink-0" /> 
+                       {vendor.custom_bank_name || vendor.bank_name || "Not provided"}
                     </div>
                  </div>
               </div>
 
-              <div className="border-t border-gray-100 pt-4 flex justify-between items-end">
-                 <span
-                   className="text-[10px] font-bold text-gray-400 uppercase tracking-widest cursor-help"
-                   title="Outstanding Balance = Amount currently payable to this garage after completed services, repairs, and payment adjustments."
-                 >
-                   Ledger Balance
+              <div className="border-t border-gray-100 pt-4">
+                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                   Vendor Account
                  </span>
-                 {vendor.balance === 0 ? (
-                   <div className="flex flex-col items-end">
-                     <span className="font-bold text-lg text-gray-400">₹0</span>
-                     <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">Settled</span>
-                   </div>
-                 ) : (
-                   <div className="flex flex-col items-end">
-                     <span className={`font-bold text-lg ${vendor.balance < 0 ? 'text-green-500' : 'text-red-500'}`}>
-                       ₹{Math.abs(vendor.balance).toLocaleString()} {vendor.balance < 0 ? 'Cr' : 'Dr'}
-                     </span>
-                     <span className="text-[10px] font-medium text-gray-400">Outstanding Payable</span>
-                   </div>
-                 )}
+                 <p className="text-sm font-semibold text-blue-600 mt-2">
+                   Active Vendor
+                 </p>
               </div>
            </div>
          ))}
 
-         {vendors.length === 0 && (
+         {filteredVendors.length === 0 && (
             <div className="col-span-full py-12 text-center text-gray-500 bg-white rounded-2xl border border-gray-100 border-dashed">
                No vendors found in this category.
             </div>
          )}
       </div>
 
-      <AddAccountModal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} categoryName={categoryName} category={category} />
+      <AddAccountModal 
+        isOpen={isAddModalOpen} 
+        onClose={() => setAddModalOpen(false)} 
+        categoryName={categoryName} 
+        category={category}
+        onSuccess={handleVendorAdded}
+      />
     </div>
   );
 }

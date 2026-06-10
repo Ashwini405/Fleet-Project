@@ -4,6 +4,7 @@ const Repair = {
 
   // ✅ CREATE
   create: async (data) => {
+    console.log('MODEL INSERT data.garage:', data.garage);
     const [result] = await db.query(
       'INSERT INTO repair_services SET ?',
       [data]

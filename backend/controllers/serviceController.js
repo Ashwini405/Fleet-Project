@@ -161,6 +161,7 @@ exports.getServiceAlerts = async (req, res) => {
 exports.createService = async (req, res) => {
   try {
     const body = req.body;
+    console.log('CREATE SERVICE body:', body);
 
     if (!body.vehicle_id) return res.status(400).json({ success: false, message: 'Vehicle required' });
     if (!body.service_type) return res.status(400).json({ success: false, message: 'Service type required' });
@@ -178,7 +179,7 @@ exports.createService = async (req, res) => {
       interval_km:      intervalKm || null,
       next_due:         nextDue || null,
       service_type:     body.service_type,
-      mechanic:         body.garage || body.mechanic || null,
+      mechanic:         body.garage_name || body.garage || body.mechanic || null,
       labour_cost:      Number(body.labour_cost) || 0,
       total_cost:       Number(body.total_cost) || 0,
       status:           body.status || 'Reported',
@@ -286,7 +287,7 @@ exports.updateService = async (req, res) => {
       interval_km:      intervalKm || null,
       next_due:         nextDue || null,
       service_type:     body.service_type,
-      mechanic:         body.garage || body.mechanic || null,
+      mechanic:         body.garage_name || body.garage || body.mechanic || null,
       labour_cost:      Number(body.labour_cost) || 0,
       total_cost:       Number(body.total_cost) || 0,
       status:           body.status,

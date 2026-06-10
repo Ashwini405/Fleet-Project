@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FiArrowLeft, FiPlus, FiMapPin, FiHome, FiPhone, FiEye, FiX, FiInbox } from 'react-icons/fi';
-import { dummyLedger, vendorCategories } from '../data/dummyData';
 import TransactionModal from './TransactionModal';
 
 // Auto-entry types come from their respective modules.
@@ -25,12 +24,41 @@ export default function LedgerView({ vendor, onBack }) {
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [selectedTxn, setSelectedTxn] = useState(null);
   const [activeFilter, setActiveFilter] = useState('All');
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const transactions = dummyLedger[vendor.id] || [];
+  // Fetch transactions from database
+  const fetchTransactions = async () => {
+    if (!vendor?.id) return;
+    
+    try {
+      const response = await fetch(`http://localhost:5001/api/vendors/${vendor.id}/transactions`);
+      const data = await response.json();
+      if (data.success) {
+        setTransactions(data.data || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch transactions:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const totalDebit  = transactions.reduce((s, t) => s + (t.debit  || 0), 0);
-  const totalCredit = transactions.reduce((s, t) => s + (t.credit || 0), 0);
-  const netBalance  = totalDebit - totalCredit;
+  useEffect(() => {
+    fetchTransactions();
+  }, [vendor]);
+
+  const totalDebit = transactions.reduce(
+    (sum, row) => sum + Number(row.debit || 0),
+    0
+  );
+
+  const totalCredit = transactions.reduce(
+    (sum, row) => sum + Number(row.credit || 0),
+    0
+  );
+
+  const netBalance = totalDebit - totalCredit;
 
   const FILTERS = [
     { label: 'All',         match: null },
@@ -44,18 +72,30 @@ export default function LedgerView({ vendor, onBack }) {
     ? transactions
     : transactions.filter(t => {
         const match = FILTERS.find(f => f.label === activeFilter)?.match;
-        return Array.isArray(match) ? match.includes(t.type) : t.type === match;
+        return Array.isArray(match) ? match.includes(t.transaction_type) : t.transaction_type === match;
       });
 
   const getCategoryLabel = (catId) => {
-    const found = vendorCategories.find(c => c.id === catId);
-    return found ? found.label.toUpperCase() : catId.toUpperCase();
+    return String(catId || "").toUpperCase();
   };
 
-  // Parse bank string "HDFC Bank - 501002345678" into parts
-  const bankParts = vendor.bank ? vendor.bank.split(' - ') : [];
-  const bankName   = bankParts[0] || vendor.bank || 'Not provided';
-  const bankAccNo  = bankParts[1] || null;
+  // Bank details from database fields
+  const bankName = vendor.custom_bank_name || vendor.bank_name || "Not provided";
+  const bankAccNo = vendor.account_number_or_upi || null;
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in pb-12">
+        <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+          <div className="h-4 bg-gray-200 rounded w-24 animate-pulse"></div>
+          <div className="h-8 bg-gray-200 rounded w-32 animate-pulse"></div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+          <div className="animate-pulse text-gray-400">Loading ledger...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in pb-12">
@@ -82,14 +122,14 @@ export default function LedgerView({ vendor, onBack }) {
             <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 tracking-widest uppercase mb-2">
               <span>{getCategoryLabel(vendor.category)}</span>
             </div>
-            <h2 className="text-3xl font-black text-gray-800 tracking-tight mb-3">{vendor.name}</h2>
+            <h2 className="text-3xl font-black text-gray-800 tracking-tight mb-3">{vendor.garage_name}</h2>
 
             <div className="space-y-1.5 mb-5">
               <div className="flex items-center gap-2 text-sm text-gray-500 font-medium">
-                <FiPhone className="text-gray-400 shrink-0" size={13} /> {vendor.contact}
+                <FiPhone className="text-gray-400 shrink-0" size={13} /> {vendor.mobile_number || "—"}
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-500 font-medium">
-                <FiMapPin className="text-gray-400 shrink-0" size={13} /> {vendor.address}
+                <FiMapPin className="text-gray-400 shrink-0" size={13} /> {vendor.address_location || "—"}
               </div>
             </div>
 
@@ -156,6 +196,7 @@ export default function LedgerView({ vendor, onBack }) {
               ))}
             </div>
           )}
+          
           {visibleTxns.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 gap-4 text-gray-400">
               <FiInbox size={40} className="text-gray-300" />
@@ -190,28 +231,28 @@ export default function LedgerView({ vendor, onBack }) {
                 {visibleTxns.map((txn) => (
                   <tr key={txn.id} className="hover:bg-gray-50/70 transition-colors">
                     <td className="py-3 px-2 md:px-4">
-                      <span className="text-xs font-bold text-gray-600 tracking-wide whitespace-nowrap">{txn.date}</span>
+                      <span className="text-xs font-bold text-gray-600 tracking-wide whitespace-nowrap">{txn.transaction_date}</span>
                     </td>
                     <td className="py-3 px-2 md:px-4">
-                      <TypeBadge type={txn.type} />
+                      <TypeBadge type={txn.transaction_type} />
                     </td>
                     <td className="py-3 px-2 md:px-4 hidden sm:table-cell">
                       <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                        {txn.truckId || '-'}
+                        {txn.truck_no || '-'}
                       </span>
                     </td>
                     <td className="py-3 px-2 md:px-4">
-                      <div className="text-xs md:text-sm font-semibold text-gray-700">{txn.desc}</div>
-                      {txn.ref && <div className="text-[10px] text-gray-400 font-medium mt-0.5">REF: {txn.ref}</div>}
+                      <div className="text-xs md:text-sm font-semibold text-gray-700">{txn.description}</div>
+                      {txn.reference_number && <div className="text-[10px] text-gray-400 font-medium mt-0.5">REF: {txn.reference_number}</div>}
                     </td>
                     <td className="py-3 px-2 md:px-4 text-right">
-                      {txn.debit > 0
-                        ? <span className="font-bold text-red-500 text-xs md:text-sm">₹{txn.debit.toLocaleString()}</span>
+                      {Number(txn.debit) > 0
+                        ? <span className="font-bold text-red-500 text-xs md:text-sm">₹{Number(txn.debit).toLocaleString()}</span>
                         : <span className="text-gray-300 font-bold">—</span>}
                     </td>
                     <td className="py-3 px-2 md:px-4 text-right">
-                      {txn.credit > 0
-                        ? <span className="font-bold text-green-500 text-xs md:text-sm">₹{txn.credit.toLocaleString()}</span>
+                      {Number(txn.credit) > 0
+                        ? <span className="font-bold text-green-500 text-xs md:text-sm">₹{Number(txn.credit).toLocaleString()}</span>
                         : <span className="text-gray-300 font-bold">—</span>}
                     </td>
                     <td className="py-3 px-2 md:px-4 text-center hidden md:table-cell">
@@ -230,7 +271,14 @@ export default function LedgerView({ vendor, onBack }) {
         </div>
       </div>
 
-      <TransactionModal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} vendor={vendor} />
+      <TransactionModal 
+        isOpen={isAddModalOpen} 
+        onClose={() => {
+          setAddModalOpen(false);
+          fetchTransactions();
+        }} 
+        vendor={vendor} 
+      />
 
       {/* View Transaction Modal */}
       {selectedTxn && (
@@ -249,33 +297,33 @@ export default function LedgerView({ vendor, onBack }) {
               <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-100">
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Date</p>
-                  <p className="font-bold text-gray-800 text-sm">{selectedTxn.date}</p>
+                  <p className="font-bold text-gray-800 text-sm">{selectedTxn.transaction_date}</p>
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Type</p>
-                  <TypeBadge type={selectedTxn.type} />
+                  <TypeBadge type={selectedTxn.transaction_type} />
                 </div>
               </div>
 
-              {selectedTxn.truckId && (
+              {selectedTxn.truck_no && (
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Vehicle Linked</p>
-                  <span className="font-bold text-gray-800 text-sm bg-gray-100 px-2 py-1 inline-block rounded">{selectedTxn.truckId}</span>
+                  <span className="font-bold text-gray-800 text-sm bg-gray-100 px-2 py-1 inline-block rounded">{selectedTxn.truck_no}</span>
                 </div>
               )}
 
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Bill Amount</p>
-                <p className={`text-3xl font-extrabold ${selectedTxn.debit > 0 ? 'text-red-500' : 'text-green-500'}`}>
-                  ₹{(selectedTxn.debit > 0 ? selectedTxn.debit : selectedTxn.credit).toLocaleString()}
-                  <span className="text-base ml-1">{selectedTxn.debit > 0 ? 'Dr' : 'Cr'}</span>
+                <p className={`text-3xl font-extrabold ${Number(selectedTxn.debit) > 0 ? 'text-red-500' : 'text-green-500'}`}>
+                  ₹{(Number(selectedTxn.debit) > 0 ? Number(selectedTxn.debit) : Number(selectedTxn.credit)).toLocaleString()}
+                  <span className="text-base ml-1">{Number(selectedTxn.debit) > 0 ? 'Dr' : 'Cr'}</span>
                 </p>
               </div>
 
-              {selectedTxn.ref && (
+              {selectedTxn.reference_number && (
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Reference Number</p>
-                  <p className="font-bold text-gray-700 text-sm">{selectedTxn.ref}</p>
+                  <p className="font-bold text-gray-700 text-sm">{selectedTxn.reference_number}</p>
                 </div>
               )}
 
@@ -288,13 +336,13 @@ export default function LedgerView({ vendor, onBack }) {
                     'Payment':           'Operational Payments',
                     'Opening Balance':   'Manual Entry',
                     'Manual Adjustment': 'Manual Entry',
-                  }[selectedTxn.type] || 'Manual Entry'}
+                  }[selectedTxn.transaction_type] || 'Manual Entry'}
                 </p>
               </div>
 
               <div className="border-t border-gray-100 pt-3">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Description</p>
-                <div className="bg-gray-50 text-gray-600 p-3 rounded-lg border border-gray-100 text-sm">{selectedTxn.desc}</div>
+                <div className="bg-gray-50 text-gray-600 p-3 rounded-lg border border-gray-100 text-sm">{selectedTxn.description}</div>
               </div>
 
               <div className="pt-2">
