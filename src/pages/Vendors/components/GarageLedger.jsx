@@ -1,27 +1,60 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FiArrowLeft, FiPlus, FiEye, FiX, FiInbox, FiSearch, FiChevronLeft, FiChevronRight, FiDollarSign } from 'react-icons/fi';
-import { dummyLedger } from '../data/dummyData';
+import axios from 'axios';
 import { TypeBadge, RecordPaymentModal, VendorInfoPanel, SummaryCards } from './shared';
 import { PAGE_SIZE, MODAL_ANIM } from './shared/constants';
 import TransactionModal from './TransactionModal';
 
 const FILTERS = [
-  { label: 'All',         match: null },
-  { label: 'Repairs',     match: 'Repair Work' },
-  { label: 'Services',    match: 'Periodic Service' },
-  { label: 'Payments',    match: 'Payment' },
+  { label: 'All', match: null },
+  { label: 'Repairs', match: 'Repair Work' },
+  { label: 'Services', match: 'Periodic Service' },
+  { label: 'Payments', match: 'Payment' },
   { label: 'Adjustments', match: ['Opening Balance', 'Manual Adjustment'] },
 ];
 
 export default function GarageLedger({ vendor, onBack }) {
-  const [rawTxns, setRawTxns]           = useState(dummyLedger[vendor.id] || []);
+  const [rawTxns, setRawTxns] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('All');
-  const [search, setSearch]             = useState('');
-  const [page, setPage]                 = useState(1);
-  const [selectedTxn, setSelectedTxn]   = useState(null);
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [selectedTxn, setSelectedTxn] = useState(null);
   const [payModalOpen, setPayModalOpen] = useState(false);
   const [exceptionOpen, setExceptionOpen] = useState(false);
 
+  // Fetch ledger transactions from database
+  const fetchLedger = async () => {
+    if (!vendor?.id) return;
+
+    try {
+      setLoading(true);
+      const res = await axios.get(`http://localhost:5001/api/vendors/${vendor.id}/transactions`);
+      const formatted = (res.data.data || []).map(item => ({
+        id: item.id,
+        date: item.transaction_date,
+        truckId: item.truck_no || '',
+        type: item.transaction_type,
+        ref: item.reference_number || '',
+        desc: item.description || '',
+        debit: Number(item.debit || 0),
+        credit: Number(item.credit || 0)
+      }));
+      setRawTxns(formatted);
+    } catch (err) {
+      console.error('LEDGER FETCH ERROR:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (vendor?.id) {
+      fetchLedger();
+    }
+  }, [vendor]);
+
+  // Calculate running balance for each transaction
   const txnsWithBalance = useMemo(() => {
     let running = 0;
     return [...rawTxns].sort((a, b) => new Date(a.date) - new Date(b.date)).map(t => {
@@ -30,10 +63,11 @@ export default function GarageLedger({ vendor, onBack }) {
     });
   }, [rawTxns]);
 
-  const totalDebit  = rawTxns.reduce((s, t) => s + (t.debit  || 0), 0);
+  const totalDebit = rawTxns.reduce((s, t) => s + (t.debit || 0), 0);
   const totalCredit = rawTxns.reduce((s, t) => s + (t.credit || 0), 0);
-  const lastDate    = txnsWithBalance.length ? txnsWithBalance[txnsWithBalance.length - 1].date : null;
+  const lastDate = txnsWithBalance.length ? txnsWithBalance[txnsWithBalance.length - 1].date : null;
 
+  // Apply filters and search
   const filtered = useMemo(() => txnsWithBalance.filter(t => {
     if (activeFilter !== 'All') {
       const match = FILTERS.find(f => f.label === activeFilter)?.match;
@@ -44,16 +78,30 @@ export default function GarageLedger({ vendor, onBack }) {
   }), [txnsWithBalance, activeFilter, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const handleSavePayment = (p) => {
-    setRawTxns(prev => [...prev, {
-      id: p.id, date: p.date, truckId: '', type: 'Payment',
-      ref: p.ref || 'PAY-NEW',
-      desc: `${p.method} Payment${p.remarks ? ' — ' + p.remarks : ''}`,
-      debit: 0, credit: p.amount,
-    }]);
+  // Refresh ledger after payment or transaction
+  const handleSavePayment = async () => {
+    await fetchLedger();
   };
+
+  const handleExceptionAdded = async () => {
+    await fetchLedger();
+  };
+
+  if (loading) {
+    return (
+      <div className="space-y-5 animate-fade-in pb-12">
+        <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+          <div className="h-5 bg-gray-200 rounded w-24 animate-pulse"></div>
+          <div className="h-9 bg-gray-200 rounded w-32 animate-pulse"></div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center">
+          <div className="animate-pulse text-gray-400">Loading ledger...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 animate-fade-in pb-12">
@@ -126,7 +174,7 @@ export default function GarageLedger({ vendor, onBack }) {
                       <span className={`text-xs font-bold ${txn.runningBalance > 0 ? 'text-red-500' : txn.runningBalance < 0 ? 'text-green-600' : 'text-gray-400'}`}>₹{Math.abs(txn.runningBalance).toLocaleString()}</span>
                     </td>
                     <td className="py-3 px-3 md:px-5 text-center hidden md:table-cell">
-                      <button onClick={() => setSelectedTxn(txn)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"><FiEye size={15}/></button>
+                      <button onClick={() => setSelectedTxn(txn)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"><FiEye size={15} /></button>
                     </td>
                   </tr>
                 ))}
@@ -137,20 +185,35 @@ export default function GarageLedger({ vendor, onBack }) {
 
         {filtered.length > PAGE_SIZE && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
-            <span className="text-xs text-gray-400 font-medium">Showing {(page-1)*PAGE_SIZE+1}–{Math.min(page*PAGE_SIZE,filtered.length)} of {filtered.length}</span>
+            <span className="text-xs text-gray-400 font-medium">Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}</span>
             <div className="flex items-center gap-1">
-              <button onClick={()=>setPage(p=>Math.max(1,p-1))} disabled={page===1} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 transition-colors"><FiChevronLeft size={16}/></button>
-              {Array.from({length:totalPages},(_,i)=>i+1).map(n=>(
-                <button key={n} onClick={()=>setPage(n)} className={`w-7 h-7 rounded-lg text-xs font-bold transition-colors ${page===n?'bg-gray-900 text-white':'text-gray-500 hover:bg-gray-100'}`}>{n}</button>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 transition-colors"><FiChevronLeft size={16} /></button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+                <button key={n} onClick={() => setPage(n)} className={`w-7 h-7 rounded-lg text-xs font-bold transition-colors ${page === n ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'}`}>{n}</button>
               ))}
-              <button onClick={()=>setPage(p=>Math.min(totalPages,p+1))} disabled={page===totalPages} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 transition-colors"><FiChevronRight size={16}/></button>
+              <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 transition-colors"><FiChevronRight size={16} /></button>
             </div>
           </div>
         )}
       </div>
 
-      <RecordPaymentModal isOpen={payModalOpen} onClose={() => setPayModalOpen(false)} onSave={handleSavePayment} vendorName={vendor.name} outstanding={totalDebit - totalCredit} />
-      <TransactionModal isOpen={exceptionOpen} onClose={() => setExceptionOpen(false)} vendor={vendor} />
+      <RecordPaymentModal
+        isOpen={payModalOpen}
+        onClose={() => setPayModalOpen(false)}
+        onSave={handleSavePayment}
+        vendor={vendor}
+        vendorName={vendor.garage_name}
+        outstanding={totalDebit - totalCredit}
+      />
+
+      <TransactionModal
+        isOpen={exceptionOpen}
+        onClose={() => {
+          setExceptionOpen(false);
+          handleExceptionAdded();
+        }}
+        vendor={vendor}
+      />
 
       {selectedTxn && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -205,11 +268,10 @@ export default function GarageLedger({ vendor, onBack }) {
               {/* Running Balance */}
               <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
                 <span className="text-xs font-semibold text-gray-400">Running Balance</span>
-                <span className={`text-sm font-bold ${
-                  selectedTxn.runningBalance > 0 ? 'text-red-500'
-                  : selectedTxn.runningBalance < 0 ? 'text-green-600'
-                  : 'text-gray-400'
-                }`}>
+                <span className={`text-sm font-bold ${selectedTxn.runningBalance > 0 ? 'text-red-500'
+                    : selectedTxn.runningBalance < 0 ? 'text-green-600'
+                      : 'text-gray-400'
+                  }`}>
                   ₹{Math.abs(selectedTxn.runningBalance).toLocaleString()}{' '}
                   <span className="text-xs font-semibold text-gray-400">
                     {selectedTxn.runningBalance > 0 ? 'Payable' : selectedTxn.runningBalance < 0 ? 'Advance' : 'Settled'}

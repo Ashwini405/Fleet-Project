@@ -1,17 +1,67 @@
 import React, { useState } from 'react';
 import { FiX } from 'react-icons/fi';
+import axios from 'axios';
 
 const inputCls = "w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 text-[14px] text-gray-700";
 const labelCls = "block text-[11px] font-bold text-gray-500 uppercase tracking-wide mb-1.5";
 
 export default function TransactionModal({ isOpen, onClose, vendor }) {
   const [entryType, setEntryType] = useState('opening'); // 'opening' | 'adjustment'
+  const [formData, setFormData] = useState({
+    transaction_date: '',
+    amount: '',
+    balance_type: '',
+    remarks: ''
+  });
 
   if (!isOpen || !vendor) return null;
 
+  const handleChange = (e) => {
+    setFormData(prev => ({
+      ...prev,
+      [e.target.name]: e.target.value
+    }));
+  };
+
   const handleClose = () => {
     setEntryType('opening');
+    setFormData({
+      transaction_date: '',
+      amount: '',
+      balance_type: '',
+      remarks: ''
+    });
     onClose();
+  };
+
+  const saveTransaction = async (e) => {
+    e.preventDefault();
+
+    if (!formData.transaction_date || !formData.amount || !formData.balance_type) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const payload = {
+        vendor_id: vendor.id,
+        transaction_type: entryType === 'opening' ? 'Opening Balance' : 'Manual Adjustment',
+        transaction_date: formData.transaction_date,
+        debit: formData.balance_type === 'debit' ? Number(formData.amount) : 0,
+        credit: formData.balance_type === 'credit' ? Number(formData.amount) : 0,
+        remarks: formData.remarks || null
+      };
+
+      await axios.post('http://localhost:5001/api/vendors/transactions', payload);
+
+      alert('Transaction Saved Successfully');
+
+      handleClose();
+
+    } catch (error) {
+      console.error('Transaction save error:', error);
+      alert(error?.response?.data?.message || 'Failed to save transaction');
+    }
   };
 
   return (
@@ -23,7 +73,7 @@ export default function TransactionModal({ isOpen, onClose, vendor }) {
         <div className="flex justify-between items-center p-5 bg-[#1e293b]">
           <div>
             <h3 className="text-[15px] font-bold text-white tracking-wide">Add Exception Entry</h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">{vendor.name}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{vendor.garage_name || vendor.name}</p>
           </div>
           <button onClick={handleClose} className="p-1 rounded hover:bg-slate-700 text-gray-400 hover:text-white transition-colors">
             <FiX size={18} />
@@ -65,20 +115,41 @@ export default function TransactionModal({ isOpen, onClose, vendor }) {
           </div>
 
           {entryType === 'opening' ? (
-            <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); handleClose(); }}>
+            <form className="space-y-5" onSubmit={saveTransaction}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <label className={labelCls}>Date <span className="text-red-400">*</span></label>
-                  <input type="date" className={inputCls} required />
+                  <input
+                    type="date"
+                    name="transaction_date"
+                    value={formData.transaction_date}
+                    onChange={handleChange}
+                    className={inputCls}
+                    required
+                  />
                 </div>
                 <div>
                   <label className={labelCls}>Amount (₹) <span className="text-red-400">*</span></label>
-                  <input type="number" placeholder="0.00" className={inputCls} required />
+                  <input
+                    type="number"
+                    name="amount"
+                    value={formData.amount}
+                    onChange={handleChange}
+                    placeholder="0.00"
+                    className={inputCls}
+                    required
+                  />
                 </div>
               </div>
               <div>
                 <label className={labelCls}>Balance Type <span className="text-red-400">*</span></label>
-                <select className={inputCls} required>
+                <select
+                  name="balance_type"
+                  value={formData.balance_type}
+                  onChange={handleChange}
+                  className={inputCls}
+                  required
+                >
                   <option value="">Select Type</option>
                   <option value="debit">Debit (Dr) — Amount owed to garage</option>
                   <option value="credit">Credit (Cr) — Advance paid to garage</option>
@@ -86,27 +157,55 @@ export default function TransactionModal({ isOpen, onClose, vendor }) {
               </div>
               <div>
                 <label className={labelCls}>Remarks</label>
-                <input type="text" placeholder="e.g. Opening balance as on 01-Apr-2024" className={inputCls} />
+                <input
+                  type="text"
+                  name="remarks"
+                  value={formData.remarks}
+                  onChange={handleChange}
+                  placeholder="e.g. Opening balance as on 01-Apr-2024"
+                  className={inputCls}
+                />
               </div>
               <button type="submit" className="w-full py-3 bg-[#1e293b] hover:bg-slate-800 text-white rounded-lg font-bold text-[14px] transition-colors">
                 Save Opening Balance
               </button>
             </form>
           ) : (
-            <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); handleClose(); }}>
+            <form className="space-y-5" onSubmit={saveTransaction}>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <label className={labelCls}>Date <span className="text-red-400">*</span></label>
-                  <input type="date" className={inputCls} required />
+                  <input
+                    type="date"
+                    name="transaction_date"
+                    value={formData.transaction_date}
+                    onChange={handleChange}
+                    className={inputCls}
+                    required
+                  />
                 </div>
                 <div>
                   <label className={labelCls}>Amount (₹) <span className="text-red-400">*</span></label>
-                  <input type="number" placeholder="0.00" className={inputCls} required />
+                  <input
+                    type="number"
+                    name="amount"
+                    value={formData.amount}
+                    onChange={handleChange}
+                    placeholder="0.00"
+                    className={inputCls}
+                    required
+                  />
                 </div>
               </div>
               <div>
                 <label className={labelCls}>Adjustment Type <span className="text-red-400">*</span></label>
-                <select className={inputCls} required>
+                <select
+                  name="balance_type"
+                  value={formData.balance_type}
+                  onChange={handleChange}
+                  className={inputCls}
+                  required
+                >
                   <option value="">Select Type</option>
                   <option value="debit">Debit Adjustment — Increase outstanding</option>
                   <option value="credit">Credit Adjustment — Reduce outstanding</option>
@@ -114,7 +213,15 @@ export default function TransactionModal({ isOpen, onClose, vendor }) {
               </div>
               <div>
                 <label className={labelCls}>Remarks <span className="text-red-400">*</span></label>
-                <input type="text" placeholder="e.g. Correction for duplicate entry on 15-Oct" className={inputCls} required />
+                <input
+                  type="text"
+                  name="remarks"
+                  value={formData.remarks}
+                  onChange={handleChange}
+                  placeholder="e.g. Correction for duplicate entry on 15-Oct"
+                  className={inputCls}
+                  required
+                />
               </div>
               <button type="submit" className="w-full py-3 bg-[#1e293b] hover:bg-slate-800 text-white rounded-lg font-bold text-[14px] transition-colors">
                 Save Adjustment
