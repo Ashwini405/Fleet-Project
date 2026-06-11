@@ -272,10 +272,23 @@ function POCard({ po, onAction }) {
         <div className="border-t border-slate-100 bg-slate-50 px-4 py-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
           <div>
             <p className="font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Items</p>
+            {po.category && (
+              <div className="mb-2 flex items-center gap-1.5">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Category:</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-violet-50 text-violet-700 border-violet-200">
+                  {po.category}
+                </span>
+              </div>
+            )}
             {po.items?.length ? po.items.map((item, i) => (
               <div key={i} className="flex items-center justify-between bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 mb-1">
                 <span className="font-medium text-slate-800">{item.partName || item.name || '—'}</span>
-                <span className="text-slate-500">×{item.qty ?? item.quantity ?? 0}</span>
+                <div className="flex items-center gap-2">
+                  {item.unitPrice > 0 && (
+                    <span className="text-[10px] text-slate-400">₹{item.unitPrice.toLocaleString()}</span>
+                  )}
+                  <span className="text-slate-500">×{item.qty ?? item.quantity ?? 0}</span>
+                </div>
               </div>
             )) : <p className="text-slate-400">No items</p>}
             {po.expectedDelivery && (

@@ -6,6 +6,7 @@ import Sidebar from "./layout/Sidebar";
 import { DUMMY_VEHICLES } from "./pages/vehicleData";
 import { InventoryProvider } from "./context/InventoryContext";
 import { NotificationProvider } from "./context/NotificationContext";
+import { VendorLedgerProvider } from "./context/VendorLedgerContext";
 import NotificationBell from "./layout/NotificationBell";
 import CriticalPopup from "./layout/CriticalPopup";
 
@@ -93,9 +94,11 @@ function InnerApp() {
             <div className="flex-1 flex justify-center">
               <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 shadow-sm">
                 {[
-                  { id: 'active', label: 'Active Tyres' },
-                  { id: 'stock', label: 'In Stock Tyres' },
-                  { id: 'old', label: 'Old Tyres Stock' },
+                  { id: 'active',     label: 'Active Tyres'      },
+                  { id: 'stock',      label: 'In Stock Tyres'    },
+                  { id: 'old',        label: 'Old Tyres Stock'   },
+                  { id: 'retreading', label: 'Retreading'         },
+                  { id: 'scrap',      label: 'Scrap History'     },
                   { id: 'individual', label: 'Individual Vehicle' },
                 ].map((tab) => (
                   <button
@@ -165,7 +168,9 @@ function InnerApp() {
       return (
         <BrowserRouter>
           <NotificationProvider>
+          <VendorLedgerProvider>
             <InnerApp />
+          </VendorLedgerProvider>
           </NotificationProvider>
         </BrowserRouter>
       );

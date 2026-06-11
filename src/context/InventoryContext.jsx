@@ -55,6 +55,12 @@ export function InventoryProvider({ children }) {
   const [issueHistory, setIssueHistory] = useState([]);
   const [movementHistory, setMovementHistory] = useState([]);
   const [purchaseOrders, setPurchaseOrders] = useState([]);
+
+  // Add a locally-created PO (frontend-only, before backend is connected)
+  const addLocalPO = (po) => {
+    if (!po) return;
+    setPurchaseOrders(prev => [po, ...prev]);
+  };
   const [vendorList, setVendorList] = useState([]);
   const [warehouseList, setWarehouseList] = useState([]);
   const [vehicleList, setVehicleList] = useState([]);
@@ -800,6 +806,7 @@ export function InventoryProvider({ children }) {
         holdPO,
         orderPO,
         receivePO,
+        addLocalPO,
 
         exportInventoryReport,
       }}

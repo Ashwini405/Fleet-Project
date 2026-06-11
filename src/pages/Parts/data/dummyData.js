@@ -4,6 +4,63 @@ export const vendorList = [
   'Philips Auto', 'Exide Industries',
 ];
 
+// Categorised vendor list for PO creation
+export const PO_VENDORS = [
+  { id: 'v1',  name: 'Bosch Parts',        category: 'Parts & Spares' },
+  { id: 'v2',  name: 'Lucas Supplies',      category: 'Parts & Spares' },
+  { id: 'v3',  name: 'Railway Warehousing', category: 'Parts & Spares' },
+  { id: 'v4',  name: 'Gulf Lubricants',     category: 'Lubricants'     },
+  { id: 'v5',  name: 'Castrol India',       category: 'Lubricants'     },
+  { id: 'v6',  name: 'Exide Industries',    category: 'Batteries'      },
+  { id: 'v7',  name: 'Amaron Batteries',    category: 'Batteries'      },
+  { id: 'v8',  name: 'Mitra Tyres',         category: 'Tubes'          },
+  { id: 'v9',  name: 'MRF Tyres Ltd',       category: 'Tubes'          },
+  { id: 'v10', name: 'ElectroPro',          category: 'Electrical'     },
+  { id: 'v11', name: 'Philips Auto',        category: 'Electrical'     },
+  { id: 'v12', name: 'General Supplies Co', category: 'Others'         },
+];
+
+// Items per category for PO item selection
+export const PO_ITEMS_BY_CATEGORY = {
+  'Parts & Spares': [
+    { id: 'pi1',  name: 'Brake Pads',    unit: 'pcs',    price: 560  },
+    { id: 'pi2',  name: 'Clutch Plate',  unit: 'pcs',    price: 2200 },
+    { id: 'pi3',  name: 'Air Filter',    unit: 'pcs',    price: 180  },
+    { id: 'pi4',  name: 'Wiper Blades',  unit: 'pcs',    price: 320  },
+    { id: 'pi5',  name: 'Fuel Filter',   unit: 'pcs',    price: 420  },
+  ],
+  Lubricants: [
+    { id: 'pi6',  name: '15W40 Engine Oil', unit: 'liters', price: 560 },
+    { id: 'pi7',  name: 'Gear Oil',         unit: 'liters', price: 380 },
+    { id: 'pi8',  name: 'Grease',           unit: 'kg',     price: 160 },
+    { id: 'pi9',  name: 'Coolant',          unit: 'liters', price: 220 },
+    { id: 'pi10', name: 'Brake Fluid',      unit: 'liters', price: 310 },
+  ],
+  Batteries: [
+    { id: 'pi11', name: 'Exide 12V 88Ah',   unit: 'pcs', price: 3800 },
+    { id: 'pi12', name: 'Amaron 12V 100Ah', unit: 'pcs', price: 4200 },
+    { id: 'pi13', name: 'Exide 24V 120Ah',  unit: 'pcs', price: 7200 },
+  ],
+  Tubes: [
+    { id: 'pi14', name: '10.00-20 Tyre Tube',  unit: 'pcs', price: 850  },
+    { id: 'pi15', name: '7.50-16 Tyre Tube',   unit: 'pcs', price: 620  },
+    { id: 'pi16', name: '295/80 R22.5 Tube',   unit: 'pcs', price: 1100 },
+  ],
+  Electrical: [
+    { id: 'pi17', name: 'Headlight Bulb 24V', unit: 'pcs', price: 280 },
+    { id: 'pi18', name: 'Alternator Belt',    unit: 'pcs', price: 740 },
+    { id: 'pi19', name: 'Starter Motor',      unit: 'pcs', price: 4800 },
+    { id: 'pi20', name: 'Electrical Tape',    unit: 'pcs', price: 55  },
+  ],
+  Others: [
+    { id: 'pi21', name: 'Torque Wrench',  unit: 'pcs', price: 1800 },
+    { id: 'pi22', name: 'Safety Gloves',  unit: 'pcs', price: 120  },
+    { id: 'pi23', name: 'Workshop Cloth', unit: 'kg',  price: 80   },
+  ],
+};
+
+export const PO_CATEGORIES = Object.keys(PO_ITEMS_BY_CATEGORY);
+
 export const dummyTruckList = ['AP21TY4455', 'KA01AA0001', 'TS09AB9988', 'MH12CD5678', 'TN07GH3321', 'DL01AB1234'];
 
 export const warehouseList = ['Main Warehouse', 'Workshop Store', 'Regional Warehouse'];

@@ -6,7 +6,10 @@ import {
   Gauge, Activity, ShieldCheck,
 } from 'lucide-react';
 import axios from 'axios';
-import { layoutPositions } from '../data/dummyData'; // only static positions
+import { layoutPositions } from '../data/dummyData';
+import { createVendorTransaction } from '../../../services/vendorTransactionService';
+import { useVendorLedger } from '../../../context/VendorLedgerContext';
+
 
 // ─── Static Data ────────────────────────────────────────────────────────────
 const BRAND_MODELS = {
@@ -62,13 +65,20 @@ const BRAND_MODELS = {
 const MATERIALS = ['Radial', 'Radial Tubeless', 'Bias Ply', 'Tube Type'];
 const STATUSES = ['In Stock', 'Mounted'];
 const PLACEMENTS = layoutPositions.map(p => ({ id: p.id, label: p.label }));
-const VENDORS_LIST = ['Tyre World', 'Apollo Dealer', 'MRF Distributor', 'Highway Auth', 'Global Tyres'];
+// Tyre vendors — matches TyresVendorPage SAMPLE_VENDORS
+// When backend ready: fetch from /api/vendors?category=tyres
+const TYRE_VENDORS = [
+  { id: 'tv1', name: 'MRF Tyres Dealer'        },
+  { id: 'tv2', name: 'Apollo Tyres Distributor' },
+  { id: 'tv3', name: 'JK Retreading Works'      },
+  { id: 'tv4', name: 'ABC Scrap Traders'        },
+];
 
 const EMPTY_FORM = {
   serialNo: '', brand: '', model: '', tyreSize: '', material: '',
   status: 'In Stock', truckId: '', placement: '', dateOfIssue: '',
   fittedOdo: '', expectedLife: '',
-  vendor: '', purchaseDate: '', invoiceNo: '', tyreCost: '',
+  vendor: '', vendorId: '', purchaseDate: '', invoiceNo: '', tyreCost: '',
   files: [],
 };
 
@@ -365,6 +375,7 @@ function UploadZone({ files, onChange }) {
 
 // ─── Main Modal ───────────────────────────────────────────────────────────────
 export default function RegisterTyreModal({ isOpen, onClose, onRegister, existingSerials = [] }) {
+  const { addVendorTransaction } = useVendorLedger();
   const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState(false);
@@ -486,60 +497,65 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
     return e;
   };
 
-  // ── Submit to database ─────────────────────────────────────────────────────
+  // ── Submit ─────────────────────────────────────────────────────────────────
   const handleRegister = async () => {
     const e = validate();
-    if (Object.keys(e).length) {
-      setErrors(e);
-      return;
+    if (Object.keys(e).length) { setErrors(e); return; }
+
+    // 1. Always fire frontend callback (updates local tyre state)
+    if (onRegister) onRegister(form);
+
+    // 2. Always create vendor ledger transaction if vendor + cost filled
+    if (form.vendorId && form.tyreCost) {
+      const vendor = TYRE_VENDORS.find(v => v.id === form.vendorId);
+      createVendorTransaction({
+        vendorId:      form.vendorId,
+        vendorName:    vendor?.name || form.vendor,
+        date:          form.purchaseDate || form.dateOfIssue,
+        type:          'Tyre Purchase',
+        ref:           form.invoiceNo || `TYR-${Date.now()}`,
+        desc:          `${form.brand} ${form.model} ${form.tyreSize} — ${form.serialNo}`,
+        debit:         parseFloat(form.tyreCost),
+        onTransaction: addVendorTransaction,
+      });
     }
 
+    // 3. Show toast & reset
+    setToast(true);
+    setTimeout(() => {
+      setToast(false);
+      onClose();
+      setForm(EMPTY_FORM);
+      setErrors({});
+    }, 2000);
+
+    // 4. Try backend (optional — fails silently when not running)
     try {
-      const selectedVehicle = vehicles.find(v => String(v.id) === String(form.truckId));
+      const sv = vehicles.find(v => String(v.id) === String(form.truckId));
       const formData = new FormData();
-
-      formData.append('tyre_number', `TYR-${Date.now()}`);
-      formData.append('serial_no', form.serialNo);
-      formData.append('brand', form.brand);
-      formData.append('model', form.model);
-      formData.append('tyre_size', form.tyreSize);
-      formData.append('material_type', form.material);
-      formData.append('status', form.status);
-      formData.append('vehicle_id', form.truckId || null);
-      formData.append('vehicle_number', selectedVehicle?.vehicle_no || '');
-      formData.append('tyre_position', form.placement);
-      formData.append('date_of_issue', form.dateOfIssue);
-      formData.append('fitted_odometer', form.fittedOdo);
+      formData.append('tyre_number',      `TYR-${Date.now()}`);
+      formData.append('serial_no',        form.serialNo);
+      formData.append('brand',            form.brand);
+      formData.append('model',            form.model);
+      formData.append('tyre_size',        form.tyreSize);
+      formData.append('material_type',    form.material);
+      formData.append('status',           form.status);
+      formData.append('vehicle_id',       form.truckId || '');
+      formData.append('vehicle_number',   sv?.vehicle_no || '');
+      formData.append('tyre_position',    form.placement);
+      formData.append('date_of_issue',    form.dateOfIssue);
+      formData.append('fitted_odometer',  form.fittedOdo);
       formData.append('expected_life_km', form.expectedLife);
-      formData.append('running_km', '0');
-      formData.append('remaining_life_km', form.expectedLife);
-      formData.append('tyre_health', health.label);
-      formData.append('vendor_name', form.vendor);
-      formData.append('purchase_date', form.purchaseDate);
-      formData.append('invoice_number', form.invoiceNo);
-      formData.append('tyre_cost', form.tyreCost || 0);
-
-      form.files.forEach(fileObj => {
-        formData.append('tyre_files', fileObj.file);
-      });
-
-      await axios.post('http://localhost:5001/api/tyres', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      setToast(true);
-      fetchActiveTyres(); // refresh list
-      if (onRegister) onRegister(form); // optional parent callback
-
-      setTimeout(() => {
-        setToast(false);
-        onClose();
-        setForm(EMPTY_FORM);
-        setErrors({});
-      }, 2000);
-    } catch (error) {
-      console.log('Register Tyre Error:', error);
-    }
+      formData.append('running_km',       '0');
+      formData.append('remaining_life_km',form.expectedLife);
+      formData.append('tyre_health',      health.label);
+      formData.append('vendor_name',      form.vendor);
+      formData.append('purchase_date',    form.purchaseDate);
+      formData.append('invoice_number',   form.invoiceNo);
+      formData.append('tyre_cost',        form.tyreCost || 0);
+      form.files.forEach(f => formData.append('tyre_files', f.file));
+      await axios.post('http://localhost:5001/api/tyres', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+    } catch { /* backend not running — frontend already updated */ }
   };
 
   const handleDraft = () => {
@@ -785,9 +801,16 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
                 <SectionCard icon={ShoppingBag} title="Purchase Details">
                   <div>
                     <Label>Vendor</Label>
-                    <Select value={form.vendor} onChange={e => set('vendor', e.target.value)}>
+                    <Select
+                      value={form.vendorId}
+                      onChange={e => {
+                        const v = TYRE_VENDORS.find(tv => tv.id === e.target.value);
+                        set('vendorId', e.target.value);
+                        set('vendor', v?.name || '');
+                      }}
+                    >
                       <option value="">Select Vendor</option>
-                      {VENDORS_LIST.map(v => <option key={v}>{v}</option>)}
+                      {TYRE_VENDORS.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
                     </Select>
                   </div>
 
