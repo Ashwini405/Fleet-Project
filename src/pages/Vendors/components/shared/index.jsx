@@ -1,6 +1,6 @@
-import React from 'react';
-import { FiPhone, FiMail, FiMapPin, FiHome, FiUser, FiCreditCard, FiTrendingUp, FiTrendingDown, FiShoppingBag, FiClock } from 'react-icons/fi';
-import { TYPE_STYLES, STATUS_STYLES } from './constants';
+import React, { useState } from 'react';
+import { FiX, FiCheckCircle, FiPhone, FiMail, FiMapPin, FiHome, FiUser, FiCreditCard, FiTrendingUp, FiTrendingDown, FiShoppingBag, FiClock } from 'react-icons/fi';
+import { PAYMENT_METHODS, MODAL_ANIM, TYPE_STYLES, STATUS_STYLES } from './constants';
 import RecordPaymentModal from './RecordPaymentModal';
 import TransactionModal from './TransactionModal';
 
