@@ -2,9 +2,11 @@ const Vendor = require("../models/vendorModel");
 
 const vendorController = {
 
-  // GET ALL
-  getAllVendors: async (req, res) => {
+  // =====================================
+  // GET ALL VENDORS
+  // =====================================
 
+  getAllVendors: async (req, res) => {
     try {
 
       const category = req.query.category;
@@ -16,11 +18,15 @@ const vendorController = {
         vendors = await Vendor.getAllVendors();
       }
 
-      res.json({ success: true, data: vendors });
+      res.status(200).json({
+        success: true,
+        count: vendors.length,
+        data: vendors
+      });
 
     } catch (error) {
 
-      console.error(error);
+      console.error("GET ALL VENDORS ERROR:", error);
 
       res.status(500).json({
         success: false,
@@ -29,22 +35,31 @@ const vendorController = {
     }
   },
 
-  // GET BY ID
-  getVendorById: async (req, res) => {
+  // =====================================
+  // GET SINGLE VENDOR
+  // =====================================
 
+  getVendorById: async (req, res) => {
     try {
 
       const vendor =
         await Vendor.getVendorById(req.params.id);
 
-      res.json({
+      if (!vendor) {
+        return res.status(404).json({
+          success: false,
+          message: "Vendor not found"
+        });
+      }
+
+      res.status(200).json({
         success: true,
         data: vendor
       });
 
     } catch (error) {
 
-      console.error(error);
+      console.error("GET VENDOR ERROR:", error);
 
       res.status(500).json({
         success: false,
@@ -53,13 +68,23 @@ const vendorController = {
     }
   },
 
-  // CREATE
-  createVendor: async (req, res) => {
+  // =====================================
+  // CREATE VENDOR
+  // =====================================
 
+  createVendor: async (req, res) => {
     try {
+
+      console.log("\n=================================");
+      console.log("CREATE VENDOR REQUEST");
+      console.log(req.body);
+      console.log("=================================\n");
 
       const result =
         await Vendor.createVendor(req.body);
+
+      console.log("INSERT RESULT:");
+      console.log(result);
 
       res.status(201).json({
         success: true,
@@ -69,33 +94,45 @@ const vendorController = {
 
     } catch (error) {
 
-      console.error(error);
+      console.error("CREATE VENDOR ERROR:", error);
 
       res.status(500).json({
         success: false,
-        message: "Failed to create vendor"
+        message: error.message
       });
     }
   },
 
-  // UPDATE
-  updateVendor: async (req, res) => {
+  // =====================================
+  // UPDATE VENDOR
+  // =====================================
 
+  updateVendor: async (req, res) => {
     try {
+
+      const vendor =
+        await Vendor.getVendorById(req.params.id);
+
+      if (!vendor) {
+        return res.status(404).json({
+          success: false,
+          message: "Vendor not found"
+        });
+      }
 
       await Vendor.updateVendor(
         req.params.id,
         req.body
       );
 
-      res.json({
+      res.status(200).json({
         success: true,
         message: "Vendor updated successfully"
       });
 
     } catch (error) {
 
-      console.error(error);
+      console.error("UPDATE VENDOR ERROR:", error);
 
       res.status(500).json({
         success: false,
@@ -104,21 +141,33 @@ const vendorController = {
     }
   },
 
-  // DELETE
-  deleteVendor: async (req, res) => {
+  // =====================================
+  // DELETE VENDOR
+  // =====================================
 
+  deleteVendor: async (req, res) => {
     try {
+
+      const vendor =
+        await Vendor.getVendorById(req.params.id);
+
+      if (!vendor) {
+        return res.status(404).json({
+          success: false,
+          message: "Vendor not found"
+        });
+      }
 
       await Vendor.deleteVendor(req.params.id);
 
-      res.json({
+      res.status(200).json({
         success: true,
         message: "Vendor deleted successfully"
       });
 
     } catch (error) {
 
-      console.error(error);
+      console.error("DELETE VENDOR ERROR:", error);
 
       res.status(500).json({
         success: false,

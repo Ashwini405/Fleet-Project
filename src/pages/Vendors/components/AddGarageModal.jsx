@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FiX, FiHome, FiCheckCircle } from 'react-icons/fi';
+import axios from 'axios';
 
 const BANK_OPTIONS = ['HDFC Bank','State Bank of India (SBI)','ICICI Bank','Axis Bank','Canara Bank','Union Bank','Indian Bank','Bank of Baroda','Others'];
 const inputCls    = "w-full p-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm";
@@ -17,6 +18,7 @@ export default function AddGarageModal({ isOpen, onClose }) {
   const [form, setForm]     = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [toast, setToast]   = useState(false);
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -34,12 +36,53 @@ export default function AddGarageModal({ isOpen, onClose }) {
     return e;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     const errs = validate();
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    setToast(true);
-    setTimeout(() => { setToast(false); setForm(EMPTY); setErrors({}); onClose(); }, 1500);
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const payload = {
+        category: "garages",
+        garage_name: form.name,
+        mobile_number: form.mobile,
+        email: form.email,
+        address_location: form.address,
+        gst_number: form.gst,
+        opening_balance: form.openingBalance,
+        status: form.status,
+        bank_name: form.bankName,
+        custom_bank_name: form.customBank,
+        account_number_or_upi: form.accountNo,
+        ifsc_code: form.ifsc,
+        upi_id: form.upi
+      };
+
+      const response = await axios.post("http://localhost:5001/api/vendors", payload);
+
+      console.log("Garage Created:", response.data);
+
+      setToast(true);
+
+      setTimeout(() => {
+        setToast(false);
+        setForm(EMPTY);
+        setErrors({});
+        onClose();
+      }, 1500);
+
+    } catch (error) {
+      console.error("CREATE GARAGE ERROR:", error);
+      alert(error?.response?.data?.message || "Failed to create garage");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => { setForm(EMPTY); setErrors({}); onClose(); };
@@ -160,8 +203,12 @@ export default function AddGarageModal({ isOpen, onClose }) {
             </div>
 
             <div className="pt-2">
-              <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors">
-                Create Garage
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? "Creating..." : "Create Garage"}
               </button>
             </div>
 

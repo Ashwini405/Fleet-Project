@@ -37,6 +37,8 @@ const vendorTransactionRoutes =
 require("./routes/vendorTransactionRoutes");
 const vendorRoutes =
 require("./routes/vendorRoutes");
+const vendorPaymentRoutes =
+require("./routes/vendorPaymentRoutes");
 
 const db = require('./config/db');
 
@@ -147,6 +149,11 @@ app.use(
 app.use(
   "/api/vendors",
   vendorTransactionRoutes
+);
+
+app.use(
+  "/api/vendors",
+  vendorPaymentRoutes
 );
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {

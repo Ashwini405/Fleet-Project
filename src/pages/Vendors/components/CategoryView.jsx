@@ -12,9 +12,20 @@ export default function CategoryView({ category, categoryName, vendors: allVendo
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [editVendor, setEditVendor] = useState(null);
 
+  // Filter vendors based on search term using database field name
   const vendors = searchTerm
-    ? allVendors.filter(v => (v.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
-    : allVendors;
+  ? allVendors.filter(v =>
+      (
+        v.garage_name ||
+        v.showroom_name ||
+        v.vendor_name ||
+        v.name ||
+        ''
+      )
+      .toLowerCase()
+      .includes(searchTerm.toLowerCase())
+    )
+  : allVendors;
 
   const balanceLabel = isShowroom(category) ? 'Pending Warranty Amount' : 'Ledger Balance';
   const balanceTip   = isShowroom(category)
@@ -79,7 +90,13 @@ export default function CategoryView({ category, categoryName, vendors: allVendo
               </div>
 
               <div className="flex items-center justify-between mb-1">
-                <h3 className="font-bold text-gray-800 text-lg">{vendor.name}</h3>
+                <h3 className="font-bold text-gray-800 text-lg">{
+  vendor.garage_name ||
+  vendor.showroom_name ||
+  vendor.vendor_name ||
+  vendor.name ||
+  "Unnamed Vendor"
+}</h3>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                   vendor.status === 'Inactive'
                     ? 'bg-red-50 text-red-500 border-red-100'
@@ -89,22 +106,22 @@ export default function CategoryView({ category, categoryName, vendors: allVendo
                 </span>
               </div>
               <p className="text-[11px] font-semibold text-blue-500 mb-3">
-                {vendor.vendorCategory || categoryName}
+                {vendor.category || categoryName}
               </p>
 
               <div className="space-y-1.5 mb-6">
                 <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                  <FiPhone className="text-gray-400 shrink-0" /> {vendor.contact}
+                  <FiPhone className="text-gray-400 shrink-0" /> {vendor.mobile_number}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                  <FiMapPin className="text-gray-400 shrink-0" /> {vendor.address}
+                  <FiMapPin className="text-gray-400 shrink-0" /> {vendor.address_location}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                  <FiHome className="text-gray-400 shrink-0" /> {vendor.bank || 'Not provided'}
+                  <FiHome className="text-gray-400 shrink-0" /> {vendor.bank_name || 'Not provided'}
                 </div>
-                {isShowroom(category) && vendor.contactPerson && (
+                {isShowroom(category) && vendor.contact_person && (
                   <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                    <FiUser className="text-gray-400 shrink-0" /> {vendor.contactPerson}
+                    <FiUser className="text-gray-400 shrink-0" /> {vendor.contact_person}
                     {vendor.designation && <span className="text-gray-400">· {vendor.designation}</span>}
                   </div>
                 )}
@@ -117,29 +134,29 @@ export default function CategoryView({ category, categoryName, vendors: allVendo
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Vehicles Purchased</div>
-                      <div className="text-base font-black text-indigo-600">{vendor.vehiclesPurchased ?? 0}</div>
+                      <div className="text-base font-black text-indigo-600">{vendor.vehicles_purchased ?? 0}</div>
                     </div>
                     <div>
                       <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Purchase Value</div>
                       <div className="text-base font-black text-gray-800">
-                        {vendor.totalPurchaseValue ? `₹${(vendor.totalPurchaseValue / 100000).toFixed(1)}L` : '₹0'}
+                        {vendor.total_purchase_value ? `₹${(vendor.total_purchase_value / 100000).toFixed(1)}L` : '₹0'}
                       </div>
                     </div>
                   </div>
-                  {(vendor.totalWarrantyClaims ?? 0) > 0 && (
+                  {(vendor.total_warranty_claims ?? 0) > 0 && (
                     <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
                       <div>
                         <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Claims</div>
-                        <div className="text-sm font-black text-gray-700">{vendor.totalWarrantyClaims}</div>
+                        <div className="text-sm font-black text-gray-700">{vendor.total_warranty_claims}</div>
                       </div>
                       <div>
                         <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Pending</div>
-                        <div className="text-sm font-black text-yellow-500">{vendor.pendingClaims ?? 0}</div>
+                        <div className="text-sm font-black text-yellow-500">{vendor.pending_claims ?? 0}</div>
                       </div>
                       <div>
                         <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Pending ₹</div>
                         <div className="text-sm font-black text-red-500">
-                          {vendor.pendingWarrantyAmount ? `₹${(vendor.pendingWarrantyAmount / 1000).toFixed(0)}K` : '₹0'}
+                          {vendor.pending_warranty_amount ? `₹${(vendor.pending_warranty_amount / 1000).toFixed(0)}K` : '₹0'}
                         </div>
                       </div>
                     </div>
@@ -153,7 +170,7 @@ export default function CategoryView({ category, categoryName, vendors: allVendo
                   >
                     {balanceLabel}
                   </span>
-                  {!vendor.balance || vendor.balance === 0 ? (
+                  {(!vendor.balance || vendor.balance === 0) ? (
                     <div className="flex flex-col items-end">
                       <span className="font-bold text-lg text-gray-400">₹0</span>
                       <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">Settled</span>

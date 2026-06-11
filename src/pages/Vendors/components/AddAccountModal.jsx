@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FiX, FiHome, FiCheckCircle } from 'react-icons/fi';
+import axios from 'axios';
 
 const BANK_OPTIONS = ['HDFC Bank','State Bank of India (SBI)','ICICI Bank','Axis Bank','Canara Bank','Union Bank','Indian Bank','Bank of Baroda','Others'];
 
@@ -29,6 +30,7 @@ export default function AddAccountModal({ isOpen, onClose, categoryName, categor
   const [form, setForm]     = useState(() => makeEmpty(prefill));
   const [errors, setErrors] = useState({});
   const [toast, setToast]   = useState(false);
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -48,12 +50,51 @@ export default function AddAccountModal({ isOpen, onClose, categoryName, categor
     return e;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     const errs = validate();
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
-    setToast(true);
-    setTimeout(() => { setToast(false); setForm(makeEmpty(prefill)); setErrors({}); onClose(); }, 1500);
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const payload = {
+        category: form.category,
+        garage_name: form.name,
+        mobile_number: form.mobile,
+        email: form.email,
+        address_location: form.address,
+        gst_number: form.gst,
+        opening_balance: form.openingBalance,
+        status: form.status,
+        bank_name: form.bankName,
+        custom_bank_name: form.customBank,
+        account_number_or_upi: form.accountNo,
+        ifsc_code: form.ifsc,
+        upi_id: form.upi
+      };
+
+      await axios.post("http://localhost:5001/api/vendors", payload);
+
+      setToast(true);
+
+      setTimeout(() => {
+        setToast(false);
+        setForm(makeEmpty(prefill));
+        setErrors({});
+        onClose();
+      }, 1500);
+
+    } catch (error) {
+      console.error("Vendor creation error:", error);
+      alert(error?.response?.data?.message || "Failed to create vendor");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => { setForm(makeEmpty(prefill)); setErrors({}); onClose(); };
@@ -185,8 +226,12 @@ export default function AddAccountModal({ isOpen, onClose, categoryName, categor
             </div>
 
             <div className="pt-2">
-              <button type="submit" className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors">
-                Create Vendor
+              <button 
+                type="submit" 
+                disabled={loading}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? "Creating..." : "Create Vendor"}
               </button>
             </div>
 

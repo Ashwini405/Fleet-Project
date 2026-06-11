@@ -1,6 +1,8 @@
 const db = require("../config/db");
 const Vendor = require("../models/vendorModel");
 const VendorTransaction = require("../models/vendorTransactionModel");
+const VendorPayment =
+  require("../models/vendorPaymentModel");
 
 // ======================================
 // GET VENDOR LEDGER TRANSACTIONS
@@ -54,7 +56,7 @@ exports.getVendorTransactions = async (req, res) => {
 
       UNION ALL
 
-      SELECT
+        SELECT
           vt.id,
           vt.transaction_date,
           vt.transaction_type,
@@ -63,12 +65,31 @@ exports.getVendorTransactions = async (req, res) => {
           vt.debit,
           vt.credit,
           NULL AS reference_number
-      FROM vendor_transactions vt
-      WHERE vt.vendor_id = ?
+        FROM vendor_transactions vt
+        WHERE vt.vendor_id = ?
+
+        UNION ALL
+
+        SELECT
+          vp.id,
+          vp.payment_date AS transaction_date,
+          'Payment' AS transaction_type,
+          '-' AS truck_no,
+          vp.notes AS description,
+          0 AS debit,
+          vp.amount AS credit,
+          vp.reference_number
+        FROM vendor_payments vp
+        WHERE vp.vendor_id = ?
 
       ORDER BY transaction_date DESC, id DESC
       `,
-      [garageName, garageName, vendorId]
+      [
+        garageName,
+        garageName,
+        vendorId,
+        vendorId
+      ]
     );
 
     res.status(200).json({
