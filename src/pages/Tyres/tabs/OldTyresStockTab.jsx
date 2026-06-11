@@ -6,6 +6,8 @@ import { layoutPositions } from '../data/dummyData';
 import OldTyreDetailsModal from '../components/OldTyreDetailsModal';
 import ReMountModal from '../components/ReMountModal';
 import AddOldTyreModal from '../components/AddOldTyreModal';
+import SendForRetreadingModal from '../components/SendForRetreadingModal';
+import ScrapTyreModal from '../components/ScrapTyreModal';
 import { Toast, useToast, TableSkeleton, EmptyState, StickyTable, StickyThead } from '../components/ERPUtils';
 
 const posLabel = (id) => layoutPositions.find(p => p.id === id)?.label ?? id ?? '—';
@@ -57,36 +59,62 @@ function ActionMenu({ tyre, onView, onRemount, onMarkReusable, onRetread, onScra
             transition={{ duration: 0.12 }}
             className="absolute right-0 top-8 z-30 bg-white rounded-xl shadow-xl border border-gray-200 py-1 min-w-[160px]"
           >
+            {/* View Details — always */}
             <button onClick={() => { onView(); setOpen(false); }}
               className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors">
               <Archive className="w-3.5 h-3.5 text-slate-500" /> View Details
             </button>
+
+            {/* REUSABLE actions */}
             {tyre.status === 'REUSABLE' && (
-              <button onClick={() => { onRemount(); setOpen(false); }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 transition-colors">
-                <RefreshCw className="w-3.5 h-3.5 text-blue-500" /> Re-Mount Tyre
-              </button>
-            )}
-            {tyre.status === 'OLD_STOCK' && (
-              <button onClick={() => { onMarkReusable(); setOpen(false); }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors">
-                <RefreshCw className="w-3.5 h-3.5 text-emerald-500" /> Mark as Reusable
-              </button>
-            )}
-            {tyre.status !== 'RETREADING' && tyre.status !== 'SCRAP' && tyre.status !== 'REUSABLE' && (
-              <button onClick={() => { onRetread(); setOpen(false); }}
-                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors">
-                <RotateCcw className="w-3.5 h-3.5 text-amber-500" /> Send for Retreading
-              </button>
-            )}
-            {tyre.status !== 'SCRAP' && (
               <>
+                <button onClick={() => { onRemount(); setOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-50 transition-colors">
+                  <RefreshCw className="w-3.5 h-3.5 text-blue-500" /> Mount Again
+                </button>
+                <button onClick={() => { onRetread(); setOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors">
+                  <RotateCcw className="w-3.5 h-3.5 text-amber-500" /> Send for Retreading
+                </button>
                 <div className="my-1 border-t border-gray-100" />
                 <button onClick={() => { onScrap(); setOpen(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors">
                   <Trash2 className="w-3.5 h-3.5 text-red-500" /> Mark as Scrap
                 </button>
               </>
+            )}
+
+            {/* OLD_STOCK actions */}
+            {tyre.status === 'OLD_STOCK' && (
+              <>
+                <button onClick={() => { onMarkReusable(); setOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 transition-colors">
+                  <RefreshCw className="w-3.5 h-3.5 text-emerald-500" /> Mark as Reusable
+                </button>
+                <button onClick={() => { onRetread(); setOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors">
+                  <RotateCcw className="w-3.5 h-3.5 text-amber-500" /> Send for Retreading
+                </button>
+                <div className="my-1 border-t border-gray-100" />
+                <button onClick={() => { onScrap(); setOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" /> Mark as Scrap
+                </button>
+              </>
+            )}
+
+            {/* RETREADING — view only, no extra actions */}
+            {tyre.status === 'RETREADING' && (
+              <div className="px-3.5 py-2">
+                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">At Vendor</span>
+              </div>
+            )}
+
+            {/* SCRAP — view only */}
+            {tyre.status === 'SCRAP' && (
+              <div className="px-3.5 py-2">
+                <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">Scrapped</span>
+              </div>
             )}
           </motion.div>
         )}
@@ -97,16 +125,18 @@ function ActionMenu({ tyre, onView, onRemount, onMarkReusable, onRetread, onScra
 
 const filterCls = 'h-[38px] bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all';
 
-export default function OldTyresStockTab() {
+export default function OldTyresStockTab({ onNewRetreadingRecord, returnedRetreadTyre, onNewScrapRecord }) {
   const { toasts, push, dismiss } = useToast();
 
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [loading, setLoading]           = useState(true);
+  const [search, setSearch]             = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterLocation, setFilterLocation] = useState('all');
-  const [viewingTyre, setViewingTyre] = useState(null);
+  const [viewingTyre, setViewingTyre]   = useState(null);
   const [remountingTyre, setRemountingTyre] = useState(null);
-  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [retreadingTyre, setRetreadingTyre] = useState(null);
+  const [scrappingTyre, setScrappingTyre]   = useState(null);
+  const [isAddOpen, setIsAddOpen]       = useState(false);
 
   const [oldTyres, setOldTyres] = useState([]);
 
@@ -148,6 +178,34 @@ export default function OldTyresStockTab() {
     fetchOldTyres();
   }, []);
 
+  // When a retreading tyre is returned, update its local status to REUSABLE
+  useEffect(() => {
+    if (!returnedRetreadTyre) return;
+    setOldTyres(prev => {
+      const exists = prev.some(t => t.tyreNo === returnedRetreadTyre.tyreNo || t.id === returnedRetreadTyre.tyreId);
+      if (exists) {
+        return prev.map(t =>
+          (t.tyreNo === returnedRetreadTyre.tyreNo || t.id === returnedRetreadTyre.tyreId)
+            ? { ...t, status: 'REUSABLE', storeLocation: 'Reusable Storage', remainingTread: returnedRetreadTyre.newTreadPercent }
+            : t
+        );
+      }
+      // Tyre not in local list (added via backend) — add it
+      return [{
+        tyreNo:        returnedRetreadTyre.tyreNo,
+        make:          returnedRetreadTyre.brand,
+        model:         returnedRetreadTyre.model,
+        tyreSize:      returnedRetreadTyre.tyreSize,
+        vehicleNo:     returnedRetreadTyre.vehicleNo,
+        lastPosition:  returnedRetreadTyre.lastPosition,
+        runningKm:     returnedRetreadTyre.runningKm || 0,
+        remainingTread: returnedRetreadTyre.newTreadPercent,
+        status:        'REUSABLE',
+        storeLocation: 'Reusable Storage',
+      }, ...prev];
+    });
+  }, [returnedRetreadTyre]);
+
   const locations = [...new Set(oldTyres.map(t => t.storeLocation).filter(Boolean))];
 
   const filtered = oldTyres.filter(t => {
@@ -168,37 +226,41 @@ export default function OldTyresStockTab() {
         tyre_status: 'REUSABLE',
         store_location: 'Reusable Storage',
       });
-      fetchOldTyres();
       push(`${tyreNo} marked as reusable`, 'success');
-    } catch (error) {
-      console.log(error);
-    }
+    } catch (_) {}
+    setOldTyres(prev => prev.map(t =>
+      t.tyreNo === tyreNo ? { ...t, status: 'REUSABLE', storeLocation: 'Reusable Storage' } : t
+    ));
   };
 
-  const handleRetread = async (tyreNo) => {
+  const handleRetreadConfirm = async (record) => {
     try {
-      await axios.put(`http://localhost:5001/api/old-tyres/${tyreNo}`, {
+      await axios.put(`http://localhost:5001/api/old-tyres/${record.tyreNo}`, {
         tyre_status: 'RETREADING',
         store_location: 'Retreading Area',
       });
-      fetchOldTyres();
-      push(`${tyreNo} sent for retreading`, 'warning');
+      push(`${record.tyreNo} sent to ${record.vendorName} for retreading`, 'warning');
     } catch (error) {
-      console.log(error);
+      // backend not connected — update local state
     }
+    // Always update local list regardless of API result
+    setOldTyres(prev => prev.map(t =>
+      (t.tyreNo === record.tyreNo || t.id === record.tyreId)
+        ? { ...t, status: 'RETREADING', storeLocation: 'Retreading Area' }
+        : t
+    ));
+    push(`${record.tyreNo} sent to ${record.vendorName} for retreading`, 'warning');
+    setRetreadingTyre(null);
+    onNewRetreadingRecord?.(record);
   };
 
-  const handleScrap = async (tyreNo) => {
-    try {
-      await axios.put(`http://localhost:5001/api/old-tyres/${tyreNo}`, {
-        tyre_status: 'SCRAP',
-        store_location: 'Scrap Yard',
-      });
-      fetchOldTyres();
-      push(`${tyreNo} marked as scrap`, 'error');
-    } catch (error) {
-      console.log(error);
-    }
+  const handleScrapConfirm = (record) => {
+    setOldTyres(prev => prev.map(t =>
+      t.tyreNo === record.tyreNo ? { ...t, status: 'SCRAP', storeLocation: 'Scrap Yard' } : t
+    ));
+    push(`${record.tyreNo} scrapped — ₹${record.saleAmount.toLocaleString()} sale recorded`, 'error');
+    setScrappingTyre(null);
+    onNewScrapRecord?.(record);
   };
 
   return (
@@ -419,8 +481,8 @@ export default function OldTyresStockTab() {
                         onView={()          => setViewingTyre(tyre)}
                         onRemount={()       => setRemountingTyre(tyre)}
                         onMarkReusable={()  => handleMarkReusable(tyre.tyreNo)}
-                        onRetread={()       => handleRetread(tyre.tyreNo)}
-                        onScrap={()         => handleScrap(tyre.tyreNo)}
+                        onRetread={()       => setRetreadingTyre(tyre)}
+                        onScrap={()         => setScrappingTyre(tyre)}
                       />
                     </td>
                   </motion.tr>
@@ -441,9 +503,23 @@ export default function OldTyresStockTab() {
         )}
       </div>
 
+      <ScrapTyreModal
+        tyre={scrappingTyre}
+        onClose={() => setScrappingTyre(null)}
+        onConfirm={handleScrapConfirm}
+      />
       <OldTyreDetailsModal tyre={viewingTyre} onClose={() => setViewingTyre(null)} />
+      <SendForRetreadingModal
+        tyre={retreadingTyre}
+        onClose={() => setRetreadingTyre(null)}
+        onConfirm={handleRetreadConfirm}
+      />
       <ReMountModal tyre={remountingTyre} onClose={() => setRemountingTyre(null)}
-        onSuccess={(tyreNo) => { push(`${tyreNo} re-mounted successfully`, 'success'); }} />
+        onSuccess={(tyreNo) => {
+          push(`${tyreNo} mounted successfully — moved to Active Tyres`, 'success');
+          setOldTyres(prev => prev.filter(t => t.tyreNo !== tyreNo));
+          setRemountingTyre(null);
+        }} />
       <AddOldTyreModal
         isOpen={isAddOpen}
         onClose={() => {

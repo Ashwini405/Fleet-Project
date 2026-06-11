@@ -75,7 +75,7 @@ export default function Vendors() {
         ) : activePage === 'showrooms' ? (
           <ShowroomsPage onVendorClick={handleVendorClick} />
         ) : activePage === 'parts' ? (
-          <PartsPage onVendorClick={handleVendorClick} />
+          <PartsPage />
         ) : activePage === 'tyres' ? (
           <TyresVendorPage onVendorClick={handleVendorClick} />
         ) : activePage === 'oils' ? (

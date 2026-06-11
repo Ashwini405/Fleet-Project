@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import AddItemModal      from './components/AddItemModal';
+import { useVendorLedger } from '../../context/VendorLedgerContext';
+import { dummyVendors } from '../Vendors/data/dummyData';
 
 // ── Payment Info Panel (read-only, derived from PO data) ─────────────────────
 function PaymentInfoPanel({ po }) {
@@ -87,7 +89,7 @@ import {
 } from 'lucide-react';
 
 const CATEGORIES  = ['Spares', 'Batteries', 'Tubes', 'Lubricants', 'Electrical', 'Others'];
-const PAGE_TABS   = ['Inventory', 'Purchase Orders'];
+const PAGE_TABS   = ['Inventory', 'Purchase Orders', 'Returns'];
 const API         = 'http://localhost:5001/api';
 
 /* ── helpers ── */
@@ -118,6 +120,51 @@ function fmt(d) {
   const date = new Date(d);
   if (isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+const RETURN_STATUS = {
+  pending:   { label: 'Pending Pickup', className: 'bg-amber-50 text-amber-700 border border-amber-200' },
+  collected: { label: 'Collected',       className: 'bg-sky-50 text-sky-700 border border-sky-200' },
+  completed: { label: 'Completed',       className: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
+};
+
+const RETURN_REASONS = ['Damaged', 'Wrong Item', 'Warranty Return', 'Excess Stock', 'Other'];
+
+function buildReturnNumber(index, date) {
+  const dt = new Date(date);
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const d = String(dt.getDate()).padStart(2, '0');
+  return `RTN-${y}${m}${d}-${String(index).padStart(3, '0')}`;
+}
+
+function getReturnStatusText(status) {
+  return RETURN_STATUS[status]?.label || status || 'Pending Pickup';
+}
+
+function getReturnBadge(status) {
+  return RETURN_STATUS[status]?.className || RETURN_STATUS.pending.className;
+}
+
+function advanceReturnStatus(status) {
+  if (status === 'pending') return 'collected';
+  if (status === 'collected') return 'completed';
+  return 'completed';
+}
+
+function findVendorIdByName(name) {
+  if (!name) return null;
+  const key = name.toLowerCase();
+  const exact = dummyVendors.find(v => v.name.toLowerCase() === key);
+  if (exact) return exact.id;
+  const fuzzy = dummyVendors.find(v => key.includes(v.name.toLowerCase()) || v.name.toLowerCase().includes(key));
+  return fuzzy?.id || null;
+}
+
+function itemHasReceivedPO(item, poList) {
+  const itemName = (item.part_name || item.name || '').toLowerCase();
+  if (!itemName) return false;
+  return poList.some(po => getStatusId(po) === 4 && (po.items || []).some(poi => ((poi.partName || poi.name || '')).toLowerCase() === itemName));
 }
 
 function Toast({ toast }) {
@@ -162,6 +209,20 @@ export default function PartsModule() {
   const [expandedPOIds, setExpandedPOIds]       = useState([]);
   const [poFilter, setPoFilter]                 = useState(null); // null = all
   const [currentUser, setCurrentUser] = useState({ name: 'Amina Ahmed', role: 'Supervisor' });
+
+  const [returns, setReturns] = useState([]);
+  const [returnModalItem, setReturnModalItem] = useState(null);
+  const [returnForm, setReturnForm] = useState({
+    quantity: '',
+    date: new Date().toISOString().split('T')[0],
+    reason: 'Damaged',
+    remarks: '',
+  });
+  const [returnDetails, setReturnDetails] = useState(null);
+  const [returnErrors, setReturnErrors] = useState({});
+  const [returnActionLoading, setReturnActionLoading] = useState(false);
+
+  const { addVendorTransaction } = useVendorLedger();
 
   /* ── toast ── */
   const [toast, setToast] = useState(null);
@@ -208,6 +269,26 @@ export default function PartsModule() {
   }, [fetchInventory, fetchHistory, fetchPOs]);
 
   const canReviewPO = ['Admin', 'Manager'].includes(currentUser.role);
+
+  const receivedPOItems = useMemo(() => {
+    const names = new Set();
+    poList.forEach(po => {
+      if (getStatusId(po) !== 4) return;
+      (po.items || []).forEach(item => {
+        const name = (item.partName || item.name || '').toLowerCase();
+        if (name) names.add(name);
+      });
+    });
+    return names;
+  }, [poList]);
+
+  const returnSummary = useMemo(() => {
+    const totalReturns = returns.length;
+    const returnedValue = returns.reduce((sum, r) => sum + (Number(r.creditAmount) || 0), 0);
+    const pending = returns.filter(r => r.status === 'pending').length;
+    const completed = returns.filter(r => r.status === 'completed').length;
+    return { totalReturns, returnedValue, pending, completed };
+  }, [returns]);
 
   /* ── derived ── */
   const categoryCounts = useMemo(() => {
@@ -261,11 +342,159 @@ export default function PartsModule() {
     fetchHistory();
   };
 
+  const openReturnModal = (item) => {
+    setReturnModalItem(item);
+    setReturnForm({
+      quantity: '',
+      date: new Date().toISOString().split('T')[0],
+      reason: 'Damaged',
+      remarks: '',
+    });
+    setReturnErrors({});
+  };
+
+  const closeReturnModal = () => {
+    setReturnModalItem(null);
+    setReturnErrors({});
+  };
+
+  const handleReturnFormChange = (field, value) => {
+    setReturnForm(prev => ({ ...prev, [field]: value }));
+    setReturnErrors(prev => ({ ...prev, [field]: null }));
+  };
+
+  const findMatchingReturnPO = (item) => {
+    const itemName = (item.part_name || item.name || '').toLowerCase();
+    return poList.find(po =>
+      getStatusId(po) === 4 &&
+      (po.items || []).some(poi => ((poi.partName || poi.name || '')).toLowerCase() === itemName)
+    );
+  };
+
+  const handleConfirmReturn = () => {
+    if (!returnModalItem) return;
+    const qty = Number(returnForm.quantity || 0);
+    const currentStock = Number(returnModalItem.current_stock || 0);
+    const errors = {};
+    if (!qty || qty <= 0) errors.quantity = 'Enter a valid return quantity.';
+    if (qty > currentStock) errors.quantity = 'Return quantity cannot exceed current stock.';
+    if (!returnForm.date) errors.date = 'Return date is required.';
+    if (Object.keys(errors).length) {
+      setReturnErrors(errors);
+      return;
+    }
+
+    setReturnActionLoading(true);
+    const itemName = returnModalItem.part_name || returnModalItem.name || 'Unknown Item';
+    const vendorName = returnModalItem.preferredVendor || returnModalItem.vendor || 'Unknown Vendor';
+    const matchedPO = findMatchingReturnPO(returnModalItem);
+    const returnNumber = buildReturnNumber(returns.length + 1, returnForm.date);
+    const unitCost = Number(returnModalItem.costPrice || returnModalItem.cost_price || returnModalItem.cost || 0);
+    const creditAmount = qty * unitCost;
+
+    const newReturn = {
+      id: returnNumber,
+      number: returnNumber,
+      vendor: vendorName,
+      itemName,
+      quantity: qty,
+      date: returnForm.date,
+      reason: returnForm.reason,
+      remarks: returnForm.remarks,
+      status: 'pending',
+      poRef: matchedPO?.po_number || matchedPO?.poNumber || '-',
+      costPerUnit: unitCost,
+      creditAmount,
+      details: {
+        type: 'Adjustment Credit',
+        reference: returnNumber,
+        vendor: vendorName,
+        item: itemName,
+        quantity: qty,
+        creditAmount,
+        reason: returnForm.reason,
+      },
+    };
+
+    setInventory(prev => prev.map(i =>
+      i.id === returnModalItem.id
+        ? { ...i, current_stock: Math.max(0, currentStock - qty) }
+        : i
+    ));
+
+    setReturns(prev => [newReturn, ...prev]);
+
+    if (matchedPO) {
+      setPoList(prev => prev.map(po => {
+        if (po.id !== matchedPO.id) return po;
+        const returnEntry = {
+          returnNumber,
+          quantity: qty,
+          reason: returnForm.reason,
+          date: returnForm.date,
+          status: 'Pending Pickup',
+        };
+        return {
+          ...po,
+          returnHistory: [returnEntry, ...(po.returnHistory || [])],
+          returnedQty: (po.returnedQty || 0) + qty,
+        };
+      }));
+    }
+
+    const vendorId = findVendorIdByName(vendorName);
+    if (vendorId) {
+      addVendorTransaction({
+        vendorId,
+        id: `TXN-${Date.now()}`,
+        date: returnForm.date,
+        truckId: '',
+        type: 'Adjustment Credit',
+        ref: returnNumber,
+        desc: `Vendor Return - ${itemName} (${qty} Qty)`,
+        debit: 0,
+        credit: creditAmount,
+        vendor: vendorName,
+        itemName,
+        quantity: qty,
+        reason: returnForm.reason,
+        poRef: newReturn.poRef,
+      });
+    }
+
+    setReturnModalItem(null);
+    setReturnErrors({});
+    setReturnActionLoading(false);
+    showToast('Return recorded and inventory adjusted.');
+  };
+
+  const handleAdvanceReturnStatus = (recordId) => {
+    setReturns(prev => prev.map(r =>
+      r.id === recordId ? { ...r, status: advanceReturnStatus(r.status) } : r
+    ));
+    showToast('Return status updated.');
+  };
+
+  const openReturnDetails = (record) => {
+    setReturnDetails(record);
+  };
+
   /* ── PO handlers ── */
-  const handleCreatePOSuccess = () => {
+  const handleCreatePOSuccess = (localPO) => {
     setIsCreatePOOpen(false);
+    if (localPO) {
+      // Backend not connected — add to local list immediately
+      setPoList(prev => [{
+        ...localPO,
+        po_number:       localPO.poNumber,
+        status_id:       0,
+        requested_date:  localPO.requested_date,
+        requested_by:    localPO.requested_by,
+      }, ...prev]);
+    } else {
+      fetchPOs();
+    }
     showToast('Purchase order created.');
-    fetchPOs();
   };
 
   const openCommentModal = (po, action) => {
@@ -497,6 +726,12 @@ export default function PartsModule() {
                                 className="rounded-xl bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100 active:scale-95 transition disabled:opacity-35 disabled:cursor-not-allowed">
                                 Issue
                               </button>
+                              {qty > 0 && receivedPOItems.has((item.part_name || item.name || '').toLowerCase()) && (
+                                <button onClick={() => openReturnModal(item)}
+                                  className="rounded-xl bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100 active:scale-95 transition">
+                                  Return
+                                </button>
+                              )}
                               <button onClick={() => setEditItem(item)}
                                 className="rounded-xl p-1.5 text-slate-400 hover:text-violet-600 hover:bg-violet-50 transition" title="Edit">
                                 <Pencil className="h-3.5 w-3.5" />
@@ -569,6 +804,98 @@ export default function PartsModule() {
               </table>
             </div>
           </div>}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════
+          RETURNS TAB
+      ════════════════════════════════════════ */}
+      {pageTab === 'Returns' && (
+        <div className="p-4 md:p-6 space-y-6">
+          <div className="grid gap-4 sm:grid-cols-4">
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+              <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-2 font-bold">Total Returns</p>
+              <p className="text-3xl font-bold text-slate-900">{returnSummary.totalReturns}</p>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+              <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-2 font-bold">Returned Value</p>
+              <p className="text-3xl font-bold text-slate-900">₹{returnSummary.returnedValue.toLocaleString()}</p>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+              <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-2 font-bold">Pending Returns</p>
+              <p className="text-3xl font-bold text-slate-900">{returnSummary.pending}</p>
+            </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+              <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-2 font-bold">Completed Returns</p>
+              <p className="text-3xl font-bold text-slate-900">{returnSummary.completed}</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100">
+              <ShoppingCart className="h-4 w-4 text-violet-600" />
+              <h2 className="text-sm font-bold text-slate-800">Vendor Return History</h2>
+              {returns.length > 0 && (
+                <span className="ml-auto text-xs text-slate-400">{returns.length} records</span>
+              )}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Return No.</th>
+                    <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Date</th>
+                    <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Vendor</th>
+                    <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Item</th>
+                    <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Qty</th>
+                    <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Reason</th>
+                    <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Status</th>
+                    <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Reference PO</th>
+                    <th className="text-right text-xs font-semibold text-slate-400 px-5 py-3">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {returns.length === 0 ? (
+                    <tr><td colSpan={9} className="py-16 text-center text-slate-400">
+                      <ShoppingCart className="h-9 w-9 text-slate-200 mx-auto mb-3" />
+                      No returns recorded yet. Use the Return button from inventory rows to log a vendor return.
+                    </td></tr>
+                  ) : (
+                    returns.map(record => (
+                      <tr key={record.id} className="border-b border-slate-50 hover:bg-slate-50/70 transition">
+                        <td className="px-5 py-3.5 font-mono text-slate-700">{record.number}</td>
+                        <td className="px-5 py-3.5 text-slate-500 whitespace-nowrap">{fmt(record.date)}</td>
+                        <td className="px-5 py-3.5 text-slate-700">{record.vendor}</td>
+                        <td className="px-5 py-3.5 text-slate-700">{record.itemName}</td>
+                        <td className="px-5 py-3.5 text-slate-600">{record.quantity}</td>
+                        <td className="px-5 py-3.5 text-slate-600">{record.reason}</td>
+                        <td className="px-5 py-3.5">
+                          <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold ${getReturnBadge(record.status)}`}>
+                            {getReturnStatusText(record.status)}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-slate-600">{record.poRef || '—'}</td>
+                        <td className="px-5 py-3.5 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            {record.status !== 'completed' && (
+                              <button onClick={() => handleAdvanceReturnStatus(record.id)}
+                                className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200 transition">
+                                Advance
+                              </button>
+                            )}
+                            <button onClick={() => openReturnDetails(record)}
+                              className="rounded-xl bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100 transition">
+                              View Details
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       )}
 
@@ -775,6 +1102,11 @@ export default function PartsModule() {
                                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 text-xs">
                                   <div>
                                     <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-2 font-bold">Item Details</p>
+                                    {po.category && (
+                                      <span className="inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200 mb-1.5">
+                                        {po.category}
+                                      </span>
+                                    )}
                                     <p className="font-semibold text-slate-800">{po.item_name || item0.partName || '—'}</p>
                                     <p className="text-slate-500 mt-0.5">Qty: {po.quantity || item0.qty || '—'}</p>
                                     <p className="text-slate-500">Expected: {fmt(po.expected_delivery)}</p>
@@ -814,6 +1146,110 @@ export default function PartsModule() {
       )}
 
       {/* ── Modals ── */}
+      {returnModalItem && (
+        <AnimatePresence>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.96, opacity: 0 }}
+              transition={{ duration: 0.18 }}
+              className="w-full max-w-2xl overflow-hidden rounded-[32px] bg-white shadow-2xl ring-1 ring-slate-200"
+            >
+              <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-slate-200">
+                <div>
+                  <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">Return Item</p>
+                  <h2 className="mt-1 text-xl font-bold text-slate-900">{returnModalItem.part_name || returnModalItem.name || 'Item'}</h2>
+                </div>
+                <button onClick={closeReturnModal}
+                  className="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4 px-6 py-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-500 uppercase">Return Quantity</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={returnForm.quantity}
+                      onChange={e => handleReturnFormChange('quantity', e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
+                    />
+                    {returnErrors.quantity && <p className="text-xs text-red-600">{returnErrors.quantity}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-500 uppercase">Return Date</label>
+                    <input
+                      type="date"
+                      value={returnForm.date}
+                      onChange={e => handleReturnFormChange('date', e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
+                    />
+                    {returnErrors.date && <p className="text-xs text-red-600">{returnErrors.date}</p>}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-500 uppercase">Reason</label>
+                    <select
+                      value={returnForm.reason}
+                      onChange={e => handleReturnFormChange('reason', e.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
+                    >
+                      {RETURN_REASONS.map(reason => (
+                        <option key={reason} value={reason}>{reason}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-semibold text-slate-500 uppercase">Current Stock</label>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                      {Number(returnModalItem.current_stock || 0)} available
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-500 uppercase">Remarks</label>
+                  <textarea
+                    rows={3}
+                    value={returnForm.remarks}
+                    onChange={e => handleReturnFormChange('remarks', e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3 px-6 py-5 border-t border-slate-200 bg-slate-50 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm text-slate-500">
+                  Vendor: <span className="font-semibold text-slate-900">{returnModalItem.preferredVendor || returnModalItem.vendor || 'Unknown Vendor'}</span>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <button onClick={closeReturnModal}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition">
+                    Cancel
+                  </button>
+                  <button onClick={handleConfirmReturn}
+                    disabled={returnActionLoading}
+                    className="rounded-2xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {returnActionLoading ? 'Processing...' : 'Confirm Return'}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        </AnimatePresence>
+      )}
       <AddItemModal
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}

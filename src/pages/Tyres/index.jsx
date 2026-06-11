@@ -1,11 +1,12 @@
 import React, { useState, createContext, useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
 import { dummyActiveTyres, dummyStockTyres, dummyOldTyres, dummyTrucks } from './data/dummyData';
 import ActiveTyresTab from './tabs/AllTyresTab';
 import InStockTab     from './tabs/InStockTab';
 import OldTyresStockTab from './tabs/OldTyresStockTab';
 import IndividualVehicleTab from './tabs/IndividualVehicleTab';
+import RetreadingTab from './tabs/RetreadingTab';
+import ScrapHistoryTab from './tabs/ScrapHistoryTab';
 
 // ── Shared lifecycle context ──────────────────────────────────────────────────
 export const TyreLifecycleContext = createContext(null);
@@ -165,6 +166,41 @@ export default function TyresModule() {
     if (patch.status === 'REUSABLE')   addActivity(createActivityItem('remounted',  tyreNo, tyre?.lastPosition, tyre?.vehicleNo, `Marked reusable`));
   };
 
+  const [retreadingRecords, setRetreadingRecords] = useState([]);
+  const [lastReturnedTyre,  setLastReturnedTyre]  = useState(null);
+  const [scrapRecords,      setScrapRecords]      = useState([]);
+
+  const addScrapRecord = (record) =>
+    setScrapRecords(prev => [record, ...prev]);
+
+  const addRetreadingRecord = (record) =>
+    setRetreadingRecords(prev => [record, ...prev]);
+
+  const updateRetreadingRecord = (updated) => {
+    setRetreadingRecords(prev => prev.map(r => r.id === updated.id ? updated : r));
+    if (updated.status === 'RETURNED') {
+      setLastReturnedTyre(updated);
+      setOldTyres(prev => prev.map(t =>
+        (t.tyreNo === updated.tyreNo || t.id === updated.tyreId)
+          ? { ...t, status: 'REUSABLE', storeLocation: 'Reusable Storage', remainingTread: updated.newTreadPercent }
+          : t
+      ));
+    }
+    if (updated.status === 'REJECTED') {
+      setOldTyres(prev => prev.map(t =>
+        (t.tyreNo === updated.tyreNo || t.id === updated.tyreId)
+          ? { ...t, status: 'OLD_STOCK', storeLocation: 'Warehouse Old Stock' }
+          : t
+      ));
+    }
+  };
+
+  const handleRetreadingRejected = (tyreNo) => {
+    setOldTyres(prev => prev.map(t =>
+      t.tyreNo === tyreNo ? { ...t, status: 'OLD_STOCK', storeLocation: 'Warehouse Old Stock' } : t
+    ));
+  };
+
   // Manually add an old tyre record
   const addOldTyre = (record) =>
     setOldTyres(prev => [record, ...prev]);
@@ -261,31 +297,25 @@ export default function TyresModule() {
     { id: 'active',     label: 'Active Tyres'      },
     { id: 'stock',      label: 'In Stock Tyres'    },
     { id: 'old',        label: 'Old Tyres Stock'   },
+    { id: 'retreading', label: 'Retreading'         },
     { id: 'individual', label: 'Individual Vehicle' },
   ];
+
+  const retreadingInProgress = retreadingRecords.filter(r => r.status === 'IN_PROGRESS').length;
 
   return (
     <TyreLifecycleContext.Provider value={{ activeTyres, stockTyres, oldTyres, activityLog, removeTyre, updateOldTyre, addOldTyre, remountTyre, mountTyreToTruck, mountFromStock, replaceTyre, quickRemoveTyre, registerTyre, dummyTrucks }}>
       <div className="flex flex-col min-h-[calc(100vh-4rem)] bg-[#f8fafc]">
-
-        {/* Tab content */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.2 }}
-            >
-              {activeTab === 'active'     && <ActiveTyresTab />}
-              {activeTab === 'stock'      && <InStockTab />}
-              {activeTab === 'old'        && <OldTyresStockTab />}
-              {activeTab === 'individual' && <IndividualVehicleTab />}
-            </motion.div>
-          </AnimatePresence>
+          <div>
+            <div className={activeTab === 'active'     ? '' : 'hidden'}><ActiveTyresTab /></div>
+            <div className={activeTab === 'stock'      ? '' : 'hidden'}><InStockTab /></div>
+            <div className={activeTab === 'old'        ? '' : 'hidden'}><OldTyresStockTab onNewRetreadingRecord={addRetreadingRecord} returnedRetreadTyre={lastReturnedTyre} onNewScrapRecord={addScrapRecord} /></div>
+            <div className={activeTab === 'retreading' ? '' : 'hidden'}><RetreadingTab records={retreadingRecords} onRecordUpdate={updateRetreadingRecord} onRejected={handleRetreadingRejected} /></div>
+            <div className={activeTab === 'scrap'      ? '' : 'hidden'}><ScrapHistoryTab records={scrapRecords} /></div>
+            <div className={activeTab === 'individual' ? '' : 'hidden'}><IndividualVehicleTab /></div>
+          </div>
         </div>
-
       </div>
     </TyreLifecycleContext.Provider>
   );

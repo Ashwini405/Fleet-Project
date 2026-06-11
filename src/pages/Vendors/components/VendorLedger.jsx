@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FiArrowLeft, FiPlus, FiEye, FiX, FiInbox, FiSearch, FiCalendar, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 import { dummyLedger, vendorCategories, dummyVendorPOs } from '../data/dummyData';
-import { TypeBadge, RecordPaymentModal, VendorInfoPanel, SummaryCards } from './shared';
+import { TypeBadge, RecordPaymentModal, CollectReceiptModal, VendorInfoPanel, SummaryCards } from './shared';
 import { PAGE_SIZE, MODAL_ANIM } from './shared/constants';
 
 // Build initial PO allocation state from dummyVendorPOs + existing ledger payments
@@ -53,18 +53,26 @@ function autoAllocate(poList, paymentAmount, paymentRef, paymentDate) {
   return { updated, applied };
 }
 
-export default function VendorLedger({ vendor, onBack }) {
-  const initialTxns = dummyLedger[vendor.id] || [];
+export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
+  const baseTxns = dummyLedger[vendor.id] || [];
 
-  const [rawTxns,      setRawTxns]      = useState(initialTxns);
-  const [poList,       setPoList]       = useState(() => buildInitialPOState(vendor.id, initialTxns));
+  const [rawTxns, setRawTxns] = useState(() => [...baseTxns, ...extraTxns]);
+  const [poList,  setPoList]  = useState(() => buildInitialPOState(vendor.id, [...baseTxns, ...extraTxns]));
+
+  // Re-sync whenever extraTxns array reference changes (context update)
+  const extraTxnsKey = extraTxns.map(t => `${t.id}:${t.debit}`).join(',');
+  useEffect(() => {
+    setRawTxns([...baseTxns, ...extraTxns]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [extraTxnsKey]);
   const [activeFilter, setActiveFilter] = useState('All');
   const [search,       setSearch]       = useState('');
   const [dateFrom,     setDateFrom]     = useState('');
   const [dateTo,       setDateTo]       = useState('');
   const [page,         setPage]         = useState(1);
   const [selectedTxn,  setSelectedTxn]  = useState(null);
-  const [payModalOpen, setPayModalOpen] = useState(false);
+  const [payModalOpen,     setPayModalOpen]     = useState(false);
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
 
   const categoryLabel = vendorCategories.find(c => c.id === vendor.category)?.label?.toUpperCase() || vendor.category?.toUpperCase();
 
@@ -82,8 +90,8 @@ export default function VendorLedger({ vendor, onBack }) {
 
   const FILTERS     = ['All', 'Purchases', 'Payments', 'Adjustments'];
   const filterMatch = {
-    Purchases:   ['Purchase', 'Fuel Fill', 'RTA Fee'],
-    Payments:    ['Payment'],
+    Purchases:   ['Purchase', 'Tyre Purchase', 'Retreading Service', 'Scrap Sale', 'Fuel Fill', 'RTA Fee'],
+    Payments:    ['Payment', 'Receipt'],
     Adjustments: ['Adjustment', 'Opening Balance', 'Manual Adjustment'],
   };
 
@@ -131,9 +139,15 @@ export default function VendorLedger({ vendor, onBack }) {
         <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors">
           <FiArrowLeft /> Vendor Accounts
         </button>
-        <button onClick={() => setPayModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors">
-          <FiPlus /> Record Payment
-        </button>
+        {totalCredit > totalDebit ? (
+          <button onClick={() => setReceiptModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors">
+            <FiPlus /> Collect Payment
+          </button>
+        ) : (
+          <button onClick={() => setPayModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors">
+            <FiPlus /> Record Payment
+          </button>
+        )}
       </div>
 
       <VendorInfoPanel vendor={vendor} categoryLabel={categoryLabel} />
@@ -233,6 +247,27 @@ export default function VendorLedger({ vendor, onBack }) {
           </div>
         )}
       </div>
+
+      {/* Collect Receipt Modal — for scrap/receivable vendors */}
+      <CollectReceiptModal
+        isOpen={receiptModalOpen}
+        onClose={() => setReceiptModalOpen(false)}
+        vendorName={vendor.name}
+        receivable={totalCredit - totalDebit}
+        onSave={(p) => {
+          setRawTxns(prev => [...prev, {
+            id:      p.id,
+            date:    p.date,
+            type:    'Receipt',
+            ref:     p.ref || `REC-${Date.now()}`,
+            desc:    `${p.method} Receipt${p.remarks ? ' — ' + p.remarks : ''}`,
+            debit:   p.amount,
+            credit:  0,
+            truckId: '',
+          }]);
+          setPage(1);
+        }}
+      />
 
       {/* Record Payment Modal */}
       <RecordPaymentModal

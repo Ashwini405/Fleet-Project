@@ -294,16 +294,132 @@ export function VendorInfoPanel({ vendor, categoryLabel }) {
   );
 }
 
+// ── CollectReceiptModal — for scrap/receivable vendors ────────────────────
+export function CollectReceiptModal({ isOpen, onClose, onSave, vendorName, receivable }) {
+  const today = new Date().toISOString().split('T')[0];
+  const EMPTY = { date: today, amount: '', method: 'Cash', ref: '', remarks: '' };
+  const [form, setForm]     = useState(EMPTY);
+  const [errors, setErrors] = useState({});
+  const [toast, setToast]   = useState(false);
+
+  if (!isOpen) return null;
+
+  const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: null })); };
+  const totalAmt = Number(form.amount) || 0;
+
+  const validate = () => {
+    const e = {};
+    if (!form.date)          e.date   = 'Date is required';
+    if (!form.amount || totalAmt <= 0) e.amount = 'Enter a valid amount';
+    return e;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    onSave({ ...form, amount: totalAmt, id: 'rec-' + Date.now() });
+    setToast(true);
+    setTimeout(() => { setToast(false); setForm(EMPTY); setErrors({}); onClose(); }, 1400);
+  };
+
+  const iCls  = 'w-full p-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm';
+  const iECls = 'w-full p-3 bg-white border border-red-300 rounded-xl focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-300 text-sm';
+  const lCls  = 'block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1';
+  const loCls = 'block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden" style={{ animation: 'modalSlideIn 0.25s ease-out' }}>
+        <div className="flex justify-between items-center p-5 bg-emerald-700">
+          <div>
+            <h3 className="text-sm font-bold text-white">Collect Payment</h3>
+            <p className="text-[11px] text-emerald-200 mt-0.5">Record money received from scrap buyer</p>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-full hover:bg-emerald-600 text-emerald-200 transition-colors"><FiX size={18} /></button>
+        </div>
+
+        {toast && (
+          <div className="flex items-center gap-2 px-5 py-3 bg-emerald-50 border-b border-emerald-100 text-emerald-700 text-sm font-semibold">
+            <FiCheckCircle size={15} /> Payment collected successfully
+          </div>
+        )}
+
+        <div className="p-6 space-y-4">
+          <div>
+            <label className={loCls}>Vendor</label>
+            <div className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 flex items-center justify-between">
+              <span>{vendorName}</span>
+              {receivable != null && (
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                  receivable <= 0 ? 'bg-gray-100 text-gray-500' : 'bg-emerald-100 text-emerald-700'
+                }`}>
+                  {receivable <= 0 ? 'Collected' : `₹${receivable.toLocaleString()} Pending`}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={lCls}>Receipt Date <span className="text-red-400">*</span></label>
+                <input type="date" value={form.date} onChange={e => set('date', e.target.value)}
+                  className={errors.date ? iECls : iCls} />
+                {errors.date && <p className="text-xs text-red-500 mt-1">{errors.date}</p>}
+              </div>
+              <div>
+                <label className={lCls}>Amount (₹) <span className="text-red-400">*</span></label>
+                <input type="number" value={form.amount} onChange={e => set('amount', e.target.value)}
+                  placeholder="e.g. 2000" min="1" className={errors.amount ? iECls : iCls} />
+                {errors.amount && <p className="text-xs text-red-500 mt-1">{errors.amount}</p>}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className={lCls}>Payment Mode</label>
+                <select value={form.method} onChange={e => set('method', e.target.value)} className={iCls + ' text-gray-700'}>
+                  {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={loCls}>Reference No</label>
+                <input type="text" value={form.ref} onChange={e => set('ref', e.target.value)}
+                  placeholder="e.g. TXN123" className={iCls} />
+              </div>
+            </div>
+            <div>
+              <label className={loCls}>Remarks</label>
+              <textarea rows={2} value={form.remarks} onChange={e => set('remarks', e.target.value)}
+                placeholder="Optional…" className={iCls + ' resize-none'} />
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={onClose}
+                className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-50 transition-colors text-sm">Cancel</button>
+              <button type="submit"
+                className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-colors text-sm">Collect Payment</button>
+            </div>
+          </form>
+        </div>
+      </div>
+      <style>{MODAL_ANIM}</style>
+    </div>
+  );
+}
+
 // ── SummaryCards ───────────────────────────────────────────────────────────
 export function SummaryCards({ totalDebit, totalCredit, lastDate }) {
   const outstanding = totalDebit - totalCredit;
-  const outColor = outstanding === 0 ? 'text-gray-400' : outstanding > 20000 ? 'text-red-600' : outstanding > 5000 ? 'text-yellow-600' : 'text-green-600';
-  const outBg    = outstanding === 0 ? 'bg-gray-50'    : outstanding > 20000 ? 'bg-red-50'    : outstanding > 5000 ? 'bg-yellow-50'    : 'bg-green-50';
+  // If net credit > debit, this is a receivable vendor (e.g. scrap buyer)
+  const isReceivable = outstanding < 0;
+  const outColor = outstanding === 0 ? 'text-gray-400' : isReceivable ? 'text-emerald-600' : outstanding > 20000 ? 'text-red-600' : outstanding > 5000 ? 'text-yellow-600' : 'text-green-600';
+  const outBg    = outstanding === 0 ? 'bg-gray-50'    : isReceivable ? 'bg-emerald-50'   : outstanding > 20000 ? 'bg-red-50'    : outstanding > 5000 ? 'bg-yellow-50'    : 'bg-green-50';
+  const outSub   = outstanding === 0 ? 'Fully Settled' : isReceivable ? 'Receivable (Pending Collection)' : 'Payable';
 
   const cards = [
-    { label: 'Outstanding Balance', value: outstanding === 0 ? '₹0' : `₹${Math.abs(outstanding).toLocaleString()}`, sub: outstanding === 0 ? 'Fully Settled' : outstanding > 0 ? 'Payable' : 'Advance', icon: <FiTrendingUp size={18}/>, color: outColor, bg: outBg },
-    { label: 'Total Purchases',     value: `₹${totalDebit.toLocaleString()}`,   sub: 'Cumulative debits',    icon: <FiShoppingBag size={18}/>, color: 'text-red-500',   bg: 'bg-red-50'   },
-    { label: 'Total Payments',      value: `₹${totalCredit.toLocaleString()}`,  sub: 'Cumulative credits',   icon: <FiTrendingDown size={18}/>, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Outstanding Balance', value: outstanding === 0 ? '₹0' : `₹${Math.abs(outstanding).toLocaleString()}`, sub: outSub, icon: <FiTrendingUp size={18}/>, color: outColor, bg: outBg },
+    { label: isReceivable ? 'Total Sales' : 'Total Purchases', value: `₹${totalDebit.toLocaleString()}`,  sub: 'Cumulative debits',    icon: <FiShoppingBag size={18}/>, color: 'text-red-500',   bg: 'bg-red-50'   },
+    { label: isReceivable ? 'Total Collected' : 'Total Payments', value: `₹${totalCredit.toLocaleString()}`, sub: 'Cumulative credits', icon: <FiTrendingDown size={18}/>, color: 'text-green-600', bg: 'bg-green-50' },
     { label: 'Last Transaction',    value: lastDate || '—',                      sub: 'Most recent activity', icon: <FiClock size={18}/>,        color: 'text-blue-600',  bg: 'bg-blue-50'  },
   ];
 
