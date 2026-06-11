@@ -1,8 +1,14 @@
 import React, { useState } from 'react';
 import { vendorCategories } from './data/dummyData';
 import DashboardPage    from './pages/DashboardPage';
-import CategoryPage     from './pages/CategoryPage';
 import VendorDetailPage from './pages/VendorDetailPage';
+import GaragesPage      from './pages/GaragesPage';
+import ShowroomsPage    from './pages/ShowroomsPage';
+import PartsPage        from './pages/PartsPage';
+import TyresVendorPage  from './pages/TyresVendorPage';
+import OilsPage         from './pages/OilsPage';
+import FuelVendorPage   from './pages/FuelVendorPage';
+import RTAPage          from './pages/RTAPage';
 import {
   FiGrid, FiTool, FiUsers, FiBriefcase,
   FiSettings, FiCircle, FiDroplet, FiFeather, FiFileText,
@@ -27,8 +33,6 @@ export default function Vendors() {
     setSelectedVendor(null);
     setActivePage(tabId);
   };
-
-  const activeCategory = vendorCategories.find(c => c.id === activePage);
 
   return (
     <div className="max-w-7xl mx-auto font-sans text-gray-800">
@@ -66,13 +70,21 @@ export default function Vendors() {
           <VendorDetailPage vendor={selectedVendor} onBack={handleBack} />
         ) : activePage === 'dashboard' ? (
           <DashboardPage onVendorClick={handleVendorClick} />
-        ) : (
-          <CategoryPage
-            category={activePage}
-            categoryName={activeCategory?.label}
-            onVendorClick={handleVendorClick}
-          />
-        )}
+        ) : activePage === 'garages' ? (
+          <GaragesPage onVendorClick={handleVendorClick} />
+        ) : activePage === 'showrooms' ? (
+          <ShowroomsPage onVendorClick={handleVendorClick} />
+        ) : activePage === 'parts' ? (
+          <PartsPage onVendorClick={handleVendorClick} />
+        ) : activePage === 'tyres' ? (
+          <TyresVendorPage onVendorClick={handleVendorClick} />
+        ) : activePage === 'oils' ? (
+          <OilsPage onVendorClick={handleVendorClick} />
+        ) : activePage === 'fuel' ? (
+          <FuelVendorPage onVendorClick={handleVendorClick} />
+        ) : activePage === 'rta' ? (
+          <RTAPage onVendorClick={handleVendorClick} />
+        ) : null}
       </div>
     </div>
   );

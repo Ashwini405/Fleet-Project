@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { FiSearch, FiPlus, FiBriefcase, FiPhone, FiMapPin, FiHome, FiChevronRight, FiEdit2, FiUser } from 'react-icons/fi';
-import { dummyVendors } from '../data/dummyData';
 import AddAccountModal from './AddAccountModal';
 import AddShowroomModal from './AddShowroomModal';
 import AddGarageModal from './AddGarageModal';
@@ -8,16 +7,14 @@ import EditShowroomModal from './EditShowroomModal';
 
 const isShowroom = (cat) => cat === 'showrooms';
 
-export default function CategoryView({ category, categoryName, onVendorClick }) {
+export default function CategoryView({ category, categoryName, vendors: allVendors = [], loading = false, onVendorClick, onRefresh }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [editVendor, setEditVendor] = useState(null);
 
-  const vendors = dummyVendors.filter(v => {
-    if (v.category !== category) return false;
-    if (searchTerm && !v.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    return true;
-  });
+  const vendors = searchTerm
+    ? allVendors.filter(v => (v.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
+    : allVendors;
 
   const balanceLabel = isShowroom(category) ? 'Pending Warranty Amount' : 'Ledger Balance';
   const balanceTip   = isShowroom(category)
@@ -177,7 +174,12 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
           </div>
         ))}
 
-        {vendors.length === 0 && (
+        {loading && (
+          <div className="col-span-full py-12 text-center text-gray-400 bg-white rounded-2xl border border-gray-100 border-dashed">
+            Loading...
+          </div>
+        )}
+        {!loading && vendors.length === 0 && (
           <div className="col-span-full py-12 text-center text-gray-500 bg-white rounded-2xl border border-gray-100 border-dashed">
             No vendors found in this category.
           </div>
@@ -185,15 +187,15 @@ export default function CategoryView({ category, categoryName, onVendorClick }) 
       </div>
 
       {category === 'showrooms' && (
-        <AddShowroomModal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} />
+        <AddShowroomModal isOpen={isAddModalOpen} onClose={() => { setAddModalOpen(false); onRefresh?.(); }} />
       )}
       {category === 'garages' && (
-        <AddGarageModal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} />
+        <AddGarageModal isOpen={isAddModalOpen} onClose={() => { setAddModalOpen(false); onRefresh?.(); }} />
       )}
       {category !== 'showrooms' && category !== 'garages' && (
-        <AddAccountModal isOpen={isAddModalOpen} onClose={() => setAddModalOpen(false)} categoryName={categoryName} category={category} />
+        <AddAccountModal isOpen={isAddModalOpen} onClose={() => { setAddModalOpen(false); onRefresh?.(); }} categoryName={categoryName} category={category} />
       )}
-      <EditShowroomModal isOpen={!!editVendor} onClose={() => setEditVendor(null)} vendor={editVendor} />
+      <EditShowroomModal isOpen={!!editVendor} onClose={() => { setEditVendor(null); onRefresh?.(); }} vendor={editVendor} />
     </div>
   );
 }
