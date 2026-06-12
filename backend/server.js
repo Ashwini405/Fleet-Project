@@ -40,6 +40,12 @@ require("./routes/vendorRoutes");
 const vendorPaymentRoutes =
 require("./routes/vendorPaymentRoutes");
 
+const showroomRoutes =
+require("./routes/showroomRoutes");
+
+const showroomLedgerRoutes =
+require("./routes/showroomLedgerRoutes");
+
 const db = require('./config/db');
 
 // Auto-create tyre_notifications table
@@ -154,6 +160,16 @@ app.use(
 app.use(
   "/api/vendors",
   vendorPaymentRoutes
+);
+
+app.use(
+  "/api/showrooms",
+  showroomRoutes
+);
+
+app.use(
+  "/api/showroom-ledger",
+  showroomLedgerRoutes
 );
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {

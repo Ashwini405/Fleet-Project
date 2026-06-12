@@ -720,6 +720,9 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                 <InfoItem label="Tire Size" value={vehicle.tire_size} />
                 <InfoItem label="GVW" value={vehicle.gvw} />
                 <InfoItem label="ULW" value={vehicle.ulw} />
+                <InfoItem label="Dealer / Showroom" value={vehicle.dealer_showroom || '—'} />
+                <InfoItem label="Purchase Date" value={formatDate(vehicle.purchase_date)} />
+                <InfoItem label="Purchase Amount" value={vehicle.purchase_amount ? `₹${Number(vehicle.purchase_amount).toLocaleString()}` : '—'} />
               </div>
             </div>
 

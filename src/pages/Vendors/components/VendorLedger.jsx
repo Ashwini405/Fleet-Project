@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { FiArrowLeft, FiPlus, FiEye, FiX, FiInbox, FiSearch, FiCalendar, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
-import { dummyLedger, vendorCategories, dummyVendorPOs } from '../data/dummyData';
+import { vendorCategories, dummyLedger, dummyVendorPOs } from '../data/dummyData';
 import { TypeBadge, RecordPaymentModal, CollectReceiptModal, VendorInfoPanel, SummaryCards } from './shared';
 import { PAGE_SIZE, MODAL_ANIM } from './shared/constants';
 
@@ -54,15 +54,50 @@ function autoAllocate(poList, paymentAmount, paymentRef, paymentDate) {
 }
 
 export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
-  const baseTxns = dummyLedger[vendor.id] || [];
+  const [rawTxns, setRawTxns] = useState([]);
+  const [poList,  setPoList]  = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [rawTxns, setRawTxns] = useState(() => [...baseTxns, ...extraTxns]);
-  const [poList,  setPoList]  = useState(() => buildInitialPOState(vendor.id, [...baseTxns, ...extraTxns]));
+  useEffect(() => {
+    if (!vendor?.id) return;
+    setLoading(true);
 
-  // Re-sync whenever extraTxns array reference changes (context update)
+    // Dummy vendors (id starts with 'v') use local dummy data
+    if (String(vendor.id).startsWith('v')) {
+      const baseTxns = dummyLedger[vendor.id] || [];
+      setRawTxns([...baseTxns, ...extraTxns]);
+      setPoList(buildInitialPOState(vendor.id, baseTxns));
+      setLoading(false);
+      return;
+    }
+
+    fetch(`http://localhost:5001/api/vendors/${vendor.id}/transactions`)
+      .then(r => r.json())
+      .then(d => {
+        const rows = (d.data || []).map((t, i) => ({
+          id:      `db-${t.id ?? i}`,
+          date:    t.transaction_date ? String(t.transaction_date).split('T')[0] : '',
+          truckId: t.truck_no || '',
+          type:    t.transaction_type || '',
+          ref:     t.reference_number || '',
+          desc:    t.description || '',
+          debit:   Number(t.debit)  || 0,
+          credit:  Number(t.credit) || 0,
+        }));
+        setRawTxns([...rows, ...extraTxns]);
+        setPoList(buildInitialPOState(vendor.id, rows));
+      })
+      .catch(() => setRawTxns([...extraTxns]))
+      .finally(() => setLoading(false));
+  }, [vendor?.id]);
+
+  // Re-sync whenever extraTxns changes
   const extraTxnsKey = extraTxns.map(t => `${t.id}:${t.debit}`).join(',');
   useEffect(() => {
-    setRawTxns([...baseTxns, ...extraTxns]);
+    setRawTxns(prev => {
+      const nonExtra = prev.filter(t => !extraTxns.find(e => String(e.id) === String(t.id)));
+      return [...nonExtra, ...extraTxns];
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extraTxnsKey]);
   const [activeFilter, setActiveFilter] = useState('All');
@@ -252,7 +287,7 @@ export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
       <CollectReceiptModal
         isOpen={receiptModalOpen}
         onClose={() => setReceiptModalOpen(false)}
-        vendorName={vendor.name}
+        vendorName={vendor.garage_name || vendor.showroom_name || vendor.name || ''}
         receivable={totalCredit - totalDebit}
         onSave={(p) => {
           setRawTxns(prev => [...prev, {
@@ -274,7 +309,7 @@ export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
         isOpen={payModalOpen}
         onClose={() => setPayModalOpen(false)}
         onSave={handleSavePayment}
-        vendorName={vendor.name}
+        vendorName={vendor.garage_name || vendor.showroom_name || vendor.name || ''}
         outstanding={totalDebit - totalCredit}
         poList={poList}
       />

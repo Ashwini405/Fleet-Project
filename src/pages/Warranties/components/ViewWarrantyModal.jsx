@@ -173,6 +173,7 @@ export default function ViewWarrantyModal({ isOpen, onClose, itemData, onUpdated
   const [editing, setEditing]   = useState(false);
   const [saving,  setSaving]    = useState(false);
   const [vehicles, setVehicles] = useState([]);
+  const [showrooms, setShowrooms] = useState([]);
   const [fd, setFd]             = useState({});
   const [files, setFiles]       = useState({ warrantyCard: null, invoiceFile: null });
 
@@ -187,6 +188,7 @@ export default function ViewWarrantyModal({ isOpen, onClose, itemData, onUpdated
       serial_no:      d.serial_no      || '',
       vehicle_id:     d.vehicle_id     || '',
       vehicle_no:     d.vehicle_no     || '',
+      dealerShowroom: d.dealer_showroom || '',
       odometer:       d.odometer       || '',
       startDate:      toInputDate(d.start_date),
       endDate:        toInputDate(d.end_date),
@@ -197,12 +199,17 @@ export default function ViewWarrantyModal({ isOpen, onClose, itemData, onUpdated
     setEditing(false);
   }, [itemData]);
 
-  // Fetch vehicles for the vehicle dropdown in edit mode
+  // Fetch vehicles and showrooms for the edit form
   useEffect(() => {
     fetch('http://localhost:5001/api/vehicles')
       .then(r => r.json())
       .then(data => { if (data.success) setVehicles(data.data || []); })
       .catch(err => console.error('FETCH VEHICLES ERROR:', err));
+
+    fetch('http://localhost:5001/api/showrooms')
+      .then(r => r.json())
+      .then(data => { if (data.success) setShowrooms(data.data || []); })
+      .catch(err => console.error('FETCH SHOWROOMS ERROR:', err));
   }, []);
 
   if (!isOpen || !itemData) return null;
@@ -220,8 +227,9 @@ export default function ViewWarrantyModal({ isOpen, onClose, itemData, onUpdated
     const selected = vehicles.find(v => v.id === Number(e.target.value));
     setFd(p => ({
       ...p,
-      vehicle_id: selected?.id     || '',
-      vehicle_no: selected?.vehicle_no || '',
+      vehicle_id:     selected?.id              || '',
+      vehicle_no:     selected?.vehicle_no      || '',
+      dealerShowroom: selected?.dealer_showroom || p.dealerShowroom || '',
     }));
   };
 
@@ -240,6 +248,7 @@ export default function ViewWarrantyModal({ isOpen, onClose, itemData, onUpdated
       formData.append('serial_no',       fd.serial_no);
       formData.append('vehicle_id',      fd.vehicle_id);
       formData.append('vehicle_no',      fd.vehicle_no);
+      formData.append('dealer_showroom',  fd.dealerShowroom);
       formData.append('odometer',        fd.odometer);
       formData.append('start_date',      fd.startDate);
       formData.append('end_date',        fd.endDate);
@@ -281,6 +290,7 @@ export default function ViewWarrantyModal({ isOpen, onClose, itemData, onUpdated
       serial_no:      d.serial_no      || '',
       vehicle_id:     d.vehicle_id     || '',
       vehicle_no:     d.vehicle_no     || '',
+      dealerShowroom: d.dealer_showroom || '',
       odometer:       d.odometer       || '',
       startDate:      toInputDate(d.start_date),
       endDate:        toInputDate(d.end_date),
@@ -354,6 +364,7 @@ export default function ViewWarrantyModal({ isOpen, onClose, itemData, onUpdated
                     <Field label="Vehicle Number">{d.vehicle_no}</Field>
                     <Field label="Brand">{d.brand}</Field>
                     <Field label="Model">{d.model}</Field>
+                    <Field label="Dealer / Showroom">{d.dealer_showroom || '—'}</Field>
                     <Field label="Serial Number">
                       <span className="font-mono text-xs">{d.serial_no}</span>
                     </Field>
@@ -408,6 +419,12 @@ export default function ViewWarrantyModal({ isOpen, onClose, itemData, onUpdated
                     <Sel label="Model" required value={fd.model} onChange={e => set('model', e.target.value)} disabled={!fd.category}>
                       <option value="">{fd.category ? 'Select Model' : 'Select category first'}</option>
                       {(MODELS_BY_CATEGORY[fd.category] || []).map(m => <option key={m}>{m}</option>)}
+                    </Sel>
+                    <Sel label="Dealer / Showroom" value={fd.dealerShowroom} onChange={e => set('dealerShowroom', e.target.value)}>
+                      <option value="">Select Showroom</option>
+                      {showrooms.map(s => (
+                        <option key={s.id} value={s.showroom_name}>{s.showroom_name}</option>
+                      ))}
                     </Sel>
                     <Inp label="Serial Number" value={fd.serial_no} onChange={e => set('serial_no', e.target.value)} placeholder="e.g. SN1234567890" />
                   </div>

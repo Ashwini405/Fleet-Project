@@ -38,6 +38,10 @@ async function createTable() {
       console.log("Sample data inserted.");
     }
 
+    // Make sure dealer_showroom exists for existing schema
+    await db.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS dealer_showroom VARCHAR(255) DEFAULT NULL`);
+    await db.query(`ALTER TABLE warranties ADD COLUMN IF NOT EXISTS dealer_showroom VARCHAR(255) DEFAULT NULL`);
+
     // Create repair_files table
     const repairFilesQuery = `
       CREATE TABLE IF NOT EXISTS repair_files (

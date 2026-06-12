@@ -23,6 +23,7 @@ const createWarranty = async (data) => {
 
       vehicle_id,
       vehicle_no,
+      dealer_showroom,
       odometer,
 
       purchase_date,
@@ -91,6 +92,7 @@ const createWarranty = async (data) => {
 
       data.vehicle_id || null,
       data.vehicle_no,
+      data.dealer_showroom,
       data.odometer || 0,
 
       data.purchase_date || null,
@@ -196,9 +198,10 @@ const updateWarranty = async (id, data) => {
       brand          = ?,
       model          = ?,
       serial_no      = ?,
-      vehicle_id     = ?,
-      vehicle_no     = ?,
-      odometer       = ?,
+      vehicle_id      = ?,
+      vehicle_no      = ?,
+      dealer_showroom = ?,
+      odometer        = ?,
       start_date     = ?,
       end_date       = ?,
       warranty_period = ?,
@@ -215,6 +218,7 @@ const updateWarranty = async (id, data) => {
       data.serial_no,
       data.vehicle_id || null,
       data.vehicle_no,
+      data.dealer_showroom,
       data.odometer || null,
       data.start_date || null,
       data.end_date   || null,

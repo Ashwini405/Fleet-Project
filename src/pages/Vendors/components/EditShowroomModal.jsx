@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { FiX, FiHome } from 'react-icons/fi';
 
 const BANK_OPTIONS = [
@@ -23,21 +24,38 @@ export default function EditShowroomModal({ isOpen, onClose, vendor }) {
   const [form, setForm] = useState({ name: '', contact: '', address: '', accountNo: '', ifsc: '', contactPerson: '', designation: '', email: '' });
 
   useEffect(() => {
+
     if (!vendor) return;
-    const bankParts = vendor.bank ? vendor.bank.split(' - ') : [];
-    const detectedBank = BANK_OPTIONS.includes(bankParts[0]) ? bankParts[0] : bankParts[0] ? 'Others' : '';
-    setBankName(detectedBank);
-    setCustomBank(detectedBank === 'Others' ? bankParts[0] : '');
+
+    setBankName(
+      vendor.bank_name || ""
+    );
+
+    setCustomBank(
+      vendor.custom_bank_name || ""
+    );
+
     setForm({
-      name:          vendor.name          || '',
-      contact:       vendor.contact       || '',
-      address:       vendor.address       || '',
-      accountNo:     bankParts[1]         || '',
-      ifsc:          '',
-      contactPerson: vendor.contactPerson || '',
-      designation:   vendor.designation   || '',
-      email:         vendor.email         || '',
+      name: vendor.showroom_name || "",
+      contact: vendor.mobile_number || "",
+      address: vendor.address_location || "",
+
+      accountNo:
+        vendor.account_number || "",
+
+      ifsc:
+        vendor.ifsc_code || "",
+
+      contactPerson:
+        vendor.contact_person || "",
+
+      designation:
+        vendor.designation || "",
+
+      email:
+        vendor.email || ""
     });
+
   }, [vendor]);
 
   if (!isOpen || !vendor) return null;
@@ -57,7 +75,66 @@ export default function EditShowroomModal({ isOpen, onClose, vendor }) {
         </div>
 
         <div className="p-6 max-h-[80vh] overflow-y-auto">
-          <form className="space-y-6" onSubmit={(e) => { e.preventDefault(); handleClose(); }}>
+          <form className="space-y-6" onSubmit={async (e) => {
+
+            e.preventDefault();
+
+            try {
+
+              await axios.put(
+                `http://localhost:5001/api/showrooms/${vendor.id}`,
+                {
+                  showroom_name: form.name,
+                  mobile_number: form.contact,
+                  email: form.email,
+                  address_location: form.address,
+
+                  status:
+                    vendor.status || "Active",
+
+                  contact_person:
+                    form.contactPerson,
+
+                  designation:
+                    form.designation,
+
+                  bank_name:
+                    bankName,
+
+                  custom_bank_name:
+                    customBank,
+
+                  account_number:
+                    form.accountNo,
+
+                  ifsc_code:
+                    form.ifsc,
+
+                  upi_id:
+                    vendor.upi_id || ""
+                }
+              );
+
+              alert(
+                "Showroom updated successfully"
+              );
+
+              onClose();
+
+            } catch (error) {
+
+              console.error(
+                "UPDATE ERROR:",
+                error
+              );
+
+              alert(
+                "Failed to update showroom"
+              );
+
+            }
+
+          }}>
 
             {/* Basic Details */}
             <div>

@@ -21,6 +21,7 @@ const createWarranty = async (req, res) => {
 
       vehicle_id,
       vehicle_no,
+      dealer_showroom,
       odometer,
 
       purchase_date,
@@ -81,7 +82,7 @@ const createWarranty = async (req, res) => {
       warranty_number,
       item_title: item_title || `${category || ''} ${brand || ''}`.trim() || 'Unnamed',
       category, brand, model, serial_no,
-      vehicle_id, vehicle_no, odometer,
+      vehicle_id, vehicle_no, dealer_showroom, odometer,
       purchase_date, start_date, end_date, warranty_period,
       warranty_type,
       warranty_status: warranty_status || calcStatus(end_date),
@@ -130,6 +131,10 @@ const updateWarranty = async (req, res) => {
       serial_no:       req.body.serial_no,
       vehicle_id:      req.body.vehicle_id,
       vehicle_no:      req.body.vehicle_no,
+
+      dealer_showroom:
+        req.body.dealer_showroom,
+
       odometer:        req.body.odometer,
       start_date:      req.body.start_date,
       end_date:        req.body.end_date,

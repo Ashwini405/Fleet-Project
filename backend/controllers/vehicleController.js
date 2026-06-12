@@ -18,6 +18,7 @@ const getVehicles = async (req, res) => {
 
         v.type,
         v.initial_odometer,
+        v.dealer_showroom,
 
         v.make_brand,
 v.fuel_type,
