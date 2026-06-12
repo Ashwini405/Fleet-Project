@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { vendorCategories } from './data/dummyData';
 import DashboardPage    from './pages/DashboardPage';
 import VendorDetailPage from './pages/VendorDetailPage';
+import ShowroomLedger   from './components/ShowroomLedger';
 import GaragesPage      from './pages/GaragesPage';
 import ShowroomsPage    from './pages/ShowroomsPage';
 import PartsPage        from './pages/PartsPage';
@@ -26,9 +27,18 @@ function resolveIcon(iconName) {
 export default function Vendors() {
   const [activePage, setActivePage] = useState('dashboard'); // 'dashboard' | category.id
   const [selectedVendor, setSelectedVendor] = useState(null);
+  const [selectedType, setSelectedType] = useState(null);
 
-  const handleVendorClick = (vendor) => setSelectedVendor(vendor);
-  const handleBack = () => setSelectedVendor(null);
+  const handleVendorClick = (vendor) => {
+    setSelectedVendor(vendor);
+    setSelectedType(activePage);
+  };
+
+  const handleBack = () => {
+    setSelectedVendor(null);
+    setSelectedType(null);
+  };
+
   const handleTabClick = (tabId) => {
     setSelectedVendor(null);
     setActivePage(tabId);
@@ -67,7 +77,11 @@ export default function Vendors() {
       {/* Page Router */}
       <div className="mt-4">
         {selectedVendor ? (
-          <VendorDetailPage vendor={selectedVendor} onBack={handleBack} />
+          selectedType === 'showrooms' ? (
+            <ShowroomLedger vendor={selectedVendor} onBack={handleBack} />
+          ) : (
+            <VendorDetailPage vendor={selectedVendor} onBack={handleBack} />
+          )
         ) : activePage === 'dashboard' ? (
           <DashboardPage onVendorClick={handleVendorClick} />
         ) : activePage === 'garages' ? (

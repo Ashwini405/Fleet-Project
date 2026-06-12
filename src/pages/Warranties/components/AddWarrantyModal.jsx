@@ -5,29 +5,29 @@ import { X, UploadCloud, ShieldCheck, ChevronDown } from 'lucide-react';
 const CATEGORIES = ['Battery', 'Engine', 'Tyres', 'Brakes', 'Transmission', 'Electrical', 'AC System', 'Suspension', 'Fuel System', 'Other'];
 
 const BRANDS_BY_CATEGORY = {
-   Battery:      ['Amaron', 'Exide', 'Bosch'],
-   Engine:       ['Tata', 'Cummins', 'Ashok Leyland', 'Mahindra'],
-   Tyres:        ['MRF', 'Apollo', 'Ceat', 'Bridgestone'],
-   Brakes:       ['Bosch', 'Tata', 'Wabco'],
+   Battery: ['Amaron', 'Exide', 'Bosch'],
+   Engine: ['Tata', 'Cummins', 'Ashok Leyland', 'Mahindra'],
+   Tyres: ['MRF', 'Apollo', 'Ceat', 'Bridgestone'],
+   Brakes: ['Bosch', 'Tata', 'Wabco'],
    Transmission: ['ZF', 'Eaton', 'Tata'],
-   Electrical:   ['Bosch', 'Denso', 'Valeo'],
-   'AC System':  ['Carrier', 'Voltas', 'Mahindra'],
-   Suspension:   ['Gabriel', 'Monroe', 'Tata'],
-   'Fuel System':['Bosch', 'Delphi', 'Denso'],
-   Other:        ['Tata', 'Mahindra', 'Bosch'],
+   Electrical: ['Bosch', 'Denso', 'Valeo'],
+   'AC System': ['Carrier', 'Voltas', 'Mahindra'],
+   Suspension: ['Gabriel', 'Monroe', 'Tata'],
+   'Fuel System': ['Bosch', 'Delphi', 'Denso'],
+   Other: ['Tata', 'Mahindra', 'Bosch'],
 };
 
 const MODELS_BY_CATEGORY = {
-   Battery:      ['HD Battery 150Ah', 'Pro Series 180Ah', 'SuperMax 200Ah', 'HeavyDuty 120Ah'],
-   Engine:       ['Cummins X15', 'Tata Turbo Engine', 'Ashok Leyland H Series', 'Mahindra mHawk'],
-   Tyres:        ['MRF ZLX', 'Apollo EnduRace', 'Ceat LoadMax', 'Bridgestone R150'],
-   Brakes:       ['Bosch Brake Pro', 'Tata Air Brake Kit', 'Wabco ABS Module'],
+   Battery: ['HD Battery 150Ah', 'Pro Series 180Ah', 'SuperMax 200Ah', 'HeavyDuty 120Ah'],
+   Engine: ['Cummins X15', 'Tata Turbo Engine', 'Ashok Leyland H Series', 'Mahindra mHawk'],
+   Tyres: ['MRF ZLX', 'Apollo EnduRace', 'Ceat LoadMax', 'Bridgestone R150'],
+   Brakes: ['Bosch Brake Pro', 'Tata Air Brake Kit', 'Wabco ABS Module'],
    Transmission: ['ZF 16S', 'Eaton Fuller 10-Speed', 'Tata GBS40'],
-   Electrical:   ['Bosch Alternator 24V', 'Denso Starter Motor', 'Valeo Wiper System'],
-   'AC System':  ['Carrier ACX', 'Voltas HeavyCool', 'Mahindra CoolMax'],
-   Suspension:   ['Gabriel HD Shock', 'Monroe OESpectrum', 'Tata Leaf Spring Kit'],
-   'Fuel System':['Bosch Common Rail', 'Delphi Fuel Pump', 'Denso Injector Set'],
-   Other:        ['Generic Part A', 'Generic Part B'],
+   Electrical: ['Bosch Alternator 24V', 'Denso Starter Motor', 'Valeo Wiper System'],
+   'AC System': ['Carrier ACX', 'Voltas HeavyCool', 'Mahindra CoolMax'],
+   Suspension: ['Gabriel HD Shock', 'Monroe OESpectrum', 'Tata Leaf Spring Kit'],
+   'Fuel System': ['Bosch Common Rail', 'Delphi Fuel Pump', 'Denso Injector Set'],
+   Other: ['Generic Part A', 'Generic Part B'],
 };
 
 const inputCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder-slate-300';
@@ -119,6 +119,10 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
          formData.append('category', fd.category);
          formData.append('brand', fd.brand);
          formData.append('model', fd.model);
+         formData.append(
+            'dealer_showroom',
+            fd.dealerShowroom
+         );
          formData.append('serial_no', fd.serialNo);
          formData.append('vehicle_id', fd.vehicle_id);
          formData.append('vehicle_no', fd.vehicle_no);

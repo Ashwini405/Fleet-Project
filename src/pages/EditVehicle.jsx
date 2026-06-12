@@ -149,6 +149,7 @@ export default function EditVehicle() {
   const [supervisors, setSupervisors] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [stations, setStations] = useState([]);
+  const [showrooms, setShowrooms] = useState([]);
 
   const isCLLApplicable = useMemo(
     () => ['Tanker', 'LPG', 'Milk Transport'].includes(formData.vehicleType),
@@ -183,6 +184,11 @@ export default function EditVehicle() {
       .then(res => res.json())
       .then(data => { if (data.success) setStations(data.data || []); })
       .catch(err => console.error('Error fetching stations:', err));
+
+    fetch('http://localhost:5001/api/showrooms')
+      .then(res => res.json())
+      .then(data => { if (data.success) setShowrooms(data.data || []); })
+      .catch(err => console.error('Error fetching showrooms:', err));
   }, []);
 
   // Fetch vehicle data from backend and populate form
@@ -215,6 +221,10 @@ export default function EditVehicle() {
             chassisNumber: v.chassis_number ?? '',
             initialOdometer: v.initial_odometer ?? '',
             mileage: v.mileage ?? '',
+
+            dealerShowroom: v.dealer_showroom ?? '',
+            purchaseDate: fmtDate(v.purchase_date),
+            purchaseAmount: v.purchase_amount ?? '',
 
             insuranceValidity: fmtDate(v.insurance_validity),
             fcValidity: fmtDate(v.fc_validity),
@@ -322,6 +332,10 @@ export default function EditVehicle() {
       formDataToSend.append("chassis_number", formData.chassisNumber);
       formDataToSend.append("initial_odometer", formData.initialOdometer);
       formDataToSend.append("mileage", formData.mileage);
+
+      formDataToSend.append("dealer_showroom", formData.dealerShowroom);
+      formDataToSend.append("purchase_date", formData.purchaseDate);
+      formDataToSend.append("purchase_amount", formData.purchaseAmount);
 
       // ✅ COMPLIANCE
       formDataToSend.append("insurance_validity", formData.insuranceValidity);
@@ -447,6 +461,15 @@ export default function EditVehicle() {
               <SelectGroup label="Vehicle Category" name="vehicleCategory" options={['Owned', 'Rented', 'Lease']} formData={formData} handleChange={handleChange} />
               <InputGroup label="Make / Brand" name="makeBrand" placeholder="e.g. Tata, Ashok Leyland" formData={formData} handleChange={handleChange} />
               <SelectGroup label="Fuel Type" name="fuelType" options={['Diesel', 'Petrol', 'CNG', 'EV']} formData={formData} handleChange={handleChange} />
+              <SelectGroup
+                label="Dealer / Showroom"
+                name="dealerShowroom"
+                options={showrooms.map(s => ({ label: s.showroom_name, value: s.showroom_name }))}
+                formData={formData}
+                handleChange={handleChange}
+              />
+              <InputGroup label="Purchase Date" name="purchaseDate" type="date" formData={formData} handleChange={handleChange} />
+              <InputGroup label="Purchase Amount (₹)" name="purchaseAmount" type="number" placeholder="e.g. 2500000" formData={formData} handleChange={handleChange} />
 
               <InputGroup label="Model Year" name="modelYear" type="number" placeholder="YYYY" formData={formData} handleChange={handleChange} />
               <InputGroup label="Mileage (KM/L)" name="mileage" type="number" step="0.1" placeholder="e.g. 8.5" formData={formData} handleChange={handleChange} />

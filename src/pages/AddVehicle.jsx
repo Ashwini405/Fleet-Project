@@ -2,7 +2,6 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiSave, FiX, FiCheckCircle, FiUpload, FiFileText, FiImage } from 'react-icons/fi';
 import { generateAxlePositions } from './axlePositionGenerator';
-import { dummyVendors } from './Vendors/data/dummyData';
 
 const InputGroup = ({ label, name, type = "text", placeholder, formData, handleChange, disabled = false, error }) => {
   // Determine maxLength based on field name
@@ -258,9 +257,10 @@ export default function AddVehicle() {
       .then(data => { if (data.success) setStations(data.data || []); })
       .catch(err => console.error('Error fetching stations:', err));
 
-    // Load showrooms from Vendor Ledger — Showroom Accounts
-    const showroomList = dummyVendors.filter(v => v.category === 'showrooms');
-    setShowrooms(showroomList);
+    fetch('http://localhost:5001/api/showrooms')
+      .then(res => res.json())
+      .then(data => { if (data.success) setShowrooms(data.data || []); })
+      .catch(err => console.error('Error fetching showrooms:', err));
   }, []);
 
   const handleFileChange = useCallback((e) => {
@@ -592,7 +592,7 @@ export default function AddVehicle() {
               <SelectGroup
                 label="Dealer / Showroom"
                 name="dealerShowroom"
-                options={showrooms.map(s => ({ label: s.name, value: s.name }))}
+                options={showrooms.map(s => ({ label: s.showroom_name, value: s.showroom_name }))}
                 formData={formData}
                 handleChange={handleChange}
                 error={formErrors.dealerShowroom}
