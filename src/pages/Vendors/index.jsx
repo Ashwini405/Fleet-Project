@@ -79,11 +79,11 @@ export default function Vendors() {
         ) : activePage === 'tyres' ? (
           <TyresVendorPage onVendorClick={handleVendorClick} />
         ) : activePage === 'oils' ? (
-          <OilsPage onVendorClick={handleVendorClick} />
+          <OilsPage />
         ) : activePage === 'fuel' ? (
-          <FuelVendorPage onVendorClick={handleVendorClick} />
+          <FuelVendorPage />
         ) : activePage === 'rta' ? (
-          <RTAPage onVendorClick={handleVendorClick} />
+          <RTAPage />
         ) : null}
       </div>
     </div>

@@ -1,5 +1,7 @@
 import React, { useContext, useState, useMemo } from 'react';
 import { InventoryContext } from '../../../context/InventoryContext';
+import { useVendorLedger } from '../../../context/VendorLedgerContext';
+import { dummyVendors } from '../../Vendors/data/dummyData';
 import {
   ShoppingCart, Building2, Package, Calendar,
   Check, X, Truck, CheckCircle2, Clock, AlertCircle, PauseCircle,
@@ -342,8 +344,9 @@ function TimelineRow({ label, value }) {
 // ── Main Component ─────────────────────────────────────
 export default function PurchaseOrders() {
   const { purchaseOrders, approvePO, rejectPO, holdPO, orderPO, receivePO } = useContext(InventoryContext);
-  const [activeTab, setActiveTab] = useState(0);   // default: Pending Approval
-  const [modal, setModal]         = useState(null); // { action, po }
+  const { addVendorTransaction, hasPOTransaction } = useVendorLedger();
+  const [activeTab, setActiveTab] = useState(0);
+  const [modal, setModal]         = useState(null);
   const [actionLoading, setActionLoading] = useState(null);
 
   const counts = TABS.reduce((acc, t) => {
@@ -363,8 +366,31 @@ export default function PurchaseOrders() {
       return;
     }
     setActionLoading(po.id + action);
-    if (action === 'order')   await orderPO(po.id);
-    if (action === 'receive') await receivePO(po.id);
+    if (action === 'order') await orderPO(po.id);
+    if (action === 'receive') {
+      const res = await receivePO(po.id);
+      if (res?.success !== false && po.category === 'Lubricants') {
+        const oilsVendor = dummyVendors.find(
+          v => v.category === 'oils' &&
+            v.name.toLowerCase() === (po.vendor || '').toLowerCase()
+        );
+        if (oilsVendor && !hasPOTransaction(po.poNumber)) {
+          const receivedDate = new Date().toISOString().split('T')[0];
+          addVendorTransaction({
+            id:       `PO-TXN-${po.poNumber}`,
+            vendorId: oilsVendor.id,
+            type:     'Purchase',
+            ref:      po.poNumber,
+            poRef:    po.poNumber,
+            desc:     'Lubricant Purchase',
+            category: 'Lubricants',
+            date:     receivedDate,
+            debit:    Number(po.totalAmount || po.total_amount || 0),
+            credit:   0,
+          });
+        }
+      }
+    }
     setActionLoading(null);
   }
 

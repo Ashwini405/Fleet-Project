@@ -8,6 +8,8 @@ export const TYPE_STYLES = {
   'Fuel Fill':             'bg-amber-50 text-amber-600 border border-amber-100',
   'RTA Fee':               'bg-rose-50 text-rose-600 border border-rose-100',
   'Adjustment':            'bg-teal-50 text-teal-600 border border-teal-100',
+  'Return Adjustment':     'bg-orange-50 text-orange-600 border border-orange-100',
+  'Adjustment Credit':     'bg-orange-50 text-orange-600 border border-orange-100',
   'Tyre Purchase':         'bg-indigo-50 text-indigo-600 border border-indigo-100',
   'Retreading Service':    'bg-amber-50 text-amber-600 border border-amber-100',
   'Scrap Sale':            'bg-emerald-50 text-emerald-700 border border-emerald-100',
