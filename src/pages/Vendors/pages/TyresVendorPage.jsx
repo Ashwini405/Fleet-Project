@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { FiSearch, FiPlus, FiBriefcase, FiPhone, FiMapPin, FiHome, FiChevronRight } from 'react-icons/fi';
 import AddTyreVendorModal from '../components/AddTyreVendorModal';
-import VendorLedger from '../components/VendorLedger';
+import TyresLedger from '../components/TyresLedger';
 import TyreVendorDetailPage from '../components/TyreVendorDetailPage';
-import { useVendorLedger } from '../../../context/VendorLedgerContext';
 
 const SAMPLE_VENDORS = [
   {
@@ -45,7 +44,6 @@ const SAMPLE_VENDORS = [
 ];
 
 export default function TyresVendorPage() {
-  const { txnsByVendor } = useVendorLedger();
   const [vendors, setVendors]           = useState(SAMPLE_VENDORS);
   const [search, setSearch]             = useState('');
   const [addOpen, setAddOpen]           = useState(false);
@@ -62,10 +60,9 @@ export default function TyresVendorPage() {
 
   if (selectedVendor && viewMode === 'ledger') {
     return (
-      <VendorLedger
+      <TyresLedger
         vendor={selectedVendor}
         onBack={() => setViewMode('detail')}
-        extraTxns={txnsByVendor[selectedVendor.id] || []}
       />
     );
   }

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { FiSearch, FiPlus, FiBriefcase, FiPhone, FiMapPin, FiHome, FiChevronRight } from 'react-icons/fi';
 import { dummyVendors } from '../data/dummyData';
-import AddAccountModal from '../components/AddAccountModal';
-import VendorLedger from '../components/VendorLedger';
+import AddPartsVendorModal from '../components/AddPartsVendorModal';
+import PartsLedger from '../components/PartsLedger';
 
 const allVendors = dummyVendors.filter(v => v.category === 'parts');
 
@@ -16,7 +16,7 @@ export default function PartsPage() {
     : allVendors;
 
   if (selectedVendor) {
-    return <VendorLedger vendor={selectedVendor} onBack={() => setSelectedVendor(null)} />;
+    return <PartsLedger vendor={selectedVendor} onBack={() => setSelectedVendor(null)} />;
   }
 
   return (
@@ -119,12 +119,7 @@ export default function PartsPage() {
         )}
       </div>
 
-      <AddAccountModal
-        isOpen={addOpen}
-        onClose={() => setAddOpen(false)}
-        categoryName="Parts & Spares"
-        category="parts"
-      />
+      <AddPartsVendorModal isOpen={addOpen} onClose={() => setAddOpen(false)} />
     </div>
   );
 }

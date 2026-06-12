@@ -1,22 +1,26 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { FiArrowLeft, FiPlus, FiEye, FiX, FiInbox, FiSearch, FiCalendar, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
-import { dummyLedger, vendorCategories, dummyVendorPOs } from '../data/dummyData';
+import { dummyLedger, dummyVendorPOs } from '../data/dummyData';
 import { TypeBadge, RecordPaymentModal, CollectReceiptModal, VendorInfoPanel, SummaryCards } from './shared';
 import { PAGE_SIZE, MODAL_ANIM } from './shared/constants';
+import { useVendorLedger } from '../../../context/VendorLedgerContext';
 
-// Build initial PO allocation state from dummyVendorPOs + existing ledger payments
+const CATEGORY_LABEL = 'TYRE VENDOR';
+const FILTERS = ['All', 'Purchases', 'Payments', 'Retreading', 'Adjustments'];
+const filterMatch = {
+  Purchases:  ['Tyre Purchase'],
+  Payments:   ['Payment'],
+  Retreading: ['Retreading Service'],
+  Adjustments:['Scrap Sale', 'Adjustment', 'Opening Balance', 'Manual Adjustment'],
+};
+
 function buildInitialPOState(vendorId, ledgerTxns) {
   const poList = (dummyVendorPOs[vendorId] || []).map(po => ({
-    ...po,
-    paidAmount:   0,
-    allocations:  [], // [{ paymentRef, date, amount }]
+    ...po, paidAmount: 0, allocations: [],
   }));
-
-  // Replay existing Payment transactions against POs in order (oldest PO first)
   const payments = [...ledgerTxns]
     .filter(t => t.type === 'Payment' && t.credit > 0)
     .sort((a, b) => new Date(a.date) - new Date(b.date));
-
   payments.forEach(pay => {
     let remaining = pay.credit;
     for (const po of poList) {
@@ -29,16 +33,13 @@ function buildInitialPOState(vendorId, ledgerTxns) {
       remaining -= apply;
     }
   });
-
   return poList;
 }
 
-// Auto-allocate a new payment amount across POs (oldest unpaid first)
 function autoAllocate(poList, paymentAmount, paymentRef, paymentDate) {
   let remaining = paymentAmount;
-  const updated  = poList.map(po => ({ ...po, allocations: [...po.allocations] }));
-  const applied  = []; // [{ poRef, amountApplied }]
-
+  const updated = poList.map(po => ({ ...po, allocations: [...po.allocations] }));
+  const applied = [];
   for (const po of updated) {
     if (remaining <= 0) break;
     const balance = po.amount - po.paidAmount;
@@ -49,22 +50,23 @@ function autoAllocate(poList, paymentAmount, paymentRef, paymentDate) {
     applied.push({ poRef: po.poRef, desc: po.desc, amountApplied: apply });
     remaining -= apply;
   }
-
   return { updated, applied };
 }
 
-export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
-  const baseTxns = dummyLedger[vendor.id] || [];
+export default function TyresLedger({ vendor, onBack }) {
+  const { getVendorTransactions } = useVendorLedger();
+  const baseTxns  = dummyLedger[vendor.id] || [];
+  const extraTxns = getVendorTransactions(vendor.id);
 
   const [rawTxns, setRawTxns] = useState(() => [...baseTxns, ...extraTxns]);
   const [poList,  setPoList]  = useState(() => buildInitialPOState(vendor.id, [...baseTxns, ...extraTxns]));
 
-  // Re-sync whenever extraTxns array reference changes (context update)
   const extraTxnsKey = extraTxns.map(t => `${t.id}:${t.debit}`).join(',');
   useEffect(() => {
     setRawTxns([...baseTxns, ...extraTxns]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extraTxnsKey]);
+
   const [activeFilter, setActiveFilter] = useState('All');
   const [search,       setSearch]       = useState('');
   const [dateFrom,     setDateFrom]     = useState('');
@@ -73,8 +75,6 @@ export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
   const [selectedTxn,  setSelectedTxn]  = useState(null);
   const [payModalOpen,     setPayModalOpen]     = useState(false);
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
-
-  const categoryLabel = vendorCategories.find(c => c.id === vendor.category)?.label?.toUpperCase() || vendor.category?.toUpperCase();
 
   const txnsWithBalance = useMemo(() => {
     let running = 0;
@@ -88,13 +88,6 @@ export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
   const totalCredit = rawTxns.reduce((s, t) => s + (t.credit || 0), 0);
   const lastDate    = txnsWithBalance.length ? txnsWithBalance[txnsWithBalance.length - 1].date : null;
 
-  const FILTERS     = ['All', 'Purchases', 'Payments', 'Adjustments'];
-  const filterMatch = {
-    Purchases:   ['Purchase', 'Tyre Purchase', 'Retreading Service', 'Scrap Sale', 'Fuel Fill', 'RTA Fee'],
-    Payments:    ['Payment', 'Receipt'],
-    Adjustments: ['Adjustment', 'Opening Balance', 'Manual Adjustment'],
-  };
-
   const filtered = useMemo(() => txnsWithBalance.filter(t => {
     if (activeFilter !== 'All' && !filterMatch[activeFilter]?.includes(t.type)) return false;
     if (search && !t.desc?.toLowerCase().includes(search.toLowerCase()) && !t.ref?.toLowerCase().includes(search.toLowerCase())) return false;
@@ -106,27 +99,17 @@ export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  // ── Save payment: auto-allocate to POs, add ledger row ──────────────────
   const handleSavePayment = (p) => {
     const payRef = p.ref || `PAY-${Date.now()}`;
     const { updated, applied } = autoAllocate(poList, p.amount, payRef, p.date);
     setPoList(updated);
-
     const allocSummary = applied.length
       ? applied.map(a => `${a.poRef} ₹${a.amountApplied.toLocaleString()}`).join(', ')
       : '';
-
     setRawTxns(prev => [...prev, {
-      id:       p.id,
-      date:     p.date,
-      truckId:  '',
-      type:     'Payment',
-      ref:      payRef,
-      desc:     `${p.method} Payment${p.remarks ? ' — ' + p.remarks : ''}`,
-      debit:    0,
-      credit:   p.amount,
-      allocations: applied,       // stored for detail modal
-      allocSummary,
+      id: p.id, date: p.date, truckId: '', type: 'Payment',
+      ref: payRef, desc: `${p.method} Payment${p.remarks ? ' — ' + p.remarks : ''}`,
+      debit: 0, credit: p.amount, allocations: applied, allocSummary,
     }]);
     setPage(1);
   };
@@ -137,7 +120,7 @@ export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
       {/* Nav */}
       <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
         <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors">
-          <FiArrowLeft /> Vendor Accounts
+          <FiArrowLeft /> Tyre Vendor Accounts
         </button>
         {totalCredit > totalDebit ? (
           <button onClick={() => setReceiptModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors">
@@ -150,7 +133,7 @@ export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
         )}
       </div>
 
-      <VendorInfoPanel vendor={vendor} categoryLabel={categoryLabel} />
+      <VendorInfoPanel vendor={vendor} categoryLabel={CATEGORY_LABEL} />
       <SummaryCards totalDebit={totalDebit} totalCredit={totalCredit} lastDate={lastDate} />
 
       {/* Transaction Table */}
@@ -204,7 +187,7 @@ export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {paginated.map(txn => (
-                  <tr key={txn.id} className="hover:bg-blue-50/30 transition-colors">
+                  <tr key={txn.id} className="hover:bg-indigo-50/30 transition-colors">
                     <td className="py-3 px-3 md:px-5"><span className="text-xs font-bold text-gray-600 whitespace-nowrap">{txn.date}</span></td>
                     <td className="py-3 px-3 md:px-5"><TypeBadge type={txn.type} /></td>
                     <td className="py-3 px-3 md:px-5 hidden sm:table-cell"><span className="text-[11px] font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">{txn.ref || '—'}</span></td>
@@ -248,7 +231,6 @@ export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
         )}
       </div>
 
-      {/* Collect Receipt Modal — for scrap/receivable vendors */}
       <CollectReceiptModal
         isOpen={receiptModalOpen}
         onClose={() => setReceiptModalOpen(false)}
@@ -256,20 +238,15 @@ export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
         receivable={totalCredit - totalDebit}
         onSave={(p) => {
           setRawTxns(prev => [...prev, {
-            id:      p.id,
-            date:    p.date,
-            type:    'Receipt',
-            ref:     p.ref || `REC-${Date.now()}`,
-            desc:    `${p.method} Receipt${p.remarks ? ' — ' + p.remarks : ''}`,
-            debit:   p.amount,
-            credit:  0,
-            truckId: '',
+            id: p.id, date: p.date, type: 'Receipt',
+            ref: p.ref || `REC-${Date.now()}`,
+            desc: `${p.method} Receipt${p.remarks ? ' — ' + p.remarks : ''}`,
+            debit: p.amount, credit: 0, truckId: '',
           }]);
           setPage(1);
         }}
       />
 
-      {/* Record Payment Modal */}
       <RecordPaymentModal
         isOpen={payModalOpen}
         onClose={() => setPayModalOpen(false)}
@@ -283,25 +260,22 @@ export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
       {selectedTxn && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[90vh] flex flex-col" style={{ animation: 'modalSlideIn 0.2s ease-out' }}>
-
             <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100 shrink-0">
               <div>
                 <h3 className="text-sm font-bold text-gray-800">Transaction Details</h3>
-                <p className="text-[11px] text-gray-400 font-medium mt-0.5">{vendor.name}</p>
+                <p className="text-[11px] text-indigo-600 font-semibold mt-0.5">{vendor.name} · Tyre Vendor</p>
               </div>
               <button onClick={() => setSelectedTxn(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
                 <FiX size={16} />
               </button>
             </div>
 
-            <div className="p-5 space-y-0 overflow-y-auto">
+            <div className="p-5 overflow-y-auto space-y-0">
               {[
-                ['Date',      selectedTxn.date,   null],
-                ['Type',      null,                <TypeBadge type={selectedTxn.type} />],
-                ['Vendor',    null,                <span className="text-sm font-bold text-gray-800">{vendor.name}</span>],
+                ['Date',   selectedTxn.date, null],
+                ['Type',   null, <TypeBadge type={selectedTxn.type} />],
+                ['Vendor', null, <span className="text-sm font-bold text-gray-800">{vendor.name}</span>],
                 selectedTxn.ref     ? ['Reference', null, <span className="text-sm font-bold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.ref}</span>] : null,
-                selectedTxn.poRef   ? ['PO Number', null, <span className="text-sm font-bold text-gray-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">{selectedTxn.poRef}</span>] : null,
-                selectedTxn.category ? ['Category', null, <span className="text-sm font-bold text-violet-700 bg-violet-50 border border-violet-200 px-2.5 py-1 rounded-lg">{selectedTxn.category}</span>] : null,
                 selectedTxn.truckId ? ['Vehicle',   null, <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.truckId}</span>] : null,
               ].filter(Boolean).map(([label, text, node]) => (
                 <div key={label} className="flex justify-between items-center py-2.5 border-b border-gray-50">
@@ -328,28 +302,10 @@ export default function VendorLedger({ vendor, onBack, extraTxns = [] }) {
                 </span>
               </div>
 
-              <div className="flex justify-between items-start py-2.5 border-b border-gray-50">
+              <div className="flex justify-between items-start py-2.5">
                 <span className="text-xs font-semibold text-gray-400 shrink-0">Description</span>
                 <span className="text-sm font-semibold text-gray-700 text-right ml-4">{selectedTxn.desc}</span>
               </div>
-
-              {/* PO Allocation section — only for Payment transactions */}
-              {selectedTxn.type === 'Payment' && selectedTxn.allocations?.length > 0 && (
-                <div className="pt-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Allocated Purchase Orders</p>
-                  <div className="space-y-1.5">
-                    {selectedTxn.allocations.map((a, i) => (
-                      <div key={i} className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-                        <div>
-                          <span className="text-xs font-bold text-blue-700">{a.poRef}</span>
-                          {a.desc && <span className="text-[10px] text-blue-400 ml-2">{a.desc}</span>}
-                        </div>
-                        <span className="text-xs font-bold text-green-600">₹{a.amountApplied.toLocaleString()} Applied</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="px-5 pb-5 shrink-0">

@@ -162,7 +162,21 @@ export const dummyLedger = {
     { id: "p5", date: "2024-03-03", truckId: "",           type: "Adjustment", ref: "ADJ-001", desc: "Return — Damaged Air Filter",  debit: 0,     credit: 900 },
     { id: "p6", date: "2024-03-20", truckId: "KA01-8877", type: "Purchase",   ref: "PO-0028", desc: "Wiper Blades & Bulbs",         debit: 1200,  credit: 0 }
   ],
-  // Fuel Station ledger
+  // Oils & Lubes ledger — Castrol Distributor
+  "v10": [
+    { id: "o1", date: "2024-01-10", truckId: "", type: "Opening Balance", ref: "OB-001",  desc: "Opening Balance",            debit: 3400,  credit: 0 },
+    { id: "o2", date: "2024-01-15", truckId: "", type: "Purchase",        ref: "PO-OIL-001", poRef: "PO-OIL-001", desc: "Lubricant Purchase", category: "Lubricants", debit: 8500, credit: 0 },
+    { id: "o3", date: "2024-02-01", truckId: "", type: "Payment",         ref: "PAY-O01", desc: "Bank Transfer Payment",       debit: 0,     credit: 8500 },
+  ],
+  // Oils & Lubes ledger — Servo Oils
+  "v11": [
+    { id: "s1", date: "2024-01-20", truckId: "", type: "Purchase", ref: "PO-OIL-002", poRef: "PO-OIL-002", desc: "Lubricant Purchase", category: "Lubricants", debit: 5200, credit: 0 },
+    { id: "s2", date: "2024-02-10", truckId: "", type: "Payment",  ref: "PAY-S01",   desc: "UPI Payment",      debit: 0,  credit: 5200 },
+  ],
+  // Oils & Lubes ledger — HP Lubricants
+  "v12": [
+    { id: "h1", date: "2024-01-25", truckId: "", type: "Opening Balance", ref: "OB-002", desc: "Opening Balance",             debit: 1800, credit: 0 },
+  ],
   "v3": [
     { id: "f1", date: "2024-01-03", truckId: "AP02X1234", type: "Fuel Fill",  ref: "FUL-001", desc: "Diesel 80L @ ₹92",             debit: 7360,  credit: 0 },
     { id: "f2", date: "2024-01-10", truckId: "TS09-8899", type: "Fuel Fill",  ref: "FUL-002", desc: "Diesel 60L @ ₹92",             debit: 5520,  credit: 0 },
@@ -218,6 +232,12 @@ export const dummyShowroomActivities = {
 
 // PO payment state per vendor — frontend only, used for allocation tracking.
 export const dummyVendorPOs = {
+  "v10": [
+    { poRef: "PO-OIL-001", desc: "Lubricant Purchase", date: "2024-01-15", amount: 8500 },
+  ],
+  "v11": [
+    { poRef: "PO-OIL-002", desc: "Lubricant Purchase", date: "2024-01-20", amount: 5200 },
+  ],
   "v4": [
     { poRef: "PO-0011", desc: "Air Filter Set (x5)",       date: "2024-01-08", amount: 4500  },
     { poRef: "PO-0015", desc: "Brake Liners Bulk Order",   date: "2024-01-22", amount: 12000 },

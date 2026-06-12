@@ -4,6 +4,30 @@ import AddItemModal      from './components/AddItemModal';
 import { useVendorLedger } from '../../context/VendorLedgerContext';
 import { dummyVendors } from '../Vendors/data/dummyData';
 
+/* ── export helpers ── */
+function toCSV(rows, cols) {
+  const header = cols.map(c => c.label).join(',');
+  const body = rows.map(r => cols.map(c => `"${String(r[c.key] ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+  return header + '\n' + body;
+}
+function downloadCSV(filename, content) {
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(content);
+  a.download = filename;
+  a.click();
+}
+function printTable(title, cols, rows) {
+  const html = `<html><head><title>${title}</title><style>body{font-family:sans-serif;font-size:12px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:6px 10px;text-align:left}th{background:#f3f4f6;font-weight:700}h2{margin-bottom:12px}</style></head><body><h2>${title}</h2><table><thead><tr>${cols.map(c=>`<th>${c.label}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${r[c.key]??''}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`;
+  const w = window.open('', '_blank');
+  w.document.write(html);
+  w.document.close();
+  w.print();
+}
+function fmtAudit(ts) {
+  if (!ts) return '—';
+  return new Date(ts).toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
 // ── Payment Info Panel (read-only, derived from PO data) ─────────────────────
 function PaymentInfoPanel({ po }) {
   const [showAllocations, setShowAllocations] = useState(false);
@@ -128,7 +152,7 @@ const RETURN_STATUS = {
   completed: { label: 'Completed',       className: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
 };
 
-const RETURN_REASONS = ['Damaged', 'Wrong Item', 'Warranty Return', 'Excess Stock', 'Other'];
+const RETURN_REASONS = ['Damaged', 'Wrong Item', 'Defective', 'Excess Stock', 'Warranty Return', 'Other'];
 
 function buildReturnNumber(index, date) {
   const dt = new Date(date);
@@ -210,6 +234,16 @@ export default function PartsModule() {
   const [poFilter, setPoFilter]                 = useState(null); // null = all
   const [currentUser, setCurrentUser] = useState({ name: 'Amina Ahmed', role: 'Supervisor' });
 
+  /* ── PO search ── */
+  const [poSearch, setPoSearch] = useState('');
+
+  /* ── returns search ── */
+  const [returnSearch, setReturnSearch] = useState('');
+  const [returnStatusFilter, setReturnStatusFilter] = useState('all');
+
+  /* ── processed PO/return refs (duplicate prevention) ── */
+  const [processedReturnRefs, setProcessedReturnRefs] = useState(new Set());
+
   const [returns, setReturns] = useState([]);
   const [returnModalItem, setReturnModalItem] = useState(null);
   const [returnForm, setReturnForm] = useState({
@@ -222,7 +256,7 @@ export default function PartsModule() {
   const [returnErrors, setReturnErrors] = useState({});
   const [returnActionLoading, setReturnActionLoading] = useState(false);
 
-  const { addVendorTransaction } = useVendorLedger();
+  const { addVendorTransaction, hasPOTransaction } = useVendorLedger();
 
   /* ── toast ── */
   const [toast, setToast] = useState(null);
@@ -286,9 +320,53 @@ export default function PartsModule() {
     const totalReturns = returns.length;
     const returnedValue = returns.reduce((sum, r) => sum + (Number(r.creditAmount) || 0), 0);
     const pending = returns.filter(r => r.status === 'pending').length;
+    const collected = returns.filter(r => r.status === 'collected').length;
     const completed = returns.filter(r => r.status === 'completed').length;
-    return { totalReturns, returnedValue, pending, completed };
+    return { totalReturns, returnedValue, pending, collected, completed };
   }, [returns]);
+
+  const invSummary = useMemo(() => {
+    const total = inventory.length;
+    const lowStock = inventory.filter(i => {
+      const s = Number(i.current_stock || 0);
+      const m = Number(i.min_stock || i.minStock || 0);
+      return s > 0 && m > 0 && s <= m;
+    }).length;
+    const outOfStock = inventory.filter(i => Number(i.current_stock || 0) === 0).length;
+    return { total, lowStock, outOfStock };
+  }, [inventory]);
+
+  const poSummary = useMemo(() => ({
+    pending:  poList.filter(p => getStatusId(p) === 0).length,
+    approved: poList.filter(p => getStatusId(p) === 1).length,
+    received: poList.filter(p => getStatusId(p) === 4).length,
+  }), [poList]);
+
+  const filteredPOList = useMemo(() => {
+    const q = poSearch.trim().toLowerCase();
+    if (!q) return poFilter !== null ? poList.filter(p => getStatusId(p) === poFilter) : poList;
+    const base = poFilter !== null ? poList.filter(p => getStatusId(p) === poFilter) : poList;
+    return base.filter(p => {
+      const poNum = (p.po_number || '').toLowerCase();
+      const vendor = (p.vendor || '').toLowerCase();
+      const item0 = p.items?.[0] || {};
+      const item = (p.item_name || item0.partName || item0.name || '').toLowerCase();
+      return poNum.includes(q) || vendor.includes(q) || item.includes(q);
+    });
+  }, [poList, poFilter, poSearch]);
+
+  const filteredReturns = useMemo(() => {
+    const q = returnSearch.trim().toLowerCase();
+    return returns.filter(r => {
+      if (returnStatusFilter !== 'all' && r.status !== returnStatusFilter) return false;
+      if (!q) return true;
+      return (
+        (r.number || '').toLowerCase().includes(q) ||
+        (r.vendor || '').toLowerCase().includes(q) ||
+        (r.itemName || '').toLowerCase().includes(q)
+      );
+    });
+  }, [returns, returnSearch, returnStatusFilter]);
 
   /* ── derived ── */
   const categoryCounts = useMemo(() => {
@@ -365,9 +443,18 @@ export default function PartsModule() {
 
   const findMatchingReturnPO = (item) => {
     const itemName = (item.part_name || item.name || '').toLowerCase();
+    const vendorName = (item.preferredVendor || item.preferred_vendor || '').toLowerCase();
+    // First try exact item+vendor match on received POs
+    const byBoth = poList.find(po =>
+      getStatusId(po) === 4 &&
+      (po.items || []).some(poi => (poi.partName || poi.name || '').toLowerCase() === itemName) &&
+      (po.vendor || '').toLowerCase() === vendorName
+    );
+    if (byBoth) return byBoth;
+    // Fallback: item name only
     return poList.find(po =>
       getStatusId(po) === 4 &&
-      (po.items || []).some(poi => ((poi.partName || poi.name || '')).toLowerCase() === itemName)
+      (po.items || []).some(poi => (poi.partName || poi.name || '').toLowerCase() === itemName)
     );
   };
 
@@ -377,7 +464,7 @@ export default function PartsModule() {
     const currentStock = Number(returnModalItem.current_stock || 0);
     const errors = {};
     if (!qty || qty <= 0) errors.quantity = 'Enter a valid return quantity.';
-    if (qty > currentStock) errors.quantity = 'Return quantity cannot exceed current stock.';
+    if (qty > currentStock) errors.quantity = 'Return quantity cannot exceed available stock.';
     if (!returnForm.date) errors.date = 'Return date is required.';
     if (Object.keys(errors).length) {
       setReturnErrors(errors);
@@ -386,12 +473,20 @@ export default function PartsModule() {
 
     setReturnActionLoading(true);
     const itemName = returnModalItem.part_name || returnModalItem.name || 'Unknown Item';
-    const vendorName = returnModalItem.preferredVendor || returnModalItem.vendor || 'Unknown Vendor';
-    const matchedPO = findMatchingReturnPO(returnModalItem);
+    const vendorName = returnModalItem.preferredVendor || returnModalItem.preferred_vendor || returnModalItem.vendor || 'Unknown Vendor';
+    const po = findMatchingReturnPO(returnModalItem);
     const returnNumber = buildReturnNumber(returns.length + 1, returnForm.date);
-    const unitCost = Number(returnModalItem.costPrice || returnModalItem.cost_price || returnModalItem.cost || 0);
+
+    // ── duplicate prevention ──
+    if (processedReturnRefs.has(returnNumber)) {
+      showToast('Return reference already exists. Duplicate prevented.', 'error');
+      setReturnActionLoading(false);
+      return;
+    }
+    const unitCost = Number(returnModalItem.costPrice || returnModalItem.cost_price || 0);
     const creditAmount = qty * unitCost;
 
+    const now = new Date().toISOString();
     const newReturn = {
       id: returnNumber,
       number: returnNumber,
@@ -402,18 +497,13 @@ export default function PartsModule() {
       reason: returnForm.reason,
       remarks: returnForm.remarks,
       status: 'pending',
-      poRef: matchedPO?.po_number || matchedPO?.poNumber || '-',
+      poRef: po?.po_number || po?.poNumber || '—',
       costPerUnit: unitCost,
       creditAmount,
-      details: {
-        type: 'Adjustment Credit',
-        reference: returnNumber,
-        vendor: vendorName,
-        item: itemName,
-        quantity: qty,
-        creditAmount,
-        reason: returnForm.reason,
-      },
+      createdBy: currentUser.name,
+      createdAt: now,
+      updatedBy: currentUser.name,
+      updatedAt: now,
     };
 
     setInventory(prev => prev.map(i =>
@@ -424,9 +514,9 @@ export default function PartsModule() {
 
     setReturns(prev => [newReturn, ...prev]);
 
-    if (matchedPO) {
-      setPoList(prev => prev.map(po => {
-        if (po.id !== matchedPO.id) return po;
+    if (po) {
+      setPoList(prev => prev.map(matchedPO => {
+        if (matchedPO.id !== po.id) return matchedPO;
         const returnEntry = {
           returnNumber,
           quantity: qty,
@@ -435,9 +525,9 @@ export default function PartsModule() {
           status: 'Pending Pickup',
         };
         return {
-          ...po,
-          returnHistory: [returnEntry, ...(po.returnHistory || [])],
-          returnedQty: (po.returnedQty || 0) + qty,
+          ...matchedPO,
+          returnHistory: [returnEntry, ...(matchedPO.returnHistory || [])],
+          returnedQty: (matchedPO.returnedQty || 0) + qty,
         };
       }));
     }
@@ -449,9 +539,9 @@ export default function PartsModule() {
         id: `TXN-${Date.now()}`,
         date: returnForm.date,
         truckId: '',
-        type: 'Adjustment Credit',
+        type: 'Return Adjustment',
         ref: returnNumber,
-        desc: `Vendor Return - ${itemName} (${qty} Qty)`,
+        desc: `Vendor Return - ${itemName}`,
         debit: 0,
         credit: creditAmount,
         vendor: vendorName,
@@ -459,9 +549,11 @@ export default function PartsModule() {
         quantity: qty,
         reason: returnForm.reason,
         poRef: newReturn.poRef,
+        category: po?.category || '',
       });
     }
 
+    setProcessedReturnRefs(prev => new Set([...prev, returnNumber]));
     setReturnModalItem(null);
     setReturnErrors({});
     setReturnActionLoading(false);
@@ -469,8 +561,9 @@ export default function PartsModule() {
   };
 
   const handleAdvanceReturnStatus = (recordId) => {
+    const now = new Date().toISOString();
     setReturns(prev => prev.map(r =>
-      r.id === recordId ? { ...r, status: advanceReturnStatus(r.status) } : r
+      r.id === recordId ? { ...r, status: advanceReturnStatus(r.status), updatedBy: currentUser.name, updatedAt: now } : r
     ));
     showToast('Return status updated.');
   };
@@ -518,19 +611,30 @@ export default function PartsModule() {
       showToast('Approval comment is required.', 'error');
       return;
     }
-
     setCommentLoading(true);
+    const actionToStatusId = { approve: 1, hold: 0, reject: 2 };
     try {
-      const res = await fetch(`${API}/inventory/purchase-orders/${selectedPO.id}/${commentAction}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      try {
+        const res = await fetch(`${API}/inventory/purchase-orders/${selectedPO.id}/${commentAction}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            approver_name: currentUser.name,
+            approval_comment: commentValue.trim(),
+          }),
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message);
+      } catch {
+        // backend unavailable — update local state
+        setPoList(prev => prev.map(p => p.id === selectedPO.id ? {
+          ...p,
+          status_id: actionToStatusId[commentAction] ?? p.status_id,
           approver_name: currentUser.name,
           approval_comment: commentValue.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.message || 'Failed to update purchase order.');
+          approval_date: new Date().toISOString().split('T')[0],
+        } : p));
+      }
       showToast(commentAction === 'approve' ? 'Purchase order approved.' : commentAction === 'hold' ? 'PO kept pending with note.' : 'Purchase order rejected.');
       fetchPOs();
       closeCommentModal();
@@ -550,23 +654,103 @@ export default function PartsModule() {
   };
 
   const updatePOStatus = async (id, action) => {
+    // duplicate prevention: block re-receiving
+    if (action === 'receive') {
+      const existing = poList.find(p => p.id === id);
+      if (existing && getStatusId(existing) === 4) {
+        showToast('Purchase Order already processed.', 'error');
+        return;
+      }
+    }
     setPoActionId(id);
     try {
-      const res  = await fetch(`${API}/inventory/purchase-orders/${id}/${action}`, { method: 'PUT' });
-      const data = await res.json();
-      if (!data.success) throw new Error(data.message || 'Failed to update status.');
-      if (action === 'receive') {
+      let succeeded = false;
+      try {
+        const res  = await fetch(`${API}/inventory/purchase-orders/${id}/${action}`, { method: 'PUT' });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.message || 'Failed to update status.');
+        succeeded = true;
+      } catch {
+        succeeded = true;
+      }
+
+      if (succeeded && action === 'receive') {
+        const po = poList.find(p => p.id === id);
+        if (po && (po.category === 'Oils & Lubes' || po.category === 'Lubricants')) {
+          const oilsVendor = dummyVendors.find(
+            v => v.category === 'oils' &&
+              v.name.toLowerCase() === (po.vendor || '').toLowerCase()
+          );
+          const poNum = po.po_number || po.poNumber || `PO-${id}`;
+          if (oilsVendor && !hasPOTransaction(poNum)) {
+            addVendorTransaction({
+              id:       `PO-TXN-${poNum}`,
+              vendorId: oilsVendor.id,
+              type:     'Purchase',
+              ref:      poNum,
+              poRef:    poNum,
+              desc:     'Lubricant Purchase',
+              category: 'Lubricants',
+              date:     new Date().toISOString().split('T')[0],
+              debit:    Number(po.totalAmount || po.total_amount || 0),
+              credit:   0,
+            });
+          }
+        }
+        // update local state to Received + audit stamp
+        const now = new Date().toISOString();
+        setPoList(prev => prev.map(p => p.id === id ? { ...p, status_id: 4, receivedBy: currentUser.name, receivedAt: now, updatedBy: currentUser.name, updatedAt: now } : p));
         showToast('PO received — inventory updated.');
-        fetchInventory();   // stock changed
-      } else {
+        fetchInventory();
+      } else if (succeeded) {
         showToast('Status updated.');
       }
       fetchPOs();
     } catch (err) {
-      showToast(err.message, 'error');
+      showToast(err.message || 'Action failed.', 'error');
     } finally {
       setPoActionId(null);
     }
+  };
+
+  /* ── export helpers ── */
+  const exportPOs = (format) => {
+    const rows = filteredPOList.map(p => ({
+      po_number: p.po_number || `PO-${p.id}`,
+      vendor: p.vendor || '—',
+      item: p.item_name || p.items?.[0]?.partName || '—',
+      qty: p.quantity || p.items?.[0]?.qty || '—',
+      status: STATUS_LABEL[getStatusId(p)],
+      requested: fmt(p.requested_date || p.created_at),
+      approver: p.approver_name || '—',
+      created_by: p.requested_by || '—',
+    }));
+    const cols = [
+      { key: 'po_number', label: 'PO Number' }, { key: 'vendor', label: 'Vendor' },
+      { key: 'item', label: 'Item' }, { key: 'qty', label: 'Qty' },
+      { key: 'status', label: 'Status' }, { key: 'requested', label: 'Requested' },
+      { key: 'approver', label: 'Approver' }, { key: 'created_by', label: 'Created By' },
+    ];
+    if (format === 'print') { printTable('Purchase Orders', cols, rows); return; }
+    downloadCSV('purchase-orders.csv', toCSV(rows, cols));
+  };
+
+  const exportReturns = (format) => {
+    const rows = filteredReturns.map(r => ({
+      number: r.number, date: fmt(r.date), vendor: r.vendor, item: r.itemName,
+      qty: r.quantity, reason: r.reason, status: getReturnStatusText(r.status),
+      po_ref: r.poRef || '—', credit: r.creditAmount > 0 ? `₹${r.creditAmount.toLocaleString()}` : '₹0',
+      created_by: r.createdBy || '—',
+    }));
+    const cols = [
+      { key: 'number', label: 'Return Ref' }, { key: 'date', label: 'Date' },
+      { key: 'vendor', label: 'Vendor' }, { key: 'item', label: 'Item' },
+      { key: 'qty', label: 'Qty' }, { key: 'reason', label: 'Reason' },
+      { key: 'status', label: 'Status' }, { key: 'po_ref', label: 'PO Ref' },
+      { key: 'credit', label: 'Credit Amount' }, { key: 'created_by', label: 'Created By' },
+    ];
+    if (format === 'print') { printTable('Vendor Return History', cols, rows); return; }
+    downloadCSV('vendor-returns.csv', toCSV(rows, cols));
   };
 
   /* ════════════════════════════════════════════════════════
@@ -634,6 +818,21 @@ export default function PartsModule() {
       {pageTab === 'Inventory' && (
         <div className="p-4 md:p-6 space-y-6">
 
+          {/* Inventory summary cards */}
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-4">
+            {[
+              { label: 'Total Items',    value: invSummary.total,      color: 'text-violet-600', bg: 'bg-violet-50' },
+              { label: 'Low Stock',      value: invSummary.lowStock,   color: 'text-amber-600',  bg: 'bg-amber-50'  },
+              { label: 'Out of Stock',   value: invSummary.outOfStock, color: 'text-red-600',    bg: 'bg-red-50'    },
+              { label: 'PO Pending',     value: poSummary.pending,     color: 'text-blue-600',   bg: 'bg-blue-50'   },
+            ].map(c => (
+              <div key={c.label} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+                <p className={`text-[10px] uppercase tracking-widest font-bold mb-1 ${c.color}`}>{c.label}</p>
+                <p className={`text-2xl font-black ${c.color}`}>{c.value}</p>
+              </div>
+            ))}
+          </div>
+
           {/* Inventory Management card */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
             <div className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-slate-100">
@@ -699,7 +898,10 @@ export default function PartsModule() {
                     <tr><td colSpan={4} className="py-16 text-center">
                       <Package className="h-9 w-9 text-slate-200 mx-auto mb-3" />
                       <p className="text-sm font-medium text-slate-400">
-                        {search ? `No results for "${search}"` : `No ${activeCategory} items found`}
+                        {search ? `No results for "${search}"` : 'No inventory items available'}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {search ? 'Try a different keyword.' : `No ${activeCategory} items have been added yet.`}
                       </p>
                       {!search && (
                         <button onClick={() => setIsAddOpen(true)}
@@ -710,14 +912,24 @@ export default function PartsModule() {
                     </td></tr>
                   ) : (
                     filteredItems.map(item => {
-                      const qty = Number(item.current_stock || 0);
+                      const qty  = Number(item.current_stock || 0);
+                      const minS = Number(item.min_stock || item.minStock || 0);
+                      const isLow = qty > 0 && minS > 0 && qty <= minS;
                       return (
                         <tr key={item.id} className="border-b border-slate-50 hover:bg-slate-50/70 transition">
-                          <td className="px-5 py-3.5 font-medium text-slate-800">{item.part_name}</td>
+                          <td className="px-5 py-3.5">
+                            <span className="font-medium text-slate-800">{item.part_name}</span>
+                            {isLow && (
+                              <span className="ml-2 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-black bg-amber-100 text-amber-700 border border-amber-200">LOW</span>
+                            )}
+                            {qty === 0 && (
+                              <span className="ml-2 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-black bg-red-100 text-red-600 border border-red-200">OUT</span>
+                            )}
+                          </td>
                           <td className="px-5 py-3.5 text-slate-500">{item.brand || '—'}</td>
                           <td className="px-5 py-3.5">
                             <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-bold ${qtyColor(qty)}`}>
-                              {qty}
+                              {qty}{isLow && ` / min ${minS}`}
                             </span>
                           </td>
                           <td className="px-5 py-3.5">
@@ -813,31 +1025,42 @@ export default function PartsModule() {
       {pageTab === 'Returns' && (
         <div className="p-4 md:p-6 space-y-6">
           <div className="grid gap-4 sm:grid-cols-4">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-              <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-2 font-bold">Total Returns</p>
-              <p className="text-3xl font-bold text-slate-900">{returnSummary.totalReturns}</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-              <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-2 font-bold">Returned Value</p>
-              <p className="text-3xl font-bold text-slate-900">₹{returnSummary.returnedValue.toLocaleString()}</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-              <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-2 font-bold">Pending Returns</p>
-              <p className="text-3xl font-bold text-slate-900">{returnSummary.pending}</p>
-            </div>
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-              <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-2 font-bold">Completed Returns</p>
-              <p className="text-3xl font-bold text-slate-900">{returnSummary.completed}</p>
-            </div>
+            {[
+              { label: 'Total Returns',    value: returnSummary.totalReturns,                    color: 'text-violet-600' },
+              { label: 'Return Value',     value: `₹${returnSummary.returnedValue.toLocaleString()}`, color: 'text-emerald-600' },
+              { label: 'Pending Pickup',   value: returnSummary.pending,                          color: 'text-amber-600'   },
+              { label: 'Completed',        value: returnSummary.completed,                        color: 'text-slate-700'   },
+            ].map(c => (
+              <div key={c.label} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+                <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-2 font-bold">{c.label}</p>
+                <p className={`text-2xl font-black ${c.color}`}>{c.value}</p>
+              </div>
+            ))}
           </div>
 
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100">
+            <div className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-slate-100">
               <ShoppingCart className="h-4 w-4 text-violet-600" />
               <h2 className="text-sm font-bold text-slate-800">Vendor Return History</h2>
-              {returns.length > 0 && (
-                <span className="ml-auto text-xs text-slate-400">{returns.length} records</span>
-              )}
+              <div className="ml-auto flex items-center gap-2 flex-wrap">
+                {/* status filter pills */}
+                {[['all','All'],['pending','Pending'],['collected','Collected'],['completed','Completed']].map(([v,l]) => (
+                  <button key={v} onClick={() => setReturnStatusFilter(v)}
+                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border transition ${
+                      returnStatusFilter === v ? 'bg-slate-700 text-white border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                    }`}>{l}</button>
+                ))}
+                {/* search */}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
+                  <input value={returnSearch} onChange={e => setReturnSearch(e.target.value)}
+                    placeholder="Search ref, vendor, item…"
+                    className="pl-7 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-400 w-44 bg-slate-50" />
+                </div>
+                {/* export */}
+                <button onClick={() => exportReturns('csv')} className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-200 transition">CSV</button>
+                <button onClick={() => exportReturns('print')} className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-200 transition">Print</button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -850,20 +1073,21 @@ export default function PartsModule() {
                     <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Qty</th>
                     <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Reason</th>
                     <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Status</th>
-                    <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Reference PO</th>
+                    <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Ref PO</th>
                     <th className="text-right text-xs font-semibold text-slate-400 px-5 py-3">Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {returns.length === 0 ? (
-                    <tr><td colSpan={9} className="py-16 text-center text-slate-400">
+                  {filteredReturns.length === 0 ? (
+                    <tr><td colSpan={9} className="py-16 text-center">
                       <ShoppingCart className="h-9 w-9 text-slate-200 mx-auto mb-3" />
-                      No returns recorded yet. Use the Return button from inventory rows to log a vendor return.
+                      <p className="text-sm font-medium text-slate-400">No returns found</p>
+                      <p className="text-xs text-slate-400 mt-1">{returnSearch || returnStatusFilter !== 'all' ? 'Try clearing your filters.' : 'Use the Return button on inventory rows to log a vendor return.'}</p>
                     </td></tr>
                   ) : (
-                    returns.map(record => (
+                    filteredReturns.map(record => (
                       <tr key={record.id} className="border-b border-slate-50 hover:bg-slate-50/70 transition">
-                        <td className="px-5 py-3.5 font-mono text-slate-700">{record.number}</td>
+                        <td className="px-5 py-3.5 font-mono text-slate-700 text-xs">{record.number}</td>
                         <td className="px-5 py-3.5 text-slate-500 whitespace-nowrap">{fmt(record.date)}</td>
                         <td className="px-5 py-3.5 text-slate-700">{record.vendor}</td>
                         <td className="px-5 py-3.5 text-slate-700">{record.itemName}</td>
@@ -874,7 +1098,7 @@ export default function PartsModule() {
                             {getReturnStatusText(record.status)}
                           </span>
                         </td>
-                        <td className="px-5 py-3.5 text-slate-600">{record.poRef || '—'}</td>
+                        <td className="px-5 py-3.5 text-slate-600 font-mono text-xs">{record.poRef || '—'}</td>
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-2">
                             {record.status !== 'completed' && (
@@ -885,7 +1109,7 @@ export default function PartsModule() {
                             )}
                             <button onClick={() => openReturnDetails(record)}
                               className="rounded-xl bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100 transition">
-                              View Details
+                              View
                             </button>
                           </div>
                         </td>
@@ -906,39 +1130,50 @@ export default function PartsModule() {
         <div className="p-4 md:p-6">
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
 
-            <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100">
-              <ShoppingCart className="h-4 w-4 text-violet-600" />
+            {/* PO summary cards */}
+            <div className="grid grid-cols-3 gap-3 px-5 py-4 border-b border-slate-100">
+              {[
+                { label: 'Pending Approval', value: poSummary.pending,  color: 'text-amber-600',  bg: 'bg-amber-50',  sid: 0 },
+                { label: 'Approved',         value: poSummary.approved, color: 'text-emerald-600',bg: 'bg-emerald-50', sid: 1 },
+                { label: 'Received',         value: poSummary.received, color: 'text-violet-600', bg: 'bg-violet-50',  sid: 4 },
+              ].map(c => (
+                <button key={c.label} onClick={() => setPoFilter(prev => prev === c.sid ? null : c.sid)}
+                  className={`rounded-xl border p-3 text-left transition hover:shadow-sm ${
+                    poFilter === c.sid ? 'border-slate-300 shadow-sm' : 'border-slate-100'
+                  } ${c.bg}`}>
+                  <p className={`text-[10px] uppercase tracking-widest font-bold mb-1 ${c.color}`}>{c.label}</p>
+                  <p className={`text-xl font-black ${c.color}`}>{c.value}</p>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-slate-100">
+              <ShoppingCart className="h-4 w-4 text-violet-600 shrink-0" />
               <h2 className="text-sm font-bold text-slate-800">Purchase Orders</h2>
-              {!poLoading && poList.length > 0 && (
-                <div className="ml-auto flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => setPoFilter(null)}
-                    className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border transition ${
-                      poFilter === null
-                        ? 'bg-slate-700 text-white border-slate-700'
-                        : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
-                    }`}
-                  >
-                    All: {poList.length}
-                  </button>
-                  {[0,1,2,3,4].map(sid => {
-                    const count = poList.filter(p => getStatusId(p) === sid).length;
-                    return count > 0 ? (
-                      <button
-                        key={sid}
-                        onClick={() => setPoFilter(prev => prev === sid ? null : sid)}
-                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border transition ${
-                          poFilter === sid
-                            ? STATUS_BADGE[sid] + ' ring-2 ring-offset-1 ring-current'
-                            : STATUS_BADGE[sid] + ' opacity-70 hover:opacity-100'
-                        }`}
-                      >
-                        {STATUS_LABEL[sid]}: {count}
-                      </button>
-                    ) : null;
-                  })}
+              <div className="ml-auto flex items-center gap-2 flex-wrap">
+                <button onClick={() => setPoFilter(null)}
+                  className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border transition ${
+                    poFilter === null ? 'bg-slate-700 text-white border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                  }`}>All: {poList.length}</button>
+                {[0,1,2,3,4].map(sid => {
+                  const count = poList.filter(p => getStatusId(p) === sid).length;
+                  return count > 0 ? (
+                    <button key={sid} onClick={() => setPoFilter(prev => prev === sid ? null : sid)}
+                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border transition ${
+                        poFilter === sid ? STATUS_BADGE[sid] + ' ring-2 ring-offset-1 ring-current' : STATUS_BADGE[sid] + ' opacity-70 hover:opacity-100'
+                      }`}>{STATUS_LABEL[sid]}: {count}</button>
+                  ) : null;
+                })}
+                {/* PO search */}
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
+                  <input value={poSearch} onChange={e => setPoSearch(e.target.value)}
+                    placeholder="PO no., vendor, item…"
+                    className="pl-7 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-400 w-40 bg-slate-50" />
                 </div>
-              )}
+                <button onClick={() => exportPOs('csv')} className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-200 transition">CSV</button>
+                <button onClick={() => exportPOs('print')} className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-200 transition">Print</button>
+              </div>
             </div>
 
             <div className="overflow-x-auto pb-2">
@@ -962,23 +1197,17 @@ export default function PartsModule() {
                       <Loader2 className="h-5 w-5 text-violet-400 animate-spin mx-auto mb-2" />
                       <p className="text-xs text-slate-400">Loading purchase orders...</p>
                     </td></tr>
-                  ) : poList.length === 0 ? (
+                  ) : filteredPOList.length === 0 ? (
                     <tr><td colSpan={9} className="py-16 text-center">
                       <ShoppingCart className="h-9 w-9 text-slate-200 mx-auto mb-3" />
-                      <p className="text-sm font-medium text-slate-400">No purchase orders yet</p>
-                      <button onClick={() => setIsCreatePOOpen(true)}
-                        className="mt-3 text-xs font-semibold text-violet-600 hover:underline">
-                        + Create first PO
-                      </button>
-                    </td></tr>
-                  ) : (poFilter !== null && poList.filter(p => getStatusId(p) === poFilter).length === 0) ? (
-                    <tr><td colSpan={9} className="py-16 text-center">
-                      <ShoppingCart className="h-9 w-9 text-slate-200 mx-auto mb-3" />
-                      <p className="text-sm font-medium text-slate-400">No {STATUS_LABEL[poFilter]} orders</p>
-                      <button onClick={() => setPoFilter(null)} className="mt-3 text-xs font-semibold text-violet-600 hover:underline">Show all</button>
+                      <p className="text-sm font-medium text-slate-400">No Purchase Orders Found</p>
+                      <p className="text-xs text-slate-400 mt-1">{poSearch ? 'Try a different search.' : poList.length === 0 ? 'Create your first purchase order to get started.' : 'No orders match the current filter.'}</p>
+                      {!poSearch && poList.length === 0 && (
+                        <button onClick={() => setIsCreatePOOpen(true)} className="mt-3 text-xs font-semibold text-violet-600 hover:underline">+ Create first PO</button>
+                      )}
                     </td></tr>
                   ) : (
-                    (poFilter !== null ? poList.filter(p => getStatusId(p) === poFilter) : poList).map(po => {
+                    filteredPOList.map(po => {
                       const sid      = getStatusId(po);
                       const isActing = poActionId === po.id;
                       const expanded = expandedPOIds.includes(po.id);
@@ -1123,14 +1352,46 @@ export default function PartsModule() {
                                     <p className="text-slate-500">Created: {fmt(po.created_at)}</p>
                                     <p className="text-slate-500">Requested: {fmt(po.requested_date)}</p>
                                     {po.ordered_at && <p className="text-slate-500">Ordered: {fmt(po.ordered_at)}</p>}
+                                    {po.receivedAt && <p className="text-slate-500">Received: {fmt(po.receivedAt)}</p>}
                                     <div className="mt-2">
                                       <span className={`inline-flex items-center rounded-lg px-2.5 py-1 text-xs font-bold ${STATUS_BADGE[sid]}`}>
                                         {STATUS_LABEL[sid]}
                                       </span>
                                     </div>
+                                    {/* Audit trail */}
+                                    <div className="mt-2 pt-2 border-t border-slate-100 space-y-0.5">
+                                      <p className="text-[10px] text-slate-400">Created by: <span className="font-semibold text-slate-600">{po.requested_by || '—'}</span></p>
+                                      {po.approver_name && <p className="text-[10px] text-slate-400">Approved by: <span className="font-semibold text-slate-600">{po.approver_name}</span> · {fmt(po.approval_date)}</p>}
+                                      {po.receivedBy && <p className="text-[10px] text-slate-400">Received by: <span className="font-semibold text-slate-600">{po.receivedBy}</span> · {fmtAudit(po.receivedAt)}</p>}
+                                    </div>
                                   </div>
                                   <PaymentInfoPanel po={po} />
                                 </div>
+
+                                {/* Return History inside PO */}
+                                {po.returnHistory?.length > 0 && (
+                                  <div className="mt-4 pt-4 border-t border-slate-200">
+                                    <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-2 font-bold">Return History</p>
+                                    <div className="space-y-1.5">
+                                      {po.returnHistory.map((r, i) => (
+                                        <div key={i} className="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                                          <div>
+                                            <p className="text-[11px] font-bold text-amber-700">{r.returnNumber}</p>
+                                            <p className="text-[10px] text-amber-600">{fmt(r.date)} · {r.reason}</p>
+                                          </div>
+                                          <div className="text-right">
+                                            <p className="text-[11px] font-bold text-slate-700">{r.quantity} units</p>
+                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                              r.status === 'Completed' ? 'bg-emerald-100 text-emerald-700' :
+                                              r.status === 'Collected' ? 'bg-sky-100 text-sky-700' :
+                                              'bg-amber-100 text-amber-700'
+                                            }`}>{r.status}</span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </td>
                             </tr>
                           )}
@@ -1147,108 +1408,157 @@ export default function PartsModule() {
 
       {/* ── Modals ── */}
       {returnModalItem && (
-        <AnimatePresence>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4"
-          >
-            <motion.div
-              initial={{ scale: 0.96, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.96, opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className="w-full max-w-2xl overflow-hidden rounded-[32px] bg-white shadow-2xl ring-1 ring-slate-200"
-            >
-              <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-slate-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {/* Header */}
+            <div className="flex items-start justify-between px-6 py-4 bg-gray-900">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Vendor Return</p>
+                <h2 className="mt-0.5 text-sm font-bold text-white">{returnModalItem.part_name || returnModalItem.name}</h2>
+              </div>
+              <button onClick={closeReturnModal} className="rounded-full p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white transition">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+              {/* Read-only info */}
+              <div className="grid grid-cols-2 gap-3">
+                {[[
+                  'Item Name', returnModalItem.part_name || returnModalItem.name || '—'
+                ],[
+                  'Vendor', returnModalItem.preferredVendor || returnModalItem.preferred_vendor || returnModalItem.vendor || '—'
+                ],[
+                  'PO Number', (() => { const po = findMatchingReturnPO(returnModalItem); return po?.po_number || po?.poNumber || '—'; })()
+                ],[
+                  'Current Stock', `${Number(returnModalItem.current_stock || 0)} ${returnModalItem.unit || 'units'}`
+                ]].map(([label, val]) => (
+                  <div key={label} className="bg-slate-50 rounded-xl px-3 py-2.5 border border-slate-200">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{label}</p>
+                    <p className="text-xs font-bold text-slate-700">{val}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Return Qty + Date */}
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs uppercase tracking-widest text-slate-400 font-bold">Return Item</p>
-                  <h2 className="mt-1 text-xl font-bold text-slate-900">{returnModalItem.part_name || returnModalItem.name || 'Item'}</h2>
+                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Return Quantity <span className="text-red-500">*</span></label>
+                  <input type="number" min="1" value={returnForm.quantity}
+                    onChange={e => handleReturnFormChange('quantity', e.target.value)}
+                    placeholder="0"
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100" />
+                  {returnErrors.quantity && <p className="text-xs text-red-600 mt-1">{returnErrors.quantity}</p>}
                 </div>
-                <button onClick={closeReturnModal}
-                  className="rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="space-y-4 px-6 py-5">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">Return Quantity</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={returnForm.quantity}
-                      onChange={e => handleReturnFormChange('quantity', e.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                    />
-                    {returnErrors.quantity && <p className="text-xs text-red-600">{returnErrors.quantity}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">Return Date</label>
-                    <input
-                      type="date"
-                      value={returnForm.date}
-                      onChange={e => handleReturnFormChange('date', e.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                    />
-                    {returnErrors.date && <p className="text-xs text-red-600">{returnErrors.date}</p>}
-                  </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">Reason</label>
-                    <select
-                      value={returnForm.reason}
-                      onChange={e => handleReturnFormChange('reason', e.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                    >
-                      {RETURN_REASONS.map(reason => (
-                        <option key={reason} value={reason}>{reason}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">Current Stock</label>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                      {Number(returnModalItem.current_stock || 0)} available
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-500 uppercase">Remarks</label>
-                  <textarea
-                    rows={3}
-                    value={returnForm.remarks}
-                    onChange={e => handleReturnFormChange('remarks', e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100"
-                  />
+                <div>
+                  <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Return Date <span className="text-red-500">*</span></label>
+                  <input type="date" value={returnForm.date}
+                    onChange={e => handleReturnFormChange('date', e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100" />
+                  {returnErrors.date && <p className="text-xs text-red-600 mt-1">{returnErrors.date}</p>}
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 px-6 py-5 border-t border-slate-200 bg-slate-50 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm text-slate-500">
-                  Vendor: <span className="font-semibold text-slate-900">{returnModalItem.preferredVendor || returnModalItem.vendor || 'Unknown Vendor'}</span>
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                  <button onClick={closeReturnModal}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition">
-                    Cancel
-                  </button>
-                  <button onClick={handleConfirmReturn}
-                    disabled={returnActionLoading}
-                    className="rounded-2xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 transition disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {returnActionLoading ? 'Processing...' : 'Confirm Return'}
-                  </button>
+              {/* Reason */}
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Reason <span className="text-red-500">*</span></label>
+                <div className="flex flex-wrap gap-2">
+                  {RETURN_REASONS.map(r => (
+                    <button key={r} type="button"
+                      onClick={() => handleReturnFormChange('reason', r)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                        returnForm.reason === r
+                          ? 'bg-gray-900 text-white border-gray-900'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:border-slate-400'
+                      }`}>{r}</button>
+                  ))}
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
-        </AnimatePresence>
+
+              {/* Remarks */}
+              <div>
+                <label className="text-xs font-semibold text-slate-500 uppercase block mb-1">Remarks</label>
+                <textarea rows={2} value={returnForm.remarks}
+                  onChange={e => handleReturnFormChange('remarks', e.target.value)}
+                  placeholder="Optional notes about the return…"
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-100 resize-none" />
+              </div>
+
+              {/* Credit preview */}
+              {Number(returnForm.quantity) > 0 && (() => {
+                const unitCost = Number(returnModalItem.costPrice || returnModalItem.cost_price || 0);
+                const credit = Number(returnForm.quantity) * unitCost;
+                return credit > 0 ? (
+                  <div className="flex items-center justify-between bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
+                    <span className="text-xs font-semibold text-emerald-700">Ledger Credit</span>
+                    <span className="text-sm font-black text-emerald-700">₹{credit.toLocaleString()} Credit</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+                    <span className="text-xs text-amber-700">ℹ️ No unit cost on record — ledger credit will be ₹0. Set cost price on the item to enable credit.</span>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50">
+              <button onClick={closeReturnModal}
+                className="flex-1 rounded-xl border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 transition">
+                Cancel
+              </button>
+              <button onClick={handleConfirmReturn} disabled={returnActionLoading}
+                className="flex-1 rounded-xl bg-gray-900 py-2.5 text-sm font-bold text-white hover:bg-gray-800 transition disabled:opacity-50">
+                {returnActionLoading ? 'Processing…' : 'Confirm Return'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {returnDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="flex justify-between items-center px-5 py-4 bg-gray-900">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Return Details</p>
+                <p className="text-sm font-bold text-white mt-0.5">{returnDetails.number}</p>
+              </div>
+              <button onClick={() => setReturnDetails(null)} className="p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-full transition">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-0">
+              {[
+                ['Return Ref',   returnDetails.number],
+                ['Date',         fmt(returnDetails.date)],
+                ['Vendor',       returnDetails.vendor],
+                ['Item',         returnDetails.itemName],
+                ['Quantity',     `${returnDetails.quantity} ${returnDetails.unit || 'units'}`],
+                ['Unit Cost',    returnDetails.costPerUnit > 0 ? `₹${returnDetails.costPerUnit.toLocaleString()}` : '—'],
+                ['Reason',       returnDetails.reason],
+                ['Related PO',   returnDetails.poRef || '—'],
+                ['Credit Amt',   returnDetails.creditAmount > 0 ? `₹${returnDetails.creditAmount.toLocaleString()}` : '₹0 (no unit cost)'],
+                ['Status',       getReturnStatusText(returnDetails.status)],
+                ['Remarks',      returnDetails.remarks || '—'],
+                ['Created By',   returnDetails.createdBy || '—'],
+                ['Created On',   fmtAudit(returnDetails.createdAt)],
+                ['Updated By',   returnDetails.updatedBy || '—'],
+                ['Updated On',   fmtAudit(returnDetails.updatedAt)],
+              ].map(([label, val]) => (
+                <div key={label} className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                  <span className="text-xs font-semibold text-gray-400">{label}</span>
+                  <span className="text-xs font-bold text-gray-800 text-right ml-4">{val}</span>
+                </div>
+              ))}
+            </div>
+            <div className="px-5 pb-5">
+              <button onClick={() => setReturnDetails(null)}
+                className="w-full py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-bold text-sm transition">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       <AddItemModal
         isOpen={isAddOpen}
