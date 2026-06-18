@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Loader2, AlertCircle } from 'lucide-react';
-import { dummyVendors } from '../../Vendors/data/dummyData';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -61,10 +60,41 @@ function Err({ msg }) {
 }
 
 export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy }) {
-  const [form, setForm]     = useState(EMPTY);
+  // ── All hooks MUST be declared before any early return ──
+  const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
+  const [partsVendors, setPartsVendors] = useState([]);
+  const [oilVendors, setOilVendors] = useState([]);
 
+  // Fetch parts vendors from database
+  const fetchPartsVendors = async () => {
+    try {
+      const res = await fetch('http://localhost:5001/api/parts-vendors');
+      const data = await res.json();
+      setPartsVendors(data.data || []);
+    } catch (error) {
+      console.error('PARTS VENDORS ERROR', error);
+    }
+  };
+
+  // Fetch oil vendors from database
+  const fetchOilVendors = async () => {
+    try {
+      const res = await fetch('http://localhost:5001/api/oil-vendors');
+      const data = await res.json();
+      setOilVendors(data.data || []);
+    } catch (error) {
+      console.error('OIL VENDORS ERROR', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchPartsVendors();
+    fetchOilVendors();
+  }, []);
+
+  // ── Early return AFTER all hooks ──
   if (!isOpen) return null;
 
   const set = (k, v) => {
@@ -78,8 +108,8 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
   };
 
   const handleVendorChange = (vendorId) => {
-    const v = vendorsForCategory.find(x => x.id === vendorId);
-    setForm(f => ({ ...f, vendorId, vendor: v?.name || '', itemId: '', item_name: '', unit: '', unit_price: '' }));
+    const v = vendorsForCategory.find(x => String(x.id) === String(vendorId));
+    setForm(f => ({ ...f, vendorId, vendor: v?.vendor_name || '', itemId: '', item_name: '', unit: '', unit_price: '' }));
     setErrors(e => ({ ...e, vendorId: null }));
   };
 
@@ -95,9 +125,14 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
   };
 
   const catMeta = CATEGORIES.find(c => c.id === form.category);
-  const vendorsForCategory = form.category
-    ? dummyVendors.filter(v => v.category === catMeta?.vendorCat)
+  
+  // Vendors loaded from database based on selected category
+  const vendorsForCategory = form.category === 'Parts & Spares'
+    ? partsVendors
+    : form.category === 'Oils & Lubes'
+    ? oilVendors
     : [];
+
   const itemsForCategory = ITEMS_BY_CATEGORY[form.category] || [];
 
   const total = (Number(form.quantity) || 0) * (Number(form.unit_price) || 0);
@@ -213,7 +248,7 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
                 className={sCls(errors.vendorId)}>
                 <option value="">— Select Vendor —</option>
                 {vendorsForCategory.map(v => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
+                  <option key={v.id} value={v.id}>{v.vendor_name}</option>
                 ))}
               </select>
               <Err msg={errors.vendorId} />

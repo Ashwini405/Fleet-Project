@@ -1,60 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FiSearch, FiPlus, FiBriefcase, FiPhone, FiMapPin, FiHome, FiChevronRight } from 'react-icons/fi';
+import axios from 'axios';
 import AddTyreVendorModal from '../components/AddTyreVendorModal';
 import TyresLedger from '../components/TyresLedger';
 import TyreVendorDetailPage from '../components/TyreVendorDetailPage';
 
-const SAMPLE_VENDORS = [
-  {
-    id: 'tv1', category: 'tyres', name: 'MRF Tyres Dealer',
-    vendorType: 'Tyre Supplier', contactPerson: 'Suresh Reddy',
-    contact: '9876543210', email: 'suresh@mrfdealer.com',
-    gst: '36AABCU9603R1ZX', address: 'Auto Nagar, Hyderabad',
-    bank: 'HDFC Bank - 501002345678',
-    paymentTerms: 'Net 30 Days', status: 'Active', balance: 45000,
-    vendorCategory: 'Tyre Supplier',
-  },
-  {
-    id: 'tv2', category: 'tyres', name: 'Apollo Tyres Distributor',
-    vendorType: 'Tyre Supplier', contactPerson: 'Ravi Kumar',
-    contact: '9988776655', email: 'ravi@apollodist.com',
-    gst: '36BBBCU1234R1ZY', address: 'Secunderabad, Hyderabad',
-    bank: 'SBI - 1122334455',
-    paymentTerms: 'Net 15 Days', status: 'Active', balance: 18500,
-    vendorCategory: 'Tyre Supplier',
-  },
-  {
-    id: 'tv3', category: 'tyres', name: 'JK Retreading Works',
-    vendorType: 'Retreading Vendor', contactPerson: 'Mohan Das',
-    contact: '8877665544', email: 'mohan@jkretread.com',
-    gst: '', address: 'Kukatpally, Hyderabad',
-    bank: 'Axis Bank',
-    paymentTerms: 'Immediate', status: 'Active', balance: 7200,
-    vendorCategory: 'Retreading Vendor',
-  },
-  {
-    id: 'tv4', category: 'tyres', name: 'ABC Scrap Traders',
-    vendorType: 'Scrap Buyer', contactPerson: 'Anwar Sheikh',
-    contact: '7766554433', email: '',
-    gst: '', address: 'Old City, Hyderabad',
-    bank: '',
-    paymentTerms: 'Immediate', status: 'Active', balance: 0,
-    vendorCategory: 'Scrap Buyer',
-  },
-];
-
 export default function TyresVendorPage() {
-  const [vendors, setVendors]           = useState(SAMPLE_VENDORS);
-  const [search, setSearch]             = useState('');
-  const [addOpen, setAddOpen]           = useState(false);
+  const [vendors, setVendors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [addOpen, setAddOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
-  const [viewMode, setViewMode]             = useState(null); // 'detail' | 'ledger'
+  const [viewMode, setViewMode] = useState(null); // 'detail' | 'ledger'
 
+  // Fetch tyre vendors from database
+  const fetchTyreVendors = async () => {
+    try {
+      const response = await axios.get("http://localhost:5001/api/tyre-vendors");
+      setVendors(response.data.data || []);
+    } catch (error) {
+      console.error("TYRE VENDOR FETCH ERROR", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTyreVendors();
+  }, []);
+
+  // Filter vendors based on search term
   const filtered = search
-    ? vendors.filter(v => v.name.toLowerCase().includes(search.toLowerCase()))
+    ? vendors.filter(v => v.vendor_name?.toLowerCase().includes(search.toLowerCase()))
     : vendors;
-
-  const handleAdd = (v) => setVendors(p => [v, ...p]);
 
   const clearSelection = () => { setSelectedVendor(null); setViewMode(null); };
 
@@ -74,6 +52,40 @@ export default function TyresVendorPage() {
         onBack={clearSelection}
         onViewLedger={() => setViewMode('ledger')}
       />
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div>
+            <div className="h-6 bg-gray-200 rounded w-48 animate-pulse"></div>
+            <div className="h-4 bg-gray-200 rounded w-64 mt-2 animate-pulse"></div>
+          </div>
+          <div className="flex items-center gap-4 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-64">
+              <div className="h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+            </div>
+            <div className="h-10 bg-gray-200 rounded-lg w-32 animate-pulse"></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 animate-pulse">
+              <div className="w-10 h-10 bg-gray-200 rounded-xl mb-4"></div>
+              <div className="h-6 bg-gray-200 rounded w-32 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-24 mb-3"></div>
+              <div className="h-4 bg-gray-200 rounded w-32 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-40 mb-2"></div>
+              <div className="h-4 bg-gray-200 rounded w-36 mb-4"></div>
+              <div className="border-t border-gray-100 pt-4">
+                <div className="h-8 bg-gray-200 rounded w-24 ml-auto"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -123,7 +135,7 @@ export default function TyresVendorPage() {
               </div>
 
               <div className="flex items-center justify-between mb-1">
-                <h3 className="font-bold text-gray-800 text-lg">{vendor.name}</h3>
+                <h3 className="font-bold text-gray-800 text-lg">{vendor.vendor_name}</h3>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                   vendor.status === 'Inactive'
                     ? 'bg-red-50 text-red-500 border-red-100'
@@ -133,39 +145,28 @@ export default function TyresVendorPage() {
                 </span>
               </div>
               <p className="text-[11px] font-semibold text-blue-500 mb-3">
-                {vendor.vendorCategory}
+                {vendor.vendor_type}
               </p>
 
               <div className="space-y-1.5 mb-6">
                 <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                  <FiPhone className="text-gray-400 shrink-0" /> {vendor.contact}
+                  <FiPhone className="text-gray-400 shrink-0" /> {vendor.mobile_number}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                  <FiMapPin className="text-gray-400 shrink-0" /> {vendor.address}
+                  <FiMapPin className="text-gray-400 shrink-0" /> {vendor.address_location}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                  <FiHome className="text-gray-400 shrink-0" /> {vendor.bank || 'Not provided'}
+                  <FiHome className="text-gray-400 shrink-0" /> Not provided
                 </div>
               </div>
             </div>
 
             <div className="border-t border-gray-100 pt-4 flex justify-between items-end">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ledger Balance</span>
-              {!vendor.balance || vendor.balance === 0 ? (
-                <div className="flex flex-col items-end">
-                  <span className="font-bold text-lg text-gray-400">₹0</span>
-                  <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">Settled</span>
-                </div>
-              ) : (
-                <div className="flex flex-col items-end">
-                  <span className={`font-bold text-lg ${vendor.balance < 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    ₹{Math.abs(vendor.balance).toLocaleString()}
-                  </span>
-                  <span className="text-[10px] font-medium text-gray-400">
-                    {vendor.balance < 0 ? 'Advance Balance' : 'Outstanding Payable'}
-                  </span>
-                </div>
-              )}
+              <div className="flex flex-col items-end">
+                <span className="font-bold text-lg text-gray-400">₹0</span>
+                <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">Settled</span>
+              </div>
             </div>
           </div>
         ))}
@@ -177,7 +178,13 @@ export default function TyresVendorPage() {
         )}
       </div>
 
-      <AddTyreVendorModal isOpen={addOpen} onClose={() => setAddOpen(false)} onAdd={handleAdd} />
+      <AddTyreVendorModal
+        isOpen={addOpen}
+        onClose={() => {
+          setAddOpen(false);
+          fetchTyreVendors();
+        }}
+      />
     </div>
   );
 }

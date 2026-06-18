@@ -43,9 +43,8 @@ export default function AddOilsVendorModal({ isOpen, onClose }) {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     try {
       setLoading(true);
-      await axios.post('http://localhost:5001/api/vendors', {
-        category: 'Lubricants',
-        garage_name: form.name,
+      await axios.post('http://localhost:5001/api/oil-vendors', {
+        vendor_name: form.name,
         mobile_number: form.mobile,
         email: form.email,
         address_location: form.address,
@@ -53,13 +52,15 @@ export default function AddOilsVendorModal({ isOpen, onClose }) {
         opening_balance: form.openingBalance,
         status: form.status,
         bank_name: form.bankName === 'Others' ? form.customBank : form.bankName,
-        account_number_or_upi: form.accountNo,
+        custom_bank_name: form.bankName === 'Others' ? form.customBank : null,
+        account_number: form.accountNo,
         ifsc_code: form.ifsc,
         upi_id: form.upi,
       });
       setToast(true);
       setTimeout(() => { setToast(false); setForm(EMPTY); setErrors({}); onClose(); }, 1500);
     } catch (err) {
+      console.error('OIL VENDOR SAVE ERROR:', err);
       alert(err?.response?.data?.message || 'Failed to create vendor');
     } finally {
       setLoading(false);

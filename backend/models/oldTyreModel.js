@@ -128,11 +128,40 @@ const getAllOldTyres = async () => {
 
 };
 
+// ======================================================
+// UPDATE OLD TYRE STATUS
+// ======================================================
+
+const updateOldTyreStatus = async (
+  tyreNo,
+  tyreStatus,
+  storeLocation
+) => {
+
+  const [result] = await db.query(
+    `
+    UPDATE old_tyres
+    SET
+      tyre_status = ?,
+      store_location = ?
+    WHERE old_tyre_number = ?
+    `,
+    [
+      tyreStatus,
+      storeLocation,
+      tyreNo
+    ]
+  );
+
+  return result;
+
+};
 
 module.exports = {
 
   createOldTyre,
 
-  getAllOldTyres
+  getAllOldTyres,
+  updateOldTyreStatus
 
 };

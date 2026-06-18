@@ -234,25 +234,44 @@ export default function OldTyresStockTab({ onNewRetreadingRecord, returnedRetrea
   };
 
   const handleRetreadConfirm = async (record) => {
-    try {
-      await axios.put(`http://localhost:5001/api/old-tyres/${record.tyreNo}`, {
+
+  if (!record) return;
+
+  try {
+
+    await axios.put(
+      `http://localhost:5001/api/old-tyres/${record.tyre_no}`,
+      {
         tyre_status: 'RETREADING',
         store_location: 'Retreading Area',
-      });
-      push(`${record.tyreNo} sent to ${record.vendorName} for retreading`, 'warning');
-    } catch (error) {
-      // backend not connected — update local state
-    }
-    // Always update local list regardless of API result
-    setOldTyres(prev => prev.map(t =>
-      (t.tyreNo === record.tyreNo || t.id === record.tyreId)
-        ? { ...t, status: 'RETREADING', storeLocation: 'Retreading Area' }
+      }
+    );
+
+  } catch (error) {
+    console.log(error);
+  }
+
+  setOldTyres(prev =>
+    prev.map(t =>
+      (t.tyreNo === record.tyre_no || t.id === record.tyre_id)
+        ? {
+            ...t,
+            status: 'RETREADING',
+            storeLocation: 'Retreading Area',
+          }
         : t
-    ));
-    push(`${record.tyreNo} sent to ${record.vendorName} for retreading`, 'warning');
-    setRetreadingTyre(null);
-    onNewRetreadingRecord?.(record);
-  };
+    )
+  );
+
+  push(
+    `${record.tyre_no} sent to ${record.vendor_name} for retreading`,
+    'warning'
+  );
+
+  setRetreadingTyre(null);
+
+  onNewRetreadingRecord?.(record);
+};
 
   const handleScrapConfirm = (record) => {
     setOldTyres(prev => prev.map(t =>

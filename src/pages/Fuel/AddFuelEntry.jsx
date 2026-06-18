@@ -28,6 +28,24 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
   const [suggestions, setSuggestions] = useState({});
   const [vehicleInfo, setVehicleInfo] = useState(null);
   const [trips, setTrips] = useState([]); // kept for potential future use
+  const [fuelVendors, setFuelVendors] = useState([]);
+
+  // ─── Fetch fuel vendors from database ────────────────────────────────────
+  useEffect(() => {
+    fetchFuelVendors();
+  }, []);
+
+  const fetchFuelVendors = async () => {
+    try {
+      const response = await fetch('http://localhost:5001/api/fuel-vendors');
+      const data = await response.json();
+      if (data.success) {
+        setFuelVendors(data.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching fuel vendors:', error);
+    }
+  };
 
   // ─── Populate vehicle and trip info from the `trip` prop ────────────────
   useEffect(() => {
@@ -222,7 +240,7 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
       tank_capacity: vehicleInfo?.tankCapacity,
       current_odo: Number(addForm.currentOdo),
       distance: distance,
-      quantity: quantityNum,              // ✅ fixed: use parsed value
+      quantity: quantityNum,
       rate: parseFloat(addForm.rate) || 0,
       total_cost: calculatedCost,
       mileage: calculatedMileage,
@@ -236,8 +254,7 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
       receipt_files: JSON.stringify(uploadedFiles.map(f => f.file.name)),
     };
 
-    // 🔍 DEBUG: Check what is being sent
-    console.log("FINAL FUEL DATA:", fuelData);
+    console.log('FINAL FUEL DATA:', fuelData);
 
     try {
       const response = await fetch('http://localhost:5001/api/fuel', {
@@ -504,7 +521,11 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
                 <label className={labelClass}>Fuel Vendor *</label>
                 <select name="vendor" value={addForm.vendor} onChange={handleFormChange} className={`${inputClass} ${errors.vendor ? 'border-red-300' : ''}`}>
                   <option value="">Select vendor...</option>
-                  <option>Indian Oil</option><option>BPCL</option><option>HPCL</option>
+                  {fuelVendors.map((vendor) => (
+                    <option key={vendor.id} value={vendor.vendor_name}>
+                      {vendor.vendor_name}
+                    </option>
+                  ))}
                 </select>
                 {errors.vendor && <p className="text-xs text-red-600 mt-1">{errors.vendor}</p>}
               </div>

@@ -65,15 +65,6 @@ const BRAND_MODELS = {
 const MATERIALS = ['Radial', 'Radial Tubeless', 'Bias Ply', 'Tube Type'];
 const STATUSES = ['In Stock', 'Mounted'];
 const PLACEMENTS = layoutPositions.map(p => ({ id: p.id, label: p.label }));
-// Tyre vendors — matches TyresVendorPage SAMPLE_VENDORS
-// When backend ready: fetch from /api/vendors?category=tyres
-const TYRE_VENDORS = [
-  { id: 'tv1', name: 'MRF Tyres Dealer'        },
-  { id: 'tv2', name: 'Apollo Tyres Distributor' },
-  { id: 'tv3', name: 'JK Retreading Works'      },
-  { id: 'tv4', name: 'ABC Scrap Traders'        },
-];
-
 const EMPTY_FORM = {
   serialNo: '', brand: '', model: '', tyreSize: '', material: '',
   status: 'In Stock', truckId: '', placement: '', dateOfIssue: '',
@@ -381,11 +372,13 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
   const [toast, setToast] = useState(false);
   const [vehicles, setVehicles] = useState([]);
   const [activeTyres, setActiveTyres] = useState([]);
+  const [tyreVendors, setTyreVendors] = useState([]);
 
-  // Fetch vehicles & tyres from database
+  // Fetch vehicles, tyres & tyre vendors from database
   useEffect(() => {
     fetchVehicles();
     fetchActiveTyres();
+    fetchTyreVendors();
   }, []);
 
   const fetchVehicles = async () => {
@@ -403,6 +396,16 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
       setActiveTyres(res.data.data);
     } catch (error) {
       console.log('Tyre Fetch Error:', error);
+    }
+  };
+
+  const fetchTyreVendors = async () => {
+    try {
+      const res = await axios.get('http://localhost:5001/api/tyre-vendors');
+      console.log('TYRE VENDORS:', res.data);
+      setTyreVendors(res.data.data || []);
+    } catch (error) {
+      console.error('Vendor Fetch Error:', error);
     }
   };
 
@@ -507,10 +510,10 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
 
     // 2. Always create vendor ledger transaction if vendor + cost filled
     if (form.vendorId && form.tyreCost) {
-      const vendor = TYRE_VENDORS.find(v => v.id === form.vendorId);
+      const vendor = tyreVendors.find(v => String(v.id) === String(form.vendorId));
       createVendorTransaction({
         vendorId:      form.vendorId,
-        vendorName:    vendor?.name || form.vendor,
+        vendorName:    vendor?.vendor_name || form.vendor,
         date:          form.purchaseDate || form.dateOfIssue,
         type:          'Tyre Purchase',
         ref:           form.invoiceNo || `TYR-${Date.now()}`,
@@ -804,13 +807,15 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
                     <Select
                       value={form.vendorId}
                       onChange={e => {
-                        const v = TYRE_VENDORS.find(tv => tv.id === e.target.value);
+                        const vendor = tyreVendors.find(v => String(v.id) === String(e.target.value));
                         set('vendorId', e.target.value);
-                        set('vendor', v?.name || '');
+                        set('vendor', vendor?.vendor_name || '');
                       }}
                     >
                       <option value="">Select Vendor</option>
-                      {TYRE_VENDORS.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                      {tyreVendors.map(vendor => (
+                        <option key={vendor.id} value={vendor.id}>{vendor.vendor_name}</option>
+                      ))}
                     </Select>
                   </div>
 

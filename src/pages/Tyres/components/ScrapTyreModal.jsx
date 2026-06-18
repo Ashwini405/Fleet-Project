@@ -1,18 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Trash2, CheckCircle, AlertCircle, ArrowRight, ChevronDown } from 'lucide-react';
+import axios from 'axios';
 import { createVendorTransaction } from '../../../services/vendorTransactionService';
 import { useVendorLedger } from '../../../context/VendorLedgerContext';
 
 const today = () => new Date().toISOString().split('T')[0];
-
-// Scrap buyer vendors — matches TyresVendorPage SAMPLE_VENDORS where vendorType = 'Scrap Buyer'
-// When backend ready: fetch from /api/vendors?category=tyres&vendorType=Scrap+Buyer
-const SCRAP_VENDORS = [
-  { id: 'tv4', name: 'ABC Scrap Traders',    mobile: '7766554433' },
-  { id: 'sv1', name: 'City Scrap Dealers',   mobile: '9988001122' },
-  { id: 'sv2', name: 'Metro Tyre Recyclers', mobile: '9911334455' },
-];
 
 const SCRAP_REASONS = [
   'Fully Worn Out',
@@ -49,6 +42,7 @@ function Err({ msg }) {
 }
 
 export default function ScrapTyreModal({ tyre, onClose, onConfirm }) {
+  // ── ALL hooks at the top level ──
   const { addVendorTransaction } = useVendorLedger();
   const [form, setForm] = useState({
     vendorId:   '',
@@ -60,7 +54,28 @@ export default function ScrapTyreModal({ tyre, onClose, onConfirm }) {
   });
   const [errors, setErrors] = useState({});
   const [done, setDone]     = useState(false);
+  const [vendors, setVendors] = useState([]);
 
+  // Fetch scrap buyer vendors from database
+  useEffect(() => {
+    fetchScrapVendors();
+  }, []);
+
+  const fetchScrapVendors = async () => {
+    try {
+      const res = await axios.get('http://localhost:5001/api/tyre-vendors');
+      if (res.data.success) {
+        const scrapBuyers = res.data.data.filter(
+          v => v.vendor_type === 'Scrap Buyer'
+        );
+        setVendors(scrapBuyers);
+      }
+    } catch (error) {
+      console.error('SCRAP VENDORS FETCH ERROR:', error);
+    }
+  };
+
+  // ── Early return AFTER all hooks ──
   if (!tyre) return null;
 
   const set = (key, val) => {
@@ -78,9 +93,12 @@ export default function ScrapTyreModal({ tyre, onClose, onConfirm }) {
     return e;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      return;
+    }
 
     const txnNo = `SCRAP-${Date.now().toString().slice(-6)}`;
     const saleAmount = Number(form.saleAmount);
@@ -116,8 +134,38 @@ export default function ScrapTyreModal({ tyre, onClose, onConfirm }) {
       createdAt:   new Date().toISOString(),
     };
 
-    onConfirm?.(record);
-    setDone(true);
+    try {
+      // 1. Save scrap record to tyre_scrap_history
+      await axios.post('http://localhost:5001/api/tyre-scrap', {
+        id: record.id,
+        txn_no: record.txnNo,
+        tyre_no: record.tyreNo,
+        make: record.make,
+        model: record.model,
+        tyre_size: record.tyreSize,
+        vehicle_no: record.vehicleNo,
+        running_km: record.runningKm,
+        remaining_tread: record.remainingTread,
+        vendor_id: record.vendorId,
+        vendor_name: record.vendorName,
+        scrap_date: record.scrapDate,
+        sale_amount: record.saleAmount,
+        reason: record.reason,
+        remarks: record.remarks,
+      });
+
+      // 2. Update old tyre status to SCRAPPED
+      await axios.put(`http://localhost:5001/api/old-tyres/${record.tyreNo}`, {
+        tyre_status: 'SCRAPPED',
+        store_location: 'Scrap Yard',
+      });
+
+      onConfirm?.();
+      setDone(true);
+    } catch (error) {
+      console.error('SCRAP SAVE ERROR:', error);
+      alert(error?.response?.data?.message || 'Failed to scrap tyre');
+    }
   };
 
   const handleClose = () => {
@@ -216,20 +264,22 @@ export default function ScrapTyreModal({ tyre, onClose, onConfirm }) {
                         <select
                           value={form.vendorId}
                           onChange={e => {
-                            const v = SCRAP_VENDORS.find(sv => sv.id === e.target.value);
+                            const v = vendors.find(sv => String(sv.id) === e.target.value);
                             set('vendorId', e.target.value);
-                            set('vendorName', v?.name || '');
+                            set('vendorName', v?.vendor_name || '');
                           }}
                           className={`w-full pl-3.5 pr-9 h-[40px] bg-white border rounded-xl text-sm font-medium text-slate-800 appearance-none focus:outline-none focus:ring-2 transition-all ${errors.vendorId ? 'border-red-300 focus:ring-red-100' : 'border-slate-200 focus:border-blue-500 focus:ring-blue-100'}`}
                         >
                           <option value="">Select Scrap Buyer</option>
-                          {SCRAP_VENDORS.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                          {vendors.map(v => (
+                            <option key={v.id} value={v.id}>{v.vendor_name}</option>
+                          ))}
                         </select>
                         <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                       </div>
                       {form.vendorId && (
                         <p className="mt-1 text-[10px] text-emerald-600 font-semibold">
-                          📞 {SCRAP_VENDORS.find(v => v.id === form.vendorId)?.mobile}
+                          📞 {vendors.find(v => String(v.id) === form.vendorId)?.mobile_number}
                         </p>
                       )}
                       <Err msg={errors.vendorId} />

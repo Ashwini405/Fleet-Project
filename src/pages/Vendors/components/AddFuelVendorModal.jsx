@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FiX, FiHome, FiCheckCircle, FiZap } from 'react-icons/fi';
+import axios from 'axios';
 
 const FUEL_TYPES = ['Diesel', 'Petrol', 'CNG', 'LNG', 'EV Charging'];
 const BANK_OPTIONS = ['HDFC Bank', 'State Bank of India (SBI)', 'ICICI Bank', 'Axis Bank', 'Canara Bank', 'Union Bank', 'Indian Bank', 'Bank of Baroda', 'Others'];
@@ -23,7 +24,12 @@ function validate(form, existingVendors) {
   if (!form.address.trim()) e.address = 'Address is required';
   if (form.fuelTypes.length === 0) e.fuelTypes = 'Select at least one fuel type';
   if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Enter a valid email address';
-  if (form.gst && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(form.gst.trim().toUpperCase())) e.gst = 'Enter a valid GST number';
+  if (form.gst) {
+    const gst = form.gst.trim().toUpperCase();
+    const validOfficial = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gst);
+    const validCustom = /^GST[0-9A-Z]{9,12}$/.test(gst);
+    if (!validOfficial && !validCustom) e.gst = 'Enter a valid GST number';
+  }
   const dup = existingVendors.find(v =>
     v.name.trim().toLowerCase() === form.name.trim().toLowerCase() &&
     (v.contact || v.mobile || '').replace(/\D/g, '') === form.mobile.trim()
@@ -55,62 +61,51 @@ export default function AddFuelVendorModal({ isOpen, onClose, onAdd, existingVen
     setErrors(p => ({ ...p, fuelTypes: null }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     const errs = validate(form, existingVendors);
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      return;
+    }
 
-    setLoading(true);
-    const id = `fv-${Date.now()}`;
-    const ob = Number(form.openingBalance) || 0;
+    try {
+      setLoading(true);
 
-    const newVendor = {
-      id,
-      name:            form.name.trim(),
-      contactPerson:   form.contactPerson.trim(),
-      contact:         form.mobile.trim(),
-      mobile:          form.mobile.trim(),
-      email:           form.email.trim(),
-      address:         form.address.trim(),
-      fuelTypes:       form.fuelTypes,
-      gst_number:      form.gst.trim().toUpperCase(),
-      openingBalance:  ob,
-      balance:         ob,
-      status:          form.status,
-      category:        'fuel',
-      vendorCategory:  'Fuel Station',
-      bank:            form.bankName === 'Others' ? form.customBank : form.bankName,
-      bank_name:       form.bankName === 'Others' ? form.customBank : form.bankName,
-      account_number_or_upi: form.accountNo.trim(),
-      ifsc_code:       form.ifsc.trim(),
-      upi_id:          form.upi.trim(),
-      notes:           form.notes.trim(),
-      createdAt:       new Date().toISOString(),
-    };
+      await axios.post('http://localhost:5001/api/fuel-vendors', {
+        vendor_name: form.name.trim(),
+        contact_person: form.contactPerson.trim(),
+        mobile_number: form.mobile.trim(),
+        email: form.email.trim(),
+        address_location: form.address.trim(),
+        fuel_types: form.fuelTypes,
+        gst_number: form.gst.trim().toUpperCase(),
+        opening_balance: Number(form.openingBalance) || 0,
+        status: form.status,
+        bank_name: form.bankName === 'Others' ? form.customBank : form.bankName,
+        custom_bank_name: form.bankName === 'Others' ? form.customBank : null,
+        account_number: form.accountNo.trim(),
+        ifsc_code: form.ifsc.trim(),
+        upi_id: form.upi.trim(),
+        notes: form.notes.trim(),
+      });
 
-    // Auto-create opening balance ledger entry if ob > 0
-    const ledgerEntry = ob > 0 ? {
-      id:       `OB-${id}`,
-      vendorId: id,
-      date:     new Date().toISOString().split('T')[0],
-      type:     'Opening Balance',
-      ref:      `OB-${id}`,
-      desc:     'Opening Balance',
-      debit:    ob,
-      credit:   0,
-    } : null;
-
-    setTimeout(() => {
-      setLoading(false);
       setSuccess(true);
-      if (onAdd) onAdd(newVendor, ledgerEntry);
+
       setTimeout(() => {
         setSuccess(false);
         setForm(EMPTY);
         setErrors({});
         onClose();
-      }, 1400);
-    }, 600);
+      }, 1200);
+
+    } catch (error) {
+      console.error('FUEL VENDOR SAVE ERROR', error);
+      alert(error?.response?.data?.message || 'Failed to create fuel vendor');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => { setForm(EMPTY); setErrors({}); onClose(); };

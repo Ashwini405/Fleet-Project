@@ -89,11 +89,50 @@ const getAllOldTyres = async (req, res) => {
 
 };
 
+// ======================================================
+// UPDATE OLD TYRE STATUS
+// ======================================================
+
+const updateOldTyreStatus = async (req, res) => {
+
+  try {
+
+    const { tyreNo } = req.params;
+
+    const {
+      tyre_status,
+      store_location
+    } = req.body;
+
+    await OldTyreModel.updateOldTyreStatus(
+      tyreNo,
+      tyre_status,
+      store_location
+    );
+
+    res.status(200).json({
+      success: true,
+      message: 'Old tyre updated successfully'
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+
+  }
+
+};
 
 module.exports = {
 
   createOldTyre,
 
-  getAllOldTyres
+  getAllOldTyres,
+  updateOldTyreStatus
 
 };

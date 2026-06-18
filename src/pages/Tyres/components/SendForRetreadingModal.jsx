@@ -1,16 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, RotateCcw, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react';
+import axios from 'axios';
 
 const today = () => new Date().toISOString().split('T')[0];
-
-// Retreading vendors — matches TyresVendorPage SAMPLE_VENDORS filtered to Retreading type
-// When backend ready: fetch from /api/vendors?category=tyres&service=Retreading
-const RETREADING_VENDORS = [
-  { id: 'tv3', name: 'JK Retreading Works',     mobile: '8877665544' },
-  { id: 'tv5', name: 'City Tyre Retreads',      mobile: '9900112233' },
-  { id: 'tv6', name: 'National Retread Centre', mobile: '9911223344' },
-];
 
 const inputCls = (err) =>
   `w-full px-3.5 h-[40px] bg-white border rounded-xl text-sm font-medium text-slate-800
@@ -47,6 +40,7 @@ function InfoRow({ label, value }) {
 }
 
 export default function SendForRetreadingModal({ tyre, onClose, onConfirm }) {
+  // ── All hooks MUST be declared before any early return ──
   const [form, setForm] = useState({
     vendorId:           '',
     vendorName:         '',
@@ -57,7 +51,34 @@ export default function SendForRetreadingModal({ tyre, onClose, onConfirm }) {
   });
   const [errors, setErrors] = useState({});
   const [done, setDone]     = useState(false);
+  const [retreadingVendors, setRetreadingVendors] = useState([]);
+  const [loading, setLoading] = useState(false);
 
+  // Fetch retreading vendors from database
+  useEffect(() => {
+    fetchRetreadingVendors();
+  }, []);
+
+  const fetchRetreadingVendors = async () => {
+    try {
+      const response = await axios.get('http://localhost:5001/api/tyre-vendors');
+      const vendors = response.data.data || [];
+
+      // Filter vendors that offer Retreading service
+      const filtered = vendors.filter(vendor => {
+        const services = Array.isArray(vendor.services)
+          ? vendor.services
+          : [];
+        return services.includes("Retreading");
+      });
+
+      setRetreadingVendors(filtered);
+    } catch (error) {
+      console.error("RETREADING VENDORS FETCH ERROR:", error);
+    }
+  };
+
+  // ── Early return AFTER all hooks ──
   if (!tyre) return null;
 
   const set = (key, val) => {
@@ -66,9 +87,9 @@ export default function SendForRetreadingModal({ tyre, onClose, onConfirm }) {
   };
 
   const handleVendorChange = (id) => {
-    const vendor = RETREADING_VENDORS.find(v => v.id === id);
+    const vendor = retreadingVendors.find(v => String(v.id) === String(id));
     set('vendorId', id);
-    set('vendorName', vendor?.name || '');
+    set('vendorName', vendor?.vendor_name || '');
   };
 
   const validate = () => {
@@ -82,41 +103,56 @@ export default function SendForRetreadingModal({ tyre, onClose, onConfirm }) {
     return e;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      return;
+    }
 
-    const orderNo = `RET-${Date.now().toString().slice(-6)}`;
-    const record = {
-      id:                 orderNo,
-      orderNo,
-      tyreId:             tyre.id || tyre.tyreNo,
-      tyreNo:             tyre.tyreNo || tyre.old_tyre_number,
-      brand:              tyre.make || tyre.brand || '',
-      model:              tyre.model || '',
-      tyreSize:           tyre.tyreSize || '',
-      vehicleNo:          tyre.vehicleNo || '',
-      lastPosition:       tyre.lastPosition || '',
-      runningKm:          tyre.runningKm || 0,
-      remainingTread:     tyre.remainingTread || null,
-      vendorId:           form.vendorId,
-      vendorName:         form.vendorName,
-      sentDate:           form.sentDate,
-      expectedReturnDate: form.expectedReturnDate,
-      expectedCost:       Number(form.expectedCost),
-      actualCost:         null,
-      returnDate:         null,
-      newTreadPercent:    null,
-      condition:          null,
-      notes:              form.notes,
-      status:             'IN_PROGRESS',
-      createdAt:          new Date().toISOString(),
-    };
+    try {
+      setLoading(true);
 
-    // NO ledger entry yet — entry is created only on completion with actual cost
+      // Prepare payload matching tyre_retreading table schema
+      const payload = {
+        tyre_id: tyre.id || tyre.tyreId,
+        tyre_no: tyre.tyreNo || tyre.old_tyre_number || '',
+        brand: tyre.make || tyre.brand || '',
+        model: tyre.model || '',
+        tyre_size: tyre.tyreSize || '',
+        vehicle_no: tyre.vehicleNo || '',
+        last_position: tyre.lastPosition || '',
+        running_km: Number(tyre.runningKm || 0),
+        remaining_tread: Number(tyre.remainingTread || tyre.remaining_tread_percent || 0),
+        vendor_id: form.vendorId,
+        vendor_name: form.vendorName,
+        sent_date: form.sentDate,
+        expected_return_date: form.expectedReturnDate,
+        expected_cost: Number(form.expectedCost),
+        actual_cost: null,
+        return_date: null,
+        new_tread_percent: null,
+        tyre_condition: null,
+        notes: form.notes,
+        status: 'IN_PROGRESS'
+      };
 
-    onConfirm?.(record);
-    setDone(true);
+      const response = await axios.post('http://localhost:5001/api/tyre-retreading', payload);
+
+      if (response.data.success) {
+
+  onConfirm?.(payload);
+
+  setDone(true);
+} else {
+        alert(response.data.message || 'Failed to send tyre for retreading');
+      }
+    } catch (error) {
+      console.error('RETREADING SAVE ERROR:', error);
+      alert(error?.response?.data?.message || 'Server error – please try again');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => {
@@ -227,14 +263,14 @@ export default function SendForRetreadingModal({ tyre, onClose, onConfirm }) {
                           className={`w-full pl-3.5 pr-9 h-[40px] bg-white border rounded-xl text-sm font-medium text-slate-800 appearance-none focus:outline-none focus:ring-2 transition-all ${errors.vendorId ? 'border-red-300 focus:ring-red-100' : 'border-slate-200 focus:border-blue-500 focus:ring-blue-100'}`}
                         >
                           <option value="">Select Vendor</option>
-                          {RETREADING_VENDORS.map(v => (
-                            <option key={v.id} value={v.id}>{v.name}</option>
+                          {retreadingVendors.map(v => (
+                            <option key={v.id} value={v.id}>{v.vendor_name}</option>
                           ))}
                         </select>
                       </div>
                       {form.vendorId && (
                         <p className="mt-1 text-[10px] text-emerald-600 font-semibold">
-                          📞 {RETREADING_VENDORS.find(v => v.id === form.vendorId)?.mobile}
+                          📞 {retreadingVendors.find(v => String(v.id) === String(form.vendorId))?.mobile_number}
                         </p>
                       )}
                       <Err msg={errors.vendorId} />
@@ -290,11 +326,11 @@ export default function SendForRetreadingModal({ tyre, onClose, onConfirm }) {
                 className="h-10 px-5 text-sm font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
                 Cancel
               </button>
-              <button onClick={handleSubmit}
-                className="h-10 px-6 text-sm font-extrabold text-white rounded-xl flex items-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+              <button onClick={handleSubmit} disabled={loading}
+                className="h-10 px-6 text-sm font-extrabold text-white rounded-xl flex items-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)' }}>
-                <RotateCcw className="w-4 h-4" />
-                Send for Retreading
+                <RotateCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Sending...' : 'Send for Retreading'}
               </button>
             </div>
           )}
