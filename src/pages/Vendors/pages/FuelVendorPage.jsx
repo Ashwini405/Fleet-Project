@@ -1,36 +1,32 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   FiSearch, FiPlus, FiDroplet, FiPhone, FiMapPin,
   FiChevronRight, FiEdit2, FiToggleLeft, FiToggleRight,
   FiEye, FiX, FiCheckCircle, FiUser,
 } from 'react-icons/fi';
-import { dummyVendors } from '../data/dummyData';
+import axios from 'axios';
 import AddFuelVendorModal from '../components/AddFuelVendorModal';
 import FuelLedger from '../components/FuelLedger';
 import { useVendorLedger } from '../../../context/VendorLedgerContext';
 
 const FUEL_TYPES = ['Diesel', 'Petrol', 'CNG', 'LNG', 'EV Charging'];
 
-const SEED = dummyVendors
-  .filter(v => v.category === 'fuel')
-  .map(v => ({ ...v, fuelTypes: v.fuelTypes || ['Diesel'] }));
-
 // ── Edit Modal ──────────────────────────────────────────────────────────────
 function EditFuelVendorModal({ vendor, onClose, onSave }) {
   const [form, setForm] = useState({
-    name:          vendor.name || '',
-    contactPerson: vendor.contactPerson || '',
-    mobile:        vendor.contact || vendor.mobile || '',
+    name:          vendor.vendor_name || vendor.name || '',
+    contactPerson: vendor.contact_person || vendor.contactPerson || '',
+    mobile:        vendor.mobile_number || vendor.mobile || vendor.contact || '',
     email:         vendor.email || '',
-    address:       vendor.address || vendor.address_location || '',
+    address:       vendor.address_location || vendor.address || '',
     fuelTypes:     vendor.fuelTypes || [],
-    gst:           vendor.gst_number || '',
+    gst:           vendor.gst_number || vendor.gst || '',
     status:        vendor.status || 'Active',
     notes:         vendor.notes || '',
     bankName:      vendor.bank_name || vendor.bank || '',
-    accountNo:     vendor.account_number_or_upi || '',
-    ifsc:          vendor.ifsc_code || '',
-    upi:           vendor.upi_id || '',
+    accountNo:     vendor.account_number || vendor.account_number_or_upi || '',
+    ifsc:          vendor.ifsc_code || vendor.ifsc || '',
+    upi:           vendor.upi_id || vendor.upi || '',
   });
   const [errors, setErrors] = useState({});
 
@@ -62,19 +58,17 @@ function EditFuelVendorModal({ vendor, onClose, onSave }) {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     onSave({
       ...vendor,
-      name:           form.name.trim(),
-      contactPerson:  form.contactPerson.trim(),
-      contact:        form.mobile.trim(),
-      mobile:         form.mobile.trim(),
+      vendor_name:    form.name.trim(),
+      contact_person: form.contactPerson.trim(),
+      mobile_number:  form.mobile.trim(),
       email:          form.email.trim(),
-      address:        form.address.trim(),
+      address_location: form.address.trim(),
       fuelTypes:      form.fuelTypes,
       gst_number:     form.gst.trim().toUpperCase(),
       status:         form.status,
       notes:          form.notes.trim(),
-      bank:           form.bankName,
       bank_name:      form.bankName,
-      account_number_or_upi: form.accountNo.trim(),
+      account_number: form.accountNo.trim(),
       ifsc_code:      form.ifsc.trim(),
       upi_id:         form.upi.trim(),
     });
@@ -86,7 +80,7 @@ function EditFuelVendorModal({ vendor, onClose, onSave }) {
         <div className="flex justify-between items-center px-5 py-4 bg-gray-900">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-yellow-400">Edit Vendor</p>
-            <p className="text-sm font-bold text-white mt-0.5">{vendor.name}</p>
+            <p className="text-sm font-bold text-white mt-0.5">{vendor.vendor_name || vendor.name}</p>
           </div>
           <button onClick={onClose} className="p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-full transition-colors"><FiX size={16} /></button>
         </div>
@@ -155,16 +149,16 @@ function EditFuelVendorModal({ vendor, onClose, onSave }) {
 // ── View Modal ──────────────────────────────────────────────────────────────
 function ViewVendorModal({ vendor, onClose, onEdit }) {
   const rows = [
-    ['Mobile',         vendor.contact || vendor.mobile],
-    ['Contact Person', vendor.contactPerson || '—'],
+    ['Mobile',         vendor.mobile_number || vendor.contact || vendor.mobile || '—'],
+    ['Contact Person', vendor.contact_person || vendor.contactPerson || '—'],
     ['Email',          vendor.email || '—'],
-    ['Address',        vendor.address || vendor.address_location || '—'],
-    ['GST Number',     vendor.gst_number || '—'],
+    ['Address',        vendor.address_location || vendor.address || '—'],
+    ['GST Number',     vendor.gst_number || vendor.gst || '—'],
     ['Bank',           vendor.bank_name || vendor.bank || '—'],
-    ['Account No.',    vendor.account_number_or_upi || '—'],
-    ['IFSC',           vendor.ifsc_code || '—'],
-    ['UPI',            vendor.upi_id || '—'],
-    ['Opening Bal.',   vendor.openingBalance != null ? `₹${Number(vendor.openingBalance).toLocaleString('en-IN')}` : '₹0'],
+    ['Account No.',    vendor.account_number || vendor.account_number_or_upi || '—'],
+    ['IFSC',           vendor.ifsc_code || vendor.ifsc || '—'],
+    ['UPI',            vendor.upi_id || vendor.upi || '—'],
+    ['Opening Bal.',   vendor.opening_balance != null ? `₹${Number(vendor.opening_balance).toLocaleString('en-IN')}` : '₹0'],
     ['Notes',          vendor.notes || '—'],
   ];
   return (
@@ -173,7 +167,7 @@ function ViewVendorModal({ vendor, onClose, onEdit }) {
         <div className="flex justify-between items-center px-5 py-4 bg-gray-900">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-yellow-400">Fuel Vendor</p>
-            <p className="text-sm font-bold text-white mt-0.5">{vendor.name}</p>
+            <p className="text-sm font-bold text-white mt-0.5">{vendor.vendor_name || vendor.name}</p>
           </div>
           <button onClick={onClose} className="p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-full transition-colors"><FiX size={16} /></button>
         </div>
@@ -207,19 +201,41 @@ function ViewVendorModal({ vendor, onClose, onEdit }) {
 // ── Main Page ───────────────────────────────────────────────────────────────
 export default function FuelVendorPage() {
   const { addVendorTransaction } = useVendorLedger();
-  const [vendors, setVendors]           = useState(SEED);
-  const [search, setSearch]             = useState('');
+  const [vendors, setVendors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [addOpen, setAddOpen]           = useState(false);
-  const [editVendor, setEditVendor]     = useState(null);
-  const [viewVendor, setViewVendor]     = useState(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editVendor, setEditVendor] = useState(null);
+  const [viewVendor, setViewVendor] = useState(null);
   const [selectedVendor, setSelectedVendor] = useState(null);
-  const [toast, setToast]               = useState(null);
+  const [toast, setToast] = useState(null);
 
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 2800);
   };
+
+  // Fetch fuel vendors from database
+  const fetchFuelVendors = async () => {
+    try {
+      const response = await axios.get('http://localhost:5001/api/fuel-vendors');
+      const data = response.data.data || [];
+      const formatted = data.map(v => ({
+        ...v,
+        fuelTypes: typeof v.fuel_types === 'string' ? JSON.parse(v.fuel_types) : v.fuel_types || []
+      }));
+      setVendors(formatted);
+    } catch (error) {
+      console.error('FUEL VENDOR FETCH ERROR', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFuelVendors();
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -227,31 +243,90 @@ export default function FuelVendorPage() {
       if (statusFilter !== 'All' && v.status !== statusFilter) return false;
       if (!q) return true;
       return (
-        v.name.toLowerCase().includes(q) ||
-        (v.contact || v.mobile || '').includes(q)
+        (v.vendor_name || '').toLowerCase().includes(q) ||
+        (v.mobile_number || '').includes(q)
       );
     });
   }, [vendors, search, statusFilter]);
 
-  const handleAdd = (newVendor, ledgerEntry) => {
-    setVendors(prev => [newVendor, ...prev]);
-    if (ledgerEntry) {
-      addVendorTransaction({ ...ledgerEntry });
+  const handleAdd = async () => {
+    await fetchFuelVendors();
+    showToast('Fuel Vendor Added Successfully');
+  };
+
+  const handleEdit = async (updated) => {
+    try {
+      await axios.put(`http://localhost:5001/api/fuel-vendors/${updated.id}`, {
+        vendor_name: updated.vendor_name,
+        contact_person: updated.contact_person,
+        mobile_number: updated.mobile_number,
+        email: updated.email,
+        address_location: updated.address_location,
+        fuel_types: updated.fuelTypes,
+        gst_number: updated.gst_number,
+        status: updated.status,
+        bank_name: updated.bank_name,
+        account_number: updated.account_number,
+        ifsc_code: updated.ifsc_code,
+        upi_id: updated.upi_id,
+        notes: updated.notes,
+      });
+      await fetchFuelVendors();
+      setEditVendor(null);
+      showToast('Vendor Updated');
+    } catch (error) {
+      console.error('EDIT ERROR:', error);
+      showToast('Failed to update vendor', 'error');
     }
-    showToast(`${newVendor.name} added successfully.`);
   };
 
-  const handleEdit = (updated) => {
-    setVendors(prev => prev.map(v => v.id === updated.id ? updated : v));
-    setEditVendor(null);
-    showToast('Vendor updated.');
+  const toggleStatus = async (vendor) => {
+    try {
+      const next = vendor.status === 'Active' ? 'Inactive' : 'Active';
+      await axios.put(`http://localhost:5001/api/fuel-vendors/${vendor.id}`, {
+        ...vendor,
+        status: next,
+      });
+      await fetchFuelVendors();
+      showToast(`Vendor marked ${next}`);
+    } catch (error) {
+      console.error('STATUS TOGGLE ERROR:', error);
+      showToast('Failed to update status', 'error');
+    }
   };
 
-  const toggleStatus = (vendor) => {
-    const next = vendor.status === 'Active' ? 'Inactive' : 'Active';
-    setVendors(prev => prev.map(v => v.id === vendor.id ? { ...v, status: next } : v));
-    showToast(`${vendor.name} marked ${next}.`);
-  };
+  if (loading) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div>
+            <div className="h-6 bg-gray-200 rounded w-48 animate-pulse"></div>
+            <div className="h-4 bg-gray-200 rounded w-64 mt-2 animate-pulse"></div>
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-60">
+              <div className="h-10 bg-gray-200 rounded-xl animate-pulse"></div>
+            </div>
+            <div className="h-10 bg-gray-200 rounded-xl w-32 animate-pulse"></div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5 animate-pulse">
+              <div className="w-10 h-10 bg-gray-200 rounded-xl mb-3"></div>
+              <div className="h-5 bg-gray-200 rounded w-32 mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded w-24 mb-3"></div>
+              <div className="h-3 bg-gray-200 rounded w-28 mb-2"></div>
+              <div className="h-3 bg-gray-200 rounded w-36 mb-2"></div>
+              <div className="border-t border-gray-100 pt-3 mt-2">
+                <div className="h-6 bg-gray-200 rounded w-20"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (selectedVendor) {
     const live = vendors.find(v => v.id === selectedVendor.id) || selectedVendor;
@@ -315,10 +390,10 @@ export default function FuelVendorPage() {
                 </div>
               </div>
 
-              <h3 className="font-bold text-gray-800 text-base mb-0.5 truncate">{vendor.name}</h3>
-              {vendor.contactPerson && (
+              <h3 className="font-bold text-gray-800 text-base mb-0.5 truncate">{vendor.vendor_name}</h3>
+              {vendor.contact_person && (
                 <p className="text-[11px] text-gray-400 flex items-center gap-1 mb-2">
-                  <FiUser size={10} />{vendor.contactPerson}
+                  <FiUser size={10} />{vendor.contact_person}
                 </p>
               )}
 
@@ -334,8 +409,8 @@ export default function FuelVendorPage() {
               )}
 
               <div className="space-y-1 text-xs text-gray-500">
-                <div className="flex items-center gap-2"><FiPhone size={11} className="text-gray-400 shrink-0" />{vendor.contact || vendor.mobile || '—'}</div>
-                <div className="flex items-center gap-2 truncate"><FiMapPin size={11} className="text-gray-400 shrink-0" /><span className="truncate">{vendor.address || vendor.address_location || '—'}</span></div>
+                <div className="flex items-center gap-2"><FiPhone size={11} className="text-gray-400 shrink-0" />{vendor.mobile_number || '—'}</div>
+                <div className="flex items-center gap-2 truncate"><FiMapPin size={11} className="text-gray-400 shrink-0" /><span className="truncate">{vendor.address_location || '—'}</span></div>
               </div>
             </div>
 
@@ -343,8 +418,8 @@ export default function FuelVendorPage() {
             <div className="border-t border-gray-100 px-5 py-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Ledger Balance</p>
-                <p className={`text-sm font-black ${!vendor.balance ? 'text-gray-400' : vendor.balance < 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {vendor.balance ? `₹${Math.abs(vendor.balance).toLocaleString('en-IN')}` : '₹0'}
+                <p className={`text-sm font-black ${Number(vendor.opening_balance || 0) === 0 ? 'text-gray-400' : Number(vendor.opening_balance) < 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {Number(vendor.opening_balance || 0) === 0 ? '₹0' : `₹${Math.abs(Number(vendor.opening_balance)).toLocaleString('en-IN')}`}
                 </p>
               </div>
               <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
@@ -396,8 +471,10 @@ export default function FuelVendorPage() {
       {/* Modals */}
       <AddFuelVendorModal
         isOpen={addOpen}
-        onClose={() => setAddOpen(false)}
-        onAdd={handleAdd}
+        onClose={() => {
+          setAddOpen(false);
+          fetchFuelVendors();
+        }}
         existingVendors={vendors}
       />
 

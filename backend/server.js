@@ -46,6 +46,35 @@ require("./routes/showroomRoutes");
 const showroomLedgerRoutes =
 require("./routes/showroomLedgerRoutes");
 
+const partsVendorRoutes =
+require("./routes/partsVendorRoutes");
+
+
+const tyreVendorRoutes =
+require("./routes/tyreVendorRoutes");
+
+
+const oilVendorRoutes =
+require("./routes/oilVendorRoutes");
+
+const fuelVendorRoutes =
+require("./routes/fuelVendorRoutes");
+
+const partsVendorLedgerRoutes =
+require(
+"./routes/partsVendorLedgerRoutes"
+);
+const tyreRetreadingRoutes =
+require("./routes/tyreRetreadingRoutes");
+
+const tyreScrapRoutes = require('./routes/tyreScrapRoutes');
+
+const tyreLedgerRoutes = require("./routes/tyreLedgerRoutes");
+
+const oilLedgerRoutes =
+require("./routes/oilLedgerRoutes");
+const fuelLedgerRoutes =
+require("./routes/fuelLedgerRoutes");
 const db = require('./config/db');
 
 // Auto-create tyre_notifications table
@@ -171,6 +200,53 @@ app.use(
   "/api/showroom-ledger",
   showroomLedgerRoutes
 );
+
+app.use(
+  "/api/parts-vendors",
+  partsVendorRoutes
+);
+
+app.use(
+  "/api/tyre-vendors",
+  tyreVendorRoutes
+);
+
+app.use(
+  "/api/oil-vendors",
+  oilVendorRoutes
+);
+app.use(
+  "/api/fuel-vendors",
+  fuelVendorRoutes
+);
+
+app.use(
+"/api/parts-vendors",
+partsVendorLedgerRoutes
+);
+
+
+app.use(
+  "/api/tyre-retreading",
+  tyreRetreadingRoutes
+);
+
+app.use(
+  '/api/tyre-scrap',
+  tyreScrapRoutes
+);
+
+app.use("/api/tyre-ledger", tyreLedgerRoutes);
+app.use(
+  "/api/oil-ledger",
+  oilLedgerRoutes
+);
+
+app.use(
+  "/api/fuel-ledger",
+  fuelLedgerRoutes
+);
+
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {
   res.send('Fleet Management Backend is running...');

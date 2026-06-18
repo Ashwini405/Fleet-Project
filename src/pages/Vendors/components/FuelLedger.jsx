@@ -4,10 +4,9 @@ import {
   FiCalendar, FiChevronLeft, FiChevronRight,
   FiDownload, FiPrinter, FiPhone, FiMapPin, FiDroplet, FiZap,
 } from 'react-icons/fi';
-import { dummyLedger, dummyVendorPOs } from '../data/dummyData';
+import axios from 'axios';
 import { TypeBadge, RecordPaymentModal, SummaryCards } from './shared';
 import { PAGE_SIZE, MODAL_ANIM } from './shared/constants';
-import { useVendorLedger } from '../../../context/VendorLedgerContext';
 
 /* ── constants ─────────────────────────────────────────────────────────── */
 const FILTERS = ['All', 'Fuel Fills', 'Payments', 'Adjustments'];
@@ -87,47 +86,17 @@ function printLedger(vendorName, rows) {
   w.print();
 }
 
-/* ── PO / payment allocation helpers ──────────────────────────────────── */
-function buildInitialPOState(vendorId, ledgerTxns) {
-  const poList = (dummyVendorPOs[vendorId] || []).map(po => ({ ...po, paidAmount: 0, allocations: [] }));
-  const payments = [...ledgerTxns].filter(t => t.type === 'Payment' && t.credit > 0).sort((a, b) => new Date(a.date) - new Date(b.date));
-  payments.forEach(pay => {
-    let rem = pay.credit;
-    for (const po of poList) {
-      if (rem <= 0) break;
-      const bal = po.amount - po.paidAmount;
-      if (bal <= 0) continue;
-      const apply = Math.min(rem, bal);
-      po.paidAmount += apply;
-      po.allocations.push({ paymentRef: pay.ref, date: pay.date, amount: apply });
-      rem -= apply;
-    }
-  });
-  return poList;
-}
-function autoAllocate(poList, payAmt, payRef, payDate) {
-  let rem = payAmt;
-  const updated = poList.map(p => ({ ...p, allocations: [...p.allocations] }));
-  const applied = [];
-  for (const po of updated) {
-    if (rem <= 0) break;
-    const bal = po.amount - po.paidAmount;
-    if (bal <= 0) continue;
-    const apply = Math.min(rem, bal);
-    po.paidAmount += apply;
-    po.allocations.push({ paymentRef: payRef, date: payDate, amount: apply });
-    applied.push({ poRef: po.poRef, desc: po.desc, amountApplied: apply });
-    rem -= apply;
-  }
-  return { updated, applied };
-}
-
 /* ── Compact vendor info card ──────────────────────────────────────────── */
 function FuelVendorCard({ vendor }) {
-  const phone   = vendor.contact || vendor.mobile || vendor.mobile_number;
-  const address = vendor.address || vendor.address_location;
+  const phone   = vendor.mobile_number;
+  const address = vendor.address_location;
   const gst     = vendor.gst_number;
-  const fuels   = vendor.fuelTypes || [];
+  let fuels = [];
+  try {
+    fuels = vendor.fuel_types ? JSON.parse(vendor.fuel_types) : [];
+  } catch (e) {
+    fuels = [];
+  }
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-5 py-4">
@@ -144,7 +113,7 @@ function FuelVendorCard({ vendor }) {
                 vendor.status === 'Inactive' ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-600 border-green-100'
               }`}>{vendor.status || 'Active'}</span>
             </div>
-            <h2 className="text-base font-black text-gray-800 tracking-tight truncate">{vendor.garage_name || vendor.name}</h2>
+            <h2 className="text-base font-black text-gray-800 tracking-tight truncate">{vendor.vendor_name}</h2>
           </div>
         </div>
 
@@ -178,27 +147,8 @@ function FuelVendorCard({ vendor }) {
 
 /* ════════════════════════════════════════════════════════════════════════ */
 export default function FuelLedger({ vendor, onBack }) {
-  const { getVendorTransactions } = useVendorLedger();
-  const baseTxns  = dummyLedger[vendor.id] || [];
-  const extraTxns = getVendorTransactions(vendor.id);
-
-  const [rawTxns, setRawTxns] = useState(() => [...baseTxns, ...extraTxns]);
-  const [poList,  setPoList]  = useState(() => buildInitialPOState(vendor.id, [...baseTxns, ...extraTxns]));
-
-  const extraTxnsKey = extraTxns.map(t => `${t.id}:${t.debit}`).join(',');
-  useEffect(() => {
-    const all = [...baseTxns, ...extraTxns];
-    setRawTxns(all);
-    setPoList(prev => {
-      const existingRefs = new Set(prev.map(p => p.poRef));
-      const newPOs = extraTxns
-        .filter(t => t.type === 'Fuel Fill' && t.ref && !existingRefs.has(t.ref))
-        .map(t => ({ poRef: t.ref, desc: t.desc, date: t.date, amount: t.debit, paidAmount: 0, allocations: [] }));
-      return newPOs.length ? [...prev, ...newPOs] : prev;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [extraTxnsKey]);
-
+  const [rawTxns, setRawTxns] = useState([]);
+  const [poList, setPoList] = useState([]);
   const [activeFilter, setActiveFilter] = useState('All');
   const [search,       setSearch]       = useState('');
   const [dateFrom,     setDateFrom]     = useState('');
@@ -206,6 +156,33 @@ export default function FuelLedger({ vendor, onBack }) {
   const [page,         setPage]         = useState(1);
   const [selectedTxn,  setSelectedTxn]  = useState(null);
   const [payModalOpen, setPayModalOpen] = useState(false);
+
+  // ── Fetch ledger from database ─────────────────────────────────────────────
+  useEffect(() => {
+    fetchLedger();
+  }, [vendor.id]);
+
+  const fetchLedger = async () => {
+    try {
+      const response = await axios.get(`http://localhost:5001/api/fuel-ledger/${vendor.id}`);
+      if (response.data.success) {
+        const transactions = response.data.transactions || [];
+        setRawTxns(transactions);
+        setPoList(
+          transactions.map((txn) => ({
+            poRef: txn.ref,
+            desc: txn.desc,
+            date: txn.date,
+            amount: txn.debit || 0,
+            paidAmount: 0,
+            allocations: [],
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Fuel Ledger Fetch Error:', error);
+    }
+  };
 
   /* running balance per transaction */
   const txnsWithBalance = useMemo(() => {
@@ -228,9 +205,9 @@ export default function FuelLedger({ vendor, onBack }) {
       });
   }, [rawTxns]);
 
-  const totalDebit  = rawTxns.reduce((s, t) => s + (t.debit  || 0), 0);
-  const totalCredit = rawTxns.reduce((s, t) => s + (t.credit || 0), 0);
-  const lastDate    = txnsWithBalance.length ? txnsWithBalance[txnsWithBalance.length - 1].date : null;
+  const totalDebit = txnsWithBalance.reduce((sum, txn) => sum + Number(txn.debit || 0), 0);
+  const totalCredit = txnsWithBalance.reduce((sum, txn) => sum + Number(txn.credit || 0), 0);
+  const lastDate = txnsWithBalance.length ? txnsWithBalance[txnsWithBalance.length - 1].date : null;
 
   const filtered = useMemo(() => txnsWithBalance.filter(t => {
     if (activeFilter !== 'All' && !filterMatch[activeFilter]?.includes(t.type)) return false;
@@ -253,16 +230,12 @@ export default function FuelLedger({ vendor, onBack }) {
   /* payment handler */
   const handleSavePayment = (p) => {
     const payRef = p.ref || `PAY-${Date.now()}`;
-    const { updated, applied } = autoAllocate(poList, p.amount, payRef, p.date);
-    setPoList(updated);
-    const allocSummary = applied.length
-      ? applied.map(a => `${a.poRef} ₹${a.amountApplied.toLocaleString()}`).join(', ')
-      : '';
+    // Simple payment record without PO allocation for now
     setRawTxns(prev => [...prev, {
       id: p.id, date: p.date, truckId: '', type: 'Payment',
       ref: payRef,
       desc: `${p.method} Payment${p.remarks ? ' — ' + p.remarks : ''}`,
-      debit: 0, credit: p.amount, allocations: applied, allocSummary,
+      debit: 0, credit: p.amount,
     }]);
     setPage(1);
   };
@@ -286,13 +259,13 @@ export default function FuelLedger({ vendor, onBack }) {
         </button>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => dlCSV(`fuel-ledger-${vendor.name}.csv`, toCSV(filtered, exportCols))}
+            onClick={() => dlCSV(`fuel-ledger-${vendor.vendor_name}.csv`, toCSV(filtered, exportCols))}
             className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-500 rounded-lg font-bold text-xs hover:bg-gray-50 transition-colors"
           >
             <FiDownload size={13} /> CSV
           </button>
           <button
-            onClick={() => printLedger(vendor.name, filtered)}
+            onClick={() => printLedger(vendor.vendor_name, filtered)}
             className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-500 rounded-lg font-bold text-xs hover:bg-gray-50 transition-colors"
           >
             <FiPrinter size={13} /> Print
@@ -545,7 +518,7 @@ export default function FuelLedger({ vendor, onBack }) {
         isOpen={payModalOpen}
         onClose={() => setPayModalOpen(false)}
         onSave={handleSavePayment}
-        vendorName={vendor.name}
+        vendorName={vendor.vendor_name}
         outstanding={totalDebit - totalCredit}
         poList={poList}
       />
@@ -559,7 +532,7 @@ export default function FuelLedger({ vendor, onBack }) {
             <div className="flex justify-between items-center px-5 py-4 bg-gray-900 shrink-0">
               <div>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-amber-400">Transaction Details</p>
-                <p className="text-sm font-bold text-white mt-0.5">{vendor.name}</p>
+                <p className="text-sm font-bold text-white mt-0.5">{vendor.vendor_name}</p>
               </div>
               <button onClick={() => setSelectedTxn(null)}
                 className="p-1.5 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white transition-colors">
@@ -571,7 +544,7 @@ export default function FuelLedger({ vendor, onBack }) {
               {[
                 ['Date',        fmtDate(selectedTxn.date), null],
                 ['Type',        null, <TypeBadge type={selectedTxn.type} />],
-                ['Vendor',      vendor.name, null],
+                ['Vendor',      vendor.vendor_name, null],
                 selectedTxn.ref     ? ['Reference', null, <span className="text-sm font-bold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.ref}</span>] : null,
                 selectedTxn.truckId ? ['Vehicle',   null, <span className="text-sm font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg">{selectedTxn.truckId}</span>] : null,
                 selectedTxn.fuelQty  ? ['Fuel Qty',  null, <span className="text-sm font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg">{selectedTxn.fuelQty}</span>] : null,
@@ -611,21 +584,6 @@ export default function FuelLedger({ vendor, onBack }) {
                 <span className="text-xs font-semibold text-gray-400 shrink-0">Description</span>
                 <span className="text-sm font-semibold text-gray-700 text-right ml-4">{selectedTxn.desc}</span>
               </div>
-
-              {/* Allocation summary for payments */}
-              {selectedTxn.type === 'Payment' && selectedTxn.allocations?.length > 0 && (
-                <div className="pt-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Allocated Fuel Fills</p>
-                  <div className="space-y-1.5">
-                    {selectedTxn.allocations.map((a, i) => (
-                      <div key={i} className="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                        <span className="text-xs font-bold text-amber-700">{a.poRef || a.paymentRef}</span>
-                        <span className="text-xs font-bold text-green-600">₹{(a.amountApplied || a.amount || 0).toLocaleString('en-IN')} Applied</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             <div className="px-5 pb-5 shrink-0">

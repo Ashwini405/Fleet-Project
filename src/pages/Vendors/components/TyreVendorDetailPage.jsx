@@ -1,17 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import axios from 'axios';
 import {
   FiArrowLeft, FiPhone, FiMail, FiMapPin, FiCreditCard, FiUser,
   FiHome, FiTrendingUp, FiTrendingDown, FiShoppingBag, FiClock,
   FiBook, FiActivity, FiInbox, FiCalendar,
 } from 'react-icons/fi';
-import { useVendorLedger } from '../../../context/VendorLedgerContext';
-import { dummyLedger } from '../data/dummyData';
 import { TypeBadge } from './shared';
 
 const PURCHASE_TYPES   = ['Tyre Purchase', 'Purchase'];
 const RETREADING_TYPES = ['Retreading Service'];
 const SCRAP_TYPES      = ['Scrap Sale'];
-const PAYMENT_TYPES    = ['Payment', 'Receipt'];
+const PAYMENT_TYPES    = [];
 
 function fmt(n) { return `₹${(n || 0).toLocaleString()}`; }
 function fmtDate(d) {
@@ -30,24 +29,40 @@ function activityMeta(type) {
 }
 
 export default function TyreVendorDetailPage({ vendor, onBack, onViewLedger }) {
-  const { txnsByVendor } = useVendorLedger();
   const [txnFilter, setTxnFilter] = useState('All');
+  const [allTxns, setAllTxns] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Merge dummy ledger + context transactions
-  const allTxns = useMemo(() => {
-    const base  = dummyLedger[vendor.id] || [];
-    const extra = txnsByVendor[vendor.id] || [];
-    return [...base, ...extra].sort((a, b) => new Date(b.date) - new Date(a.date));
-  }, [vendor.id, txnsByVendor]);
+  // ── Fetch ledger from database ─────────────────────────────────────────────
+  useEffect(() => {
+    fetchVendorLedger();
+  }, [vendor.id]);
 
-  // Financial totals
-  const totalPurchases  = allTxns.filter(t => PURCHASE_TYPES.includes(t.type)).reduce((s, t) => s + (t.debit || 0), 0);
+  const fetchVendorLedger = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.get(`http://localhost:5001/api/tyre-ledger/${vendor.id}`);
+      if (res.data.success) {
+        setAllTxns(
+          (res.data.transactions || [])
+            .sort((a, b) => new Date(b.date) - new Date(a.date))
+        );
+      }
+    } catch (error) {
+      console.error('Vendor Details Ledger Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Financial totals ──────────────────────────────────────────────────────
+  const totalPurchases = allTxns.filter(t => PURCHASE_TYPES.includes(t.type)).reduce((s, t) => s + (t.debit || 0), 0);
   const totalRetreading = allTxns.filter(t => RETREADING_TYPES.includes(t.type)).reduce((s, t) => s + (t.debit || 0), 0);
-  const totalScrap      = allTxns.filter(t => SCRAP_TYPES.includes(t.type)).reduce((s, t) => s + (t.credit || 0), 0);
-  const totalPayments   = allTxns.filter(t => PAYMENT_TYPES.includes(t.type)).reduce((s, t) => s + (t.credit || 0), 0);
-  const outstanding     = (totalPurchases + totalRetreading) - totalPayments - totalScrap;
+  const totalScrap = allTxns.filter(t => SCRAP_TYPES.includes(t.type)).reduce((s, t) => s + (t.credit || 0), 0);
+  const totalPayments = allTxns.filter(t => PAYMENT_TYPES.includes(t.type)).reduce((s, t) => s + (t.credit || 0), 0);
+  const outstanding = (totalPurchases + totalRetreading) - totalScrap;
 
-  // Running balance for table
+  // ── Running balance for table ─────────────────────────────────────────────
   const txnsAsc = [...allTxns].sort((a, b) => new Date(a.date) - new Date(b.date));
   let running = 0;
   const txnsWithBal = txnsAsc.map(t => {
@@ -55,30 +70,37 @@ export default function TyreVendorDetailPage({ vendor, onBack, onViewLedger }) {
     return { ...t, runningBalance: running };
   }).reverse();
 
-  // Filter for table
+  // ── Filter for table ───────────────────────────────────────────────────────
   const FILTER_MAP = {
-    Purchases:   [...PURCHASE_TYPES],
-    Retreading:  RETREADING_TYPES,
-    'Scrap':     SCRAP_TYPES,
-    Payments:    PAYMENT_TYPES,
+    Purchases: PURCHASE_TYPES,
+    Retreading: RETREADING_TYPES,
+    Scrap: SCRAP_TYPES,
   };
   const filtered = txnFilter === 'All'
     ? txnsWithBal
     : txnsWithBal.filter(t => FILTER_MAP[txnFilter]?.includes(t.type));
 
-  // Analytics
-  const lastPurchase   = allTxns.find(t => PURCHASE_TYPES.includes(t.type))?.date;
+  // ── Analytics ──────────────────────────────────────────────────────────────
+  const lastPurchase = allTxns.find(t => PURCHASE_TYPES.includes(t.type))?.date;
   const lastRetreading = allTxns.find(t => RETREADING_TYPES.includes(t.type))?.date;
-  const avgTxnValue    = allTxns.length
+  const avgTxnValue = allTxns.length
     ? Math.round(allTxns.reduce((s, t) => s + (t.debit || t.credit || 0), 0) / allTxns.length)
     : 0;
 
-  // Recent activity — last 5 txns
+  // ── Recent activity — last 5 txns ────────────────────────────────────────
   const recentActivity = allTxns.slice(0, 5);
 
   const outColor = outstanding <= 0 ? 'text-green-600' : outstanding > 20000 ? 'text-red-600' : 'text-orange-500';
-  const outBg    = outstanding <= 0 ? 'bg-green-50 border-green-200' : outstanding > 20000 ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200';
+  const outBg = outstanding <= 0 ? 'bg-green-50 border-green-200' : outstanding > 20000 ? 'bg-red-50 border-red-200' : 'bg-orange-50 border-orange-200';
   const outLabel = outstanding <= 0 ? 'Settled' : outstanding > 20000 ? 'High Outstanding' : 'Payable';
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl p-10 text-center">
+        Loading vendor details...
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5 animate-fade-in pb-12">
@@ -91,7 +113,7 @@ export default function TyreVendorDetailPage({ vendor, onBack, onViewLedger }) {
         </button>
         <button onClick={onViewLedger}
           className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors">
-          <FiBook size={14} /> View Full Ledger
+          <FiBook size={14} /> View Ledger
         </button>
       </div>
 
@@ -101,18 +123,18 @@ export default function TyreVendorDetailPage({ vendor, onBack, onViewLedger }) {
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-3 flex-wrap">
               <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 font-black text-lg shrink-0">
-                {vendor.name.charAt(0)}
+                {vendor.vendor_name?.charAt(0) || 'T'}
               </div>
               <div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h2 className="text-xl font-black text-gray-800 tracking-tight">{vendor.name}</h2>
+                  <h2 className="text-xl font-black text-gray-800 tracking-tight">{vendor.vendor_name}</h2>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                     vendor.status === 'Inactive'
                       ? 'bg-red-50 text-red-500 border-red-100'
                       : 'bg-green-50 text-green-600 border-green-100'
                   }`}>{vendor.status || 'Active'}</span>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">
-                    {vendor.vendorCategory || vendor.vendorType}
+                    {vendor.vendor_type}
                   </span>
                 </div>
                 <p className="text-xs text-gray-400 mt-0.5">Vendor ID: {vendor.id}</p>
@@ -120,14 +142,14 @@ export default function TyreVendorDetailPage({ vendor, onBack, onViewLedger }) {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {vendor.contactPerson && (
+              {vendor.contact_person && (
                 <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
-                  <FiUser className="text-gray-400 shrink-0" size={12} /> {vendor.contactPerson}
+                  <FiUser className="text-gray-400 shrink-0" size={12} /> {vendor.contact_person}
                 </div>
               )}
-              {vendor.contact && (
+              {vendor.mobile_number && (
                 <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
-                  <FiPhone className="text-gray-400 shrink-0" size={12} /> {vendor.contact}
+                  <FiPhone className="text-gray-400 shrink-0" size={12} /> {vendor.mobile_number}
                 </div>
               )}
               {vendor.email && (
@@ -135,21 +157,21 @@ export default function TyreVendorDetailPage({ vendor, onBack, onViewLedger }) {
                   <FiMail className="text-gray-400 shrink-0" size={12} /> {vendor.email}
                 </div>
               )}
-              {vendor.address && (
+              {vendor.address_location && (
                 <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
-                  <FiMapPin className="text-gray-400 shrink-0" size={12} /> {vendor.address}
+                  <FiMapPin className="text-gray-400 shrink-0" size={12} /> {vendor.address_location}
                 </div>
               )}
-              {vendor.gst && (
+              {vendor.gst_number && (
                 <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
-                  <FiCreditCard className="text-gray-400 shrink-0" size={12} /> GST: {vendor.gst}
+                  <FiCreditCard className="text-gray-400 shrink-0" size={12} /> GST: {vendor.gst_number}
                 </div>
               )}
             </div>
           </div>
 
           {/* Bank info */}
-          {vendor.bank && (
+          {false && (
             <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 sm:min-w-[200px] shrink-0">
               <FiHome size={15} className="text-gray-400 mt-0.5 shrink-0" />
               <div>
@@ -171,7 +193,7 @@ export default function TyreVendorDetailPage({ vendor, onBack, onViewLedger }) {
         {[
           { label: 'Total Purchases',     value: fmt(totalPurchases),   sub: 'Tyre purchases',        icon: FiShoppingBag,  color: 'text-indigo-600', bg: 'bg-indigo-50'  },
           { label: 'Retreading Cost',     value: fmt(totalRetreading),  sub: 'Retreading services',   icon: FiActivity,     color: 'text-amber-600',  bg: 'bg-amber-50'   },
-          { label: 'Total Payments',      value: fmt(totalPayments),    sub: 'Amount paid',           icon: FiTrendingDown, color: 'text-green-600',  bg: 'bg-green-50'   },
+          { label: 'Scrap Recovery',      value: fmt(totalScrap),       sub: 'Scrap sales',           icon: FiTrendingDown, color: 'text-green-600',  bg: 'bg-green-50'   },
           { label: 'Outstanding Balance', value: fmt(Math.abs(outstanding)), sub: outLabel,           icon: FiTrendingUp,   color: outColor,           bg: outBg.split(' ')[0] },
         ].map(card => (
           <div key={card.label} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
@@ -189,11 +211,11 @@ export default function TyreVendorDetailPage({ vendor, onBack, onViewLedger }) {
       {outstanding > 0 && (
         <div className={`flex items-center justify-between px-5 py-3 rounded-xl border ${outBg}`}>
           <span className={`text-sm font-bold ${outColor}`}>
-            {fmt(outstanding)} outstanding payable to {vendor.name}
+            {fmt(outstanding)} outstanding payable to {vendor.vendor_name}
           </span>
           <button onClick={onViewLedger}
             className="text-xs font-bold text-gray-600 hover:text-gray-900 underline transition-colors">
-            Record Payment →
+            View Ledger →
           </button>
         </div>
       )}
@@ -205,7 +227,7 @@ export default function TyreVendorDetailPage({ vendor, onBack, onViewLedger }) {
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
             <h3 className="text-sm font-black text-gray-800">Transaction History</h3>
             <div className="flex flex-wrap gap-1.5">
-              {['All', 'Purchases', 'Retreading', 'Scrap', 'Payments'].map(f => (
+              {['All', 'Purchases', 'Retreading', 'Scrap'].map(f => (
                 <button key={f} onClick={() => setTxnFilter(f)}
                   className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-colors ${
                     txnFilter === f ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'

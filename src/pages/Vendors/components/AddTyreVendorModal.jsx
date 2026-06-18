@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { FiX, FiCheckCircle, FiCheck } from 'react-icons/fi';
+import axios from 'axios';
 
 const VENDOR_TYPES = [
   'Tyre Dealer',
@@ -7,6 +8,7 @@ const VENDOR_TYPES = [
   'Retreading Vendor',
   'Tyre Repair Shop',
   'Service Center',
+  'Scrap Buyer',
 ];
 
 const SERVICES = [
@@ -32,6 +34,7 @@ export default function AddTyreVendorModal({ isOpen, onClose, onAdd }) {
   const [form, setForm]     = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [toast, setToast]   = useState(false);
+  const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
@@ -60,42 +63,47 @@ export default function AddTyreVendorModal({ isOpen, onClose, onAdd }) {
     if (!form.mobileNumber.trim()) e.mobileNumber = 'Mobile number is required';
     else if (!/^\d{10}$/.test(form.mobileNumber.trim())) e.mobileNumber = 'Enter a valid 10-digit mobile number';
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Enter a valid email address';
-    const services = Array.isArray(form.services) ? form.services : [];
-    // services is optional — no validation required
     return e;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = validate();
-    if (Object.keys(errs).length > 0) { setErrors(errs); return; }
+    if (Object.keys(errs).length > 0) {
+      setErrors(errs);
+      return;
+    }
 
-    const newVendor = {
-      id:            `tv-${Date.now()}`,
-      category:      'tyres',
-      // display-compatible fields
-      name:          form.vendorName,
-      contact:       form.mobileNumber,
-      bank:          '',
-      balance:       0,
-      vendorCategory: form.vendorType,
-      status:        'Active',
-      // schema fields
-      vendorName:    form.vendorName,
-      vendorType:    form.vendorType,
-      contactPerson: form.contactPerson,
-      mobileNumber:  form.mobileNumber,
-      email:         form.email,
-      gstNumber:     form.gstNumber,
-      address:       form.address,
-      services:      Array.isArray(form.services) ? form.services : [],
-      createdAt:     new Date().toISOString(),
-      updatedAt:     new Date().toISOString(),
-    };
+    try {
+      setLoading(true);
 
-    onAdd?.(newVendor);
-    setToast(true);
-    setTimeout(() => { setToast(false); setForm(EMPTY); setErrors({}); onClose(); }, 1500);
+      await axios.post('http://localhost:5001/api/tyre-vendors', {
+        vendor_name: form.vendorName,
+        vendor_type: form.vendorType,
+        contact_person: form.contactPerson,
+        mobile_number: form.mobileNumber,
+        email: form.email,
+        gst_number: form.gstNumber,
+        address_location: form.address,
+        services: form.services,
+        status: 'Active'
+      });
+
+      setToast(true);
+
+      setTimeout(() => {
+        setToast(false);
+        setForm(EMPTY);
+        setErrors({});
+        onClose();
+      }, 1500);
+
+    } catch (error) {
+      console.error('TYRE VENDOR SAVE ERROR', error);
+      alert(error?.response?.data?.message || 'Failed to save tyre vendor');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClose = () => { setForm(EMPTY); setErrors({}); onClose(); };
@@ -247,16 +255,16 @@ export default function AddTyreVendorModal({ isOpen, onClose, onAdd }) {
                   );
                 })}
               </div>
-
             </div>
 
             {/* Submit */}
             <div className="pt-2">
               <button
                 type="submit"
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
+                disabled={loading}
+                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                + Add Tyre Vendor
+                {loading ? "Saving..." : "+ Add Tyre Vendor"}
               </button>
             </div>
 

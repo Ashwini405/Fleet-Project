@@ -1,81 +1,43 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { FiArrowLeft, FiPlus, FiEye, FiX, FiInbox, FiSearch, FiCalendar, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
-import { dummyLedger, dummyVendorPOs } from '../data/dummyData';
-import { TypeBadge, RecordPaymentModal, CollectReceiptModal, VendorInfoPanel, SummaryCards } from './shared';
+import axios from 'axios';
+import { TypeBadge, VendorInfoPanel, SummaryCards } from './shared';
 import { PAGE_SIZE, MODAL_ANIM } from './shared/constants';
-import { useVendorLedger } from '../../../context/VendorLedgerContext';
 
 const CATEGORY_LABEL = 'TYRE VENDOR';
-const FILTERS = ['All', 'Purchases', 'Payments', 'Retreading', 'Adjustments'];
+const FILTERS = ['All', 'Purchases', 'Retreading', 'Adjustments'];
 const filterMatch = {
-  Purchases:  ['Tyre Purchase'],
-  Payments:   ['Payment'],
+  Purchases: ['Tyre Purchase'],
   Retreading: ['Retreading Service'],
-  Adjustments:['Scrap Sale', 'Adjustment', 'Opening Balance', 'Manual Adjustment'],
+  Adjustments: ['Scrap Sale'],
 };
 
-function buildInitialPOState(vendorId, ledgerTxns) {
-  const poList = (dummyVendorPOs[vendorId] || []).map(po => ({
-    ...po, paidAmount: 0, allocations: [],
-  }));
-  const payments = [...ledgerTxns]
-    .filter(t => t.type === 'Payment' && t.credit > 0)
-    .sort((a, b) => new Date(a.date) - new Date(b.date));
-  payments.forEach(pay => {
-    let remaining = pay.credit;
-    for (const po of poList) {
-      if (remaining <= 0) break;
-      const balance = po.amount - po.paidAmount;
-      if (balance <= 0) continue;
-      const apply = Math.min(remaining, balance);
-      po.paidAmount += apply;
-      po.allocations.push({ paymentRef: pay.ref, date: pay.date, amount: apply });
-      remaining -= apply;
-    }
-  });
-  return poList;
-}
-
-function autoAllocate(poList, paymentAmount, paymentRef, paymentDate) {
-  let remaining = paymentAmount;
-  const updated = poList.map(po => ({ ...po, allocations: [...po.allocations] }));
-  const applied = [];
-  for (const po of updated) {
-    if (remaining <= 0) break;
-    const balance = po.amount - po.paidAmount;
-    if (balance <= 0) continue;
-    const apply = Math.min(remaining, balance);
-    po.paidAmount += apply;
-    po.allocations.push({ paymentRef, date: paymentDate, amount: apply });
-    applied.push({ poRef: po.poRef, desc: po.desc, amountApplied: apply });
-    remaining -= apply;
-  }
-  return { updated, applied };
-}
-
 export default function TyresLedger({ vendor, onBack }) {
-  const { getVendorTransactions } = useVendorLedger();
-  const baseTxns  = dummyLedger[vendor.id] || [];
-  const extraTxns = getVendorTransactions(vendor.id);
-
-  const [rawTxns, setRawTxns] = useState(() => [...baseTxns, ...extraTxns]);
-  const [poList,  setPoList]  = useState(() => buildInitialPOState(vendor.id, [...baseTxns, ...extraTxns]));
-
-  const extraTxnsKey = extraTxns.map(t => `${t.id}:${t.debit}`).join(',');
-  useEffect(() => {
-    setRawTxns([...baseTxns, ...extraTxns]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [extraTxnsKey]);
-
+  const [rawTxns, setRawTxns] = useState([]);
   const [activeFilter, setActiveFilter] = useState('All');
-  const [search,       setSearch]       = useState('');
-  const [dateFrom,     setDateFrom]     = useState('');
-  const [dateTo,       setDateTo]       = useState('');
-  const [page,         setPage]         = useState(1);
-  const [selectedTxn,  setSelectedTxn]  = useState(null);
-  const [payModalOpen,     setPayModalOpen]     = useState(false);
-  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
+  const [selectedTxn, setSelectedTxn] = useState(null);
 
+  // ── Fetch ledger from database ─────────────────────────────────────────────
+  useEffect(() => {
+    fetchLedger();
+  }, [vendor.id]);
+
+  const fetchLedger = async () => {
+    try {
+      const res = await axios.get(`http://localhost:5001/api/tyre-ledger/${vendor.id}`);
+      if (res.data.success) {
+        setRawTxns(res.data.transactions || []);
+      }
+    } catch (error) {
+      console.error('Ledger Fetch Error:', error);
+    }
+  };
+
+  // ── Computed values ───────────────────────────────────────────────────────
   const txnsWithBalance = useMemo(() => {
     let running = 0;
     return [...rawTxns].sort((a, b) => new Date(a.date) - new Date(b.date)).map(t => {
@@ -84,35 +46,20 @@ export default function TyresLedger({ vendor, onBack }) {
     });
   }, [rawTxns]);
 
-  const totalDebit  = rawTxns.reduce((s, t) => s + (t.debit  || 0), 0);
+  const totalDebit = rawTxns.reduce((s, t) => s + (t.debit || 0), 0);
   const totalCredit = rawTxns.reduce((s, t) => s + (t.credit || 0), 0);
-  const lastDate    = txnsWithBalance.length ? txnsWithBalance[txnsWithBalance.length - 1].date : null;
+  const lastDate = txnsWithBalance.length ? txnsWithBalance[txnsWithBalance.length - 1].date : null;
 
   const filtered = useMemo(() => txnsWithBalance.filter(t => {
     if (activeFilter !== 'All' && !filterMatch[activeFilter]?.includes(t.type)) return false;
     if (search && !t.desc?.toLowerCase().includes(search.toLowerCase()) && !t.ref?.toLowerCase().includes(search.toLowerCase())) return false;
     if (dateFrom && t.date < dateFrom) return false;
-    if (dateTo   && t.date > dateTo)   return false;
+    if (dateTo && t.date > dateTo) return false;
     return true;
   }), [txnsWithBalance, activeFilter, search, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const handleSavePayment = (p) => {
-    const payRef = p.ref || `PAY-${Date.now()}`;
-    const { updated, applied } = autoAllocate(poList, p.amount, payRef, p.date);
-    setPoList(updated);
-    const allocSummary = applied.length
-      ? applied.map(a => `${a.poRef} ₹${a.amountApplied.toLocaleString()}`).join(', ')
-      : '';
-    setRawTxns(prev => [...prev, {
-      id: p.id, date: p.date, truckId: '', type: 'Payment',
-      ref: payRef, desc: `${p.method} Payment${p.remarks ? ' — ' + p.remarks : ''}`,
-      debit: 0, credit: p.amount, allocations: applied, allocSummary,
-    }]);
-    setPage(1);
-  };
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="space-y-5 animate-fade-in pb-12">
@@ -122,15 +69,12 @@ export default function TyresLedger({ vendor, onBack }) {
         <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors">
           <FiArrowLeft /> Tyre Vendor Accounts
         </button>
-        {totalCredit > totalDebit ? (
-          <button onClick={() => setReceiptModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors">
-            <FiPlus /> Collect Payment
-          </button>
-        ) : (
-          <button onClick={() => setPayModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors">
-            <FiPlus /> Record Payment
-          </button>
-        )}
+        <button
+          disabled
+          className="flex items-center gap-2 px-4 py-2 bg-gray-400 text-white rounded-lg font-bold text-sm cursor-not-allowed"
+        >
+          Payments Coming Soon
+        </button>
       </div>
 
       <VendorInfoPanel vendor={vendor} categoryLabel={CATEGORY_LABEL} />
@@ -194,7 +138,6 @@ export default function TyresLedger({ vendor, onBack }) {
                     <td className="py-3 px-3 md:px-5">
                       <div className="text-xs md:text-sm font-semibold text-gray-700">{txn.desc}</div>
                       {txn.truckId && <div className="text-[10px] text-gray-400 mt-0.5">Vehicle: {txn.truckId}</div>}
-                      {txn.allocSummary && <div className="text-[10px] text-blue-500 mt-0.5 font-medium">Applied: {txn.allocSummary}</div>}
                     </td>
                     <td className="py-3 px-3 md:px-5 text-right">
                       {txn.debit > 0 ? <span className="font-bold text-red-500 text-xs md:text-sm">₹{txn.debit.toLocaleString()}</span> : <span className="text-gray-300 font-bold">—</span>}
@@ -231,31 +174,6 @@ export default function TyresLedger({ vendor, onBack }) {
         )}
       </div>
 
-      <CollectReceiptModal
-        isOpen={receiptModalOpen}
-        onClose={() => setReceiptModalOpen(false)}
-        vendorName={vendor.name}
-        receivable={totalCredit - totalDebit}
-        onSave={(p) => {
-          setRawTxns(prev => [...prev, {
-            id: p.id, date: p.date, type: 'Receipt',
-            ref: p.ref || `REC-${Date.now()}`,
-            desc: `${p.method} Receipt${p.remarks ? ' — ' + p.remarks : ''}`,
-            debit: p.amount, credit: 0, truckId: '',
-          }]);
-          setPage(1);
-        }}
-      />
-
-      <RecordPaymentModal
-        isOpen={payModalOpen}
-        onClose={() => setPayModalOpen(false)}
-        onSave={handleSavePayment}
-        vendorName={vendor.name}
-        outstanding={totalDebit - totalCredit}
-        poList={poList}
-      />
-
       {/* Transaction Detail Modal */}
       {selectedTxn && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
@@ -263,7 +181,7 @@ export default function TyresLedger({ vendor, onBack }) {
             <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100 shrink-0">
               <div>
                 <h3 className="text-sm font-bold text-gray-800">Transaction Details</h3>
-                <p className="text-[11px] text-indigo-600 font-semibold mt-0.5">{vendor.name} · Tyre Vendor</p>
+                <p className="text-[11px] text-indigo-600 font-semibold mt-0.5">{vendor.vendor_name || vendor.name} · Tyre Vendor</p>
               </div>
               <button onClick={() => setSelectedTxn(null)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
                 <FiX size={16} />
@@ -272,11 +190,11 @@ export default function TyresLedger({ vendor, onBack }) {
 
             <div className="p-5 overflow-y-auto space-y-0">
               {[
-                ['Date',   selectedTxn.date, null],
-                ['Type',   null, <TypeBadge type={selectedTxn.type} />],
-                ['Vendor', null, <span className="text-sm font-bold text-gray-800">{vendor.name}</span>],
-                selectedTxn.ref     ? ['Reference', null, <span className="text-sm font-bold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.ref}</span>] : null,
-                selectedTxn.truckId ? ['Vehicle',   null, <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.truckId}</span>] : null,
+                ['Date', selectedTxn.date, null],
+                ['Type', null, <TypeBadge type={selectedTxn.type} />],
+                ['Vendor', null, <span className="text-sm font-bold text-gray-800">{vendor.vendor_name || vendor.name}</span>],
+                selectedTxn.ref ? ['Reference', null, <span className="text-sm font-bold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.ref}</span>] : null,
+                selectedTxn.truckId ? ['Vehicle', null, <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.truckId}</span>] : null,
               ].filter(Boolean).map(([label, text, node]) => (
                 <div key={label} className="flex justify-between items-center py-2.5 border-b border-gray-50">
                   <span className="text-xs font-semibold text-gray-400">{label}</span>

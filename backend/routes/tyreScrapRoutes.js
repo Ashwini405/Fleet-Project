@@ -3,44 +3,28 @@ const express = require('express');
 const router = express.Router();
 
 const {
-
-  createOldTyre,
-
-  getAllOldTyres,
-  updateOldTyreStatus
-
-} = require('../controllers/oldTyreController');
+  createScrapRecord,
+  getAllScrapRecords
+} = require('../controllers/tyreScrapController');
 
 
 // ======================================================
-// CREATE OLD TYRE
+// CREATE SCRAP RECORD
 // ======================================================
 
 router.post(
-
   '/',
-
-  createOldTyre
-
+  createScrapRecord
 );
 
 
 // ======================================================
-// GET ALL OLD TYRES
+// GET ALL SCRAP RECORDS
 // ======================================================
 
 router.get(
-
   '/',
-
-  getAllOldTyres
-
+  getAllScrapRecords
 );
-
-router.put(
-  '/:tyreNo',
-  updateOldTyreStatus
-);
-
 
 module.exports = router;
