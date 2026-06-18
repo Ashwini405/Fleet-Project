@@ -217,7 +217,7 @@ export function SummaryCards({ totalDebit, totalCredit, lastDate }) {
 
   const cards = [
     { label: 'Outstanding Balance', value: outstanding === 0 ? '₹0' : `₹${Math.abs(outstanding).toLocaleString()}`, sub: outSub, icon: <FiTrendingUp size={18}/>, color: outColor, bg: outBg },
-    { label: isReceivable ? 'Total Sales' : 'Total Purchases', value: `₹${totalDebit.toLocaleString()}`,  sub: 'Cumulative debits',    icon: <FiShoppingBag size={18}/>, color: 'text-red-500',   bg: 'bg-red-50'   },
+    { label: isReceivable ? 'Total Sales' : 'Total Expenses', value: `₹${totalDebit.toLocaleString()}`,  sub: isReceivable ? 'Cumulative sales' : 'Cumulative RTA expenses',    icon: <FiShoppingBag size={18}/>, color: 'text-red-500',   bg: 'bg-red-50'   },
     { label: isReceivable ? 'Total Collected' : 'Total Payments', value: `₹${totalCredit.toLocaleString()}`, sub: 'Cumulative credits', icon: <FiTrendingDown size={18}/>, color: 'text-green-600', bg: 'bg-green-50' },
     { label: 'Last Transaction',    value: lastDate || '—',                      sub: 'Most recent activity', icon: <FiClock size={18}/>,        color: 'text-blue-600',  bg: 'bg-blue-50'  },
   ];
