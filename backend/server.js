@@ -75,7 +75,15 @@ const oilLedgerRoutes =
 require("./routes/oilLedgerRoutes");
 const fuelLedgerRoutes =
 require("./routes/fuelLedgerRoutes");
+
+const rtaExpenseRoutes =
+require("./routes/rtaExpenseRoutes");
+const rtaVendorRoutes =
+require("./routes/rtaVendorRoutes");
 const db = require('./config/db');
+
+const rtaPaymentRoutes =
+require("./routes/rtaPaymentRoutes");
 
 // Auto-create tyre_notifications table
 db.query(`
@@ -246,6 +254,21 @@ app.use(
   "/api/fuel-ledger",
   fuelLedgerRoutes
 );
+
+app.use(
+  "/api/rta-vendors",
+  rtaVendorRoutes
+);
+app.use(
+  "/api/rta-expenses",
+  rtaExpenseRoutes
+);
+
+app.use(
+  "/api/rta-payments",
+  rtaPaymentRoutes
+);
+
 
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {
