@@ -2,25 +2,18 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   FiArrowLeft, FiPlus, FiEye, FiX, FiInbox,
   FiSearch, FiCalendar, FiChevronLeft, FiChevronRight,
-  FiEdit2, FiFileText, FiPhone, FiMapPin, FiCheckCircle,
+  FiFileText, FiPhone, FiMapPin,
 } from 'react-icons/fi';
-import { dummyLedger } from '../data/dummyData';
+import axios from 'axios';
 import { TypeBadge, SummaryCards } from './shared';
+import AddExpenseModal from './AddExpenseModal';
+import AddPaymentModal from './AddPaymentModal';
 import { PAGE_SIZE, MODAL_ANIM, PAYMENT_METHODS } from './shared/constants';
-import { useVendorLedger } from '../../../context/VendorLedgerContext';
 
 /* ─── constants ─────────────────────────────────────────────────────────── */
-const EXPENSE_TYPES = [
-  'Fitness Certificate Renewal', 'Permit Renewal', 'Road Tax',
-  'Registration Charges', 'NOC Charges', 'Insurance Verification',
-  'Pollution Certificate', 'Other',
-];
-const VEHICLE_LIST = [
-  'AP21TY4455', 'KA01AA0001', 'TS09AB9988', 'MH12CD5678', 'TN07GH3321', 'DL01AB1234',
-];
 const LEDGER_FILTERS = ['All', 'Expenses', 'Payments', 'Adjustments'];
 const ledgerFilterMatch = {
-  Expenses:    ['RTA Fee', 'Expense'],
+  Expenses:    ['Expense'],
   Payments:    ['Payment'],
   Adjustments: ['Adjustment', 'Opening Balance', 'Manual Adjustment'],
 };
@@ -29,11 +22,6 @@ const ledgerFilterMatch = {
 function fmtDate(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-function genRef(prefix) {
-  const d = new Date();
-  const ymd = `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
-  return `${prefix}-${ymd}-${String(Math.floor(Math.random()*900)+100)}`;
 }
 function balColor(b) {
   if (b > 0)  return 'text-red-500';
@@ -49,240 +37,6 @@ function balBg(b) {
   if (b > 0)  return 'bg-red-50 text-red-600 border-red-200';
   if (b < 0)  return 'bg-blue-50 text-blue-600 border-blue-200';
   return 'bg-green-50 text-green-600 border-green-200';
-}
-const iCls  = 'w-full p-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-rose-500 focus:ring-1 focus:ring-rose-200 text-sm';
-const iECls = 'w-full p-2.5 bg-white border border-red-300 rounded-xl focus:outline-none focus:border-red-400 text-sm';
-const lCls  = 'block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1';
-const loCls = 'block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1';
-
-/* ─── Add Expense Modal ─────────────────────────────────────────────────── */
-function AddExpenseModal({ isOpen, onClose, onSave, agentName }) {
-  const today = new Date().toISOString().split('T')[0];
-  const EMPTY = { expenseType: '', vehicle: '', date: today, amount: '', ref: '', notes: '' };
-  const [form, setForm]     = useState(EMPTY);
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
-
-  if (!isOpen) return null;
-
-  const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: null })); };
-
-  const validate = () => {
-    const e = {};
-    if (!form.expenseType) e.expenseType = 'Expense type is required';
-    if (!form.vehicle)     e.vehicle     = 'Vehicle is required';
-    if (!form.date)        e.date        = 'Date is required';
-    if (!form.amount || Number(form.amount) <= 0) e.amount = 'Enter a valid amount';
-    return e;
-  };
-
-  const handleSave = (e) => {
-    e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-    setLoading(true);
-    const ref = form.ref.trim() || genRef('RTA');
-    setTimeout(() => {
-      onSave({
-        id:          `exp-${Date.now()}`,
-        expenseType: form.expenseType,
-        vehicle:     form.vehicle,
-        date:        form.date,
-        amount:      Number(form.amount),
-        ref,
-        notes:       form.notes.trim(),
-        addedBy:     'Admin',
-        status:      'Completed',
-      });
-      setForm(EMPTY);
-      setErrors({});
-      setLoading(false);
-      onClose();
-    }, 400);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden" style={{ animation: 'modalSlideIn 0.22s ease-out' }}>
-        <div className="flex justify-between items-center px-5 py-4 bg-gray-900">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-rose-400">Add Expense</p>
-            <p className="text-sm font-bold text-white mt-0.5">{agentName}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-full transition-colors"><FiX size={16} /></button>
-        </div>
-        <form onSubmit={handleSave} noValidate className="p-5 space-y-4 max-h-[78vh] overflow-y-auto">
-
-          <div>
-            <label className={lCls}>Vehicle <span className="text-red-400">*</span></label>
-            <select value={form.vehicle} onChange={e => set('vehicle', e.target.value)}
-              className={`${errors.vehicle ? iECls : iCls} text-gray-700`}>
-              <option value="">Select vehicle</option>
-              {VEHICLE_LIST.map(v => <option key={v} value={v}>{v}</option>)}
-            </select>
-            {errors.vehicle && <p className="text-xs text-red-500 mt-1">{errors.vehicle}</p>}
-          </div>
-
-          <div>
-            <label className={lCls}>Expense Type <span className="text-red-400">*</span></label>
-            <select value={form.expenseType} onChange={e => set('expenseType', e.target.value)}
-              className={`${errors.expenseType ? iECls : iCls} text-gray-700`}>
-              <option value="">Select type</option>
-              {EXPENSE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-            {errors.expenseType && <p className="text-xs text-red-500 mt-1">{errors.expenseType}</p>}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={lCls}>Expense Date <span className="text-red-400">*</span></label>
-              <input type="date" value={form.date} onChange={e => set('date', e.target.value)}
-                className={errors.date ? iECls : iCls} />
-              {errors.date && <p className="text-xs text-red-500 mt-1">{errors.date}</p>}
-            </div>
-            <div>
-              <label className={lCls}>Amount (₹) <span className="text-red-400">*</span></label>
-              <input type="number" value={form.amount} onChange={e => set('amount', e.target.value)}
-                placeholder="0" min="1" className={errors.amount ? iECls : iCls} />
-              {errors.amount && <p className="text-xs text-red-500 mt-1">{errors.amount}</p>}
-            </div>
-          </div>
-
-          <div>
-            <label className={loCls}>Reference Number</label>
-            <input type="text" value={form.ref} onChange={e => set('ref', e.target.value)}
-              placeholder="Auto-generated if blank" className={iCls} />
-          </div>
-
-          <div>
-            <label className={loCls}>Notes</label>
-            <textarea rows={2} value={form.notes} onChange={e => set('notes', e.target.value)}
-              placeholder="Optional notes…" className={iCls + ' resize-none'} />
-          </div>
-
-          <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl font-bold text-sm hover:bg-gray-50 transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={loading}
-              className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-sm transition-colors disabled:opacity-50">
-              {loading ? 'Saving…' : 'Save Expense'}
-            </button>
-          </div>
-        </form>
-      </div>
-      <style>{MODAL_ANIM}</style>
-    </div>
-  );
-}
-
-/* ─── Add Payment Modal ─────────────────────────────────────────────────── */
-function AddPaymentModal({ isOpen, onClose, onSave, agentName, outstanding }) {
-  const today = new Date().toISOString().split('T')[0];
-  const EMPTY = { date: today, amount: '', method: 'Cash', ref: '', notes: '' };
-  const [form, setForm]     = useState(EMPTY);
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
-
-  if (!isOpen) return null;
-
-  const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: null })); };
-
-  const validate = () => {
-    const e = {};
-    if (!form.date)   e.date   = 'Date is required';
-    if (!form.amount || Number(form.amount) <= 0) e.amount = 'Enter a valid amount';
-    return e;
-  };
-
-  const handleSave = (e) => {
-    e.preventDefault();
-    const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-    setLoading(true);
-    const ref = form.ref.trim() || genRef('PAY');
-    setTimeout(() => {
-      onSave({
-        id:     `pay-${Date.now()}`,
-        date:   form.date,
-        amount: Number(form.amount),
-        method: form.method,
-        ref,
-        notes:  form.notes.trim(),
-        receivedBy: 'Admin',
-      });
-      setForm(EMPTY);
-      setErrors({});
-      setLoading(false);
-      onClose();
-    }, 400);
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" style={{ animation: 'modalSlideIn 0.22s ease-out' }}>
-        <div className="flex justify-between items-center px-5 py-4 bg-gray-900">
-          <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-green-400">Record Payment</p>
-            <p className="text-sm font-bold text-white mt-0.5">{agentName}</p>
-          </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-full transition-colors"><FiX size={16} /></button>
-        </div>
-        {outstanding > 0 && (
-          <div className="px-5 py-2.5 bg-red-50 border-b border-red-100 flex items-center justify-between">
-            <span className="text-xs font-semibold text-red-600">Outstanding Balance</span>
-            <span className="text-sm font-black text-red-600">₹{outstanding.toLocaleString('en-IN')}</span>
-          </div>
-        )}
-        <form onSubmit={handleSave} noValidate className="p-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={lCls}>Payment Date <span className="text-red-400">*</span></label>
-              <input type="date" value={form.date} onChange={e => set('date', e.target.value)}
-                className={errors.date ? iECls : iCls} />
-              {errors.date && <p className="text-xs text-red-500 mt-1">{errors.date}</p>}
-            </div>
-            <div>
-              <label className={lCls}>Amount (₹) <span className="text-red-400">*</span></label>
-              <input type="number" value={form.amount} onChange={e => set('amount', e.target.value)}
-                placeholder="0" min="1" className={errors.amount ? iECls : iCls} />
-              {errors.amount && <p className="text-xs text-red-500 mt-1">{errors.amount}</p>}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={lCls}>Payment Mode</label>
-              <select value={form.method} onChange={e => set('method', e.target.value)} className={iCls + ' text-gray-700'}>
-                {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className={loCls}>Reference No.</label>
-              <input type="text" value={form.ref} onChange={e => set('ref', e.target.value)}
-                placeholder="Auto-generated" className={iCls} />
-            </div>
-          </div>
-          <div>
-            <label className={loCls}>Notes</label>
-            <textarea rows={2} value={form.notes} onChange={e => set('notes', e.target.value)}
-              placeholder="Optional…" className={iCls + ' resize-none'} />
-          </div>
-          <div className="flex gap-3">
-            <button type="button" onClick={onClose}
-              className="flex-1 py-2.5 border border-gray-200 text-gray-600 rounded-xl font-bold text-sm hover:bg-gray-50 transition-colors">
-              Cancel
-            </button>
-            <button type="submit" disabled={loading}
-              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-colors disabled:opacity-50">
-              {loading ? 'Saving…' : 'Save Payment'}
-            </button>
-          </div>
-        </form>
-      </div>
-      <style>{MODAL_ANIM}</style>
-    </div>
-  );
 }
 
 /* ─── Transaction Detail Modal ──────────────────────────────────────────── */
@@ -344,39 +98,67 @@ function TxnDetailModal({ txn, agentName, onClose }) {
 
 /* ════════════════════════════════════════════════════════════════════════ */
 export default function RTALedger({ vendor, onBack }) {
-  const { getVendorTransactions, addVendorTransaction } = useVendorLedger();
-
-  const baseTxns  = dummyLedger[vendor.id] || [];
-  const extraTxns = getVendorTransactions(vendor.id);
-
-  // Seed base txns into local state so expenses/payments are immediately reflected
-  const [rawTxns, setRawTxns] = useState(() => [...baseTxns, ...extraTxns]);
-
-  const extraTxnsKey = extraTxns.map(t => `${t.id}:${t.debit}`).join(',');
-  useEffect(() => {
-    setRawTxns(prev => {
-      const existingIds = new Set(prev.map(t => t.id));
-      const newOnes = extraTxns.filter(t => !existingIds.has(t.id));
-      return newOnes.length ? [...prev, ...newOnes] : prev;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [extraTxnsKey]);
-
-  const [expenses,  setExpenses]  = useState([]);
-  const [payments,  setPayments]  = useState([]);
-  const [activeTab, setActiveTab] = useState('Expenses');
-
-  // Ledger tab state
+  const [rawTxns, setRawTxns] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('Ledger');
   const [ledgerFilter, setLedgerFilter] = useState('All');
-  const [search,       setSearch]       = useState('');
-  const [dateFrom,     setDateFrom]     = useState('');
-  const [dateTo,       setDateTo]       = useState('');
-  const [page,         setPage]         = useState(1);
-  const [selectedTxn,  setSelectedTxn]  = useState(null);
-
-  // Modals
+  const [search, setSearch] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
+  const [selectedTxn, setSelectedTxn] = useState(null);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+
+  // ── Fetch ledger from database (expenses + payments) ─────────────────────
+  useEffect(() => {
+    fetchLedger();
+  }, [vendor.id]);
+
+  const fetchLedger = async () => {
+    try {
+      setLoading(true);
+
+      const [expenseResponse, paymentResponse] = await Promise.all([
+        axios.get(`http://localhost:5001/api/rta-expenses/${vendor.id}`),
+        axios.get(`http://localhost:5001/api/rta-payments/${vendor.id}`),
+      ]);
+
+      const expenses = expenseResponse.data.data || [];
+      const payments = paymentResponse.data.data || [];
+
+      const mappedExpenses = expenses.map((exp) => ({
+        id: `EXP-${exp.id}`,
+        date: exp.expense_date,
+        truckId: exp.vehicle_no,
+        type: 'Expense',
+        expenseType: exp.expense_type,
+        ref: exp.reference_no,
+        desc: `${exp.expense_type} — ${exp.vehicle_no}`,
+        debit: Number(exp.amount),
+        credit: 0,
+        notes: exp.notes,
+      }));
+
+      const mappedPayments = payments.map((pay) => ({
+        id: `PAY-${pay.id}`,
+        date: pay.payment_date,
+        type: 'Payment',
+        ref: pay.reference_no,
+        desc: pay.payment_method,
+        debit: 0,
+        credit: Number(pay.amount),
+        method: pay.payment_method,
+        notes: pay.notes,
+      }));
+
+      setRawTxns([...mappedExpenses, ...mappedPayments]);
+    } catch (error) {
+      console.error('Error fetching ledger:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   /* ── derived ── */
   const txnsWithBalance = useMemo(() => {
@@ -389,10 +171,10 @@ export default function RTALedger({ vendor, onBack }) {
       });
   }, [rawTxns]);
 
-  const totalDebit  = rawTxns.reduce((s, t) => s + (t.debit  || 0), 0);
+  const totalDebit = rawTxns.reduce((s, t) => s + (t.debit || 0), 0);
   const totalCredit = rawTxns.reduce((s, t) => s + (t.credit || 0), 0);
   const outstanding = totalDebit - totalCredit;
-  const lastDate    = txnsWithBalance.length ? txnsWithBalance[txnsWithBalance.length - 1].date : null;
+  const lastDate = txnsWithBalance.length ? txnsWithBalance[txnsWithBalance.length - 1].date : null;
 
   const filteredLedger = useMemo(() => txnsWithBalance.filter(t => {
     if (ledgerFilter !== 'All' && !ledgerFilterMatch[ledgerFilter]?.includes(t.type)) return false;
@@ -401,59 +183,25 @@ export default function RTALedger({ vendor, onBack }) {
       if (!t.desc?.toLowerCase().includes(q) && !t.ref?.toLowerCase().includes(q) && !(t.truckId || '').toLowerCase().includes(q)) return false;
     }
     if (dateFrom && t.date < dateFrom) return false;
-    if (dateTo   && t.date > dateTo)   return false;
+    if (dateTo && t.date > dateTo) return false;
     return true;
   }), [txnsWithBalance, ledgerFilter, search, dateFrom, dateTo]);
 
   const totalPages = Math.max(1, Math.ceil(filteredLedger.length / PAGE_SIZE));
-  const paginated  = filteredLedger.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const paginated = filteredLedger.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  /* ── handlers ── */
-  const handleSaveExpense = (exp) => {
-    setExpenses(prev => [exp, ...prev]);
-    const txn = {
-      id:          `TXN-${exp.id}`,
-      vendorId:    vendor.id,
-      date:        exp.date,
-      truckId:     exp.vehicle,
-      type:        'RTA Fee',
-      expenseType: exp.expenseType,
-      ref:         exp.ref,
-      desc:        exp.expenseType + (exp.vehicle ? ` — ${exp.vehicle}` : '') + (exp.notes ? ` (${exp.notes})` : ''),
-      debit:       exp.amount,
-      credit:      0,
-      // vehicle cost integration — stored for future reporting
-      vehicleCost: {
-        vehicle:     exp.vehicle,
-        category:    'RTA',
-        expenseType: exp.expenseType,
-        amount:      exp.amount,
-        date:        exp.date,
-        vendor:      vendor.name,
-        ref:         exp.ref,
-        notes:       exp.notes,
-      },
-    };
-    setRawTxns(prev => [...prev, txn]);
-    addVendorTransaction({ ...txn });
-  };
+  const expenses = rawTxns.filter(t => t.type === 'Expense');
+  const payments = rawTxns.filter(t => t.type === 'Payment');
 
-  const handleSavePayment = (pay) => {
-    setPayments(prev => [pay, ...prev]);
-    const txn = {
-      id:       `TXN-${pay.id}`,
-      vendorId: vendor.id,
-      date:     pay.date,
-      truckId:  '',
-      type:     'Payment',
-      ref:      pay.ref,
-      desc:     `${pay.method} Payment${pay.notes ? ' — ' + pay.notes : ''}`,
-      debit:    0,
-      credit:   pay.amount,
-    };
-    setRawTxns(prev => [...prev, txn]);
-    addVendorTransaction({ ...txn });
-  };
+  if (loading) {
+    return (
+      <div className="space-y-5 animate-fade-in pb-12">
+        <div className="bg-white rounded-xl p-8 text-center">
+          <div className="animate-pulse text-gray-400">Loading ledger...</div>
+        </div>
+      </div>
+    );
+  }
 
   /* ════════════════════════ RENDER ════════════════════════ */
   return (
@@ -489,24 +237,24 @@ export default function RTALedger({ vendor, onBack }) {
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                   vendor.status === 'Inactive' ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-600 border-green-100'
                 }`}>{vendor.status || 'Active'}</span>
-                {(vendor.agentType || vendor.vendorCategory) && (
+                {(vendor.agent_type || vendor.agentType || vendor.vendorCategory) && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-100">
-                    {vendor.agentType || vendor.vendorCategory}
+                    {vendor.agent_type || vendor.agentType || vendor.vendorCategory}
                   </span>
                 )}
               </div>
-              <h2 className="text-lg font-black text-gray-800 tracking-tight truncate">{vendor.name}</h2>
+              <h2 className="text-lg font-black text-gray-800 tracking-tight truncate">{vendor.vendor_name || vendor.name}</h2>
             </div>
           </div>
           <div className="flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-gray-500 font-medium">
-            {(vendor.contact || vendor.mobile) && (
-              <span className="flex items-center gap-1.5"><FiPhone size={11} className="text-gray-400" />{vendor.contact || vendor.mobile}</span>
+            {(vendor.mobile_number || vendor.contact || vendor.mobile) && (
+              <span className="flex items-center gap-1.5"><FiPhone size={11} className="text-gray-400" />{vendor.mobile_number || vendor.contact || vendor.mobile}</span>
             )}
-            {(vendor.address || vendor.address_location) && (
-              <span className="flex items-center gap-1.5 max-w-[180px] truncate"><FiMapPin size={11} className="text-gray-400 shrink-0" />{vendor.address || vendor.address_location}</span>
+            {(vendor.address_location || vendor.address) && (
+              <span className="flex items-center gap-1.5 max-w-[180px] truncate"><FiMapPin size={11} className="text-gray-400 shrink-0" />{vendor.address_location || vendor.address}</span>
             )}
-            {vendor.openingBalance != null && Number(vendor.openingBalance) !== 0 && (
-              <span className="text-[11px] text-gray-400">Opening: ₹{Number(vendor.openingBalance).toLocaleString('en-IN')}</span>
+            {vendor.opening_balance != null && Number(vendor.opening_balance) !== 0 && (
+              <span className="text-[11px] text-gray-400">Opening: ₹{Number(vendor.opening_balance).toLocaleString('en-IN')}</span>
             )}
           </div>
           {/* Outstanding balance highlight */}
@@ -546,7 +294,7 @@ export default function RTALedger({ vendor, onBack }) {
         {activeTab === 'Expenses' && (
           <div>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50">
-              <span className="text-xs font-semibold text-gray-500">{expenses.length + (baseTxns.filter(t => t.type === 'RTA Fee').length)} total expenses</span>
+              <span className="text-xs font-semibold text-gray-500">{expenses.length} total expenses</span>
               <button onClick={() => setExpenseOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs transition-colors">
                 <FiPlus size={12} /> Add Expense
@@ -561,39 +309,33 @@ export default function RTALedger({ vendor, onBack }) {
                     <th className="py-3 px-4 text-left">Reference</th>
                     <th className="py-3 px-4 text-left">Vehicle</th>
                     <th className="py-3 px-4 text-right">Amount</th>
-                    <th className="py-3 px-4 text-left">Added By</th>
                     <th className="py-3 px-4 text-left">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {/* seed base RTA Fee txns */}
-                  {[...baseTxns.filter(t => t.type === 'RTA Fee').map(t => ({
-                    id: t.id, date: t.date, expenseType: t.desc, ref: t.ref,
-                    vehicle: t.truckId, amount: t.debit, addedBy: 'Admin', status: 'Completed',
-                  })), ...expenses].map(exp => (
+                  {expenses.map(exp => (
                     <tr key={exp.id} className="hover:bg-rose-50/20 transition-colors">
                       <td className="px-4 py-3 text-xs font-semibold text-gray-600 whitespace-nowrap">{fmtDate(exp.date)}</td>
                       <td className="px-4 py-3">
-                        <span className="text-xs font-bold text-gray-800">{exp.expenseType}</span>
+                        <span className="text-xs font-bold text-gray-800">{exp.expenseType || exp.desc}</span>
                       </td>
                       <td className="px-4 py-3"><span className="text-[11px] font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">{exp.ref || '—'}</span></td>
                       <td className="px-4 py-3">
-                        {exp.vehicle
-                          ? <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded">{exp.vehicle}</span>
+                        {exp.truckId
+                          ? <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded">{exp.truckId}</span>
                           : <span className="text-gray-300 font-bold text-xs">—</span>
                         }
                       </td>
-                      <td className="px-4 py-3 text-right"><span className="text-xs font-black text-red-500">₹{exp.amount.toLocaleString('en-IN')}</span></td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{exp.addedBy || 'Admin'}</td>
+                      <td className="px-4 py-3 text-right"><span className="text-xs font-black text-red-500">₹{exp.debit.toLocaleString('en-IN')}</span></td>
                       <td className="px-4 py-3">
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100">
-                          {exp.status || 'Completed'}
+                          Completed
                         </span>
                       </td>
                     </tr>
                   ))}
-                  {expenses.length === 0 && baseTxns.filter(t => t.type === 'RTA Fee').length === 0 && (
-                    <tr><td colSpan={7} className="py-14 text-center">
+                  {expenses.length === 0 && (
+                    <tr><td colSpan={6} className="py-14 text-center">
                       <FiInbox size={32} className="text-gray-200 mx-auto mb-2" />
                       <p className="text-sm font-semibold text-gray-400">No expenses recorded</p>
                       <p className="text-xs text-gray-400 mt-1">Add an expense to get started.</p>
@@ -609,7 +351,7 @@ export default function RTALedger({ vendor, onBack }) {
         {activeTab === 'Payments' && (
           <div>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50">
-              <span className="text-xs font-semibold text-gray-500">{payments.length + (baseTxns.filter(t => t.type === 'Payment').length)} total payments</span>
+              <span className="text-xs font-semibold text-gray-500">{payments.length} total payments</span>
               <button onClick={() => setPaymentOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition-colors">
                 <FiPlus size={12} /> Add Payment
@@ -623,26 +365,21 @@ export default function RTALedger({ vendor, onBack }) {
                     <th className="py-3 px-4 text-left">Payment Mode</th>
                     <th className="py-3 px-4 text-left">Reference</th>
                     <th className="py-3 px-4 text-right">Amount</th>
-                    <th className="py-3 px-4 text-left">Received By</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {[...baseTxns.filter(t => t.type === 'Payment').map(t => ({
-                    id: t.id, date: t.date, method: t.desc?.split(' ')[0] || 'Cash',
-                    ref: t.ref, amount: t.credit, receivedBy: 'Admin',
-                  })), ...payments].map(pay => (
+                  {payments.map(pay => (
                     <tr key={pay.id} className="hover:bg-green-50/20 transition-colors">
                       <td className="px-4 py-3 text-xs font-semibold text-gray-600 whitespace-nowrap">{fmtDate(pay.date)}</td>
                       <td className="px-4 py-3">
-                        <span className="text-xs font-bold text-gray-700">{pay.method}</span>
+                        <span className="text-xs font-bold text-gray-700">{pay.method || 'Cash'}</span>
                       </td>
                       <td className="px-4 py-3"><span className="text-[11px] font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">{pay.ref || '—'}</span></td>
-                      <td className="px-4 py-3 text-right"><span className="text-xs font-black text-green-600">₹{pay.amount.toLocaleString('en-IN')}</span></td>
-                      <td className="px-4 py-3 text-xs text-gray-500">{pay.receivedBy || 'Admin'}</td>
+                      <td className="px-4 py-3 text-right"><span className="text-xs font-black text-green-600">₹{pay.credit.toLocaleString('en-IN')}</span></td>
                     </tr>
                   ))}
-                  {payments.length === 0 && baseTxns.filter(t => t.type === 'Payment').length === 0 && (
-                    <tr><td colSpan={5} className="py-14 text-center">
+                  {payments.length === 0 && (
+                    <tr><td colSpan={4} className="py-14 text-center">
                       <FiInbox size={32} className="text-gray-200 mx-auto mb-2" />
                       <p className="text-sm font-semibold text-gray-400">No payments recorded</p>
                     </td></tr>
@@ -794,18 +531,20 @@ export default function RTALedger({ vendor, onBack }) {
       <AddExpenseModal
         isOpen={expenseOpen}
         onClose={() => setExpenseOpen(false)}
-        onSave={handleSaveExpense}
-        agentName={vendor.name}
+        onSave={fetchLedger}
+        agentName={vendor.vendor_name || vendor.name}
+        vendorId={vendor.id}
       />
       <AddPaymentModal
         isOpen={paymentOpen}
         onClose={() => setPaymentOpen(false)}
-        onSave={handleSavePayment}
-        agentName={vendor.name}
+        onSave={fetchLedger}
+        agentName={vendor.vendor_name || vendor.name}
         outstanding={outstanding}
+        vendorId={vendor.id}
       />
       {selectedTxn && (
-        <TxnDetailModal txn={selectedTxn} agentName={vendor.name} onClose={() => setSelectedTxn(null)} />
+        <TxnDetailModal txn={selectedTxn} agentName={vendor.vendor_name || vendor.name} onClose={() => setSelectedTxn(null)} />
       )}
     </div>
   );

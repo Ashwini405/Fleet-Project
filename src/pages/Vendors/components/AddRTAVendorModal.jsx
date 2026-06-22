@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import { FiX, FiHome, FiCheckCircle } from 'react-icons/fi';
 
 const AGENT_TYPES  = ['Individual Agent', 'RTO Office', 'Transport Consultant', 'Other'];
@@ -43,64 +44,56 @@ export default function AddRTAVendorModal({ isOpen, onClose, onAdd, existingVend
     setErrors(p => ({ ...p, [key]: null }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+
     const errs = validate(form, existingVendors);
-    if (Object.keys(errs).length) { setErrors(errs); return; }
-
-    setLoading(true);
-    const id = `rta-${Date.now()}`;
-    const ob = Number(form.openingBalance) || 0;
-
-    const newAgent = {
-      id,
-      name:           form.name.trim(),
-      contact:        form.mobile.trim(),
-      mobile:         form.mobile.trim(),
-      email:          form.email.trim(),
-      address:        form.address.trim(),
-      address_location: form.address.trim(),
-      agentType:      form.agentType,
-      vendorCategory: form.agentType,
-      openingBalance: ob,
-      balance:        ob,
-      status:         form.status,
-      category:       'rta',
-      bank:           form.bankName === 'Others' ? form.customBank : form.bankName,
-      bank_name:      form.bankName === 'Others' ? form.customBank : form.bankName,
-      account_number_or_upi: form.accountNo.trim(),
-      ifsc_code:      form.ifsc.trim(),
-      upi_id:         form.upi.trim(),
-      notes:          form.notes.trim(),
-      createdAt:      new Date().toISOString(),
-    };
-
-    // Auto-create opening balance ledger entry
-    let ledgerEntry = null;
-    if (ob !== 0) {
-      ledgerEntry = {
-        id:       `OB-${id}`,
-        vendorId: id,
-        date:     new Date().toISOString().split('T')[0],
-        type:     'Opening Balance',
-        ref:      `OB-${id}`,
-        desc:     'Opening Balance',
-        debit:    ob > 0 ? ob : 0,
-        credit:   ob < 0 ? Math.abs(ob) : 0,
-      };
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      return;
     }
 
-    setTimeout(() => {
+    try {
+      setLoading(true);
+
+      const payload = {
+        vendor_name: form.name.trim(),
+        mobile_number: form.mobile.trim(),
+        email: form.email.trim(),
+        address_location: form.address.trim(),
+        agent_type: form.agentType,
+        opening_balance: Number(form.openingBalance) || 0,
+        status: form.status,
+        bank_name: form.bankName === "Others" ? form.customBank : form.bankName,
+        custom_bank_name: form.customBank,
+        account_number: form.accountNo.trim(),
+        ifsc_code: form.ifsc.trim(),
+        upi_id: form.upi.trim(),
+        notes: form.notes.trim(),
+      };
+
+      const response = await axios.post("http://localhost:5001/api/rta-vendors", payload);
+
+      if (response.data.success) {
+        setSuccess(true);
+
+        setTimeout(() => {
+          setSuccess(false);
+          setForm(EMPTY);
+          setErrors({});
+          onClose();
+
+          if (onAdd) {
+            onAdd();
+          }
+        }, 1200);
+      }
+    } catch (error) {
+      console.error("Create RTA Vendor Error:", error);
+      alert(error?.response?.data?.message || "Failed to create vendor");
+    } finally {
       setLoading(false);
-      setSuccess(true);
-      if (onAdd) onAdd(newAgent, ledgerEntry);
-      setTimeout(() => {
-        setSuccess(false);
-        setForm(EMPTY);
-        setErrors({});
-        onClose();
-      }, 1400);
-    }, 500);
+    }
   };
 
   const handleClose = () => { setForm(EMPTY); setErrors({}); onClose(); };
