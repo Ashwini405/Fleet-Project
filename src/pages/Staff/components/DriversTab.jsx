@@ -135,13 +135,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Truck, Plus, Search, MapPin, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import AddDriverModal from './AddDriverModal';
-import ViewDriverModal from './ViewDriverModal';
 
 export default function DriversTab() {
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
-  const [viewStaff, setViewStaff] = useState(null);
   const [staffData, setStaffData] = useState([]);
 
   // Fetch drivers from backend
@@ -257,7 +257,7 @@ export default function DriversTab() {
                   </td>
                   <td className="py-2 px-2 md:py-4 md:px-4 text-center">
                     <button 
-                      onClick={(e) => { e.stopPropagation(); setViewStaff(person); }}
+                      onClick={(e) => { e.stopPropagation(); navigate(`/staff/drivers/${person.id}`); }}
                       className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors"
                     >
                       <Eye className="w-3.5 h-3.5" /> View
@@ -276,7 +276,6 @@ export default function DriversTab() {
       </div>
 
       <AddDriverModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />
-      <ViewDriverModal isOpen={!!viewStaff} onClose={() => setViewStaff(null)} staff={viewStaff} />
     </div>
   );
 }
