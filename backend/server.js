@@ -84,7 +84,8 @@ const db = require('./config/db');
 
 const rtaPaymentRoutes =
 require("./routes/rtaPaymentRoutes");
-
+const driverSettlementRoutes =
+require("./routes/driverSettlementRoutes");
 // Auto-create tyre_notifications table
 db.query(`
   CREATE TABLE IF NOT EXISTS tyre_notifications (
@@ -268,7 +269,10 @@ app.use(
   "/api/rta-payments",
   rtaPaymentRoutes
 );
-
+app.use(
+  "/api/driver-settlements",
+  driverSettlementRoutes
+);
 
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {

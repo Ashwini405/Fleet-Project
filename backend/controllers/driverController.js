@@ -1,13 +1,18 @@
 const Driver = require('../models/driverModel');
 
-
+// ================= CREATE DRIVER =================
 exports.createDriver = async (req, res) => {
+
   try {
+
     const data = {
       ...req.body,
-      profile_photo: req.files?.profile_photo?.[0]?.filename || null,
-      id_proof: req.files?.id_proof?.[0]?.filename || null,
-      bank_document: req.files?.bank_document?.[0]?.filename || null,
+      profile_photo:
+        req.files?.profile_photo?.[0]?.filename || null,
+      id_proof:
+        req.files?.id_proof?.[0]?.filename || null,
+      bank_document:
+        req.files?.bank_document?.[0]?.filename || null,
     };
 
     await Driver.create(data);
@@ -18,7 +23,9 @@ exports.createDriver = async (req, res) => {
     });
 
   } catch (err) {
-    console.error('createDriver error:', err);
+
+    console.error(err);
+
     res.status(500).json({
       success: false,
       message: err.message
@@ -28,22 +35,78 @@ exports.createDriver = async (req, res) => {
 
 // ================= GET ALL DRIVERS =================
 exports.getDrivers = async (req, res) => {
+
   try {
-    const data = await Driver.getAll();
-    res.json({ success: true, data });
+
+    const data =
+      await Driver.getAll();
+
+    res.json({
+      success: true,
+      data
+    });
+
   } catch (err) {
+
     console.error(err);
-    res.status(500).json({ success: false });
+
+    res.status(500).json({
+      success: false
+    });
+  }
+};
+
+// ================= DRIVER PROFILE =================
+exports.getDriverProfile = async (
+  req,
+  res
+) => {
+
+  try {
+
+    const data =
+      await Driver.getProfile(
+        req.params.id
+      );
+
+    res.json({
+      success: true,
+      data
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message
+    });
   }
 };
 
 // ================= DELETE DRIVER =================
-exports.deleteDriver = async (req, res) => {
+exports.deleteDriver = async (
+  req,
+  res
+) => {
+
   try {
-    await Driver.delete(req.params.id);
-    res.json({ success: true });
+
+    await Driver.delete(
+      req.params.id
+    );
+
+    res.json({
+      success: true
+    });
+
   } catch (err) {
+
     console.error(err);
-    res.status(500).json({ success: false });
+
+    res.status(500).json({
+      success: false
+    });
   }
 };
