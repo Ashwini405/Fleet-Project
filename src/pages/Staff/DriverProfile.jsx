@@ -1,13 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import {
   FiArrowLeft, FiEdit2, FiUser, FiPhone, FiMapPin, FiCalendar,
   FiTruck, FiFileText, FiCheck, FiClock, FiDownload, FiEye, FiX,
   FiAlertCircle, FiCheckCircle, FiDollarSign,
 } from 'react-icons/fi';
-import {
-  MOCK_DRIVERS, MOCK_TRIPS, MOCK_ADVANCES, MOCK_PAYMENTS, MOCK_DOCUMENTS,
-} from './data/driverProfileMock';
 
 // ─── Reusable status badge ───────────────────────────────────────────────────
 function StatusBadge({ status }) {
@@ -22,6 +20,8 @@ function StatusBadge({ status }) {
     'In Progress':    'bg-indigo-50 text-indigo-600 border-indigo-200',
     Valid:            'bg-green-50 text-green-700 border-green-200',
     Expired:          'bg-red-50 text-red-600 border-red-200',
+    Submitted:        'bg-yellow-50 text-yellow-600 border-yellow-200',
+    Rejected:         'bg-red-50 text-red-600 border-red-200',
   };
   return (
     <span className={`inline-flex items-center border text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${map[status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
@@ -71,17 +71,17 @@ function OverviewTab({ driver, trips, advances, payments }) {
   const totalAdvRecovered = payments.reduce((s, p) => s + p.deductions, 0);
   const outstandingAdv   = Math.max(0, totalAdvGiven - totalAdvRecovered);
   const totalSettlements = payments.filter(p => p.status === 'Paid').length;
-  const totalPaid        = payments.filter(p => p.status === 'Paid').reduce((s, p) => s + p.netPayable, 0);
+  const totalPaid        = payments.filter(p => p.status === 'Paid').reduce((s, p) => s + p.net_payable, 0);
 
   const info = [
-    ['Driver Name',      driver.name],
-    ['Driver ID',        driver.driverId],
-    ['Mobile Number',    driver.mobile],
-    ['License Number',   driver.licenseNo],
-    ['Address',          driver.address],
-    ['Joining Date',     driver.joiningDate],
-    ['Assigned Plant',   driver.plant],
-    ['Assigned Vehicle', driver.vehicle],
+    ['Driver Name',      driver.full_name],
+    ['Driver ID',        driver.id],
+    ['Mobile Number',    driver.mobile || 'N/A'],
+    ['License Number',   driver.license_no || 'N/A'],
+    ['Address',          driver.address || 'N/A'],
+    ['Joining Date',     driver.joining_date ? new Date(driver.joining_date).toLocaleDateString() : 'N/A'],
+    ['Assigned Station', driver.station_name || 'N/A'],
+    ['Assigned Vehicle', driver.vehicle_no || 'N/A'],
     ['Status',           <StatusBadge key="s" status={driver.status} />],
   ];
 
@@ -145,11 +145,11 @@ function TripsTab({ trips }) {
             ) : trips.map(t => (
               <tr key={t.id} className="hover:bg-slate-50/60 transition-colors">
                 <td className="py-3 px-5 font-bold text-indigo-600 text-xs">{t.id}</td>
-                <td className="py-3 px-5 text-slate-700 font-medium">{t.date}</td>
-                <td className="py-3 px-5"><span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{t.vehicle}</span></td>
-                <td className="py-3 px-5 text-slate-700">{t.route}</td>
-                <td className="py-3 px-5 text-slate-600 font-medium">{t.distance}</td>
-                <td className="py-3 px-5"><StatusBadge status={t.status} /></td>
+                <td className="py-3 px-5 text-slate-700 font-medium">{new Date(t.trip_date).toLocaleDateString()}</td>
+                <td className="py-3 px-5"><span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{t.truck_no}</span></td>
+                <td className="py-3 px-5 text-slate-700">{t.source} → {t.destination}</td>
+                <td className="py-3 px-5 text-slate-600 font-medium">{t.distance || 'N/A'}</td>
+                <td className="py-3 px-5"><StatusBadge status={t.trip_status || 'Completed'} /></td>
               </tr>
             ))}
           </tbody>
@@ -162,7 +162,7 @@ function TripsTab({ trips }) {
 // ─── Advances Tab ────────────────────────────────────────────────────────────
 function AdvancesTab({ advances, payments }) {
   const totalGiven     = advances.reduce((s, a) => s + a.amount, 0);
-  const totalRecovered = payments.reduce((s, p) => s + p.deductions, 0);
+  const totalRecovered = payments.reduce((s, p) => s + p.total_deductions, 0);
   const outstanding    = Math.max(0, totalGiven - totalRecovered);
 
   return (
@@ -196,10 +196,10 @@ function AdvancesTab({ advances, payments }) {
                 <tr><td colSpan={4} className="py-12 text-center text-slate-400 text-sm">No advance records</td></tr>
               ) : advances.map((a, i) => (
                 <tr key={i} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="py-3 px-5 text-slate-700 font-medium">{a.date}</td>
-                  <td className="py-3 px-5 font-bold text-indigo-600 text-xs">{a.ref}</td>
-                  <td className="py-3 px-5 font-bold text-orange-600">₹ {a.amount.toLocaleString()}</td>
-                  <td className="py-3 px-5 text-slate-600">{a.remarks}</td>
+                  <td className="py-3 px-5 text-slate-700 font-medium">{new Date(a.advance_date).toLocaleDateString()}</td>
+                  <td className="py-3 px-5 font-bold text-indigo-600 text-xs">{a.ref_no || 'N/A'}</td>
+                  <td className="py-3 px-5 font-bold text-orange-600">₹ {Number(a.amount).toLocaleString()}</td>
+                  <td className="py-3 px-5 text-slate-600">{a.remarks || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -213,7 +213,7 @@ function AdvancesTab({ advances, payments }) {
 // ─── Payments Tab ────────────────────────────────────────────────────────────
 function PaymentsTab({ payments }) {
   const totalSettlements = payments.filter(p => p.status === 'Paid').length;
-  const totalPaid        = payments.filter(p => p.status === 'Paid').reduce((s, p) => s + p.netPayable, 0);
+  const totalPaid        = payments.filter(p => p.status === 'Paid').reduce((s, p) => s + Number(p.net_payable), 0);
 
   return (
     <div className="space-y-5">
@@ -245,12 +245,12 @@ function PaymentsTab({ payments }) {
                 <tr><td colSpan={7} className="py-12 text-center text-slate-400 text-sm">No payment records</td></tr>
               ) : payments.map((p, i) => (
                 <tr key={i} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="py-3 px-4 font-bold text-slate-800">{p.month}</td>
-                  <td className="py-3 px-4 text-slate-700">₹ {p.salary.toLocaleString()}</td>
-                  <td className="py-3 px-4 text-indigo-600 font-semibold">₹ {p.battha.toLocaleString()}</td>
-                  <td className="py-3 px-4 text-green-600 font-semibold">+ ₹ {p.additions.toLocaleString()}</td>
-                  <td className="py-3 px-4 text-red-500 font-semibold">− ₹ {p.deductions.toLocaleString()}</td>
-                  <td className="py-3 px-4 font-black text-indigo-700">₹ {p.netPayable.toLocaleString()}</td>
+                  <td className="py-3 px-4 font-bold text-slate-800">{p.statement_month}</td>
+                  <td className="py-3 px-4 text-slate-700">₹ {Number(p.fixed_salary).toLocaleString()}</td>
+                  <td className="py-3 px-4 text-indigo-600 font-semibold">₹ {Number(p.total_battha).toLocaleString()}</td>
+                  <td className="py-3 px-4 text-green-600 font-semibold">+ ₹ {Number(p.total_additions).toLocaleString()}</td>
+                  <td className="py-3 px-4 text-red-500 font-semibold">− ₹ {Number(p.total_deductions).toLocaleString()}</td>
+                  <td className="py-3 px-4 font-black text-indigo-700">₹ {Number(p.net_payable).toLocaleString()}</td>
                   <td className="py-3 px-4"><StatusBadge status={p.status} /></td>
                 </tr>
               ))}
@@ -276,6 +276,8 @@ function DocumentsTab({ documents }) {
     'Driving License':      '🪪',
     'Aadhaar Card':         '🆔',
     'Medical Certificate':  '🏥',
+    'PAN Card':             '📇',
+    'Insurance':            '📋',
   };
 
   return (
@@ -284,6 +286,7 @@ function DocumentsTab({ documents }) {
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400">
           <FiFileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
           <p className="text-sm font-medium">No documents uploaded</p>
+          <p className="text-xs mt-1">Document upload feature coming soon</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -294,16 +297,16 @@ function DocumentsTab({ documents }) {
                   <span className="text-2xl">{docIcons[doc.type] || '📄'}</span>
                   <div>
                     <p className="text-sm font-bold text-slate-800">{doc.type}</p>
-                    <p className="text-xs text-slate-400 font-medium">{doc.docNo}</p>
+                    <p className="text-xs text-slate-400 font-medium">{doc.doc_no}</p>
                   </div>
                 </div>
                 <StatusBadge status={doc.status} />
               </div>
 
-              {doc.expiry && (
+              {doc.expiry_date && (
                 <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
                   <FiCalendar className="w-3.5 h-3.5 text-slate-400" />
-                  Expires: <span className={`font-bold ${doc.status === 'Expired' ? 'text-red-500' : 'text-slate-700'}`}>{doc.expiry}</span>
+                  Expires: <span className={`font-bold ${doc.status === 'Expired' ? 'text-red-500' : 'text-slate-700'}`}>{new Date(doc.expiry_date).toLocaleDateString()}</span>
                 </div>
               )}
 
@@ -328,14 +331,95 @@ export default function DriverProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('Overview');
+  
+  // ── Database states ──
+  const [driver, setDriver] = useState(null);
+  const [trips, setTrips] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [advances, setAdvances] = useState([]);
+  const [documents, setDocuments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const driver    = MOCK_DRIVERS.find(d => d.id === id) || MOCK_DRIVERS[0];
-  const trips     = MOCK_TRIPS[driver.id]     || [];
-  const advances  = MOCK_ADVANCES[driver.id]  || [];
-  const payments  = MOCK_PAYMENTS[driver.id]  || [];
-  const documents = MOCK_DOCUMENTS[driver.id] || [];
+  // ── Fetch driver profile from API ──
+  useEffect(() => {
+    fetchDriverProfile();
+  }, [id]);
 
-  const initials = driver.name.split(' ').map(n => n[0]).join('').toUpperCase();
+  const fetchDriverProfile = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const res = await axios.get(
+        `http://localhost:5001/api/drivers/profile/${id}`
+      );
+
+      const data = res.data.data;
+
+      setDriver(data.driver);
+      setTrips(data.trips || []);
+      setPayments(data.payments || []);
+      setAdvances(data.advances || []);
+      setDocuments(data.documents || []);
+
+    } catch (error) {
+      console.error('Error fetching driver profile:', error);
+      setError(error.response?.data?.message || 'Failed to load driver profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Loading state ──
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-20">
+        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+        <p className="mt-4 text-sm text-slate-500 font-medium">Loading driver profile...</p>
+      </div>
+    );
+  }
+
+  // ── Error state ──
+  if (error) {
+    return (
+      <div className="p-10 text-center">
+        <div className="inline-flex items-center gap-2 bg-red-50 text-red-600 border border-red-200 px-6 py-4 rounded-xl">
+          <FiX className="w-5 h-5" />
+          <span className="font-bold">{error}</span>
+        </div>
+        <button 
+          onClick={() => navigate('/staff')}
+          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50 transition-colors"
+        >
+          <FiArrowLeft className="w-4 h-4" /> Back to Staff
+        </button>
+      </div>
+    );
+  }
+
+  // ── Driver not found ──
+  if (!driver) {
+    return (
+      <div className="p-10 text-center text-red-500">
+        <p className="font-bold">Driver Not Found</p>
+        <button 
+          onClick={() => navigate('/staff')}
+          className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm font-bold hover:bg-slate-50 transition-colors"
+        >
+          <FiArrowLeft className="w-4 h-4" /> Back to Staff
+        </button>
+      </div>
+    );
+  }
+
+  // ── Driver initials ──
+  const initials = driver.full_name
+    ?.split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase() || '?';
 
   const tabs = [
     { label: 'Overview',  icon: FiUser        },
@@ -362,14 +446,14 @@ export default function DriverProfile() {
             {/* Details */}
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-1">
-                <h1 className="text-xl font-black text-slate-800 tracking-tight">{driver.name}</h1>
-                <StatusBadge status={driver.status} />
+                <h1 className="text-xl font-black text-slate-800 tracking-tight">{driver.full_name}</h1>
+                <StatusBadge status={driver.status || 'Active'} />
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium">
-                <span className="flex items-center gap-1"><FiUser className="w-3 h-3" />{driver.driverId}</span>
-                <span className="flex items-center gap-1"><FiPhone className="w-3 h-3" />{driver.mobile}</span>
-                <span className="flex items-center gap-1"><FiMapPin className="w-3 h-3" />{driver.plant}</span>
-                <span className="flex items-center gap-1"><FiTruck className="w-3 h-3" />{driver.vehicle}</span>
+                <span className="flex items-center gap-1"><FiUser className="w-3 h-3" />ID: {driver.id}</span>
+                <span className="flex items-center gap-1"><FiPhone className="w-3 h-3" />{driver.mobile || 'N/A'}</span>
+                <span className="flex items-center gap-1"><FiMapPin className="w-3 h-3" />{driver.station_name || 'N/A'}</span>
+                <span className="flex items-center gap-1"><FiTruck className="w-3 h-3" />{driver.vehicle_no || 'N/A'}</span>
               </div>
             </div>
           </div>
