@@ -35,6 +35,7 @@ const Finance               = lazy(() => import("./pages/Finance"));
 const Vendors               = lazy(() => import("./pages/Vendors"));
 const Payments              = lazy(() => import("./pages/Payments"));
 const Reports               = lazy(() => import("./pages/Reports"));
+const TruckPLDetail         = lazy(() => import("./pages/TruckPL"));
 const Staff                 = lazy(() => import("./pages/Staff"));
 const DriverProfile         = lazy(() => import("./pages/Staff/DriverProfile"));
 const Settings              = lazy(() => import("./pages/Settings/index"));
@@ -151,6 +152,7 @@ function InnerApp() {
                     <Route path="/vendors" element={<Vendors />} />
                     <Route path="/payments" element={<Payments />} />
                     <Route path="/reports" element={<Reports />} />
+                    <Route path="/reports/trucks/:truckId" element={<TruckPLDetail />} />
                     <Route path="/staff" element={<Staff />} />
                     <Route path="/staff/drivers/:id" element={<DriverProfile />} />
                     <Route path="/settings" element={<Settings />} />
