@@ -131,7 +131,7 @@ export default function FleetSummaryCards({ data, onFilterChange }) {
     {
       label: 'Fleet Profit',
       subLabel: '(Current Period)',
-      value: INR(Math.abs(totalProfit)),
+      value: INR(totalProfit),
       icon: FiBarChart2,
       iconBg: totalProfit >= 0 ? 'bg-emerald-50' : 'bg-red-50',
       iconColor: totalProfit >= 0 ? 'text-emerald-600' : 'text-red-500',

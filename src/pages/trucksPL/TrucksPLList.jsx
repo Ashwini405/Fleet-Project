@@ -1,7 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { FiSearch, FiFilter, FiDownload, FiEye, FiCalendar } from 'react-icons/fi';
-import { buildFleetData } from './mockFleetData';
 import FleetSummaryCards from './FleetSummaryCards';
 import FiltersPanel from './FiltersPanel';
 import { RevenueTooltip, ExpensesTooltip, ProfitTooltip } from './ColumnTooltips';
@@ -68,7 +68,8 @@ function PeriodStrip({ periodKey, startDate, endDate }) {
 
 export default function TrucksPLList({ periodKey = 'last30', startDate, endDate }) {
   const navigate = useNavigate();
-  const [loading]                     = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [fleetData, setFleetData] = useState([]);
   const [search, setSearch]           = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters]         = useState(EMPTY_FILTERS);
@@ -76,12 +77,28 @@ export default function TrucksPLList({ periodKey = 'last30', startDate, endDate 
   const [sortDir, setSortDir]         = useState('desc');
   const [page, setPage]               = useState(1);
   const [pageSize, setPageSize]       = useState(10);
+  const [error, setError]             = useState(null);
 
-  // Regenerate fleet data when period changes
-  const FLEET_DATA = useMemo(
-    () => buildFleetData(startDate, endDate),
-    [startDate, endDate]
-  );
+  // ── Fetch Fleet Data from API ──
+  useEffect(() => {
+    loadFleet();
+  }, []);
+
+  const loadFleet = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const res = await axios.get(
+        "http://localhost:5001/api/truck-pl"
+      );
+      setFleetData(res.data.data || []);
+    } catch (err) {
+      console.error("Error fetching fleet data:", err);
+      setError(err.response?.data?.message || 'Failed to load fleet data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleSort = (col) => {
     const { sortKey: sk, sortDir: sd } = nextSort(sortKey, sortDir, col);
@@ -93,15 +110,15 @@ export default function TrucksPLList({ periodKey = 'last30', startDate, endDate 
     setPage(1);
   };
 
-  const filtered = useMemo(() => {
-    let d = [...FLEET_DATA];
+  const filtered = React.useMemo(() => {
+    let d = [...fleetData];
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       d = d.filter(r =>
-        r.truckNo.toLowerCase().includes(q) ||
-        r.driver.toLowerCase().includes(q) ||
-        r.plant.toLowerCase().includes(q) ||
-        r.vehicleModel.toLowerCase().includes(q)
+        r.truckNo?.toLowerCase().includes(q) ||
+        r.driver?.toLowerCase().includes(q) ||
+        r.plant?.toLowerCase().includes(q) ||
+        r.vehicleModel?.toLowerCase().includes(q)
       );
     }
     if (filters.plant)      d = d.filter(r => r.plant === filters.plant);
@@ -113,7 +130,7 @@ export default function TrucksPLList({ periodKey = 'last30', startDate, endDate 
     if (filters.minProfit)  d = d.filter(r => r.profit  >= Number(filters.minProfit));
     if (filters.maxProfit)  d = d.filter(r => r.profit  <= Number(filters.maxProfit));
     return applySorting(d, sortKey, sortDir);
-  }, [FLEET_DATA, search, filters, sortKey, sortDir]);
+  }, [fleetData, search, filters, sortKey, sortDir]);
 
   const totalPages = Math.ceil(filtered.length / pageSize);
   const paginated  = filtered.slice((page - 1) * pageSize, page * pageSize);
@@ -142,12 +159,37 @@ export default function TrucksPLList({ periodKey = 'last30', startDate, endDate 
     URL.revokeObjectURL(url);
   };
 
-  // Navigate to truck detail with period context in state
-  const viewTruck = (id) => {
-    navigate(`/reports/trucks/${id}`, {
-      state: { periodKey, startDate: startDate.toISOString(), endDate: endDate.toISOString() }
+  // ── FIXED: Navigate to truck detail with the correct vehicle ID ──
+  const viewTruck = (vehicleId) => {
+    // Ensure we have a valid ID
+    if (!vehicleId) {
+      console.error('Invalid vehicle ID:', vehicleId);
+      return;
+    }
+    navigate(`/reports/trucks/${vehicleId}`, {
+      state: { 
+        periodKey, 
+        startDate: startDate?.toISOString(), 
+        endDate: endDate?.toISOString() 
+      }
     });
   };
+
+  // ── Error State ──
+  if (error) {
+    return (
+      <div className="bg-white rounded-2xl border border-red-200 shadow-sm p-8 text-center">
+        <p className="text-red-600 font-bold">Error loading fleet data</p>
+        <p className="text-sm text-slate-500 mt-2">{error}</p>
+        <button 
+          onClick={loadFleet}
+          className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-0">
@@ -156,7 +198,7 @@ export default function TrucksPLList({ periodKey = 'last30', startDate, endDate 
       <PeriodStrip periodKey={periodKey} startDate={startDate} endDate={endDate} />
 
       {/* ── Fleet Summary Cards ── */}
-      <FleetSummaryCards data={FLEET_DATA} onFilterChange={handleCardFilter} periodKey={periodKey} />
+      <FleetSummaryCards data={fleetData} onFilterChange={handleCardFilter} periodKey={periodKey} />
 
       {/* ── Table Card ── */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -200,7 +242,7 @@ export default function TrucksPLList({ periodKey = 'last30', startDate, endDate 
         {/* Filters Panel */}
         {showFilters && (
           <div className="px-4 pt-4">
-            <FiltersPanel filters={filters} onChange={handleFilters} onReset={resetFilters} onClose={() => setShowFilters(false)} data={FLEET_DATA} />
+            <FiltersPanel filters={filters} onChange={handleFilters} onReset={resetFilters} onClose={() => setShowFilters(false)} data={fleetData} />
           </div>
         )}
 
@@ -250,10 +292,12 @@ export default function TrucksPLList({ periodKey = 'last30', startDate, endDate 
               ) : (
                 paginated.map(row => {
                   const { date, time } = formatDate(row.lastUpdated);
+                  // Use vehicleId if available, otherwise fallback to id
+                  const vehicleId = row.vehicleId || row.id;
                   return (
                     <tr
-                      key={row.id}
-                      onClick={() => viewTruck(row.id)}
+                      key={vehicleId}
+                      onClick={() => viewTruck(vehicleId)}
                       className="hover:bg-slate-50 transition-colors duration-100 cursor-pointer"
                     >
                       <td className="py-2.5 px-4">
@@ -307,7 +351,7 @@ export default function TrucksPLList({ periodKey = 'last30', startDate, endDate 
                       </td>
                       <td className="py-2.5 px-4 text-center" onClick={e => e.stopPropagation()}>
                         <button
-                          onClick={() => viewTruck(row.id)}
+                          onClick={() => viewTruck(vehicleId)}
                           title="View Detailed Profit & Loss"
                           className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white transition-all duration-150"
                         >

@@ -8,7 +8,7 @@ function pct(part, total) {
   return total > 0 ? +((part / total) * 100).toFixed(1) : 0;
 }
 function varPct(curr, prev) {
-  return prev > 0 ? +((( curr - prev) / prev) * 100).toFixed(1) : 0;
+  return prev > 0 ? +(((curr - prev) / prev) * 100).toFixed(1) : 0;
 }
 
 // ── Rule engine ───────────────────────────────────────────────────────────────
@@ -17,13 +17,13 @@ function generateInsights(totals, prev) {
 
   const fuelPct     = pct(totals.totalFuel,    totals.totalExpenses);
   const tyrePct     = pct(totals.totalTyres,   totals.totalExpenses);
-  const maintPct    = pct(totals.totalMaint,   totals.totalExpenses);
-  const driverPct   = pct(totals.netDriverCost,totals.totalExpenses);
+  const maintPct    = pct(totals.totalMaintenance, totals.totalExpenses);
+  const driverPct   = pct(totals.totalDriver,  totals.totalExpenses);
 
-  const fuelVar     = varPct(totals.totalFuel,    prev.totalFuel);
-  const tyreVar     = varPct(totals.totalTyres,   prev.totalTyres);
-  const maintVar    = varPct(totals.totalMaint,   prev.totalMaint);
-  const revenueVar  = varPct(totals.totalRevenue, prev.totalRevenue);
+  const fuelVar     = varPct(totals.totalFuel,    prev.totalFuel || 0);
+  const tyreVar     = varPct(totals.totalTyres,   prev.totalTyres || 0);
+  const maintVar    = varPct(totals.totalMaintenance, prev.totalMaintenance || 0);
+  const revenueVar  = varPct(totals.totalRevenue, prev.totalRevenue || 0);
 
   // Fuel insight
   if (fuelPct > 40) {
@@ -146,7 +146,7 @@ function generateInsights(totals, prev) {
 }
 
 export function OperationalInsights({ totals, prev }) {
-  const insights = generateInsights(totals, prev);
+  const insights = generateInsights(totals, prev || {});
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
@@ -178,16 +178,14 @@ export function AuditTrail({ totals }) {
   const isProfit = totals.netProfit >= 0;
 
   const steps = [
-    { label: 'Trip Revenue',      value: totals.totalTripRevenue,   sign: '+', color: 'text-green-700',  dot: 'bg-green-500'   },
-    { label: 'Rental Income',     value: totals.totalRentalRevenue, sign: '+', color: 'text-green-700',  dot: 'bg-green-400'   },
-    { label: 'Other Income',      value: totals.totalOtherRevenue,  sign: '+', color: 'text-green-600',  dot: 'bg-green-300'   },
-    { label: 'Fuel Expenses',     value: totals.totalFuel,          sign: '−', color: 'text-red-600',    dot: 'bg-red-500'     },
-    { label: 'Maintenance',       value: totals.totalMaint,         sign: '−', color: 'text-red-600',    dot: 'bg-amber-500'   },
-    { label: 'Tyres',             value: totals.totalTyres,         sign: '−', color: 'text-red-600',    dot: 'bg-purple-500'  },
-    { label: 'Battery',           value: totals.totalBattery,       sign: '−', color: 'text-red-600',    dot: 'bg-blue-500'    },
-    { label: 'Driver Settlement', value: totals.netDriverCost,      sign: '−', color: 'text-red-600',    dot: 'bg-teal-500'    },
-    { label: 'RTA Expenses',      value: totals.totalRTA,           sign: '−', color: 'text-red-600',    dot: 'bg-slate-500'   },
-    { label: 'Miscellaneous',     value: totals.totalMisc,          sign: '−', color: 'text-red-600',    dot: 'bg-orange-500'  },
+    { label: 'Trip Revenue',      value: totals.totalRevenue || 0,   sign: '+', color: 'text-green-700',  dot: 'bg-green-500'   },
+    { label: 'Fuel Expenses',     value: totals.totalFuel || 0,          sign: '−', color: 'text-red-600',    dot: 'bg-red-500'     },
+    { label: 'Maintenance',       value: totals.totalMaintenance || 0,         sign: '−', color: 'text-red-600',    dot: 'bg-amber-500'   },
+    { label: 'Tyres',             value: totals.totalTyres || 0,         sign: '−', color: 'text-red-600',    dot: 'bg-purple-500'  },
+    { label: 'Battery',           value: totals.totalBattery || 0,       sign: '−', color: 'text-red-600',    dot: 'bg-blue-500'    },
+    { label: 'Driver Settlement', value: totals.totalDriver || 0,      sign: '−', color: 'text-red-600',    dot: 'bg-teal-500'    },
+    { label: 'RTA Expenses',      value: totals.totalRTA || 0,           sign: '−', color: 'text-red-600',    dot: 'bg-slate-500'   },
+    { label: 'Miscellaneous',     value: totals.totalMisc || 0,          sign: '−', color: 'text-red-600',    dot: 'bg-orange-500'  },
   ];
 
   return (
@@ -205,9 +203,9 @@ export function AuditTrail({ totals }) {
             Net Profit = Total Revenue − Total Expenses
           </p>
           <p className="text-xs text-slate-500 mt-1 font-medium">
-            = {INR(totals.totalRevenue)} − {INR(totals.totalExpenses)} ={' '}
+            = {INR(totals.totalRevenue || 0)} − {INR(totals.totalExpenses || 0)} ={' '}
             <span className={isProfit ? 'text-emerald-700 font-black' : 'text-red-600 font-black'}>
-              {INR(totals.netProfit)}
+              {INR(totals.netProfit || 0)}
             </span>
           </p>
         </div>
@@ -241,7 +239,7 @@ export function AuditTrail({ totals }) {
                   {isProfit ? 'Net Profit' : 'Net Loss'}
                 </span>
                 <span className={`text-lg font-black ${isProfit ? 'text-emerald-700' : 'text-red-700'}`}>
-                  {INR(Math.abs(totals.netProfit))}
+                  {INR(Math.abs(totals.netProfit || 0))}
                 </span>
               </div>
             </div>
@@ -258,15 +256,23 @@ export function ReportFooter({ info, period }) {
   const dateStr = now.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
   const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
+  // ── STEP 2: Handle period display ──
+  const reportPeriod =
+    typeof period === "object" && period
+      ? `${period.from || "-"} to ${period.to || "-"}`
+      : period || "Current Period";
+
+  // ── STEP 3: Updated fields array ──
   const fields = [
-    { label: 'Generated On',    value: dateStr                  },
-    { label: 'Print Timestamp', value: timeStr                  },
-    { label: 'Generated By',    value: 'Fleet Manager'          },
-    { label: 'Report Period',   value: period                   },
-    { label: 'Truck Number',    value: info.truckNo             },
-    { label: 'Running Plant',   value: info.plant               },
-    { label: 'Vehicle Model',   value: info.model               },
-    { label: 'Export Version',  value: 'Version 1.0'            },
+    { label: 'Generated On',    value: dateStr },
+    { label: 'Print Timestamp', value: timeStr },
+    { label: 'Generated By',    value: 'Fleet Manager' },
+    { label: 'Report Period',   value: reportPeriod },
+    { label: 'Truck Number',    value: info?.vehicle_no || 'N/A' },
+    { label: 'Running Plant',   value: info?.station_name || 'N/A' },
+    { label: 'Vehicle Model',   value: info?.make_brand || 'N/A' },
+    { label: 'Driver',          value: info?.full_name || 'N/A' },
+    { label: 'Export Version',  value: 'Version 1.0' },
   ];
 
   return (
