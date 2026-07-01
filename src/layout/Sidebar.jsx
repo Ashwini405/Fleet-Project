@@ -61,6 +61,9 @@ export default function Sidebar({ onClose }) {
       key: "admin",
       icon: Settings,
       items: [
+        { name: "Administration", path: "/administration" },
+        { name: "Company Profile",  path: "/company-profile"  },
+        { name: "User Management",  path: "/user-management"  },
         { name: "Document Vault", path: "/documents" },
         { name: "Global Audit Logs", path: "/audit" },
         { name: "Account Section", path: "/settings" }

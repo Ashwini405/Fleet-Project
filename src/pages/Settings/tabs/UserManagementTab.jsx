@@ -1,111 +1,62 @@
-import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { Users, Plus, Pencil, Trash2 } from "lucide-react";
-import { mockUsers } from "../data/mockData";
-import UserModal from "../components/UserModal";
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { Users, ArrowRight, Shield, MapPin, Activity, Key } from "lucide-react";
 
 export default function UserManagementTab() {
-  const [users, setUsers] = useState(mockUsers);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState(null);
-
-  const handleAddClick = () => {
-    setEditingUser(null);
-    setIsModalOpen(true);
-  };
-
-  const handleEditClick = (user) => {
-    setEditingUser(user);
-    setIsModalOpen(true);
-  };
-
-  const handleDelete = (id) => {
-    if (window.confirm("Are you sure you want to completely remove this user's access?")) {
-      setUsers(users.filter(u => u.id !== id));
-    }
-  };
-
-  const handleSaveUser = (userData) => {
-    if (editingUser) {
-      setUsers(users.map(u => u.id === editingUser.id ? { ...userData, id: editingUser.id } : u));
-    } else {
-      setUsers([...users, { ...userData, id: `USR-00${users.length + 1}` }]);
-    }
-    setIsModalOpen(false);
-  };
+  const navigate = useNavigate();
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 w-full max-w-5xl">
-      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <Users className="w-5 h-5 text-indigo-600" /> User Management
-          </h2>
-          <p className="text-sm text-gray-500 mt-1">Add or remove platform access and assign roles.</p>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 w-full max-w-5xl">
+      {/* Header */}
+      <div className="flex items-start gap-4 mb-6">
+        <div className="w-11 h-11 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+          <Users className="w-5 h-5" />
         </div>
-        <button 
-          onClick={handleAddClick}
-          className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow-sm whitespace-nowrap"
-        >
-          <Plus className="w-4 h-4" /> Add New User
-        </button>
+        <div>
+          <h2 className="text-lg font-bold text-gray-800">User Management</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            User Management has moved to a dedicated module under Administration.
+          </p>
+        </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
-        <table className="w-full text-left text-sm text-gray-600">
-          <thead className="bg-gray-50 text-gray-500 uppercase text-xs font-bold border-b border-gray-100">
-            <tr>
-              <th className="px-6 py-4">User Details</th>
-              <th className="px-6 py-4 hidden md:table-cell">Role</th>
-              <th className="px-6 py-4 hidden sm:table-cell">Status</th>
-              <th className="px-6 py-4 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {users.map((user) => (
-              <tr key={user.id} className="hover:bg-gray-50/50 transition">
-                <td className="px-6 py-4">
-                  <div className="font-bold text-gray-800 text-base">{user.name}</div>
-                  <div className="text-gray-500 text-xs mt-0.5">{user.email}</div>
-                  <div className="text-gray-400 text-xs mt-1 md:hidden">Role: {user.role}</div>
-                </td>
-                <td className="px-6 py-4 hidden md:table-cell font-medium text-gray-700">
-                  {user.role}
-                </td>
-                <td className="px-6 py-4 hidden sm:table-cell">
-                  {user.status === 'Active' ? (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 uppercase tracking-widest border border-green-200/50">
-                      <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div> Active
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 uppercase tracking-widest border border-gray-200">
-                      Inactive
-                    </span>
-                  )}
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center justify-end gap-3">
-                    <button onClick={() => handleEditClick(user)} className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition" title="Edit User">
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => handleDelete(user.id)} className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition" title="Delete User">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* Notice card */}
+      <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-5 mb-6">
+        <p className="text-sm font-semibold text-indigo-800 mb-1">This section has been upgraded</p>
+        <p className="text-xs text-indigo-600 leading-relaxed">
+          The full User Management module — including role assignment, granular permissions, login history,
+          audit trail and employee-linked accounts — is now available as a dedicated administration page.
+        </p>
       </div>
 
-      {isModalOpen && (
-        <UserModal 
-          user={editingUser} 
-          onClose={() => setIsModalOpen(false)} 
-          onSave={handleSaveUser} 
-        />
-      )}
-    </motion.div>
+      {/* Feature highlights */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+        {[
+          { icon: Users,    title: 'Employee-Linked Accounts', desc: 'Every user account is linked to an existing employee record.' },
+          { icon: Shield,   title: 'Role-Based Access',         desc: 'Assign Administrator, Finance, Operations, HR and other roles.' },
+          { icon: Key,      title: 'Granular Permissions',      desc: 'Per-module permissions — View, Create, Edit, Approve, Delete.' },
+          { icon: Activity, title: 'Login History & Audit',     desc: 'Full login history, IP addresses, devices and audit trail.' },
+        ].map(f => (
+          <div key={f.title} className="flex items-start gap-3 p-4 bg-white rounded-xl border border-gray-100">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+              <f.icon className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-gray-800">{f.title}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{f.desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* CTA */}
+      <button
+        onClick={() => navigate('/user-management')}
+        className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm"
+      >
+        Open User Management
+        <ArrowRight className="w-4 h-4" />
+      </button>
+    </div>
   );
 }

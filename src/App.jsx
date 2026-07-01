@@ -42,6 +42,9 @@ const Settings              = lazy(() => import("./pages/Settings/index"));
 const Documents             = lazy(() => import("./pages/Documents/index"));
 const AuditLogs             = lazy(() => import("./pages/AuditLogs/index"));
 const Notifications         = lazy(() => import("./pages/Notifications"));
+const Administration        = lazy(() => import("./pages/Administration"));
+const CompanyProfile        = lazy(() => import("./pages/CompanyProfile"));
+const UserManagement        = lazy(() => import("./pages/UserManagement"));
 
 function PageLoader() {
   return (
@@ -159,6 +162,9 @@ function InnerApp() {
                     <Route path="/documents" element={<Documents />} />
                     <Route path="/audit" element={<AuditLogs />} />
                     <Route path="/notifications" element={<Notifications />} />
+                    <Route path="/administration" element={<Administration />} />
+                    <Route path="/company-profile" element={<CompanyProfile />} />
+                    <Route path="/user-management" element={<UserManagement />} />
                   </Routes>
                 </Suspense>
               </div>
