@@ -5,7 +5,6 @@ import {
 } from 'react-icons/fi';
 
 const INR = (n) => '₹' + Number(n).toLocaleString('en-IN');
-const INRs = (n) => n >= 1000000 ? `₹${(n/1000000).toFixed(1)}M` : n >= 1000 ? `₹${(n/1000).toFixed(0)}K` : `₹${n}`;
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
 function KpiCard({
@@ -57,7 +56,8 @@ function KpiCard({
 }
 
 export function TruckKpiCards({ kpis }) {
-  const isProfit = kpis.netProfit >= 0;
+  // FIX: Use optional chaining with defaults
+  const isProfit = (kpis.profit ?? 0) >= 0;
 
   return (
     <div className="space-y-4">
@@ -66,7 +66,7 @@ export function TruckKpiCards({ kpis }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <KpiCard
           label="Total Revenue"
-          value={INR(kpis.totalRevenue)}
+          value={INR(kpis.revenue ?? 0)}
           trend={12}
           icon={FiTrendingUp}
           iconBg="bg-green-100"
@@ -76,7 +76,7 @@ export function TruckKpiCards({ kpis }) {
         />
         <KpiCard
           label="Total Expenses"
-          value={INR(kpis.totalExpenses)}
+          value={INR(kpis.expenses ?? 0)}
           trend={-5}
           icon={FiTrendingDown}
           iconBg="bg-red-100"
@@ -86,7 +86,7 @@ export function TruckKpiCards({ kpis }) {
         />
         <KpiCard
           label="Net Profit"
-          value={INR(Math.abs(kpis.netProfit))}
+          value={INR(Math.abs(kpis.profit ?? 0))}
           trend={isProfit ? 8 : -8}
           icon={FiDollarSign}
           iconBg={isProfit ? 'bg-emerald-100' : 'bg-rose-100'}
@@ -97,12 +97,12 @@ export function TruckKpiCards({ kpis }) {
         />
         <KpiCard
           label="Profit Margin"
-          value={`${kpis.profitMargin}%`}
-          trend={kpis.profitMargin >= 0 ? 3 : -3}
+          value={`${Number(kpis.margin ?? 0).toFixed(2)}%`}
+          trend={(kpis.margin ?? 0) >= 0 ? 3 : -3}
           icon={FiPercent}
           iconBg="bg-blue-100"
           iconColor="text-blue-600"
-          valueColor={kpis.profitMargin >= 0 ? 'text-blue-700' : 'text-red-600'}
+          valueColor={(kpis.margin ?? 0) >= 0 ? 'text-blue-700' : 'text-red-600'}
           accent="border-blue-400"
         />
       </div>
@@ -111,7 +111,7 @@ export function TruckKpiCards({ kpis }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <KpiCard
           label="Completed Trips"
-          value={kpis.totalTrips}
+          value={kpis.trips ?? 0}
           trendLabel="This statement period"
           icon={FiTruck}
           iconBg="bg-purple-100"
@@ -121,7 +121,7 @@ export function TruckKpiCards({ kpis }) {
         />
         <KpiCard
           label="Distance Travelled"
-          value={`${kpis.totalDistance.toLocaleString()} km`}
+          value={`${(kpis.distance ?? 0).toLocaleString()} km`}
           trendLabel="Total km covered"
           icon={FiMap}
           iconBg="bg-cyan-100"
@@ -131,7 +131,7 @@ export function TruckKpiCards({ kpis }) {
         />
         <KpiCard
           label="Fuel Cost per km"
-          value={`₹ ${kpis.fuelPerKm}`}
+          value={`₹ ${Number(kpis.fuelCostPerKm ?? 0).toFixed(2)}`}
           trendLabel="Cost per kilometre"
           icon={FiDroplet}
           iconBg="bg-orange-100"
@@ -141,7 +141,7 @@ export function TruckKpiCards({ kpis }) {
         />
         <KpiCard
           label="Revenue per km"
-          value={`₹ ${kpis.revenuePerKm}`}
+          value={`₹ ${Number(kpis.revenuePerKm ?? 0).toFixed(2)}`}
           trendLabel="Earnings per kilometre"
           icon={FiBarChart2}
           iconBg="bg-indigo-100"
@@ -159,10 +159,10 @@ export function TruckKpiCards({ kpis }) {
 export function ExpenseSummary({ totals }) {
   const items = [
     { label: 'Fuel',          value: totals.totalFuel,       color: '#ef4444', bar: 'bg-red-500'    },
-    { label: 'Maintenance',   value: totals.totalMaint,      color: '#f59e0b', bar: 'bg-amber-500'  },
+    { label: 'Maintenance',   value: totals.totalMaintenance, color: '#f59e0b', bar: 'bg-amber-500'  },
     { label: 'Tyres',         value: totals.totalTyres,      color: '#8b5cf6', bar: 'bg-purple-500' },
     { label: 'Battery',       value: totals.totalBattery,    color: '#3b82f6', bar: 'bg-blue-500'   },
-    { label: 'Driver',        value: totals.netDriverCost,   color: '#0d9488', bar: 'bg-teal-500'   },
+    { label: 'Driver',        value: totals.totalDriver,     color: '#0d9488', bar: 'bg-teal-500'   },
     { label: 'RTA',           value: totals.totalRTA,        color: '#64748b', bar: 'bg-slate-500'  },
     { label: 'Miscellaneous', value: totals.totalMisc,       color: '#f97316', bar: 'bg-orange-500' },
   ];
@@ -230,18 +230,17 @@ export function ProfitCalculationCard({ totals }) {
   const isProfit = totals.netProfit >= 0;
 
   const revenueLines = [
-    { label: 'Trip Revenue',   value: totals.totalTripRevenue   },
-    { label: 'Rental Income',  value: totals.totalRentalRevenue },
-    { label: 'Other Income',   value: totals.totalOtherRevenue  },
+    { label: 'Trip Revenue', value: totals.totalRevenue || 0 }
   ];
+  
   const expenseLines = [
-    { label: 'Fuel',             value: totals.totalFuel      },
-    { label: 'Maintenance',      value: totals.totalMaint     },
-    { label: 'Tyres',            value: totals.totalTyres     },
-    { label: 'Battery',          value: totals.totalBattery   },
-    { label: 'Driver Settlement',value: totals.netDriverCost  },
-    { label: 'RTA Expenses',     value: totals.totalRTA       },
-    { label: 'Miscellaneous',    value: totals.totalMisc      },
+    { label: 'Fuel',             value: totals.totalFuel || 0 },
+    { label: 'Maintenance',      value: totals.totalMaintenance || 0 },
+    { label: 'Tyres',            value: totals.totalTyres || 0 },
+    { label: 'Battery',          value: totals.totalBattery || 0 },
+    { label: 'Driver Settlement',value: totals.totalDriver || 0 },
+    { label: 'RTA Expenses',     value: totals.totalRTA || 0 },
+    { label: 'Miscellaneous',    value: totals.totalMisc || 0 },
   ];
 
   const StatLine = ({ label, value, muted }) => (
@@ -266,7 +265,7 @@ export function ProfitCalculationCard({ totals }) {
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Final Profit & Loss Statement</p>
           <p className="text-white font-black text-base mt-0.5">Complete Accounting Statement</p>
         </div>
-        <PerformanceRating margin={totals.profitMargin} />
+        <PerformanceRating margin={totals.profitMargin || 0} />
       </div>
 
       <div className="bg-white px-6 py-5 space-y-4">
@@ -278,7 +277,7 @@ export function ProfitCalculationCard({ totals }) {
           </p>
           <div className="border border-slate-100 rounded-xl overflow-hidden">
             {revenueLines.map(l => <StatLine key={l.label} label={l.label} value={l.value} />)}
-            <TotalLine label="Total Revenue" value={totals.totalRevenue} color="text-green-700" />
+            <TotalLine label="Total Revenue" value={totals.totalRevenue || 0} color="text-green-700" />
           </div>
         </div>
 
@@ -289,7 +288,7 @@ export function ProfitCalculationCard({ totals }) {
           </p>
           <div className="border border-slate-100 rounded-xl overflow-hidden">
             {expenseLines.map(l => <StatLine key={l.label} label={l.label} value={l.value} />)}
-            <TotalLine label="Total Expenses" value={totals.totalExpenses} color="text-red-600" />
+            <TotalLine label="Total Expenses" value={totals.totalExpenses || 0} color="text-red-600" />
           </div>
         </div>
 
@@ -310,20 +309,18 @@ export function ProfitCalculationCard({ totals }) {
             }`}>{isProfit ? '✦ NET PROFIT' : '✦ NET LOSS'}</p>
             <p className={`text-[11px] font-medium mt-1 ${
               isProfit ? 'text-emerald-500' : 'text-red-500'
-            }`}>Margin: {totals.profitMargin}%</p>
+            }`}>Margin: {totals.profitMargin || 0}%</p>
             <div className="mt-1.5">
-              <PerformanceRating margin={totals.profitMargin} />
+              <PerformanceRating margin={totals.profitMargin || 0} />
             </div>
           </div>
           <span className={`text-4xl font-black tracking-tight ${
             isProfit ? 'text-emerald-700' : 'text-red-700'
           }`}>
-            {!isProfit && '− '}{INR(Math.abs(totals.netProfit))}
+            {!isProfit && '− '}{INR(Math.abs(totals.netProfit || 0))}
           </span>
         </div>
       </div>
     </div>
   );
 }
-
-

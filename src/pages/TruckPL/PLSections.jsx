@@ -200,7 +200,7 @@ export function RevenueSection({ data, totals, prevTotal }) {
           />
           <div className="flex justify-between mt-2 px-1">
             <span className="text-xs text-slate-400 font-medium">Trip Revenue Subtotal</span>
-            <span className="text-xs font-black text-green-700">{INR(totals.totalTripRevenue)}</span>
+            <span className="text-xs font-black text-green-700">{INR(data.totals.totalTripRevenue)}</span>
           </div>
         </div>
         <div>
@@ -233,12 +233,12 @@ export function RevenueSection({ data, totals, prevTotal }) {
 
 // ── 2. Fuel Section ───────────────────────────────────────────────────────────
 export function FuelSection({ data, total, prevTotal }) {
-  const totalLitres = data.reduce((s, e) => s + e.litres, 0);
+  const totalLitres = data.totalLitres || 0;
   return (
     <PLSection
-      title="Fuel Expenses" subtitle={`${totalLitres.toLocaleString()} L total · ${data.length} fill-ups`}
+      title="Fuel Expenses" subtitle={`${totalLitres.toLocaleString()} L total · ${data.fillups || 0} fill-ups`}
       total={total} totalLabel="Total Fuel Expense" accent="red" prevTotal={prevTotal}
-      source="Fuel Management" records={`${data.length} Fuel Entries`}
+      source="Fuel Management" records={`${data.fillups || 0} Fuel Entries`}
       viewLabel="View Fuel Entries →" viewPath="/fuel"
     >
       <PLTable
@@ -249,7 +249,7 @@ export function FuelSection({ data, total, prevTotal }) {
           { key: 'rate',    label: '₹/L'          },
           { key: 'amount',  label: 'Amount', right: true },
         ]}
-        rows={data}
+        rows={data.entries || []}
       />
     </PLSection>
   );
@@ -261,7 +261,7 @@ export function MaintenanceSection({ data, total, prevTotal }) {
     <PLSection
       title="Maintenance Expenses" subtitle="Service · Repairs · Periodic"
       total={total} totalLabel="Total Maintenance Cost" accent="amber" prevTotal={prevTotal}
-      source="Service & Maintenance Module" records={`${data.length} Service Records`}
+      source="Service & Maintenance Module" records={`${data.services || 0} Service Records`}
       viewLabel="View Service History →" viewPath="/service"
     >
       <PLTable
@@ -271,7 +271,7 @@ export function MaintenanceSection({ data, total, prevTotal }) {
           { key: 'garage', label: 'Garage'       },
           { key: 'amount', label: 'Amount', right: true },
         ]}
-        rows={data}
+        rows={data.records || []}
       />
     </PLSection>
   );
@@ -289,17 +289,17 @@ export function TyreSection({ data, total, prevTotal }) {
     <PLSection
       title="Tyre Expenses" subtitle="Purchase · Retreading · Puncture · Replacement"
       total={total} totalLabel="Total Tyre Cost" accent="purple" prevTotal={prevTotal}
-      source="Tyre Management" records={`${data.length} Transactions`}
+      source="Tyre Management" records={`${data.transactions || 0} Transactions`}
       viewLabel="View Tyre Transactions →" viewPath="/tyres"
     >
       <PLTable
         cols={[
           { key: 'date',   label: 'Date'        },
           { key: 'type',   label: 'Type', badge: typeBadge },
-          { key: 'desc',   label: 'Description' },
+          { key: 'description', label: 'Description' },
           { key: 'amount', label: 'Amount', right: true },
         ]}
-        rows={data}
+        rows={data.records || []}
       />
     </PLSection>
   );
@@ -311,17 +311,17 @@ export function BatterySection({ data, total, prevTotal }) {
     <PLSection
       title="Battery Expenses" subtitle="Purchase · Replacement · Repair"
       total={total} totalLabel="Total Battery Cost" accent="blue" prevTotal={prevTotal}
-      source="Battery Management" records={`${data.length} Transactions`}
+      source="Battery Management" records={`${data.transactions || 0} Transactions`}
       viewLabel="View Battery History →" viewPath="/vehicles"
     >
       <PLTable
         cols={[
           { key: 'date',   label: 'Date'        },
           { key: 'type',   label: 'Type'        },
-          { key: 'desc',   label: 'Description' },
+          { key: 'description', label: 'Description' },
           { key: 'amount', label: 'Amount', right: true },
         ]}
-        rows={data}
+        rows={data.records || []}
       />
     </PLSection>
   );
@@ -329,39 +329,43 @@ export function BatterySection({ data, total, prevTotal }) {
 
 // ── 6. Driver Settlement Section ──────────────────────────────────────────────
 export function DriverSettlementSection({ data, prevTotal, settlementRef }) {
+  // Extract settlement data from the API response
+  const s = data.settlement || {};
+  
   const Row = ({ label, value, bold, indent, color }) => (
     <div className={`flex justify-between items-center py-2 ${indent ? 'pl-4 border-l-2 border-slate-100' : ''} ${bold ? 'border-t border-slate-100 mt-1 pt-3' : ''}`}>
       <span className={`text-sm ${bold ? 'font-black text-slate-800' : 'font-medium text-slate-600'}`}>{label}</span>
       <span className={`text-sm font-black ${color || (bold ? 'text-slate-800' : 'text-slate-700')}`}>{INR(value)}</span>
     </div>
   );
+  
   return (
     <PLSection
       title="Driver Settlement" subtitle="Salary · Battha · Allowances · Deductions"
       total={data.netDriverCost} totalLabel="Net Driver Cost" accent="teal" prevTotal={prevTotal}
-      source="Operational Payments" records={`Settlement: ${settlementRef} · 1 Approved Settlement`}
+      source="Operational Payments" records={`Settlement: ${settlementRef || "-"} · 1 Approved Settlement`}
       viewLabel="View Settlement →" viewPath="/payments"
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Earnings</p>
-          <Row label="Fixed Salary"       value={data.salary}      indent />
-          <Row label={`Battha (${data.trips} trips × ₹${data.batthaRate})`} value={data.totalBattha} indent />
-          <Row label="Loading Charges"    value={data.loading}     indent />
-          <Row label="Unloading Charges"  value={data.unloading}   indent />
-          <Row label="Bonus"              value={data.bonus}       indent />
-          <Row label="Other Allowances"   value={data.allowances}  indent />
-          <Row label="Gross Earnings"     value={data.grossEarnings} bold color="text-green-700" />
+          <Row label="Fixed Salary"       value={Number(s.fixed_salary || 0)} indent />
+          <Row label="Battha"             value={Number(s.total_battha || 0)} indent />
+          <Row label="Loading Charges"    value={Number(s.loading_charges || 0)} indent />
+          <Row label="Unloading Charges"  value={Number(s.unloading_charges || 0)} indent />
+          <Row label="Bonus"              value={Number(s.bonus || 0)} indent />
+          <Row label="Other Allowances"   value={Number(s.other_allowances || 0)} indent />
+          <Row label="Gross Earnings"     value={data.grossEarnings || 0} bold color="text-green-700" />
         </div>
         <div>
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Deductions</p>
-          <Row label="Driver Advance"    value={data.advance}         indent />
-          <Row label="Penalty"           value={data.penalty}         indent />
-          <Row label="Other Deductions"  value={data.otherDed}        indent />
-          <Row label="Total Deductions"  value={data.totalDeductions} bold color="text-red-600" />
+          <Row label="Driver Advance"    value={Number(s.driver_advance || 0)} indent />
+          <Row label="Penalty"           value={Number(s.penalty || 0)} indent />
+          <Row label="Other Deductions"  value={Number(s.other_deductions || 0)} indent />
+          <Row label="Total Deductions"  value={data.totalDeductions || 0} bold color="text-red-600" />
           <div className="mt-4 p-4 bg-teal-50 rounded-xl border border-teal-200">
             <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest mb-1">Net Driver Cost</p>
-            <p className="text-2xl font-black text-teal-800">{INR(data.netDriverCost)}</p>
+            <p className="text-2xl font-black text-teal-800">{INR(data.netDriverCost || 0)}</p>
             <p className="text-[11px] text-teal-600 mt-0.5">Gross Earnings − Total Deductions</p>
           </div>
         </div>
@@ -376,7 +380,7 @@ export function RTASection({ data, total, prevTotal }) {
     <PLSection
       title="RTA Expenses" subtitle="Permit · Road Tax · Insurance · Fitness"
       total={total} totalLabel="Total RTA Cost" accent="slate" prevTotal={prevTotal}
-      source="Vehicle Master / RTA" records={`${data.length} Entries`}
+      source="Vehicle Master / RTA" records={`${data.transactions || 0} Entries`}
       viewLabel="View RTA Records →" viewPath="/vehicles"
     >
       <PLTable
@@ -385,7 +389,7 @@ export function RTASection({ data, total, prevTotal }) {
           { key: 'type',   label: 'Expense Type' },
           { key: 'amount', label: 'Amount', right: true },
         ]}
-        rows={data}
+        rows={data.records || []}
       />
     </PLSection>
   );
@@ -397,17 +401,17 @@ export function MiscExpenseSection({ data, total, prevTotal }) {
     <PLSection
       title="Miscellaneous Expenses" subtitle="Toll · Parking · Cleaning · Other"
       total={total} totalLabel="Total Misc Cost" accent="slate" prevTotal={prevTotal}
-      source="Income & Expense" records={`${data.length} Entries`}
+      source="Income & Expense" records={`${data.transactions || 0} Entries`}
       viewLabel="View Expense Entries →" viewPath="/finance"
     >
       <PLTable
         cols={[
           { key: 'date',   label: 'Date'        },
           { key: 'type',   label: 'Type'        },
-          { key: 'desc',   label: 'Description' },
+          { key: 'description', label: 'Description' },
           { key: 'amount', label: 'Amount', right: true },
         ]}
-        rows={data}
+        rows={data.records || []}
       />
     </PLSection>
   );
