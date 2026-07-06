@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { 
   Menu, LayoutDashboard, Truck, MapPin, Droplet, 
   Wrench, CalendarClock, CircleDashed, Package, ClipboardCheck, AlertTriangle, ShieldCheck,
-  IndianRupee, Users, CreditCard, PieChart, UserCircle, Settings, ChevronRight, ChevronDown, FolderLock, Activity
+  IndianRupee, Users, CreditCard, PieChart, UserCircle, Settings, ChevronRight, ChevronDown, Activity
 } from "lucide-react";
 
 export default function Sidebar({ onClose }) {
@@ -61,12 +61,13 @@ export default function Sidebar({ onClose }) {
       key: "admin",
       icon: Settings,
       items: [
-        { name: "Administration", path: "/administration" },
-        { name: "Company Profile",  path: "/company-profile"  },
-        { name: "User Management",  path: "/user-management"  },
-        { name: "Document Vault", path: "/documents" },
-        { name: "Global Audit Logs", path: "/audit" },
-        { name: "Account Section", path: "/settings" }
+        { name: "Administration",     path: "/administration"     },
+        { name: "Company Profile",    path: "/company-profile"    },
+        { name: "User Management",    path: "/user-management"    },
+        { name: "Roles & Permissions",path: "/roles-permissions"  },
+        { name: "Backup & Restore",   path: "/backup-restore"     },
+        { name: "Global Audit Logs",  path: "/audit"              },
+        { name: "My Account",         path: "/settings"           }
       ]
     }
   ];

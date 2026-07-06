@@ -1,39 +1,36 @@
 import React, { useState } from "react";
 import SettingsSidebar from "./SettingsSidebar";
-
-// Tabs
 import ProfileTab from "./tabs/ProfileTab";
+import ChangePasswordTab from "./tabs/ChangePasswordTab";
 import SecurityTab from "./tabs/SecurityTab";
-import UserManagementTab from "./tabs/UserManagementTab";
-import RolesPermissionsTab from "./tabs/RolesPermissionsTab";
 import NotificationsTab from "./tabs/NotificationsTab";
-import OrganizationTab from "./tabs/OrganizationTab";
+import ActiveSessionsTab from "./tabs/ActiveSessionsTab";
+import LoginHistoryTab from "./tabs/LoginHistoryTab";
 
-export default function Settings() {
+export default function MyAccount() {
   const [activeTab, setActiveTab] = useState('profile');
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'profile': return <ProfileTab />;
-      case 'security': return <SecurityTab />;
-      case 'users': return <UserManagementTab />;
-      case 'roles': return <RolesPermissionsTab />;
+      case 'profile':       return <ProfileTab />;
+      case 'password':      return <ChangePasswordTab />;
+      case 'security':      return <SecurityTab />;
       case 'notifications': return <NotificationsTab />;
-      case 'organization': return <OrganizationTab />;
-      default: return <ProfileTab />;
+      case 'sessions':      return <ActiveSessionsTab />;
+      case 'history':       return <LoginHistoryTab />;
+      default:              return <ProfileTab />;
     }
   };
 
   return (
     <div className="w-full max-w-7xl mx-auto pb-10">
       <div className="mb-8">
-        <h1 className="text-3xl font-black text-gray-800 tracking-tight">Admin & Settings</h1>
-        <p className="text-gray-500 mt-1">Manage users, permissions, and organization-wide configurations.</p>
+        <h1 className="text-3xl font-black text-gray-800 tracking-tight">My Account</h1>
+        <p className="text-gray-500 mt-1">Manage your personal profile, security, and account preferences.</p>
       </div>
 
       <div className="flex flex-col md:flex-row gap-8 items-start">
         <SettingsSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-        
         <div className="flex-1 w-full min-w-0">
           {renderContent()}
         </div>

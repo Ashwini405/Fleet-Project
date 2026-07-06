@@ -45,6 +45,8 @@ const Notifications         = lazy(() => import("./pages/Notifications"));
 const Administration        = lazy(() => import("./pages/Administration"));
 const CompanyProfile        = lazy(() => import("./pages/CompanyProfile/CompanyProfile"));
 const UserManagement        = lazy(() => import("./pages/UserManagement/UserManagement"));
+const RolesPermissions      = lazy(() => import("./pages/RolesPermissions"));
+const BackupRestore         = lazy(() => import("./pages/BackupRestore"));
 
 function PageLoader() {
   return (
@@ -165,6 +167,8 @@ function InnerApp() {
                     <Route path="/administration" element={<Administration />} />
                     <Route path="/company-profile" element={<CompanyProfile />} />
                     <Route path="/user-management" element={<UserManagement />} />
+                    <Route path="/roles-permissions" element={<RolesPermissions />} />
+                    <Route path="/backup-restore" element={<BackupRestore />} />
                   </Routes>
                 </Suspense>
               </div>
