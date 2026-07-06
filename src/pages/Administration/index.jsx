@@ -107,7 +107,7 @@ const quickAccess = [
     title: 'Backup & Restore',
     desc: 'Backup management',
     icon: Archive,
-    href: '/settings',
+    href: '/backup-restore',
   },
 ];
 
