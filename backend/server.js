@@ -88,6 +88,12 @@ const driverSettlementRoutes =
 require("./routes/driverSettlementRoutes");
 
 const truckPLRoutes = require("./routes/truckPLRoutes");
+const companyProfileRoutes =
+require("./routes/companyProfileRoutes");
+const userManagementRoutes = require("./routes/userManagementRoutes");
+const employeeRoutes = require("./routes/employeeRoutes");
+
+
 // Auto-create tyre_notifications table
 db.query(`
   CREATE TABLE IF NOT EXISTS tyre_notifications (
@@ -277,6 +283,17 @@ app.use(
 );
 
 app.use("/api/truck-pl", truckPLRoutes);
+
+app.use(
+    "/api/company-profile",
+    companyProfileRoutes
+);
+
+app.use("/api/users", userManagementRoutes);
+app.use(
+    "/api/employees",
+    employeeRoutes
+);
 
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {

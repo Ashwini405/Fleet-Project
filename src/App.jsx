@@ -43,8 +43,8 @@ const Documents             = lazy(() => import("./pages/Documents/index"));
 const AuditLogs             = lazy(() => import("./pages/AuditLogs/index"));
 const Notifications         = lazy(() => import("./pages/Notifications"));
 const Administration        = lazy(() => import("./pages/Administration"));
-const CompanyProfile        = lazy(() => import("./pages/CompanyProfile"));
-const UserManagement        = lazy(() => import("./pages/UserManagement"));
+const CompanyProfile        = lazy(() => import("./pages/CompanyProfile/CompanyProfile"));
+const UserManagement        = lazy(() => import("./pages/UserManagement/UserManagement"));
 
 function PageLoader() {
   return (
