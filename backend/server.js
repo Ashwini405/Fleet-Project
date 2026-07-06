@@ -92,6 +92,7 @@ const companyProfileRoutes =
 require("./routes/companyProfileRoutes");
 const userManagementRoutes = require("./routes/userManagementRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
+const roleRoutes = require("./routes/roleRoutes");
 
 
 // Auto-create tyre_notifications table
@@ -294,6 +295,7 @@ app.use(
     "/api/employees",
     employeeRoutes
 );
+app.use("/api/roles", roleRoutes);
 
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {
