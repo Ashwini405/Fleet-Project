@@ -1,11 +1,25 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Database, Download, Upload, Trash2, RefreshCw, Search, X,
-  CheckCircle2, AlertTriangle, Clock, HardDrive, Shield,
-  Calendar, ChevronLeft, ChevronRight, Archive, RotateCcw,
-  Server, Lock, Cloud, Zap, Settings, Play,
+  CheckCircle2, AlertTriangle, Clock, HardDrive, Calendar,
+  ChevronLeft, ChevronRight, Archive, RotateCcw,
+  Server, Lock, Cloud, Settings, Play,
 } from 'lucide-react';
-import { MOCK_BACKUPS, TIMELINE_ITEMS, DEFAULT_CONFIG } from './data';
+import {
+  DEFAULT_CONFIG,
+  formatBackup,
+  formatTimeline
+} from './data';
+import {
+  getBackups,
+  createBackup,
+  deleteBackup,
+  restoreBackup,
+  downloadBackup,
+  getTimeline,
+  getSettings,
+  updateSettings as saveSettings
+} from '../../services/backupRestoreService';
 import { Toggle, StatusBadge, TypeBadge, SectionCard } from './BackupComponents';
 import ConfirmModal from './ConfirmModal';
 
@@ -16,26 +30,28 @@ const PAGE_SIZE = 8;
 export default function BackupRestore() {
   const restorePanelRef = useRef(null);
 
-  const [config,         setConfig]         = useState({ ...DEFAULT_CONFIG });
+  const [config, setConfig] = useState({ ...DEFAULT_CONFIG });
   const [originalConfig, setOriginalConfig] = useState({ ...DEFAULT_CONFIG });
-  const [backups,        setBackups]        = useState(MOCK_BACKUPS);
-  const [search,         setSearch]         = useState('');
-  const [filterType,     setFilterType]     = useState('All');
-  const [filterStatus,   setFilterStatus]   = useState('All');
-  const [dateFrom,       setDateFrom]       = useState('');
-  const [dateTo,         setDateTo]         = useState('');
-  const [page,           setPage]           = useState(1);
-  const [modal,          setModal]          = useState({ type: null, backup: null });
-  const [restoreType,    setRestoreType]    = useState('full');
+  const [backups, setBackups] = useState([]);
+  const [search, setSearch] = useState('');
+  const [filterType, setFilterType] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [page, setPage] = useState(1);
+  const [modal, setModal] = useState({ type: null, backup: null });
+  const [restoreType, setRestoreType] = useState('full');
   const [restoreConfirm, setRestoreConfirm] = useState(false);
-  const [panelBackupId,  setPanelBackupId]  = useState('');
-  const [panelScope,     setPanelScope]     = useState('full');
-  const [panelConfirm,   setPanelConfirm]   = useState(false);
-  const [toast,          setToast]          = useState({ show: false, msg: '', type: 'success' });
-  const [savingConfig,   setSavingConfig]   = useState(false);
-  const [savedConfig,    setSavedConfig]    = useState(false);
-  const [creating,       setCreating]       = useState(false);
-  const [refreshed,      setRefreshed]      = useState(false);
+  const [panelBackupId, setPanelBackupId] = useState('');
+  const [panelScope, setPanelScope] = useState('full');
+  const [panelConfirm, setPanelConfirm] = useState(false);
+  const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
+  const [savingConfig, setSavingConfig] = useState(false);
+  const [savedConfig, setSavedConfig] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [refreshed, setRefreshed] = useState(false);
+  const [timeline, setTimeline] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const setCfg = (k, v) => setConfig(p => ({ ...p, [k]: v }));
   const configChanged = Object.keys(DEFAULT_CONFIG).some(k => config[k] !== originalConfig[k]);
@@ -45,7 +61,53 @@ export default function BackupRestore() {
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 3200);
   };
 
-  // Filtered + paginated list
+  // ── Load Page Data ──────────────────────────────────────────────────────────
+
+  const loadPage = async () => {
+    try {
+      setLoading(true);
+
+      const backupRes = await getBackups();
+      const settingRes = await getSettings();
+      const timelineRes = await getTimeline();
+
+      setBackups(
+        (backupRes.data || []).map(formatBackup)
+      );
+
+      if (settingRes.data) {
+        const s = settingRes.data;
+        const cfg = {
+          autoBackup: s.auto_backup,
+          frequency: s.frequency,
+          backupTime: s.backup_time,
+          retention: String(s.retention_days),
+          storage: s.storage,
+          compress: s.compression,
+          encrypt: s.encryption
+        };
+        setConfig(cfg);
+        setOriginalConfig(cfg);
+      }
+
+      setTimeline(
+        (timelineRes.data || []).map(formatTimeline)
+      );
+
+    } catch (err) {
+      console.error('Error loading page:', err);
+      showToast('Failed to load backup data', 'warning');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPage();
+  }, []);
+
+  // ── Filtered + paginated list ─────────────────────────────────────────────
+
   const filtered = useMemo(() => {
     return backups.filter(b => {
       if (search && !b.id.toLowerCase().includes(search.toLowerCase()) &&
@@ -67,19 +129,27 @@ export default function BackupRestore() {
   const completedBackups = backups.filter(b => b.status === 'Completed');
   const usedPct = 76;
 
-  // ── Action handlers
+  // ── Action handlers ─────────────────────────────────────────────────────────
+
   const handleSaveConfig = async () => {
-    setSavingConfig(true);
-    await new Promise(r => setTimeout(r, 900));
-    setOriginalConfig({ ...config });
-    setSavingConfig(false);
-    setSavedConfig(true);
-    showToast('Backup configuration saved successfully.');
-    setTimeout(() => setSavedConfig(false), 2500);
+    try {
+      setSavingConfig(true);
+      await saveSettings(config);
+      setOriginalConfig({ ...config });
+      setSavedConfig(true);
+      showToast('Backup configuration saved successfully.');
+      setTimeout(() => setSavedConfig(false), 2500);
+    } catch (err) {
+      console.error('Error saving config:', err);
+      showToast('Unable to save settings', 'warning');
+    } finally {
+      setSavingConfig(false);
+    }
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshed(true);
+    await loadPage();
     setTimeout(() => setRefreshed(false), 800);
     showToast('Backup list refreshed.');
   };
@@ -88,23 +158,25 @@ export default function BackupRestore() {
     const { type, backup } = modal;
     setModal({ type: null, backup: null });
 
-    if (type === 'create') {
-      setCreating(true);
-      await new Promise(r => setTimeout(r, 1800));
-      const newId = `BKP-20260702-NEW`;
-      setBackups(p => [{
-        id: newId, date: '02-Jul-2026', iso: '2026-07-02', time: 'Just now',
-        type: 'Manual', size: '1.84 GB', createdBy: 'Ashwini Kumar',
-        status: 'Completed',
-        location: config.storage === 'cloud' ? 'Cloud' : config.storage === 'local' ? 'Local' : 'Both',
-      }, ...p]);
+    try {
+      if (type === 'create') {
+        setCreating(true);
+        await createBackup();
+        await loadPage();
+        showToast('Manual backup created successfully.');
+        setCreating(false);
+      } else if (type === 'restore') {
+        await restoreBackup(backup.id);
+        showToast('Restore started.', 'warning');
+      } else if (type === 'delete') {
+        await deleteBackup(backup.id);
+        await loadPage();
+        showToast(`Backup ${backup.id} deleted successfully.`);
+      }
+    } catch (err) {
+      console.error('Error in confirm action:', err);
+      showToast('Operation failed. Please try again.', 'warning');
       setCreating(false);
-      showToast('Manual backup created successfully.');
-    } else if (type === 'restore') {
-      showToast(`Database restore initiated from ${backup?.id}.`, 'warning');
-    } else if (type === 'delete') {
-      setBackups(p => p.filter(b => b.id !== backup?.id));
-      showToast(`Backup ${backup?.id} deleted permanently.`);
     }
   };
 
@@ -114,9 +186,46 @@ export default function BackupRestore() {
     setRestoreConfirm(false);
   };
 
+  const getFileNameFromDisposition = (header) => {
+    if (!header) return null;
+    const matches = /filename\*?=(?:UTF-8''?)?["']?([^"';]+)["']?/.exec(header);
+    return matches ? decodeURIComponent(matches[1]) : null;
+  };
+
+  const handleDownloadBackup = async (id) => {
+    try {
+      const response = await downloadBackup(id);
+      const contentDisposition = response.headers['content-disposition'] || response.headers['Content-Disposition'];
+      const fileName = getFileNameFromDisposition(contentDisposition) || `backup_${id}.sql`;
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showToast(`Backup ${id} download started.`);
+    } catch (err) {
+      console.error('Error downloading backup:', err);
+      showToast('Failed to download backup', 'warning');
+    }
+  };
+
   const scrollToRestorePanel = () => {
     restorePanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
+
+  // ── Loading State ──────────────────────────────────────────────────────────
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-96">
+        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+        <p className="mt-4 text-sm text-slate-500 font-medium">Loading Backup & Restore...</p>
+      </div>
+    );
+  }
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -325,7 +434,7 @@ export default function BackupRestore() {
                     <div className="flex items-center gap-1">
                       {b.status === 'Completed' && (
                         <>
-                          <button onClick={() => showToast(`Downloading ${b.id}…`)}
+                          <button onClick={() => handleDownloadBackup(b.id)}
                             className="flex items-center gap-1 px-2 py-1 text-[11px] font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors whitespace-nowrap">
                             <Download className="w-3 h-3" /> Download
                           </button>
@@ -487,9 +596,9 @@ export default function BackupRestore() {
         <div className="lg:col-span-2">
           <SectionCard title="Backup Activity" icon={Clock}>
             <div className="space-y-0">
-              {TIMELINE_ITEMS.map((item, i) => {
+              {timeline.map((item, i) => {
                 const Ico = item.icon;
-                const isLast = i === TIMELINE_ITEMS.length - 1;
+                const isLast = i === timeline.length - 1;
                 const isFailed = item.status === 'Failed';
                 return (
                   <div key={i} className="flex gap-3">
@@ -688,7 +797,13 @@ export default function BackupRestore() {
               sub: 'Save the latest backup to your device',
               iconColor: 'bg-green-50 text-green-600',
               btnColor:  'bg-green-600 hover:bg-green-700 text-white',
-              action: () => showToast('Downloading latest backup file…'),
+              action: () => {
+                if (completedBackups.length > 0) {
+                  handleDownloadBackup(completedBackups[0].id);
+                } else {
+                  showToast('No completed backups available', 'warning');
+                }
+              },
             },
             {
               icon: Trash2, label: 'Cleanup Old Backups',
