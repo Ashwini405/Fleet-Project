@@ -5,6 +5,7 @@ const multer = require("multer");
 const path = require("path");
 
 const companyProfileController = require("../controllers/companyProfileController");
+const { protect } = require("../middleware/permissionMiddleware");
 
 // ======================================================
 // Multer Storage
@@ -141,6 +142,8 @@ router.post(
 
     "/",
 
+    ...protect("Company Profile", "create"),
+
     uploadFields,
 
     companyProfileController.createCompanyProfile
@@ -153,6 +156,8 @@ router.get(
 
     "/",
 
+    ...protect("Company Profile", "view"),
+
     companyProfileController.getCompanyProfile
 
 );
@@ -163,6 +168,8 @@ router.get(
 
     "/:id",
 
+    ...protect("Company Profile", "view"),
+
     companyProfileController.getCompanyProfileById
 
 );
@@ -172,6 +179,8 @@ router.get(
 router.put(
 
     "/:id",
+
+    ...protect("Company Profile", "edit"),
 
     uploadFields,
 
@@ -184,6 +193,8 @@ router.put(
 router.delete(
 
     "/:id",
+
+    ...protect("Company Profile", "delete"),
 
     companyProfileController.deleteCompanyProfile
 

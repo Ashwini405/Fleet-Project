@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 
 const backupRestoreController = require("../controllers/backupRestoreController");
+const { protect } = require("../middleware/permissionMiddleware");
 
 /* ===========================================================
    CREATE BACKUP
@@ -10,6 +11,7 @@ const backupRestoreController = require("../controllers/backupRestoreController"
 
 router.post(
     "/create",
+    ...protect("Backup & Restore", "create"),
     backupRestoreController.createBackup
 );
 
@@ -19,6 +21,7 @@ router.post(
 
 router.get(
     "/",
+    ...protect("Backup & Restore", "view"),
     backupRestoreController.getAllBackups
 );
 
@@ -28,6 +31,7 @@ router.get(
 
 router.get(
     "/dashboard",
+    ...protect("Backup & Restore", "view"),
     backupRestoreController.getDashboardCounts
 );
 
@@ -37,6 +41,7 @@ router.get(
 
 router.get(
     "/timeline",
+    ...protect("Backup & Restore", "view"),
     backupRestoreController.getTimeline
 );
 
@@ -46,11 +51,13 @@ router.get(
 
 router.get(
     "/settings",
+    ...protect("Backup & Restore", "view"),
     backupRestoreController.getSettings
 );
 
 router.put(
     "/settings",
+    ...protect("Backup & Restore", "edit"),
     backupRestoreController.updateSettings
 );
 
@@ -60,6 +67,7 @@ router.put(
 
 router.get(
     "/download/:id",
+    ...protect("Backup & Restore", "export"),
     backupRestoreController.downloadBackup
 );
 
@@ -69,6 +77,7 @@ router.get(
 
 router.get(
     "/verify/:id",
+    ...protect("Backup & Restore", "view"),
     backupRestoreController.verifyBackup
 );
 
@@ -78,6 +87,7 @@ router.get(
 
 router.post(
     "/restore/:id",
+    ...protect("Backup & Restore", "edit"),
     backupRestoreController.restoreBackup
 );
 
@@ -88,6 +98,7 @@ router.post(
 // ── MOVED HERE: To prevent "download" and "verify" being treated as :id ──
 router.get(
     "/:id",
+    ...protect("Backup & Restore", "view"),
     backupRestoreController.getBackupById
 );
 
@@ -97,6 +108,7 @@ router.get(
 
 router.delete(
     "/:id",
+    ...protect("Backup & Restore", "delete"),
     backupRestoreController.deleteBackup
 );
 

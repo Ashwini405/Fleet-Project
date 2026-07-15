@@ -7,13 +7,17 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "migrate:inspection-defects": "node migrateInspectionDefects.js",
-    "migrate:repair-inspection-links": "node migrateRepairInspectionLinks.js"
+    "migrate:repair-inspection-links": "node migrateRepairInspectionLinks.js",
+    "migrate:auth-rbac": "node migrateAuthRbac.js",
+    "seed:test-users": "node seedTestUsers.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.3",
     "multer": "^2.1.1",
     "mysql2": "^3.9.7"
   },

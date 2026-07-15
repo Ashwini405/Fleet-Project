@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { TrendingDown, Plus, Eye, Fuel, Wrench, CircleDot, BatteryCharging, UserRound, Utensils, Route, MoreHorizontal, Landmark } from "lucide-react";
 import Modal from "../components/Modal";
 import AddExpenseForm from "./AddExpenseForm";
+import Can from "../../../components/Can";
 
 const TONE = {
   orange: {
@@ -167,12 +168,14 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo }) {
           </h2>
           <p className="text-xs text-gray-500 mt-0.5">View all your expense history</p>
         </div>
-        <button
-          onClick={() => setView("add")}
-          className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl shadow-sm transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Add Expense
-        </button>
+        <Can module="Income & Expense" action="create">
+          <button
+            onClick={() => setView("add")}
+            className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl shadow-sm transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Add Expense
+          </button>
+        </Can>
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">

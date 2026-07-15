@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 
 const UserManagementController = require("../controllers/userManagementController");
+const { protect } = require("../middleware/permissionMiddleware");
 
 // ==========================================================
 // Dashboard
@@ -10,6 +11,7 @@ const UserManagementController = require("../controllers/userManagementControlle
 
 router.get(
     "/dashboard",
+    ...protect("User Management", "view"),
     UserManagementController.getDashboardCounts
 );
 
@@ -20,42 +22,49 @@ router.get(
 // Get All Users
 router.get(
     "/",
+    ...protect("User Management", "view"),
     UserManagementController.getAllUsers
 );
 
 // Get User By ID
 router.get(
     "/:id",
+    ...protect("User Management", "view"),
     UserManagementController.getUserById
 );
 
 // Create User
 router.post(
     "/",
+    ...protect("User Management", "create"),
     UserManagementController.createUser
 );
 
 // Update User
 router.put(
     "/:id",
+    ...protect("User Management", "edit"),
     UserManagementController.updateUser
 );
 
 // Soft Delete User
 router.delete(
     "/:id",
+    ...protect("User Management", "delete"),
     UserManagementController.deleteUser
 );
 
 // Update User Status
 router.patch(
     "/:id/status",
+    ...protect("User Management", "edit"),
     UserManagementController.updateUserStatus
 );
 
 // Reset Password
 router.post(
     "/:id/reset-password",
+    ...protect("User Management", "edit"),
     UserManagementController.resetPassword
 );
 
@@ -66,18 +75,21 @@ router.post(
 // Get User Permissions
 router.get(
     "/:id/permissions",
+    ...protect("User Management", "view"),
     UserManagementController.getUserPermissions
 );
 
 // Save User Permissions
 router.put(
     "/:id/permissions",
+    ...protect("User Management", "edit"),
     UserManagementController.saveUserPermissions
 );
 
 // Initialize Default Permissions
 router.post(
     "/:id/init-permissions",
+    ...protect("User Management", "edit"),
     UserManagementController.initPermissions
 );
 
@@ -88,6 +100,7 @@ router.post(
 // Get Login History
 router.get(
     "/:id/login-history",
+    ...protect("User Management", "view"),
     UserManagementController.getLoginHistory
 );
 
@@ -98,6 +111,7 @@ router.get(
 // Get Audit Logs
 router.get(
     "/:id/audit-logs",
+    ...protect("Audit Logs", "view"),
     UserManagementController.getAuditLogs
 );
 

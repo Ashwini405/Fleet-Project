@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Plus, Search, Calendar, Eye, Clock } from 'lucide-react';
 import RegisterPeriodicServiceModal from './RegisterPeriodicServiceModal';
+import Can from '../../../components/Can';
 
 export default function PeriodicServiceTab() {
   const navigate = useNavigate();
@@ -41,12 +42,14 @@ export default function PeriodicServiceTab() {
         <h2 className="text-lg font-bold text-gray-900 tracking-tight flex items-center gap-2">
           <Clock className="w-5 h-5 text-teal-600" /> Periodic Maintenance Log
         </h2>
-        <button 
-          onClick={() => setIsAddOpen(true)}
-          className="flex items-center justify-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-green-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> Register Service
-        </button>
+        <Can module="Maintenance" action="create">
+          <button
+            onClick={() => setIsAddOpen(true)}
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-lg text-sm font-bold shadow-sm hover:bg-green-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> Register Service
+          </button>
+        </Can>
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">

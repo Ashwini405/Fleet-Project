@@ -7,6 +7,7 @@ import {
   avatarColor, initials,
 } from './userManagementData';
 import { Toggle } from './UserManagementHelpers';
+import api from '../../services/api';
 
 // ─── Add User Drawer ──────────────────────────────────────────────────────────
 
@@ -16,30 +17,30 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
   const [saving, setSaving]       = useState(false);
   const [empSearch, setEmpSearch] = useState('');
   const [employees, setEmployees] = useState([]);
+  const [roles, setRoles]         = useState([]);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [empOpen, setEmpOpen]     = useState(false);
   const empRef = useRef(null);
 
-  const API_URL = import.meta.env.VITE_API_URL 
-    ? `${import.meta.env.VITE_API_URL}` 
-    : "http://localhost:5001/api";
-
-  // ── Fetch employees for dropdown ──
+  // ── Fetch employees + roles on open ──
   useEffect(() => {
-    if (open) {
-      fetchEmployees();
-    }
+    if (open) { fetchEmployees(); fetchRoles(); }
   }, [open]);
+
+  const fetchRoles = async () => {
+    try {
+      const { data } = await api.get('/roles');
+      if (data.success) setRoles(data.data.filter(r => r.status === 'Active').map(r => r.role_name));
+    } catch (e) {
+      console.error('Error fetching roles:', e);
+    }
+  };
 
   const fetchEmployees = async () => {
     try {
       setLoadingEmployees(true);
-      const response = await fetch(`${API_URL}/employees/dropdown`);
-      const result = await response.json();
-
-      if (result.success) {
-        setEmployees(result.data || []);
-      }
+      const { data } = await api.get('/employees/dropdown');
+      if (data.success) setEmployees(data.data || []);
     } catch (error) {
       console.error('Error fetching employees:', error);
     } finally {
@@ -136,36 +137,23 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
       setSaving(true);
       const emp = employees.find(x => x.id === form.empId);
 
-      const response = await fetch(
-        `${API_URL}/users`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            employee_id: form.empId,
-            employee_name: emp?.name || '',
-            username: form.username.trim(),
-            email: form.email.trim(),
-            phone: form.phone,
-            department: emp?.dept || '',
-            plant: form.plant,
-            role: form.role,
-            password: form.password,
-            status: form.status,
-            allow_web: form.allowWeb,
-            allow_mobile: form.allowMobile,
-            force_password_reset: form.forceReset,
-            created_by: "Admin",
-            updated_by: "Admin"
-          })
-        }
-      );
+      const { data: result } = await api.post('/users', {
+        employee_id: form.empId,
+        employee_name: emp?.name || '',
+        username: form.username.trim(),
+        email: form.email.trim(),
+        phone: form.phone,
+        department: emp?.dept || '',
+        plant: form.plant,
+        role: form.role,
+        password: form.password,
+        status: form.status,
+        allow_web: form.allowWeb,
+        allow_mobile: form.allowMobile,
+        force_password_reset: form.forceReset,
+      });
 
-      const result = await response.json();
-
-      if (!response.ok) {
+      if (!result.success) {
         alert(result.message || 'Failed to create user');
         setSaving(false);
         return;
@@ -347,7 +335,7 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
                 className={`input bg-white cursor-pointer ${errors.role ? 'border-red-300' : ''}`}
               >
                 <option value="">Select role...</option>
-                {ROLES.map(r => <option key={r}>{r}</option>)}
+                {roles.map(r => <option key={r}>{r}</option>)}
               </select>
               {errors.role && <p className="text-[11px] text-red-500 mt-1 font-bold">{errors.role}</p>}
             </div>

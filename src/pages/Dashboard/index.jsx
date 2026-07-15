@@ -1,12 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCw, LayoutDashboard } from 'lucide-react';
-
-import {
-  kpiData, analyticsData, fleetStatusData, maintenanceData,
-  fuelData, driverData, financialSummary, inventoryData,
-  notificationsData, recentActivities, quickActions,
-} from './mockData';
+import api from '../../services/api';
 
 import { FleetKpiRow, TripKpiRow, FinanceKpiRow, StaffKpiRow } from './components/KpiCards';
 import { AnalyticsWidget } from './components/AnalyticsWidget';
@@ -14,8 +9,8 @@ import {
   FleetStatusWidget, MaintenanceWidget, FuelWidget,
   DriverWidget, FinancialSummaryWidget, InventoryWidget,
 } from './components/SummaryWidgets';
-import { NotificationsPanel, RecentActivitiesWidget } from './components/ActivityWidgets';
 import { QuickActionsWidget } from './components/QuickActionsWidget';
+import { quickActions } from './mockData';
 
 function SectionLabel({ title, sub }) {
   return (
@@ -26,20 +21,64 @@ function SectionLabel({ title, sub }) {
   );
 }
 
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-8 h-8 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+}
+
+// Safe fallback shapes so widgets never crash on partial data
+const EMPTY = {
+  kpi: {
+    fleet:   { total: 0, active: 0, underMaintenance: 0, available: 0 },
+    trips:   { running: 0, completed: 0, cancelled: 0 },
+    finance: { totalRevenue: 0, totalExpenses: 0, netProfit: 0 },
+    staff:   { totalDrivers: 0, onTrip: 0, available: 0 },
+  },
+  analytics:       { monthly: [] },
+  fleetStatus:     { running: 0, idle: 0, underService: 0, dueForInspection: 0 },
+  maintenance:     { servicesDue: 0, inWorkshop: 0, pendingRepairs: 0, upcomingPeriodic: 0, recentServices: [] },
+  fuel:            { totalFuelCost: 0, fuelFilledToday: 0, averageMileage: 0, topConsumer: { vehicle: '-', litres: 0 }, recent: [] },
+  driver:          { total: 0, onTrip: 0, available: 0, pendingSettlements: 0, recentSettlements: [] },
+  financialSummary:{ breakdown: [] },
+  inventory:       { lowStock: 0, outOfStock: 0, pendingPOs: 0, items: [] },
+};
+
 export default function Dashboard() {
+  const [data, setData]       = useState(EMPTY);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const navigate = useNavigate();
 
-  const now = new Date();
+  const now     = new Date();
   const timeStr = now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
   const dateStr = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
-  const criticalCount = notificationsData.filter(n => n.severity === 'critical').length;
+  const fetchKpis = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.get('/dashboard/kpis');
+      setData({ ...EMPTY, ...res.data.data });
+    } catch (err) {
+      console.error('Dashboard KPI fetch error:', err);
+      setError('Could not load dashboard data.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchKpis(); }, [fetchKpis, refreshKey]);
+
+  if (loading) return <PageLoader />;
 
   return (
     <div className="w-full max-w-[1600px] mx-auto pb-12 space-y-8">
 
-      {/* ── Page Header ──────────────────────────────────────────────────────── */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-md">
@@ -51,11 +90,10 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {criticalCount > 0 && (
-            <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-600 text-xs font-bold px-3 py-1.5 rounded-lg">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-              {criticalCount} Critical Alert{criticalCount > 1 ? 's' : ''}
-            </div>
+          {error && (
+            <span className="text-xs font-bold text-red-600 bg-red-50 border border-red-200 px-3 py-1.5 rounded-lg">
+              {error}
+            </span>
           )}
           <button
             onClick={() => setRefreshKey(k => k + 1)}
@@ -66,68 +104,50 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ── Section 11: Quick Actions ─────────────────────────────────────────── */}
+      {/* Quick Actions */}
       <div>
         <SectionLabel title="Quick Actions" sub="Shortcut to key operations" />
         <QuickActionsWidget actions={quickActions} />
       </div>
 
-      {/* ── Section 1: KPI Cards ──────────────────────────────────────────────── */}
+      {/* KPI Cards */}
       <div className="space-y-4">
         <SectionLabel title="Fleet Overview" />
-        <FleetKpiRow data={kpiData.fleet} />
+        <FleetKpiRow data={data.kpi.fleet} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div>
             <SectionLabel title="Trip Overview" />
-            <TripKpiRow data={kpiData.trips} />
+            <TripKpiRow data={data.kpi.trips} />
           </div>
           <div>
             <SectionLabel title="Staff Overview" />
-            <StaffKpiRow data={kpiData.staff} />
+            <StaffKpiRow data={data.kpi.staff} />
           </div>
         </div>
 
         <div>
           <SectionLabel title="Financial Overview" />
-          <FinanceKpiRow data={kpiData.finance} />
+          <FinanceKpiRow data={data.kpi.finance} />
         </div>
       </div>
 
-      {/* ── Section 2: Revenue & Expense Analytics ────────────────────────────── */}
+      {/* Analytics */}
       <div>
         <SectionLabel title="Revenue & Expense Analytics" sub="Monthly financial performance across all operations" />
-        <AnalyticsWidget data={analyticsData} />
+        <AnalyticsWidget data={data.analytics} />
       </div>
 
-      {/* ── Sections 3-8: Operations Grid ────────────────────────────────────── */}
+      {/* Operations Grid */}
       <div>
         <SectionLabel title="Operations Summary" sub="Fleet · Maintenance · Fuel · Drivers · Finance · Inventory" />
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {/* Section 3 */}
-          <FleetStatusWidget data={fleetStatusData} />
-          {/* Section 4 */}
-          <MaintenanceWidget data={maintenanceData} />
-          {/* Section 5 */}
-          <FuelWidget data={fuelData} />
-          {/* Section 6 */}
-          <DriverWidget data={driverData} />
-          {/* Section 7 */}
-          <FinancialSummaryWidget data={financialSummary} />
-          {/* Section 8 */}
-          <InventoryWidget data={inventoryData} />
-        </div>
-      </div>
-
-      {/* ── Sections 9 & 10: Alerts + Activity ───────────────────────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-        <div>
-          <SectionLabel title="Alerts & Notifications" sub="Insurance · Permits · Service · Settlements" />
-          <NotificationsPanel data={notificationsData} />
-        </div>
-        <div>
-          <SectionLabel title="Recent Activities" sub="Latest actions across all modules" />
-          <RecentActivitiesWidget data={recentActivities} />
+          <FleetStatusWidget    data={data.fleetStatus} />
+          <MaintenanceWidget    data={data.maintenance} />
+          <FuelWidget           data={data.fuel} />
+          <DriverWidget         data={data.driver} />
+          <FinancialSummaryWidget data={data.financialSummary} />
+          <InventoryWidget      data={data.inventory} />
         </div>
       </div>
 

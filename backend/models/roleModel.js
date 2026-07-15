@@ -52,23 +52,24 @@ class RoleModel {
     static async getAllRoles() {
         const [rows] = await pool.query(
             `
-            SELECT 
-                id,
-                role_code,
-                role_name,
-                description,
-                department,
-                level,
-                status,
-                is_system_role,
-                color,
-                icon,
-                created_by,
-                updated_by,
-                created_at,
-                updated_at
-            FROM roles
-            ORDER BY level ASC, role_name ASC
+            SELECT
+                r.id,
+                r.role_code,
+                r.role_name,
+                r.description,
+                r.department,
+                r.level,
+                r.status,
+                r.is_system_role,
+                r.color,
+                r.icon,
+                r.created_by,
+                r.updated_by,
+                r.created_at,
+                r.updated_at,
+                (SELECT COUNT(*) FROM users u WHERE u.role = r.role_name AND u.is_deleted = 0) AS users_assigned
+            FROM roles r
+            ORDER BY r.level ASC, r.role_name ASC
             `
         );
         return rows;
@@ -298,42 +299,24 @@ class RoleModel {
     // ==========================================================
 
     static async saveRolePermissions(roleId, permissions) {
-        await pool.query(
-            `
-            DELETE FROM role_permissions
-            WHERE role_id = ?
-            `,
-            [roleId]
-        );
+        await pool.query(`DELETE FROM role_permissions WHERE role_id = ?`, [roleId]);
 
         for (const permission of permissions) {
             await pool.query(
-                `
-                INSERT INTO role_permissions
-                (
-                    role_id,
-                    module_name,
-                    can_view,
-                    can_create,
-                    can_edit,
-                    can_delete,
-                    can_approve,
-                    can_export
-                )
-                VALUES
-                (
-                    ?, ?, ?, ?, ?, ?, ?, ?
-                )
-                `,
+                `INSERT INTO role_permissions
+                (role_id, module_name, can_view, can_create, can_edit, can_delete, can_approve, can_reject, can_export, can_print)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     roleId,
                     permission.module_name,
-                    permission.can_view || false,
-                    permission.can_create || false,
-                    permission.can_edit || false,
-                    permission.can_delete || false,
-                    permission.can_approve || false,
-                    permission.can_export || false
+                    permission.can_view    ? 1 : 0,
+                    permission.can_create  ? 1 : 0,
+                    permission.can_edit    ? 1 : 0,
+                    permission.can_delete  ? 1 : 0,
+                    permission.can_approve ? 1 : 0,
+                    permission.can_reject  ? 1 : 0,
+                    permission.can_export  ? 1 : 0,
+                    permission.can_print   ? 1 : 0,
                 ]
             );
         }
@@ -376,7 +359,7 @@ class RoleModel {
                 status,
                 created_at
             FROM users
-            WHERE role = ?
+            WHERE role = ? AND is_deleted = 0
             ORDER BY employee_name ASC
             `,
             [roleName]
@@ -409,7 +392,7 @@ class RoleModel {
             `
             SELECT COUNT(*) as total
             FROM users
-            WHERE role = ?
+            WHERE role = ? AND is_deleted = 0
             `,
             [roleName]
         );

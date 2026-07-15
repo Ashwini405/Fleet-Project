@@ -247,7 +247,7 @@ const getFuel = async (req, res) => {
   }
 };
 
-// ✅ UPDATE TRIP STATUS
+// ✅ UPDATE TRIP STATUS — on Completed, update vehicle odometer
 const updateTripStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -255,11 +255,18 @@ const updateTripStatus = async (req, res) => {
 
     await Trip.update(id, { trip_status: status });
 
-    res.json({
-      success: true,
-      message: 'Status updated'
-    });
+    // When a trip is completed, push the closing odometer to the vehicle
+    if (status === 'Completed') {
+      const trip = await Trip.getById(id);
+      if (trip?.vehicle_id && trip?.closing_km) {
+        await db.query(
+          `UPDATE vehicles SET current_odometer = GREATEST(IFNULL(current_odometer,0), ?) WHERE id = ?`,
+          [trip.closing_km, trip.vehicle_id]
+        );
+      }
+    }
 
+    res.json({ success: true, message: 'Status updated' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false });

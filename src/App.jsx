@@ -7,8 +7,13 @@ import { DUMMY_VEHICLES } from "./pages/vehicleData";
 import { InventoryProvider } from "./context/InventoryContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import { VendorLedgerProvider } from "./context/VendorLedgerContext";
+import { AuthProvider } from "./context/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 import NotificationBell from "./layout/NotificationBell";
 import CriticalPopup from "./layout/CriticalPopup";
+
+const Login = lazy(() => import("./pages/Login"));
+const AccessDeniedPage = lazy(() => import("./pages/AccessDenied"));
 
 // Lazy-loaded pages
 const Dashboard             = lazy(() => import("./pages/Dashboard"));
@@ -35,6 +40,7 @@ const Finance               = lazy(() => import("./pages/Finance"));
 const Vendors               = lazy(() => import("./pages/Vendors"));
 const Payments              = lazy(() => import("./pages/Payments"));
 const Reports               = lazy(() => import("./pages/Reports"));
+const TruckPLList           = lazy(() => import("./pages/trucksPL/TrucksPLList"));
 const TruckPLDetail         = lazy(() => import("./pages/TruckPL"));
 const Staff                 = lazy(() => import("./pages/Staff"));
 const DriverProfile         = lazy(() => import("./pages/Staff/DriverProfile"));
@@ -130,45 +136,47 @@ function InnerApp() {
           <div className="flex-1 p-4 md:p-6">
             <Suspense fallback={<PageLoader />}>
                   <Routes>
-                    <Route path="/" element={<Dashboard />} />
-                    <Route path="/vehicles" element={<VehicleMaster vehicles={vehicles} setVehicles={setVehicles} />} />
-                    <Route path="/vehicles/add" element={<AddVehicle vehicles={vehicles} setVehicles={setVehicles} />} />
-                    <Route path="/vehicles/bulk-upload" element={<BulkUploadVehicles />} />
-                    <Route path="/vehicles/edit/:id" element={<EditVehicle vehicles={vehicles} setVehicles={setVehicles} />} />
-                    <Route path="/vehicles/:id" element={<VehicleDetails vehicles={vehicles} />} />
-                    <Route path="/trips" element={<TripMaster />} />
-                    <Route path="/trips/new" element={<TripAdd />} />
-                    <Route path="/trips/draft/:id" element={<TripAdd />} />
-                    <Route path="/trips/:id" element={<TripDetails />} />
-                    <Route path="/trips/:id/edit" element={<TripEdit />} />
-                    <Route path="/trips/:id/report" element={<TripReport />} />
-                    <Route path="/fuel/*" element={<Fuel />} />
-                    <Route path="/service" element={<Service />} />
-                    <Route path="/repair/:id" element={<DetailRepairWorks />} />
-                    <Route path="/service/:id" element={<DetailPeriodicService />} />
-                    <Route path="/service/periodic/:id" element={<DetailPeriodicService />} />
-                    <Route path="/service/repair/:id" element={<DetailRepairWorks />} />
-                    <Route path="/tyres" element={<Tyres />} />
-                    <Route path="/parts" element={<Parts />} />
-                    <Route path="/inspection" element={<Inspection />} />
-                    <Route path="/incidents" element={<Incidents />} />
-                    <Route path="/warranties" element={<Warranties />} />
-                    <Route path="/finance" element={<Finance />} />
-                    <Route path="/vendors" element={<Vendors />} />
-                    <Route path="/payments" element={<Payments />} />
-                    <Route path="/reports" element={<Reports />} />
-                    <Route path="/reports/trucks/:truckId" element={<TruckPLDetail />} />
-                    <Route path="/staff" element={<Staff />} />
-                    <Route path="/staff/drivers/:id" element={<DriverProfile />} />
-                    <Route path="/settings" element={<Settings />} />
-                    <Route path="/documents" element={<Documents />} />
-                    <Route path="/audit" element={<AuditLogs />} />
-                    <Route path="/notifications" element={<Notifications />} />
-                    <Route path="/administration" element={<Administration />} />
-                    <Route path="/company-profile" element={<CompanyProfile />} />
-                    <Route path="/user-management" element={<UserManagement />} />
-                    <Route path="/roles-permissions" element={<RolesPermissions />} />
-                    <Route path="/backup-restore" element={<BackupRestore />} />
+                    <Route path="/" element={<ProtectedRoute module="Dashboard"><Dashboard /></ProtectedRoute>} />
+                    <Route path="/vehicles" element={<ProtectedRoute module="Vehicle Master" action="view"><VehicleMaster vehicles={vehicles} setVehicles={setVehicles} /></ProtectedRoute>} />
+                    <Route path="/vehicles/add" element={<ProtectedRoute module="Vehicle Master" action="create"><AddVehicle vehicles={vehicles} setVehicles={setVehicles} /></ProtectedRoute>} />
+                    <Route path="/vehicles/bulk-upload" element={<ProtectedRoute module="Vehicle Master" action="create"><BulkUploadVehicles /></ProtectedRoute>} />
+                    <Route path="/vehicles/edit/:id" element={<ProtectedRoute module="Vehicle Master" action="edit"><EditVehicle vehicles={vehicles} setVehicles={setVehicles} /></ProtectedRoute>} />
+                    <Route path="/vehicles/:id" element={<ProtectedRoute module="Vehicle Master" action="view"><VehicleDetails vehicles={vehicles} /></ProtectedRoute>} />
+                    <Route path="/trips" element={<ProtectedRoute module="Trip Master" action="view"><TripMaster /></ProtectedRoute>} />
+                    <Route path="/trips/new" element={<ProtectedRoute module="Trip Master" action="create"><TripAdd /></ProtectedRoute>} />
+                    <Route path="/trips/draft/:id" element={<ProtectedRoute module="Trip Master" action="create"><TripAdd /></ProtectedRoute>} />
+                    <Route path="/trips/:id" element={<ProtectedRoute module="Trip Master" action="view"><TripDetails /></ProtectedRoute>} />
+                    <Route path="/trips/:id/edit" element={<ProtectedRoute module="Trip Master" action="edit"><TripEdit /></ProtectedRoute>} />
+                    <Route path="/trips/:id/report" element={<ProtectedRoute module="Trip Master" action="view"><TripReport /></ProtectedRoute>} />
+                    <Route path="/fuel/*" element={<ProtectedRoute module="Fuel" action="view"><Fuel /></ProtectedRoute>} />
+                    <Route path="/service" element={<ProtectedRoute module="Maintenance" action="view"><Service /></ProtectedRoute>} />
+                    <Route path="/repair/:id" element={<ProtectedRoute module="Maintenance" action="view"><DetailRepairWorks /></ProtectedRoute>} />
+                    <Route path="/service/:id" element={<ProtectedRoute module="Maintenance" action="view"><DetailPeriodicService /></ProtectedRoute>} />
+                    <Route path="/service/periodic/:id" element={<ProtectedRoute module="Maintenance" action="view"><DetailPeriodicService /></ProtectedRoute>} />
+                    <Route path="/service/repair/:id" element={<ProtectedRoute module="Maintenance" action="view"><DetailRepairWorks /></ProtectedRoute>} />
+                    <Route path="/tyres" element={<ProtectedRoute module="Tyres" action="view"><Tyres /></ProtectedRoute>} />
+                    <Route path="/parts" element={<ProtectedRoute module="Inventory" action="view"><Parts /></ProtectedRoute>} />
+                    <Route path="/inspection" element={<ProtectedRoute module="Maintenance" action="view"><Inspection /></ProtectedRoute>} />
+                    <Route path="/incidents" element={<ProtectedRoute module="Maintenance" action="view"><Incidents /></ProtectedRoute>} />
+                    <Route path="/warranties" element={<ProtectedRoute module="Maintenance" action="view"><Warranties /></ProtectedRoute>} />
+                    <Route path="/finance" element={<ProtectedRoute module="Income & Expense" action="view"><Finance /></ProtectedRoute>} />
+                    <Route path="/vendors" element={<ProtectedRoute module="Vendor" action="view"><Vendors /></ProtectedRoute>} />
+                    <Route path="/payments" element={<ProtectedRoute module="Operational Payments" action="view"><Payments /></ProtectedRoute>} />
+                    <Route path="/reports" element={<ProtectedRoute module="Reports" action="view"><Reports /></ProtectedRoute>} />
+                    <Route path="/reports/trucks" element={<ProtectedRoute module="Truck Profit & Loss" action="view"><TruckPLList /></ProtectedRoute>} />
+                    <Route path="/reports/trucks/:truckId" element={<ProtectedRoute module="Truck Profit & Loss" action="view"><TruckPLDetail /></ProtectedRoute>} />
+                    <Route path="/staff" element={<ProtectedRoute module="Staff Management" action="view"><Staff /></ProtectedRoute>} />
+                    <Route path="/staff/drivers/:id" element={<ProtectedRoute module="Staff Management" action="view"><DriverProfile /></ProtectedRoute>} />
+                    <Route path="/settings" element={<ProtectedRoute module="System Settings" action="view"><Settings /></ProtectedRoute>} />
+                    <Route path="/documents" element={<ProtectedRoute module="Document Vault" action="view"><Documents /></ProtectedRoute>} />
+                    <Route path="/audit" element={<ProtectedRoute module="Audit Logs" action="view"><AuditLogs /></ProtectedRoute>} />
+                    <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+                    <Route path="/administration" element={<ProtectedRoute module="Administration" action="view"><Administration /></ProtectedRoute>} />
+                    <Route path="/company-profile" element={<ProtectedRoute module="Company Profile" action="view"><CompanyProfile /></ProtectedRoute>} />
+                    <Route path="/user-management" element={<ProtectedRoute module="User Management" action="view"><UserManagement /></ProtectedRoute>} />
+                    <Route path="/roles-permissions" element={<ProtectedRoute module="Roles & Permissions" action="view"><RolesPermissions /></ProtectedRoute>} />
+                    <Route path="/backup-restore" element={<ProtectedRoute module="Backup & Restore" action="view"><BackupRestore /></ProtectedRoute>} />
+                    <Route path="/403" element={<AccessDeniedPage />} />
                   </Routes>
                 </Suspense>
               </div>
@@ -178,14 +186,32 @@ function InnerApp() {
       );
     }
 
+    function AppRoutes() {
+      return (
+        <Routes>
+          <Route path="/login" element={<Suspense fallback={<PageLoader />}><Login /></Suspense>} />
+          <Route
+            path="/*"
+            element={
+              <ProtectedRoute>
+                <InnerApp />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      );
+    }
+
     export default function App() {
       return (
         <BrowserRouter>
-          <NotificationProvider>
-          <VendorLedgerProvider>
-            <InnerApp />
-          </VendorLedgerProvider>
-          </NotificationProvider>
+          <AuthProvider>
+            <NotificationProvider>
+            <VendorLedgerProvider>
+              <AppRoutes />
+            </VendorLedgerProvider>
+            </NotificationProvider>
+          </AuthProvider>
         </BrowserRouter>
       );
     }

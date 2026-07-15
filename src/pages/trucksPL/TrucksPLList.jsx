@@ -6,7 +6,7 @@ import FleetSummaryCards from './FleetSummaryCards';
 import FiltersPanel from './FiltersPanel';
 import { RevenueTooltip, ExpensesTooltip, ProfitTooltip } from './ColumnTooltips';
 import { StatusBadge, SortIcon, nextSort, applySorting, INR, formatDate } from './TableHelpers';
-import { periodDisplay } from './periodService';
+import { periodDisplay, resolvePeriod } from './periodService';
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
@@ -66,7 +66,10 @@ function PeriodStrip({ periodKey, startDate, endDate }) {
   );
 }
 
-export default function TrucksPLList({ periodKey = 'last30', startDate, endDate }) {
+export default function TrucksPLList({ periodKey = 'last30', startDate: startDateProp, endDate: endDateProp }) {
+  const { startDate: resolvedStart, endDate: resolvedEnd } = resolvePeriod(periodKey);
+  const startDate = startDateProp ?? resolvedStart;
+  const endDate   = endDateProp   ?? resolvedEnd;
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [fleetData, setFleetData] = useState([]);

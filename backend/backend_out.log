@@ -1,0 +1,7 @@
+Server is running on port 5001
+Database connected successfully!
+warranty_notifications table ready
+[WarrantyChecker] Scheduled — every 24 hours
+[WarrantyChecker] Running expiry check...
+tyre_notifications table ready
+[WarrantyChecker] Done — 0 status updates, 0 notifications created.

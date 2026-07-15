@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const path = require('path');
 
 const vehicleRoutes = require('./routes/vehicleRoutes');
@@ -94,6 +95,7 @@ const userManagementRoutes = require("./routes/userManagementRoutes");
 const employeeRoutes = require("./routes/employeeRoutes");
 const roleRoutes = require("./routes/roleRoutes");
 const backupRestoreRoutes = require("./routes/backupRestoreRoutes");
+const authRoutes = require("./routes/authRoutes");
 
 
 // Auto-create tyre_notifications table
@@ -137,7 +139,15 @@ db.query(`
 
 
 // 🔥 MIDDLEWARE
-app.use(cors());
+const allowedOrigins = (process.env.FRONTEND_ORIGIN || 'http://localhost:5173,http://localhost:5174')
+  .split(',')
+  .map((origin) => origin.trim());
+
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+}));
+app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // ✅ IMPORTANT for form-data
 
@@ -147,6 +157,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
 // 🔥 API ROUTES
+app.use('/api/auth', authRoutes);
 app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/stations', stationRoutes);
 app.use('/api/supervisors', supervisorRoutes);

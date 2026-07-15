@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import Can from '../components/Can';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiSearch,
@@ -711,10 +712,12 @@ export default function TripMaster() {
               <FiDownload className="w-4 h-4" />
               Export
             </button>
-            <button onClick={() => navigate('/trips/new')} className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 shadow-sm transition-all duration-200 flex items-center gap-2 font-medium">
-              <FiPlus className="w-4 h-4" />
-              New Trip
-            </button>
+            <Can module="Trip Master" action="create">
+              <button onClick={() => navigate('/trips/new')} className="px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl hover:from-indigo-700 hover:to-purple-700 shadow-sm transition-all duration-200 flex items-center gap-2 font-medium">
+                <FiPlus className="w-4 h-4" />
+                New Trip
+              </button>
+            </Can>
           </div>
         </motion.div>
 
@@ -941,12 +944,14 @@ export default function TripMaster() {
                           >
                             Resume Editing
                           </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setDeleteConfirm(trip.id); }}
-                            className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition"
-                          >
-                            <FiTrash2 className="w-3 h-3 inline mr-1" /> Delete
-                          </button>
+                          <Can module="Trip Master" action="delete">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setDeleteConfirm(trip.id); }}
+                              className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition"
+                            >
+                              <FiTrash2 className="w-3 h-3 inline mr-1" /> Delete
+                            </button>
+                          </Can>
                         </div>
                       </td>
                     </tr>

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { FiSearch, FiPlus, FiFilter, FiSettings, FiLayers, FiX, FiTrash2, FiAlertTriangle, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
+import Can from '../components/Can';
 
 const DOC_LABELS = {
   insurance_validity: 'Insurance',
@@ -443,20 +444,24 @@ export default function VehicleMaster() {
               />
             )}
           </div>
-          <button
-            onClick={() => navigate('/vehicles/add')}
-            className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
-          >
-            <FiPlus className="w-4 h-4" />
-            Add Vehicle
-          </button>
-          <button
-            onClick={() => navigate('/vehicles/bulk-upload')}
-            className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
-          >
-            <FiLayers className="w-4 h-4" />
-            Bulk Add
-          </button>
+          <Can module="Vehicle Master" action="create">
+            <button
+              onClick={() => navigate('/vehicles/add')}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
+            >
+              <FiPlus className="w-4 h-4" />
+              Add Vehicle
+            </button>
+          </Can>
+          <Can module="Vehicle Master" action="create">
+            <button
+              onClick={() => navigate('/vehicles/bulk-upload')}
+              className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm whitespace-nowrap"
+            >
+              <FiLayers className="w-4 h-4" />
+              Bulk Add
+            </button>
+          </Can>
         </div>
       </div>
 
@@ -504,13 +509,15 @@ export default function VehicleMaster() {
                     {activeColumns.map(col => (
                       <td key={col.key} className="px-5 py-3.5">
                         {col.key === 'actions' && (
-                          <button
-                            onClick={e => { e.stopPropagation(); setDeleteConfirm(vehicle.id); }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-                            title="Delete vehicle"
-                          >
-                            <FiTrash2 className="w-4 h-4" />
-                          </button>
+                          <Can module="Vehicle Master" action="delete">
+                            <button
+                              onClick={e => { e.stopPropagation(); setDeleteConfirm(vehicle.id); }}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              title="Delete vehicle"
+                            >
+                              <FiTrash2 className="w-4 h-4" />
+                            </button>
+                          </Can>
                         )}
                         {col.key === 'truckNo' && (
                           <span className="font-semibold text-slate-900 group-hover:text-indigo-700">{vehicle.truckNo}</span>

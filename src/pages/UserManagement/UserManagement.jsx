@@ -17,6 +17,7 @@ import {
   StatusBadge, RoleBadge,
 } from './UserManagementHelpers';
 
+import Can from '../../components/Can';
 import AddUserDrawer    from './AddUserDrawer';
 import UserDetailDrawer from './UserDetailDrawer';
 
@@ -230,12 +231,16 @@ export default function UserManagement() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
-            <Download className="w-3.5 h-3.5" /> Export Users
-          </button>
-          <button onClick={() => setAddOpen(true)} className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
-            <UserPlus className="w-3.5 h-3.5" /> Add User
-          </button>
+          <Can module="User Management" action="export">
+            <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
+              <Download className="w-3.5 h-3.5" /> Export Users
+            </button>
+          </Can>
+          <Can module="User Management" action="create">
+            <button onClick={() => setAddOpen(true)} className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+              <UserPlus className="w-3.5 h-3.5" /> Add User
+            </button>
+          </Can>
         </div>
       </div>
 
@@ -314,9 +319,11 @@ export default function UserManagement() {
               <Users className="w-12 h-12 text-slate-200 mb-4" />
               <p className="text-sm font-black text-slate-400">No users found</p>
               <p className="text-xs text-slate-300 mt-1 font-medium">Try adjusting your search or filters</p>
+              <Can module="User Management" action="create">
               <button onClick={() => setAddOpen(true)} className="mt-4 flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
                 <UserPlus className="w-3.5 h-3.5" /> Add User
               </button>
+              </Can>
             </div>
           ) : (
             <div className="overflow-x-auto">

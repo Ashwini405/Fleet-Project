@@ -13,6 +13,7 @@ const {
 } = require(
   "../controllers/expenseController"
 );
+const { protect } = require("../middleware/permissionMiddleware");
 
 // =========================================
 // ROUTES
@@ -20,16 +21,19 @@ const {
 
 router.get(
   "/",
+  ...protect("Income & Expense", "view"),
   getAllExpenses
 );
 
 router.get(
   "/:id",
+  ...protect("Income & Expense", "view"),
   getExpenseById
 );
 
 router.post(
   "/",
+  ...protect("Income & Expense", "create"),
   createExpense
 );
 

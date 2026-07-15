@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../services/api';
+import Can from '../../components/Can';
 import {
   Building2, Save, X, Eye, Users, MapPin, CheckCircle2,
   FileText, Clock, CalendarDays, Phone, Mail, Globe,
@@ -141,7 +142,7 @@ export default function CompanyProfile() {
   const loadCompanyProfile = async () => {
     try {
       setLoading(true);
-      const res = await axios.get('http://localhost:5001/api/company-profile');
+      const res = await api.get('/company-profile');
       const profileData = res.data.data || {};
 
       setData(prev => ({ ...prev, ...profileData }));
@@ -281,15 +282,15 @@ export default function CompanyProfile() {
       let response;
       if (companyId) {
         // UPDATE existing profile
-        response = await axios.put(
-          `http://localhost:5001/api/company-profile/${companyId}`,
+        response = await api.put(
+          `/company-profile/${companyId}`,
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
       } else {
         // CREATE new profile
-        response = await axios.post(
-          'http://localhost:5001/api/company-profile',
+        response = await api.post(
+          '/company-profile',
           formData,
           { headers: { 'Content-Type': 'multipart/form-data' } }
         );
@@ -412,16 +413,18 @@ export default function CompanyProfile() {
           <button onClick={handlePrint} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
             <Printer className="w-3.5 h-3.5" /> Print / PDF
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-70"
-          >
-            {saving
-              ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
-              : <><Save className="w-3.5 h-3.5" /> Save Changes</>
-            }
-          </button>
+          <Can module="Company Profile" action="edit">
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-70"
+            >
+              {saving
+                ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
+                : <><Save className="w-3.5 h-3.5" /> Save Changes</>
+              }
+            </button>
+          </Can>
         </div>
       </div>
 
@@ -487,16 +490,18 @@ export default function CompanyProfile() {
                 <button onClick={handleCancel} className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">
                   <X className="w-3.5 h-3.5" /> Reset
                 </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70"
-                >
-                  {saving
-                    ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
-                    : <><Save className="w-3.5 h-3.5" /> Save Changes</>
-                  }
-                </button>
+                <Can module="Company Profile" action="edit">
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="flex items-center gap-1.5 px-5 py-2 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70"
+                  >
+                    {saving
+                      ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
+                      : <><Save className="w-3.5 h-3.5" /> Save Changes</>
+                    }
+                  </button>
+                </Can>
               </div>
             )}
           </div>

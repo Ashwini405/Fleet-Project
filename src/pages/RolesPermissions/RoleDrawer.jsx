@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Edit2, Copy, Power, Trash2, X, Clock } from 'lucide-react';
 import { MODULES, countGranted } from './data';
 import { StatusBadge, RoleAvatar, ReadMatrix } from './components';
+import api from '../../services/api';
 
 const DRAWER_TABS = ['Overview', 'Permissions', 'Assigned Users', 'Audit Trail'];
-const API_URL = "http://localhost:5001/api/roles";
+const API_URL = "/roles";
 
 export default function RoleDrawer({ role, onClose, onEdit, onDuplicate, onToggleStatus, onDelete }) {
   const [tab, setTab] = useState('Overview');
@@ -25,10 +26,10 @@ export default function RoleDrawer({ role, onClose, onEdit, onDuplicate, onToggl
   const fetchPermissions = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
+      const response = await api.get(
         `${API_URL}/${role.id}/permissions`
       );
-      const result = await response.json();
+      const result = response.data;
       if (result.success) {
         // Convert array of permission rows (module_name label + can_*)
         // into object keyed by module.key so ReadMatrix can render it.
@@ -42,7 +43,9 @@ export default function RoleDrawer({ role, onClose, onEdit, onDuplicate, onToggl
             edit: !!p.can_edit,
             delete: !!p.can_delete,
             approve: !!p.can_approve,
-            export: !!p.can_export
+            reject: !!p.can_reject,
+            export: !!p.can_export,
+            print: !!p.can_print,
           };
         });
         setPermissions(permObj);
@@ -56,10 +59,10 @@ export default function RoleDrawer({ role, onClose, onEdit, onDuplicate, onToggl
 
   const fetchUsers = async () => {
     try {
-      const response = await fetch(
+      const response = await api.get(
         `${API_URL}/${role.id}/users`
       );
-      const result = await response.json();
+      const result = response.data;
       if (result.success) {
         setUsers(result.data);
       }
@@ -70,10 +73,10 @@ export default function RoleDrawer({ role, onClose, onEdit, onDuplicate, onToggl
 
   const fetchAuditLogs = async () => {
     try {
-      const response = await fetch(
+      const response = await api.get(
         `${API_URL}/${role.id}/audit-logs`
       );
-      const result = await response.json();
+      const result = response.data;
       if (result.success) {
         setAudit(result.data);
       }

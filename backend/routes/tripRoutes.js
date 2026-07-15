@@ -19,41 +19,42 @@ const {
 
 // 🔥 MULTER
 const upload = require('../config/multer');
+const { protect } = require('../middleware/permissionMiddleware');
 
 
 // 🔥 IMPORTANT: KEEP THIS ABOVE /:id
-router.get('/by-vehicle/:vehicleId', getTripsByVehicle);
+router.get('/by-vehicle/:vehicleId', ...protect('Trip Master', 'view'), getTripsByVehicle);
 
 
 // ✅ MAIN TRIP ROUTES
 router.route('/')
-  .get(getTrips)
-  .post(createTrip);
+  .get(...protect('Trip Master', 'view'), getTrips)
+  .post(...protect('Trip Master', 'create'), createTrip);
 
 
 // ✅ SINGLE TRIP ROUTES
 router.route('/:id')
-  .get(getTripById)
-  .put(updateTrip)
-  .delete(deleteTrip);
+  .get(...protect('Trip Master', 'view'), getTripById)
+  .put(...protect('Trip Master', 'edit'), updateTrip)
+  .delete(...protect('Trip Master', 'delete'), deleteTrip);
 
 
 // 🔥 STATUS UPDATE
-router.put('/:id/status', updateTripStatus);
+router.put('/:id/status', ...protect('Trip Master', 'edit'), updateTripStatus);
 
 
 // 🔥 EXPENSE ROUTES
-router.post('/:tripId/expense', addExpense);
-router.get('/:tripId/expense', getExpenses);
+router.post('/:tripId/expense', ...protect('Trip Master', 'edit'), addExpense);
+router.get('/:tripId/expense', ...protect('Trip Master', 'view'), getExpenses);
 
 
 // 🔥 FUEL ROUTES
-router.post('/:tripId/fuel', addFuel);
-router.get('/:tripId/fuel', getFuel);
+router.post('/:tripId/fuel', ...protect('Trip Master', 'edit'), addFuel);
+router.get('/:tripId/fuel', ...protect('Trip Master', 'view'), getFuel);
 
 
 // 🔥 DOCUMENT UPLOAD ROUTE (NEW)
-router.post('/:tripId/documents', upload.single('file'), uploadDocument);
+router.post('/:tripId/documents', ...protect('Trip Master', 'edit'), upload.single('file'), uploadDocument);
 
 
 module.exports = router;

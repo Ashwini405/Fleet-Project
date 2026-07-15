@@ -92,10 +92,11 @@ class RoleController {
                 status,
                 is_system_role,
                 color,
-                icon,
-                created_by,
-                updated_by
+                icon
             } = req.body;
+
+            const created_by = req.user.username;
+            const updated_by = req.user.username;
 
             // Check if role name already exists
             const exists = await RoleModel.roleNameExists(role_name);
@@ -157,9 +158,10 @@ class RoleController {
                 status,
                 is_system_role,
                 color,
-                icon,
-                updated_by
+                icon
             } = req.body;
+
+            const updated_by = req.user.username;
 
             const role = await RoleModel.getRoleById(id);
 
@@ -222,7 +224,7 @@ class RoleController {
     static async deleteRole(req, res) {
         try {
             const { id } = req.params;
-            const { deleted_by } = req.body;
+            const deleted_by = req.user.username;
 
             const role = await RoleModel.getRoleById(id);
 
@@ -276,7 +278,8 @@ class RoleController {
     static async updateRoleStatus(req, res) {
         try {
             const { id } = req.params;
-            const { status, updated_by } = req.body;
+            const { status } = req.body;
+            const updated_by = req.user.username;
 
             const role = await RoleModel.getRoleById(id);
 
@@ -341,7 +344,8 @@ class RoleController {
     static async saveRolePermissions(req, res) {
         try {
             const { id } = req.params;
-            const { permissions, updated_by } = req.body;
+            const { permissions } = req.body;
+            const updated_by = req.user.username;
 
             if (!Array.isArray(permissions)) {
                 return res.status(400).json({
@@ -437,7 +441,7 @@ class RoleController {
     static async duplicateRole(req, res) {
         try {
             const { id } = req.params;
-            const { created_by } = req.body;
+            const created_by = req.user.username;
 
             const role = await RoleModel.getRoleById(id);
 

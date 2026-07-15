@@ -8,11 +8,15 @@ import { countGranted, emptyPerms, fullPerms } from './data';
 import { StatusBadge, RoleAvatar, ConfirmModal } from './components';
 import RoleDrawer from './RoleDrawer';
 import RoleFormModal from './RoleFormModal';
+import Can from '../../components/Can';
+import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 const PAGE_SIZE = 8;
-const API_URL = "http://localhost:5001/api/roles";
+const API_URL = "/roles";
 
 export default function RolesPermissions() {
+  const { user } = useAuth();
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [dashboard, setDashboard] = useState({
@@ -46,32 +50,43 @@ export default function RolesPermissions() {
   const fetchRoles = async () => {
     try {
       setLoading(true);
-      const response = await fetch(API_URL);
-      const result = await response.json();
+      const response = await api.get(API_URL);
+      const result = response.data;
 
       if (result.success) {
-        const mappedRoles = result.data.map(role => ({
-          id: role.id,
-          roleCode: role.role_code,
-          name: role.role_name,
-          description: role.description,
-          department: role.department,
-          level: role.level,
-          status: role.status,
-          isSystem: Boolean(role.is_system_role),
-          isCustom: !Boolean(role.is_system_role),
-          color: role.color,
-          icon: role.icon,
-          createdBy: role.created_by,
-          updatedBy: role.updated_by,
-          createdDate: role.created_at,
-          lastUpdated: role.updated_at,
-          usersAssigned: role.users_assigned || 0,
-          modulesLabel: "",
-          permissions: []
-        }));
-
-        setRoles(mappedRoles);
+        // Fetch permission counts for each role in parallel
+        const rolesWithPerms = await Promise.all(
+          result.data.map(async (role) => {
+            let modulesCount = 0;
+            try {
+              const permRes = await api.get(`${API_URL}/${role.id}/permissions`);
+              if (permRes.data.success) {
+                modulesCount = permRes.data.data.filter(p => p.can_view).length;
+              }
+            } catch (_) {}
+            return {
+              id: role.id,
+              roleCode: role.role_code,
+              name: role.role_name,
+              description: role.description,
+              department: role.department,
+              level: role.level,
+              status: role.status,
+              isSystem: Boolean(role.is_system_role),
+              isCustom: !Boolean(role.is_system_role),
+              color: role.color,
+              icon: role.icon,
+              createdBy: role.created_by,
+              updatedBy: role.updated_by,
+              createdDate: role.created_at,
+              lastUpdated: role.updated_at,
+              usersAssigned: role.users_assigned || 0,
+              modulesLabel: modulesCount > 0 ? `${modulesCount} modules` : 'No permissions',
+              permissions: []
+            };
+          })
+        );
+        setRoles(rolesWithPerms);
       }
     } catch (error) {
       console.error('Error fetching roles:', error);
@@ -82,8 +97,8 @@ export default function RolesPermissions() {
 
   const fetchDashboard = async () => {
     try {
-      const response = await fetch(`${API_URL}/dashboard`);
-      const result = await response.json();
+      const response = await api.get(`${API_URL}/dashboard`);
+      const result = response.data;
 
       if (result.success) {
         setDashboard(result.data);
@@ -123,72 +138,52 @@ export default function RolesPermissions() {
       let roleId = formModal?.role?.id;
 
       if (formModal.mode === 'add') {
-        // ── FIX 1: Use data.role_name, not data.name ──
-        response = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            role_name: data.role_name,
-            description: data.description,
-            department: data.department || 'General',
-            level: data.level || 1,
-            status: data.status,
-            is_system_role: data.is_system_role || false,
-            color: data.color || '#6366F1',
-            icon: data.icon || 'Shield',
-            created_by: data.created_by || 'Admin',
-            updated_by: data.updated_by || 'Admin'
-          })
+        response = await api.post(API_URL, {
+          role_name: data.role_name,
+          description: data.description,
+          department: data.department || 'General',
+          level: data.level || 1,
+          status: data.status,
+          is_system_role: data.is_system_role || false,
+          color: data.color || '#6366F1',
+          icon: data.icon || 'Shield',
         });
       } else {
-        // ── FIX 2: Use data.role_name, not data.name ──
-        response = await fetch(`${API_URL}/${roleId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            role_name: data.role_name,
-            description: data.description,
-            department: data.department || 'General',
-            level: data.level || 1,
-            status: data.status,
-            is_system_role: data.is_system_role || false,
-            color: data.color || '#6366F1',
-            icon: data.icon || 'Shield',
-            updated_by: data.updated_by || 'Admin'
-          })
+        response = await api.put(`${API_URL}/${roleId}`, {
+          role_name: data.role_name,
+          description: data.description,
+          department: data.department || 'General',
+          level: data.level || 1,
+          status: data.status,
+          is_system_role: data.is_system_role || false,
+          color: data.color || '#6366F1',
+          icon: data.icon || 'Shield',
         });
       }
 
-      const result = await response.json();
-      
+      const result = response.data;
+
       if (result.success) {
-        // ── FIX 3: Use data.role_name in toast ──
         showToast(`Role "${data.role_name}" ${formModal.mode === 'add' ? 'created' : 'updated'} successfully.`);
-        
-        // ── FIX 5: Save permissions after role creation ──
+
+        // Save permissions after role creation/update
         if (formModal.mode === 'add' && data.permissions && result.roleId) {
-          await fetch(`${API_URL}/${result.roleId}/permissions`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              permissions: data.permissions,
-              updated_by: data.updated_by || "Admin"
-            })
-          });
+          await api.put(`${API_URL}/${result.roleId}/permissions`, { permissions: data.permissions });
         } else if (formModal.mode === 'edit' && data.permissions && roleId) {
-          await fetch(`${API_URL}/${roleId}/permissions`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-              permissions: data.permissions,
-              updated_by: data.updated_by || "Admin"
-            })
-          });
+          await api.put(`${API_URL}/${roleId}/permissions`, { permissions: data.permissions });
         }
+        // Always refresh sidebar/permissions from server after any role permission change
+        try {
+          const [permsRes, sidebarRes] = await Promise.all([
+            api.get('/auth/permissions'),
+            api.get('/auth/sidebar'),
+          ]);
+          const perms = permsRes.data.data || [];
+          const sb = sidebarRes.data.data || [];
+          localStorage.setItem('permissions', JSON.stringify(perms));
+          localStorage.setItem('sidebar', JSON.stringify(sb));
+          window.dispatchEvent(new Event('auth-refresh'));
+        } catch (_) {}
 
         await fetchRoles();
         await fetchDashboard();
@@ -204,13 +199,9 @@ export default function RolesPermissions() {
 
   const handleDuplicate = async (role) => {
     try {
-      const response = await fetch(`${API_URL}/${role.id}/duplicate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ created_by: 'Admin' })
-      });
+      const response = await api.post(`${API_URL}/${role.id}/duplicate`, {});
 
-      const result = await response.json();
+      const result = response.data;
       if (result.success) {
         showToast(`Role "${role.name}" duplicated successfully.`);
         await fetchRoles();
@@ -234,16 +225,11 @@ export default function RolesPermissions() {
       confirmLabel: next === 'Inactive' ? 'Disable' : 'Enable',
       onConfirm: async () => {
         try {
-          const response = await fetch(`${API_URL}/${role.id}/status`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              status: next,
-              updated_by: 'Admin'
-            })
+          const response = await api.patch(`${API_URL}/${role.id}/status`, {
+            status: next,
           });
 
-          const result = await response.json();
+          const result = response.data;
           if (result.success) {
             showToast(`Role "${role.name}" ${next.toLowerCase()}.`);
             await fetchRoles();
@@ -275,13 +261,9 @@ export default function RolesPermissions() {
       confirmLabel: 'Delete',
       onConfirm: async () => {
         try {
-          const response = await fetch(`${API_URL}/${role.id}`, {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deleted_by: 'Admin' })
-          });
+          const response = await api.delete(`${API_URL}/${role.id}`);
 
-          const result = await response.json();
+          const result = response.data;
           if (result.success) {
             showToast(`Role "${role.name}" deleted.`);
             await fetchRoles();
@@ -292,7 +274,7 @@ export default function RolesPermissions() {
           }
         } catch (error) {
           console.error('Error deleting role:', error);
-          showToast('Unable to delete role. Please try again.');
+          showToast(error.response?.data?.message || 'Unable to delete role. Please try again.');
         }
       },
     });
@@ -384,14 +366,18 @@ export default function RolesPermissions() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={exportRoles}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
-            <Download className="w-3.5 h-3.5" /> Export Roles
-          </button>
-          <button onClick={() => setFormModal({ mode: 'add', role: null })}
-            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
-            <Plus className="w-3.5 h-3.5" /> Add Role
-          </button>
+          <Can module="Roles & Permissions" action="export">
+            <button onClick={exportRoles}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
+              <Download className="w-3.5 h-3.5" /> Export Roles
+            </button>
+          </Can>
+          <Can module="Roles & Permissions" action="create">
+            <button onClick={() => setFormModal({ mode: 'add', role: null })}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+              <Plus className="w-3.5 h-3.5" /> Add Role
+            </button>
+          </Can>
         </div>
       </div>
 
@@ -508,26 +494,34 @@ export default function RolesPermissions() {
                         className="px-2 py-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors whitespace-nowrap">
                         View
                       </button>
-                      <button onClick={() => setFormModal({ mode: 'edit', role })} title="Edit"
-                        className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition-colors border border-slate-200">
-                        <Edit2 className="w-3 h-3" />
-                      </button>
-                      <button onClick={() => handleDuplicate(role)} title="Duplicate"
-                        className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 transition-colors border border-slate-200">
-                        <Copy className="w-3 h-3" />
-                      </button>
-                      <button onClick={() => handleToggleStatus(role)} title={role.status === 'Active' ? 'Disable' : 'Enable'}
-                        className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-colors border border-slate-200">
-                        <Power className="w-3 h-3" />
-                      </button>
-                      <button onClick={() => handleDelete(role)} title="Delete" disabled={role.isSystem}
-                        className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors border ${
-                          role.isSystem
-                            ? 'text-slate-300 border-slate-100 cursor-not-allowed'
-                            : 'text-slate-500 hover:bg-red-50 hover:text-red-600 border-slate-200'
-                        }`}>
-                        <Trash2 className="w-3 h-3" />
-                      </button>
+                      <Can module="Roles & Permissions" action="edit">
+                        <button onClick={() => setFormModal({ mode: 'edit', role })} title="Edit"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-indigo-600 transition-colors border border-slate-200">
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                      </Can>
+                      <Can module="Roles & Permissions" action="create">
+                        <button onClick={() => handleDuplicate(role)} title="Duplicate"
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 transition-colors border border-slate-200">
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      </Can>
+                      <Can module="Roles & Permissions" action="edit">
+                        <button onClick={() => handleToggleStatus(role)} title={role.status === 'Active' ? 'Disable' : 'Enable'}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-amber-50 hover:text-amber-600 transition-colors border border-slate-200">
+                          <Power className="w-3 h-3" />
+                        </button>
+                      </Can>
+                      <Can module="Roles & Permissions" action="delete">
+                        <button onClick={() => handleDelete(role)} title="Delete" disabled={role.isSystem}
+                          className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors border ${
+                            role.isSystem
+                              ? 'text-slate-300 border-slate-100 cursor-not-allowed'
+                              : 'text-slate-500 hover:bg-red-50 hover:text-red-600 border-slate-200'
+                          }`}>
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </Can>
                     </div>
                   </td>
                 </tr>

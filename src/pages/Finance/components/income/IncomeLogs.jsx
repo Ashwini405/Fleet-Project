@@ -1,6 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { TrendingUp, Plus, Hash } from "lucide-react";
+import Can from "../../../../components/Can";
 
 function StatPill({ label, value, color }) {
   const colors = {
@@ -45,16 +46,18 @@ export default function IncomeLogs({ records, onAdd }) {
           <StatPill label="Avg"          value={`₹${avgAmount.toLocaleString("en-IN")}`} color="blue"  />
           <StatPill label="Transactions" value={count}                                   color="indigo" />
 
-          <motion.button
-            onClick={onAdd}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            className="flex items-center gap-1.5 px-4 py-2.5 text-white text-sm font-extrabold rounded-xl
-              shadow-md shadow-emerald-600/25 hover:shadow-lg hover:shadow-emerald-600/30 transition-all"
-            style={{ background: "linear-gradient(135deg, #059669 0%, #047857 100%)" }}
-          >
-            <Plus className="w-4 h-4" /> Add Income
-          </motion.button>
+          <Can module="Income & Expense" action="create">
+            <motion.button
+              onClick={onAdd}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.97 }}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-white text-sm font-extrabold rounded-xl
+                shadow-md shadow-emerald-600/25 hover:shadow-lg hover:shadow-emerald-600/30 transition-all"
+              style={{ background: "linear-gradient(135deg, #059669 0%, #047857 100%)" }}
+            >
+              <Plus className="w-4 h-4" /> Add Income
+            </motion.button>
+          </Can>
         </div>
       </div>
     </div>

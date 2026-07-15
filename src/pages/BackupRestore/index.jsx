@@ -10,6 +10,7 @@ import {
   formatBackup,
   formatTimeline
 } from './data';
+import Can from '../../components/Can';
 import {
   getBackups,
   createBackup,
@@ -268,15 +269,19 @@ export default function BackupRestore() {
             className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors shadow-sm">
             <RefreshCw className={`w-3.5 h-3.5 ${refreshed ? 'animate-spin' : ''}`} /> Refresh
           </button>
-          <button onClick={scrollToRestorePanel}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors shadow-sm">
-            <Upload className="w-3.5 h-3.5" /> Restore Backup
-          </button>
-          <button onClick={() => setModal({ type: 'create', backup: null })} disabled={creating}
-            className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-60">
-            {creating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
-            {creating ? 'Creating…' : 'Create Backup'}
-          </button>
+          <Can module="Backup & Restore" action="edit">
+            <button onClick={scrollToRestorePanel}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 transition-colors shadow-sm">
+              <Upload className="w-3.5 h-3.5" /> Restore Backup
+            </button>
+          </Can>
+          <Can module="Backup & Restore" action="create">
+            <button onClick={() => setModal({ type: 'create', backup: null })} disabled={creating}
+              className="flex items-center gap-1.5 px-4 py-1.5 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-60">
+              {creating ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Database className="w-3.5 h-3.5" />}
+              {creating ? 'Creating…' : 'Create Backup'}
+            </button>
+          </Can>
         </div>
       </div>
 

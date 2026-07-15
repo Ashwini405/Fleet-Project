@@ -1,17 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Shield, X, AlertTriangle } from 'lucide-react';
-import { emptyPerms, fullPerms, countGranted, MODULES } from './data';
+import { emptyPerms, fullPerms, countGranted, MODULES, PERMS } from './data';
 import { EditMatrix } from './components';
+import api from '../../services/api';
 
 export default function RoleFormModal({ mode, initialRole, allRoles, onClose, onSave }) {
   const [name,        setName]        = useState(initialRole?.name        ?? '');
   const [description, setDescription] = useState(initialRole?.description ?? '');
   const [status,      setStatus]      = useState(initialRole?.status      ?? 'Active');
   const [cloneFrom,   setCloneFrom]   = useState('');
-  const [permissions, setPermissions] = useState(
-    initialRole?.permissions ? structuredClone(initialRole.permissions) : emptyPerms()
-  );
-  const [errors, setErrors] = useState({});
+  const [permissions, setPermissions] = useState(emptyPerms());
+  const [errors,      setErrors]      = useState({});
+  const [loadingPerms, setLoadingPerms] = useState(mode === 'edit');
+
+  // Load existing permissions when editing
+  useEffect(() => {
+    if (mode === 'edit' && initialRole?.id) {
+      setLoadingPerms(true);
+      api.get(`/roles/${initialRole.id}/permissions`)
+        .then(res => {
+          if (res.data.success) {
+            const permObj = emptyPerms();
+            res.data.data.forEach(p => {
+              const mod = MODULES.find(m => m.label === p.module_name);
+              if (!mod) return;
+              permObj[mod.key] = {
+                view:    !!p.can_view,
+                create:  !!p.can_create,
+                edit:    !!p.can_edit,
+                delete:  !!p.can_delete,
+                approve: !!p.can_approve,
+                reject:  !!p.can_reject,
+                export:  !!p.can_export,
+                print:   !!p.can_print,
+              };
+            });
+            setPermissions(permObj);
+          }
+        })
+        .catch(console.error)
+        .finally(() => setLoadingPerms(false));
+    }
+  }, [mode, initialRole?.id]);
 
   // Fallback preset roles to show in the "Clone from Role" dropdown
   const FALLBACK_ROLES = [
@@ -68,12 +98,14 @@ export default function RoleFormModal({ mode, initialRole, allRoles, onClose, on
       const mod = MODULES.find(m => m.key === key);
       return {
         module_name: mod ? mod.label : key,
-        can_view: !!p.view,
-        can_create: !!p.create,
-        can_edit: !!p.edit,
-        can_delete: !!p.delete,
+        can_view:    !!p.view,
+        can_create:  !!p.create,
+        can_edit:    !!p.edit,
+        can_delete:  !!p.delete,
         can_approve: !!p.approve,
-        can_export: !!p.export
+        can_reject:  !!p.reject,
+        can_export:  !!p.export,
+        can_print:   !!p.print,
       };
     });
 
@@ -187,9 +219,16 @@ export default function RoleFormModal({ mode, initialRole, allRoles, onClose, on
                 <p className="text-[11px] text-red-600 font-bold">{errors.perms}</p>
               </div>
             )}
-            <div className="border border-slate-200 rounded-xl overflow-hidden">
-              <EditMatrix permissions={permissions} onChange={setPermissions} />
-            </div>
+            {loadingPerms ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-6 h-6 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+                <span className="ml-3 text-xs text-slate-400 font-medium">Loading permissions...</span>
+              </div>
+            ) : (
+              <div className="border border-slate-200 rounded-xl overflow-hidden">
+                <EditMatrix permissions={permissions} onChange={setPermissions} />
+              </div>
+            )}
           </div>
 
           {/* Footer */}

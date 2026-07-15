@@ -1,5 +1,5 @@
 import React, { createContext, useMemo, useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 
 
 
@@ -86,8 +86,8 @@ export function InventoryProvider({ children }) {
 
     try {
 
-      const res = await axios.get(
-        'http://localhost:5001/api/inventory'
+      const res = await api.get(
+        '/inventory'
       );
 
       // ✅ NORMALIZE DATABASE FIELDS
@@ -149,8 +149,8 @@ export function InventoryProvider({ children }) {
 
     try {
 
-      const res = await axios.get(
-        'http://localhost:5001/api/inventory/movement-history'
+      const res = await api.get(
+        '/inventory/movement-history'
       );
 
       const formatted = res.data.data.map((item) => ({
@@ -197,8 +197,8 @@ export function InventoryProvider({ children }) {
 
     try {
 
-      const res = await axios.get(
-        'http://localhost:5001/api/inventory/issue-history'
+      const res = await api.get(
+        '/inventory/issue-history'
       );
 
       const formatted = res.data.data.map((item) => ({
@@ -237,8 +237,8 @@ export function InventoryProvider({ children }) {
 
     try {
 
-      const res = await axios.get(
-        'http://localhost:5001/api/inventory/purchase-orders'
+      const res = await api.get(
+        '/inventory/purchase-orders'
       );
 
       const formatted = res.data.data.map((po) => ({
@@ -274,8 +274,8 @@ export function InventoryProvider({ children }) {
 
     try {
 
-      const res = await axios.get(
-        'http://localhost:5001/api/inventory/vendors'
+      const res = await api.get(
+        '/inventory/vendors'
       );
 
       const formatted = res.data.data.map((v) => (
@@ -298,8 +298,8 @@ export function InventoryProvider({ children }) {
 
     try {
 
-      const res = await axios.get(
-        'http://localhost:5001/api/inventory/warehouses'
+      const res = await api.get(
+        '/inventory/warehouses'
       );
 
       const formatted = res.data.data.map((w) => (
@@ -321,8 +321,8 @@ export function InventoryProvider({ children }) {
 
   try {
 
-    const res = await axios.get(
-      'http://localhost:5001/api/vehicles'
+    const res = await api.get(
+      '/vehicles'
     );
 
     // ✅ KEEP COMPLETE OBJECTS
@@ -341,8 +341,8 @@ export function InventoryProvider({ children }) {
 
     try {
 
-      const res = await axios.post(
-        'http://localhost:5001/api/inventory',
+      const res = await api.post(
+        '/inventory',
         formData,
         {
           headers: {
@@ -378,8 +378,8 @@ export function InventoryProvider({ children }) {
 
     try {
 
-      await axios.put(
-        `http://localhost:5001/api/inventory/${id}`,
+      await api.put(
+        `/inventory/${id}`,
         formData,
         {
           headers: {
@@ -420,8 +420,8 @@ export function InventoryProvider({ children }) {
 
     try {
 
-      await axios.delete(
-        `http://localhost:5001/api/inventory/${id}`
+      await api.delete(
+        `/inventory/${id}`
       );
 
       await fetchInventory();
@@ -481,9 +481,9 @@ export function InventoryProvider({ children }) {
 
 
       // ✅ API CALL
-      const res = await axios.post(
+      const res = await api.post(
 
-        'http://localhost:5001/api/inventory/stock-in',
+        '/inventory/stock-in',
 
         {
 
@@ -566,9 +566,9 @@ export function InventoryProvider({ children }) {
 
 
       // ✅ API CALL
-      const res = await axios.post(
+      const res = await api.post(
 
-        'http://localhost:5001/api/inventory/stock-out',
+        '/inventory/stock-out',
 
         {
 
@@ -614,8 +614,8 @@ export function InventoryProvider({ children }) {
   // ✅ PURCHASE ORDER ACTIONS
   const approvePO = async (poId, approver_name, approval_comment) => {
     try {
-      await axios.put(
-        `http://localhost:5001/api/inventory/purchase-orders/${poId}/approve`,
+      await api.put(
+        `/inventory/purchase-orders/${poId}/approve`,
         { approver_name, approval_comment }
       );
       await fetchPurchaseOrders();
@@ -628,8 +628,8 @@ export function InventoryProvider({ children }) {
 
   const rejectPO = async (poId, approver_name, approval_comment) => {
     try {
-      await axios.put(
-        `http://localhost:5001/api/inventory/purchase-orders/${poId}/reject`,
+      await api.put(
+        `/inventory/purchase-orders/${poId}/reject`,
         { approver_name, approval_comment }
       );
       await fetchPurchaseOrders();
@@ -642,8 +642,8 @@ export function InventoryProvider({ children }) {
 
   const holdPO = async (poId, approver_name, approval_comment) => {
     try {
-      await axios.put(
-        `http://localhost:5001/api/inventory/purchase-orders/${poId}/hold`,
+      await api.put(
+        `/inventory/purchase-orders/${poId}/hold`,
         { approver_name, approval_comment }
       );
       await fetchPurchaseOrders();
@@ -656,8 +656,8 @@ export function InventoryProvider({ children }) {
 
   const orderPO = async (poId) => {
     try {
-      await axios.put(
-        `http://localhost:5001/api/inventory/purchase-orders/${poId}/order`
+      await api.put(
+        `/inventory/purchase-orders/${poId}/order`
       );
       await fetchPurchaseOrders();
       return { success: true };
@@ -669,8 +669,8 @@ export function InventoryProvider({ children }) {
 
   const receivePO = async (poId) => {
     try {
-      await axios.put(
-        `http://localhost:5001/api/inventory/purchase-orders/${poId}/receive`
+      await api.put(
+        `/inventory/purchase-orders/${poId}/receive`
       );
       await fetchPurchaseOrders();
       await fetchInventory();

@@ -180,13 +180,12 @@ class UserManagementController {
 
                 allow_mobile,
 
-                force_password_reset,
-
-                created_by,
-
-                updated_by
+                force_password_reset
 
             } = req.body;
+
+            const created_by = req.user.username;
+            const updated_by = req.user.username;
 
             // -----------------------------
 
@@ -281,8 +280,6 @@ class UserManagementController {
 
                 });
 
-            await UserManagementModel.createDefaultPermissions(userId);
-
             // -----------------------------
             // Audit Log
             // -----------------------------
@@ -355,10 +352,11 @@ class UserManagementController {
                 status,
                 allow_web,
                 allow_mobile,
-                force_password_reset,
-                updated_by
+                force_password_reset
 
             } = req.body;
+
+            const updated_by = req.user.username;
 
             // ---------------------------------------
 
@@ -506,7 +504,7 @@ class UserManagementController {
 
             const { id } = req.params;
 
-            const { deleted_by } = req.body;
+            const deleted_by = req.user.username;
 
             const user =
                 await UserManagementModel.getUserById(id);
@@ -588,7 +586,8 @@ class UserManagementController {
 
             const { id } = req.params;
 
-            const { status, updated_by } = req.body;
+            const { status } = req.body;
+            const updated_by = req.user.username;
 
             const user =
                 await UserManagementModel.getUserById(id);
@@ -670,13 +669,8 @@ class UserManagementController {
 
             const { id } = req.params;
 
-            const {
-
-                password,
-
-                updated_by
-
-            } = req.body;
+            const { password } = req.body;
+            const updated_by = req.user.username;
 
             if (!password) {
 
@@ -830,7 +824,8 @@ class UserManagementController {
 
             const { id } = req.params;
 
-            const { permissions, updated_by } = req.body;
+            const { permissions } = req.body;
+            const updated_by = req.user.username;
 
             if (!Array.isArray(permissions)) {
 

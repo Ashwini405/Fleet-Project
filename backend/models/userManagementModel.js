@@ -61,7 +61,7 @@ class UserManagementModel {
         const [[admins]] = await pool.query(`
             SELECT COUNT(*) AS administrators
             FROM users
-            WHERE role='Administrator'
+            WHERE role='Admin'
             AND is_deleted=0
         `);
 
@@ -253,8 +253,14 @@ class UserManagementModel {
     static async createUser(userData) {
 
         const hashedPassword = await bcrypt.hash(userData.password, 10);
-
         const userCode = await this.generateUserCode();
+
+        // Resolve role_id from role name
+        let roleId = null;
+        if (userData.role) {
+            const [roleRow] = await pool.query(`SELECT id FROM roles WHERE role_name = ? LIMIT 1`, [userData.role]);
+            roleId = roleRow[0]?.id || null;
+        }
 
         const [result] = await pool.query(
             `
@@ -269,6 +275,7 @@ class UserManagementModel {
                 department,
                 plant,
                 role,
+                role_id,
                 password,
                 status,
                 allow_web,
@@ -278,9 +285,7 @@ class UserManagementModel {
                 updated_by
             )
             VALUES
-            (
-                ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?
-            )
+            (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         `,
             [
                 userCode,
@@ -292,6 +297,7 @@ class UserManagementModel {
                 userData.department,
                 userData.plant,
                 userData.role,
+                roleId,
                 hashedPassword,
                 userData.status || "Active",
                 userData.allow_web ?? true,
@@ -327,28 +333,27 @@ static async createDefaultPermissions(userId) {
 
             "Dashboard",
             "Vehicle Master",
-            "Station Master",
-            "Supervisor Master",
-            "Driver Master",
-            "Trip Management",
-            "Fuel Management",
-            "Service Management",
-            "Repair Management",
-            "Garage Management",
-            "Inventory",
-            "Incidents",
-            "Warranty",
-            "Inspection",
+            "Trip Master",
+            "Fuel",
+            "Maintenance",
             "Tyres",
             "Battery",
-            "Income",
-            "Expense",
+            "Inventory",
+            "Purchase Orders",
             "Vendor",
-            "Showroom",
-            "Truck P&L",
+            "Income & Expense",
+            "Operational Payments",
             "Reports",
+            "Truck Profit & Loss",
+            "Staff Management",
+            "Administration",
             "Company Profile",
-            "User Management"
+            "User Management",
+            "Roles & Permissions",
+            "Audit Logs",
+            "Document Vault",
+            "System Settings",
+            "Backup & Restore"
 
         ];
 
@@ -404,6 +409,13 @@ static async createDefaultPermissions(userId) {
 
     static async updateUser(id, userData) {
 
+        // Resolve role_id from role name
+        let roleId = null;
+        if (userData.role) {
+            const [roleRow] = await pool.query(`SELECT id FROM roles WHERE role_name = ? LIMIT 1`, [userData.role]);
+            roleId = roleRow[0]?.id || null;
+        }
+
         const [result] = await pool.query(
             `
             UPDATE users
@@ -415,6 +427,7 @@ static async createDefaultPermissions(userId) {
                 department=?,
                 plant=?,
                 role=?,
+                role_id=?,
                 status=?,
                 allow_web=?,
                 allow_mobile=?,
@@ -430,6 +443,7 @@ static async createDefaultPermissions(userId) {
                 userData.department,
                 userData.plant,
                 userData.role,
+                roleId,
                 userData.status,
                 userData.allow_web,
                 userData.allow_mobile,
