@@ -126,18 +126,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Building2, Plus, Search, MapPin, Phone, Eye } from 'lucide-react';
+import { Building2, Plus, Search, MapPin, Phone, Eye, Truck } from 'lucide-react';
 import AddStationModal from './AddStationModal';
 import ViewStationModal from './ViewStationModal';
+import EditStationModal from './EditStationModal';
 
 export default function StationsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [viewStation, setViewStation] = useState(null);
+  const [editStation, setEditStation] = useState(null);
   const [stations, setStations] = useState([]);
 
   // ✅ FETCH FROM DATABASE
-  useEffect(() => {
+  const fetchStations = () => {
     fetch('http://localhost:5001/api/stations')
       .then(res => res.json())
       .then(data => {
@@ -146,6 +148,10 @@ export default function StationsTab() {
         }
       })
       .catch(err => console.error(err));
+  };
+
+  useEffect(() => {
+    fetchStations();
   }, []);
 
   // ✅ FILTER (same logic, mapped fields)
@@ -203,6 +209,7 @@ export default function StationsTab() {
                  <th className="py-2 px-2 md:py-4 md:px-4">Location</th>
                  <th className="py-2 px-2 md:py-4 md:px-4 hidden md:table-cell">Manager</th>
                  <th className="py-2 px-2 md:py-4 md:px-4 hidden lg:table-cell">Contact</th>
+                 <th className="py-2 px-2 md:py-4 md:px-4 text-center">Vehicles</th>
                  <th className="py-2 px-2 md:py-4 md:px-4 text-center">Actions</th>
                </tr>
              </thead>
@@ -246,7 +253,13 @@ export default function StationsTab() {
                    </td>
 
                    <td className="py-2 px-2 md:py-4 md:px-4 text-center">
-                     <button 
+                     <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-full">
+                       <Truck className="w-3.5 h-3.5 text-slate-400" /> {station.vehicle_count ?? 0}
+                     </span>
+                   </td>
+
+                   <td className="py-2 px-2 md:py-4 md:px-4 text-center">
+                     <button
                        onClick={(e) => { e.stopPropagation(); setViewStation(station); }}
                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:bg-blue-50 px-2 py-1.5 rounded-lg transition-colors"
                      >
@@ -258,7 +271,7 @@ export default function StationsTab() {
 
                {filteredStations.length === 0 && (
                   <tr>
-                    <td colSpan="6" className="p-8 text-center text-gray-500 text-sm">
+                    <td colSpan="7" className="p-8 text-center text-gray-500 text-sm">
                       No stations found.
                     </td>
                   </tr>
@@ -269,8 +282,20 @@ export default function StationsTab() {
       </div>
 
       {/* Modals */}
-      <AddStationModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />
-      <ViewStationModal isOpen={!!viewStation} onClose={() => setViewStation(null)} station={viewStation} />
+      <AddStationModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} onSuccess={fetchStations} />
+      <ViewStationModal
+        isOpen={!!viewStation}
+        onClose={() => setViewStation(null)}
+        station={viewStation}
+        onSuccess={fetchStations}
+        onEdit={(station) => { setViewStation(null); setEditStation(station); }}
+      />
+      <EditStationModal
+        isOpen={!!editStation}
+        onClose={() => setEditStation(null)}
+        station={editStation}
+        onSuccess={fetchStations}
+      />
 
     </div>
   );

@@ -107,6 +107,8 @@ import IssueItemModal    from './components/IssueItemModal';
 import DeleteConfirmModal from './components/DeleteConfirmModal';
 import CreatePOModal     from './components/CreatePOModal';
 import BatteryInventory  from './components/BatteryInventory';
+import ReturnPartModal   from './components/ReturnPartModal';
+import ReturnsHistory    from './components/ReturnsHistory';
 import {
   Plus, Package, ClipboardList, Loader2,
   Search, Pencil, Trash2, ShoppingCart, CheckCircle2, X,
@@ -220,6 +222,11 @@ export default function PartsModule() {
   const [invLoading, setInvLoading]         = useState(true);
   const [histLoading, setHistLoading]       = useState(true);
 
+  /* ── part returns (restock ledger) state ── */
+  const [partReturns, setPartReturns]           = useState([]);
+  const [partReturnsLoading, setPartReturnsLoading] = useState(true);
+  const [returnPartRecord, setReturnPartRecord]  = useState(null);
+
   /* ── PO state ── */
   const [isCreatePOOpen, setIsCreatePOOpen] = useState(false);
   const [poList, setPoList]                 = useState([]);
@@ -296,11 +303,29 @@ export default function PartsModule() {
     finally  { setPoLoading(false); }
   }, []);
 
+  const fetchPartReturns = useCallback(async () => {
+    setPartReturnsLoading(true);
+    try {
+      const res  = await fetch(`${API}/inventory/returns`);
+      const data = await res.json();
+      setPartReturns(data.data || []);
+    } catch { showToast('Failed to load part returns.', 'error'); }
+    finally  { setPartReturnsLoading(false); }
+  }, []);
+
   useEffect(() => {
     fetchInventory();
     fetchHistory();
     fetchPOs();
-  }, [fetchInventory, fetchHistory, fetchPOs]);
+    fetchPartReturns();
+  }, [fetchInventory, fetchHistory, fetchPOs, fetchPartReturns]);
+
+  const handleReturnPartSuccess = () => {
+    setReturnPartRecord(null);
+    showToast('Part return recorded and stock updated.');
+    fetchPartReturns();
+    fetchInventory();
+  };
 
   const canReviewPO = ['Admin', 'Manager'].includes(currentUser.role);
 
@@ -981,16 +1006,17 @@ export default function PartsModule() {
                     <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Truck</th>
                     <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Odometer</th>
                     <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Qty</th>
+                    <th className="text-right text-xs font-semibold text-slate-400 px-5 py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {histLoading ? (
-                    <tr><td colSpan={5} className="py-14 text-center">
+                    <tr><td colSpan={6} className="py-14 text-center">
                       <Loader2 className="h-5 w-5 text-violet-400 animate-spin mx-auto mb-2" />
                       <p className="text-xs text-slate-400">Loading history...</p>
                     </td></tr>
                   ) : history.length === 0 ? (
-                    <tr><td colSpan={5} className="py-16 text-center">
+                    <tr><td colSpan={6} className="py-16 text-center">
                       <ClipboardList className="h-9 w-9 text-slate-200 mx-auto mb-3" />
                       <p className="text-sm font-medium text-slate-400">No issued history available</p>
                       <p className="text-xs text-slate-400 mt-1">Issued items will appear here.</p>
@@ -1008,6 +1034,12 @@ export default function PartsModule() {
                           <span className="inline-flex items-center rounded-lg bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700">
                             {h.quantity}
                           </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-right">
+                          <button onClick={() => setReturnPartRecord(h)}
+                            className="rounded-xl bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100 active:scale-95 transition">
+                            Return
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -1120,6 +1152,8 @@ export default function PartsModule() {
               </table>
             </div>
           </div>
+
+          <ReturnsHistory returns={partReturns} loading={partReturnsLoading} />
         </div>
       )}
 
@@ -1588,6 +1622,12 @@ export default function PartsModule() {
         onClose={() => setIsCreatePOOpen(false)}
         onSuccess={handleCreatePOSuccess}
         requestedBy={currentUser.name}
+      />
+      <ReturnPartModal
+        isOpen={!!returnPartRecord}
+        record={returnPartRecord}
+        onClose={() => setReturnPartRecord(null)}
+        onSuccess={handleReturnPartSuccess}
       />
 
       {commentModalOpen && (

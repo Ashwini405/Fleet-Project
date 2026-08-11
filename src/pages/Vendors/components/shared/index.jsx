@@ -4,6 +4,14 @@ import { PAYMENT_METHODS, MODAL_ANIM, TYPE_STYLES, STATUS_STYLES } from './const
 import RecordPaymentModal from './RecordPaymentModal';
 import TransactionModal from './TransactionModal';
 
+// ── Date formatting ────────────────────────────────────────────────────────
+export function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 // ── TypeBadge ──────────────────────────────────────────────────────────────
 export function TypeBadge({ type }) {
   return (
@@ -26,8 +34,8 @@ export function StatusBadge({ status }) {
 // ── VendorInfoPanel ────────────────────────────────────────────────────────
 export function VendorInfoPanel({ vendor, categoryLabel }) {
   // Use database field names
-  const bankName = vendor.bank_name || '—';
-  const bankAccNo = vendor.account_number_or_upi || null;
+  const bankName = (vendor.bank_name === 'Others' ? vendor.custom_bank_name : vendor.bank_name) || '—';
+  const bankAccNo = vendor.account_number || null;
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -37,13 +45,18 @@ export function VendorInfoPanel({ vendor, categoryLabel }) {
             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{categoryLabel}</div>
             <div className="flex items-center gap-3 flex-wrap">
               <h2 className="text-2xl font-black text-gray-800 tracking-tight">
-                {vendor.garage_name || vendor.name}
+                {vendor.garage_name || vendor.vendor_name || vendor.name}
               </h2>
               <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${vendor.status === 'Inactive' ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-600 border-green-100'}`}>
                 {vendor.status || 'Active'}
               </span>
               {vendor.category && (
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 border border-blue-100">{vendor.category}</span>
+              )}
+              {vendor.payment_terms && (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize ${vendor.payment_terms === 'cash' ? 'bg-violet-50 text-violet-600 border-violet-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                  {vendor.payment_terms}
+                </span>
               )}
             </div>
           </div>
@@ -207,19 +220,24 @@ export function CollectReceiptModal({ isOpen, onClose, onSave, vendorName, recei
 }
 
 // ── SummaryCards ───────────────────────────────────────────────────────────
-export function SummaryCards({ totalDebit, totalCredit, lastDate }) {
-  const outstanding = totalDebit - totalCredit;
+export function SummaryCards({ totalDebit, totalCredit, lastDate, isCash = false }) {
+  // Cash vendors are paid in full at the time of purchase — nothing ever
+  // carries forward as payable, regardless of how much was spent with them.
+  const outstanding = isCash ? 0 : totalDebit - totalCredit;
   // If net credit > debit, this is a receivable vendor (e.g. scrap buyer)
-  const isReceivable = outstanding < 0;
-  const outColor = outstanding === 0 ? 'text-gray-400' : isReceivable ? 'text-emerald-600' : outstanding > 20000 ? 'text-red-600' : outstanding > 5000 ? 'text-yellow-600' : 'text-green-600';
-  const outBg    = outstanding === 0 ? 'bg-gray-50'    : isReceivable ? 'bg-emerald-50'   : outstanding > 20000 ? 'bg-red-50'    : outstanding > 5000 ? 'bg-yellow-50'    : 'bg-green-50';
-  const outSub   = outstanding === 0 ? 'Fully Settled' : isReceivable ? 'Receivable (Pending Collection)' : 'Payable';
+  const isReceivable = !isCash && outstanding < 0;
+  const outColor = isCash ? 'text-violet-600' : outstanding === 0 ? 'text-gray-400' : isReceivable ? 'text-emerald-600' : outstanding > 20000 ? 'text-red-600' : outstanding > 5000 ? 'text-yellow-600' : 'text-green-600';
+  const outBg    = isCash ? 'bg-violet-50'    : outstanding === 0 ? 'bg-gray-50'    : isReceivable ? 'bg-emerald-50'   : outstanding > 20000 ? 'bg-red-50'    : outstanding > 5000 ? 'bg-yellow-50'    : 'bg-green-50';
+  const outSub   = isCash ? 'Settled (Cash Vendor)' : outstanding === 0 ? 'Fully Settled' : isReceivable ? 'Receivable (Pending Collection)' : 'Payable';
 
+  // Cash vendors never get a separate "Payment" ledger entry — every
+  // purchase is paid in full at the time it's made, so totalCredit stays 0
+  // even though the vendor has genuinely been paid totalDebit in full.
   const cards = [
     { label: 'Outstanding Balance', value: outstanding === 0 ? '₹0' : `₹${Math.abs(outstanding).toLocaleString()}`, sub: outSub, icon: <FiTrendingUp size={18}/>, color: outColor, bg: outBg },
-    { label: isReceivable ? 'Total Sales' : 'Total Expenses', value: `₹${totalDebit.toLocaleString()}`,  sub: isReceivable ? 'Cumulative sales' : 'Cumulative RTA expenses',    icon: <FiShoppingBag size={18}/>, color: 'text-red-500',   bg: 'bg-red-50'   },
-    { label: isReceivable ? 'Total Collected' : 'Total Payments', value: `₹${totalCredit.toLocaleString()}`, sub: 'Cumulative credits', icon: <FiTrendingDown size={18}/>, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Last Transaction',    value: lastDate || '—',                      sub: 'Most recent activity', icon: <FiClock size={18}/>,        color: 'text-blue-600',  bg: 'bg-blue-50'  },
+    { label: isReceivable ? 'Total Sales' : 'Total Expenses', value: `₹${totalDebit.toLocaleString()}`,  sub: isReceivable ? 'Cumulative sales' : 'Cumulative expenses',    icon: <FiShoppingBag size={18}/>, color: 'text-red-500',   bg: 'bg-red-50'   },
+    { label: isReceivable ? 'Total Collected' : 'Total Payments', value: `₹${(isCash ? totalDebit : totalCredit).toLocaleString()}`, sub: isCash ? 'Paid at purchase (cash vendor)' : 'Cumulative credits', icon: <FiTrendingDown size={18}/>, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Last Transaction',    value: fmtDate(lastDate),                    sub: 'Most recent activity', icon: <FiClock size={18}/>,        color: 'text-blue-600',  bg: 'bg-blue-50'  },
   ];
 
   return (

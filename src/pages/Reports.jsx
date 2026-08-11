@@ -1,61 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import TrucksPLList from './trucksPL/TrucksPLList';
 import { PERIOD_PRESETS, resolvePeriod, periodDisplay } from './trucksPL/periodService';
-import { FiSearch, FiFilter, FiDownload, FiChevronDown, FiTrendingUp, FiTrendingDown, FiTruck, FiX, FiCheckCircle, FiFileText, FiPieChart, FiBarChart2, FiCalendar } from 'react-icons/fi';
+import { FiSearch, FiFilter, FiDownload, FiChevronDown, FiTrendingUp, FiTrendingDown, FiTruck, FiX, FiCheckCircle, FiFileText, FiPieChart, FiBarChart2, FiCalendar, FiMapPin } from 'react-icons/fi';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
-// --- MOCK DATA ---
-const MOCK_KPIS = {
-  totalRevenue: 14870468,
-  revenueTrend: 12,
-  totalExpenses: 7313906,
-  expenseTrend: -5,
-  netProfit: 7556562,
-  profitMargin: 50.8,
-  activeTrucks: 22,
-  totalTrucks: 25
+const EXPENSE_COLORS = {
+  fuel: '#ef4444',
+  adBlue: '#06b6d4',
+  emi: '#8b5cf6',
+  maintenance: '#f59e0b',
+  driver: '#3b82f6',
+  ops: '#10b981',
+  other: '#64748b',
 };
 
-const EXPENSE_DATA = [
-  { name: 'Fuel', value: 3807301, color: '#ef4444' },     // Red
-  { name: 'EMI', value: 1125000, color: '#8b5cf6' },      // Purple
-  { name: 'Maint.', value: 673924, color: '#f59e0b' },    // Yellow
-  { name: 'Driver', value: 929809, color: '#3b82f6' },    // Blue
-  { name: 'Ops', value: 582576, color: '#10b981' },       // Green
-  { name: 'Other', value: 195296, color: '#64748b' }      // Slate
-];
-
-const TOP_PROFIT = [
-  { rank: 1, truck: 'AP 99 OW 3142', plant: 'Ramco Cements', amount: 658810 },
-  { rank: 2, truck: 'TS 71 CF 8495', plant: 'Hyderabad Pharma', amount: 573658 },
-  { rank: 3, truck: 'TN 93 CP 1825', plant: 'Jindal Steel', amount: 500695 },
-  { rank: 4, truck: 'KA 50 TW 9479', plant: 'Vijayawada Thermal', amount: 476093 },
-  { rank: 5, truck: 'AP 17 QA 9301', plant: 'Vijayawada Thermal', amount: 457248 },
-];
-
-const TOP_LOSS = [
-  { rank: 1, truck: 'TN 73 KH 7227', plant: 'Krishnapatnam Port', amount: -32465 },
-  { rank: 2, truck: 'MH 12 RM 2354', plant: 'Vijayawada Thermal', amount: -58754 },
-  { rank: 3, truck: 'AP 40 EN 9946', plant: 'Ramco Cements', amount: -59589 },
-  { rank: 4, truck: 'MH 50 IB 1984', plant: 'Krishnapatnam Port', amount: -79841 },
-  { rank: 5, truck: 'AP 23 UC 5785', plant: 'Vijayawada Thermal', amount: -79967 },
-];
-
-const DETAILED_FLEET = [
-  { id: 1, truck: 'TS 42 HI 4882', plant: 'Nandyal Cement Works', revenue: 524752, expenses: 347559, profit: 177193 },
-  { id: 2, truck: 'TN 73 KH 7227', plant: 'Krishnapatnam Port', revenue: 335883, expenses: 303418, profit: 32465 },
-  { id: 3, truck: 'MH 50 IB 1984', plant: 'Krishnapatnam Port', revenue: 427980, expenses: 348139, profit: 79841 },
-  { id: 4, truck: 'KA 62 IN 3957', plant: 'Krishnapatnam Port', revenue: 621031, expenses: 246058, profit: 374973 },
-  { id: 5, truck: 'KA 72 DT 8584', plant: 'Nandyal Cement Works', revenue: 693286, expenses: 279443, profit: 413843 },
-  { id: 6, truck: 'KA 35 RK 5014', plant: 'Vijayawada Thermal', revenue: 638828, expenses: 277610, profit: 361218 },
-  { id: 7, truck: 'TN 93 CP 1825', plant: 'Jindal Steel', revenue: 749522, expenses: 248827, profit: 500695 },
-  { id: 8, truck: 'AP 99 OW 3142', plant: 'Ramco Cements', revenue: 891121, expenses: 232311, profit: 658810 },
-  { id: 9, truck: 'MH 12 RM 2354', plant: 'Vijayawada Thermal', revenue: 215444, expenses: 274198, profit: -58754 }, // Loss example
-];
+const EXPENSE_LABELS = {
+  fuel: 'Fuel',
+  adBlue: 'AdBlue',
+  emi: 'EMI',
+  maintenance: 'Maint.',
+  driver: 'Driver',
+  ops: 'Ops',
+  other: 'Other',
+};
 
 const formatCur = (num) => {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(num);
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(num || 0);
 };
 
 export default function ProfitLossReports() {
@@ -65,6 +37,9 @@ export default function ProfitLossReports() {
   const [showPeriodDrop, setShowPeriodDrop] = useState(false);
   const [customStart, setCustomStart]     = useState('');
   const [customEnd, setCustomEnd]         = useState('');
+  const [summary, setSummary]             = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError]   = useState(null);
   const navigate = useNavigate();
 
   // Resolve current period dates
@@ -80,22 +55,60 @@ export default function ProfitLossReports() {
     if (key !== 'custom') setShowPeriodDrop(false);
   };
 
+  // ── Fetch Reports Summary from API ──
+  useEffect(() => {
+    const isoStart = startDate.toISOString().slice(0, 10);
+    const isoEnd   = endDate.toISOString().slice(0, 10);
+
+    const loadSummary = async () => {
+      try {
+        setSummaryLoading(true);
+        setSummaryError(null);
+        const res = await axios.get(
+          "http://localhost:5001/api/reports/summary",
+          { params: { startDate: isoStart, endDate: isoEnd } }
+        );
+        setSummary(res.data.data);
+      } catch (err) {
+        console.error("Error fetching reports summary:", err);
+        setSummaryError(err.response?.data?.message || 'Failed to load reports summary');
+      } finally {
+        setSummaryLoading(false);
+      }
+    };
+
+    loadSummary();
+  }, [periodKey, customStart, customEnd]);
+
+  const kpis = summary?.kpis || {
+    totalRevenue: 0, totalExpenses: 0, netProfit: 0, profitMargin: 0, activeTrucks: 0, totalTrucks: 0
+  };
+
+  const expenseData = summary
+    ? Object.entries(summary.expenseBreakdown || {})
+        .filter(([, value]) => value > 0)
+        .map(([key, value]) => ({ key, name: EXPENSE_LABELS[key] || key, value, color: EXPENSE_COLORS[key] || '#94a3b8' }))
+    : [];
+
+  const topProfit = summary?.topProfit || [];
+  const topLoss = summary?.topLoss || [];
+
   // --- RENDERS ---
   const renderDashboard = () => (
     <div className="space-y-6 animate-in fade-in duration-300">
-      
+
       {/* 1. TOP KPI CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        
+
         {/* Total Revenue */}
         <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex justify-between items-start mb-2">
             <h3 className="text-sm font-bold text-slate-500">Total Revenue</h3>
             <span className="p-2 bg-green-50 text-green-600 rounded-lg"><FiTrendingUp className="w-4 h-4"/></span>
           </div>
-          <p className="text-2xl font-black text-slate-800 tracking-tight">{formatCur(MOCK_KPIS.totalRevenue)}</p>
-          <div className="mt-4 flex items-center text-xs font-bold text-green-600">
-            <FiTrendingUp className="mr-1"/> +{MOCK_KPIS.revenueTrend}% <span className="text-slate-400 font-medium ml-1">vs last period</span>
+          <p className="text-2xl font-black text-slate-800 tracking-tight">{formatCur(kpis.totalRevenue)}</p>
+          <div className="mt-4 flex items-center text-xs font-bold text-slate-400">
+            {periodLabel}
           </div>
         </div>
 
@@ -105,9 +118,9 @@ export default function ProfitLossReports() {
             <h3 className="text-sm font-bold text-slate-500">Total Expenses</h3>
             <span className="p-2 bg-red-50 text-red-500 rounded-lg"><FiTrendingDown className="w-4 h-4"/></span>
           </div>
-          <p className="text-2xl font-black text-slate-800 tracking-tight">{formatCur(MOCK_KPIS.totalExpenses)}</p>
-          <div className="mt-4 flex items-center text-xs font-bold text-red-500">
-            <FiTrendingDown className="mr-1"/> {MOCK_KPIS.expenseTrend}% <span className="text-slate-400 font-medium ml-1">vs last period</span>
+          <p className="text-2xl font-black text-slate-800 tracking-tight">{formatCur(kpis.totalExpenses)}</p>
+          <div className="mt-4 flex items-center text-xs font-bold text-slate-400">
+            {periodLabel}
           </div>
         </div>
 
@@ -118,9 +131,9 @@ export default function ProfitLossReports() {
             <h3 className="text-sm font-bold text-slate-500">Net Profit</h3>
             <span className="p-2 bg-green-100 text-green-700 rounded-lg"><FiBarChart2 className="w-4 h-4"/></span>
           </div>
-          <p className="text-2xl font-black text-green-600 tracking-tight">{formatCur(MOCK_KPIS.netProfit)}</p>
-          <div className="mt-4 flex items-center text-xs font-bold text-green-600">
-            <FiTrendingUp className="mr-1"/> Margin: {MOCK_KPIS.profitMargin}%
+          <p className={`text-2xl font-black tracking-tight ${kpis.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCur(kpis.netProfit)}</p>
+          <div className={`mt-4 flex items-center text-xs font-bold ${kpis.netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {kpis.netProfit >= 0 ? <FiTrendingUp className="mr-1"/> : <FiTrendingDown className="mr-1"/>} Margin: {kpis.profitMargin}%
           </div>
         </div>
 
@@ -130,9 +143,9 @@ export default function ProfitLossReports() {
             <h3 className="text-sm font-bold text-slate-500">Fleet Activity</h3>
             <span className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><FiTruck className="w-4 h-4"/></span>
           </div>
-          <p className="text-2xl font-black text-slate-800 tracking-tight">{MOCK_KPIS.activeTrucks} <span className="text-lg font-bold text-slate-400">/ {MOCK_KPIS.totalTrucks}</span></p>
+          <p className="text-2xl font-black text-slate-800 tracking-tight">{kpis.activeTrucks} <span className="text-lg font-bold text-slate-400">/ {kpis.totalTrucks}</span></p>
           <div className="mt-4 flex items-center text-xs font-bold text-slate-500">
-             {MOCK_KPIS.totalTrucks - MOCK_KPIS.activeTrucks} Idle Trucks
+             {kpis.totalTrucks - kpis.activeTrucks} Idle Trucks
           </div>
         </div>
 
@@ -140,7 +153,7 @@ export default function ProfitLossReports() {
 
       {/* 2. TOP PERFORMERS LISTS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* Profitable */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex justify-between items-center">
@@ -148,17 +161,20 @@ export default function ProfitLossReports() {
             <span className="text-xs font-bold text-green-600 bg-green-50 px-2.5 py-1 rounded">Highest Net Profit</span>
           </div>
           <div className="p-2">
-            {TOP_PROFIT.map((item, i) => (
-              <div key={i} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-lg transition-colors">
+            {topProfit.length === 0 && !summaryLoading && (
+              <p className="text-xs font-medium text-slate-400 text-center py-6">No profitable trucks in this period.</p>
+            )}
+            {topProfit.map((item, i) => (
+              <div key={item.vehicleId} onClick={() => setSelectedTruck(item)} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer">
                 <div className="flex items-center gap-4">
-                  <div className="w-6 text-center text-xs font-bold text-slate-400">{item.rank}</div>
+                  <div className="w-6 text-center text-xs font-bold text-slate-400">{i + 1}</div>
                   <div>
-                    <p className="text-sm font-bold text-slate-800">{item.truck}</p>
+                    <p className="text-sm font-bold text-slate-800">{item.truckNo}</p>
                     <p className="text-[11px] font-medium text-slate-500 flex items-center gap-1"><FiCheckCircle className="w-3 h-3 text-slate-300"/> {item.plant}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-green-600">+{formatCur(item.amount)}</p>
+                  <p className="text-sm font-bold text-green-600">+{formatCur(item.profit)}</p>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Net Profit</p>
                 </div>
               </div>
@@ -170,20 +186,23 @@ export default function ProfitLossReports() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex justify-between items-center">
             <h3 className="font-bold text-slate-800 flex items-center gap-2"><FiTrendingDown className="text-red-500"/> Top 5 Loss Making Trucks</h3>
-            <span className="text-xs font-bold text-red-500 bg-red-50 px-2.5 py-1 rounded hover:bg-red-100 cursor-pointer">Action Required</span>
+            <span className="text-xs font-bold text-red-500 bg-red-50 px-2.5 py-1 rounded">Action Required</span>
           </div>
           <div className="p-2">
-            {TOP_LOSS.map((item, i) => (
-              <div key={i} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-lg transition-colors">
+            {topLoss.length === 0 && !summaryLoading && (
+              <p className="text-xs font-medium text-slate-400 text-center py-6">No loss-making trucks in this period.</p>
+            )}
+            {topLoss.map((item, i) => (
+              <div key={item.vehicleId} onClick={() => setSelectedTruck(item)} className="flex justify-between items-center p-3 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer">
                 <div className="flex items-center gap-4">
-                  <div className="w-6 text-center text-xs font-bold text-slate-400">{item.rank}</div>
+                  <div className="w-6 text-center text-xs font-bold text-slate-400">{i + 1}</div>
                   <div>
-                    <p className="text-sm font-bold text-slate-800">{item.truck}</p>
+                    <p className="text-sm font-bold text-slate-800">{item.truckNo}</p>
                     <p className="text-[11px] font-medium text-slate-500 flex items-center gap-1"><FiCheckCircle className="w-3 h-3 text-slate-300"/> {item.plant}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-red-500">{formatCur(item.amount)}</p>
+                  <p className="text-sm font-bold text-red-500">{formatCur(item.profit)}</p>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Net Loss</p>
                 </div>
               </div>
@@ -196,15 +215,20 @@ export default function ProfitLossReports() {
       {/* 3. EXPENSE STRUCTURE PIE CHART */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
         <h3 className="font-bold text-slate-800 text-lg mb-1">Overall Fleet Expense Structure</h3>
-        <p className="text-xs font-medium text-slate-500 mb-6">Breakdown of total fleet expenditure</p>
-        
+        <p className="text-xs font-medium text-slate-500 mb-6">Breakdown of total fleet expenditure · {periodLabel}</p>
+
+        {expenseData.length === 0 ? (
+          <p className="text-xs font-medium text-slate-400 text-center py-10">
+            {summaryLoading ? 'Loading…' : 'No expenses recorded in this period.'}
+          </p>
+        ) : (
         <div className="flex flex-col md:flex-row items-center justify-between gap-10">
-          
+
           <div className="w-full md:w-1/2 h-64 relative flex items-center justify-center">
              <ResponsiveContainer width="100%" height="100%">
                <PieChart>
                   <Pie
-                    data={EXPENSE_DATA}
+                    data={expenseData}
                     cx="50%"
                     cy="50%"
                     innerRadius={70}
@@ -213,7 +237,7 @@ export default function ProfitLossReports() {
                     dataKey="value"
                     stroke="none"
                   >
-                    {EXPENSE_DATA.map((entry, index) => (
+                    {expenseData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
                   </Pie>
@@ -222,14 +246,14 @@ export default function ProfitLossReports() {
              </ResponsiveContainer>
              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Spend</p>
-                <p className="text-xl font-black text-slate-800">₹73.1L</p>
+                <p className="text-xl font-black text-slate-800">{formatCur(kpis.totalExpenses)}</p>
              </div>
           </div>
 
           <div className="w-full md:w-1/2">
              <div className="space-y-4">
-                {EXPENSE_DATA.map((item, i) => {
-                  const percentage = ((item.value / MOCK_KPIS.totalExpenses) * 100).toFixed(1);
+                {expenseData.map((item, i) => {
+                  const percentage = kpis.totalExpenses > 0 ? ((item.value / kpis.totalExpenses) * 100).toFixed(1) : '0.0';
                   return (
                     <div key={i} className="flex items-center justify-between">
                        <div className="flex items-center gap-3">
@@ -245,12 +269,13 @@ export default function ProfitLossReports() {
                 })}
                 <div className="pt-4 mt-2 border-t border-slate-100 flex items-center justify-between">
                    <span className="text-sm font-bold text-slate-800">Total Expenses</span>
-                   <span className="text-base font-black text-red-500 mr-16">{formatCur(MOCK_KPIS.totalExpenses)}</span>
+                   <span className="text-base font-black text-red-500 mr-16">{formatCur(kpis.totalExpenses)}</span>
                 </div>
              </div>
           </div>
 
         </div>
+        )}
       </div>
     </div>
   );
@@ -261,22 +286,17 @@ export default function ProfitLossReports() {
 
   const renderTruckModal = () => {
     if(!selectedTruck) return null;
-    
-    // Derived dummy data for modal
+
     const isProfit = selectedTruck.profit >= 0;
-    const modalExpenses = [
-      { name: 'Fuel', value: selectedTruck.expenses * 0.52, color: '#ef4444' },
-      { name: 'EMI', value: selectedTruck.expenses * 0.15, color: '#8b5cf6' },
-      { name: 'Maint.', value: selectedTruck.expenses * 0.10, color: '#f59e0b' },
-      { name: 'Driver', value: selectedTruck.expenses * 0.13, color: '#3b82f6' },
-      { name: 'Ops', value: selectedTruck.expenses * 0.08, color: '#10b981' },
-      { name: 'Other', value: selectedTruck.expenses * 0.02, color: '#64748b' }
-    ];
+    const breakdown = selectedTruck.expenseBreakdown || {};
+    const modalExpenses = Object.entries(breakdown)
+      .filter(([, value]) => value > 0)
+      .map(([key, value]) => ({ name: EXPENSE_LABELS[key] || key, value, color: EXPENSE_COLORS[key] || '#94a3b8' }));
 
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
-        <div className="bg-slate-100 rounded-2xl shadow-2xl w-full max-w-5xl h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-           
+        <div className="bg-slate-100 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+
            {/* Dark Header Strip */}
            <div className="bg-slate-900 px-6 py-4 flex justify-between items-center text-white shrink-0">
              <div className="flex items-center gap-4">
@@ -284,34 +304,14 @@ export default function ProfitLossReports() {
                  <FiTruck className="w-6 h-6 text-white"/>
                </div>
                <div>
-                  <h2 className="text-xl font-black tracking-widest">{selectedTruck.truck}</h2>
-                  <p className="text-[11px] font-medium text-slate-400 flex items-center gap-1.5"><FiMapPin className="w-3 h-3"/> {selectedTruck.plant} • <span className="text-green-400 font-bold">Active</span></p>
+                  <h2 className="text-xl font-black tracking-widest">{selectedTruck.truckNo}</h2>
+                  <p className="text-[11px] font-medium text-slate-400 flex items-center gap-1.5"><FiMapPin className="w-3 h-3"/> {selectedTruck.plant} · {periodLabel}</p>
                </div>
              </div>
              <button onClick={()=>setSelectedTruck(null)} className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"><FiX className="w-5 h-5"/></button>
            </div>
 
            <div className="flex-1 overflow-auto p-4 md:p-6 space-y-6">
-              
-              {/* Top Overview Bar */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><FiTrendingUp/> KM Ran</p>
-                  <p className="text-lg font-black text-slate-800">8,198 <span className="text-xs font-bold text-slate-400">km</span></p>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1"><FiFileText/> Diesel</p>
-                  <p className="text-lg font-black text-slate-800">1,929 <span className="text-xs font-bold text-slate-400">L</span></p>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Mileage</p>
-                  <p className="text-lg font-black text-blue-600">4.25 <span className="text-xs font-bold text-blue-400">km/l</span></p>
-                </div>
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Per KM Cost</p>
-                  <p className="text-lg font-black text-red-500">₹37.01</p>
-                </div>
-              </div>
 
               {/* Finance Big Summary */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -331,62 +331,39 @@ export default function ProfitLossReports() {
 
               {/* Main Detail Area */}
               <div className="flex flex-col lg:flex-row gap-6">
-                 
+
                  {/* Income & Expense Statement */}
                  <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                     <div className="px-5 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                       <h3 className="font-bold text-slate-800 flex items-center gap-2"><FiFileText className="text-slate-400"/> Income & Expense Statement</h3>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider border border-slate-200 px-2 py-1 bg-white rounded">Last 30 Days</span>
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider border border-slate-200 px-2 py-1 bg-white rounded">{periodLabel}</span>
                     </div>
-                    
+
                     <div className="p-5 text-sm">
                        {/* Revenue */}
                        <div className="flex justify-between items-center mb-6 py-2">
-                         <span className="font-bold text-slate-700">Freight Revenue</span>
+                         <span className="font-bold text-slate-700">Total Revenue</span>
                          <span className="font-black text-slate-800">{formatCur(selectedTruck.revenue)}</span>
                        </div>
 
                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Operating Expenses</p>
                        <div className="space-y-3 font-medium text-slate-600">
-                         <div className="flex justify-between items-center pl-2 border-l-2 border-red-500">
-                           <span>Diesel Fuel</span> <span>{formatCur(modalExpenses[0].value)}</span>
-                         </div>
-                         <div className="flex justify-between items-center pl-2 border-l-2 border-purple-500">
-                           <span>Truck EMI</span> <span>{formatCur(modalExpenses[1].value)}</span>
-                         </div>
-                         <div className="flex justify-between items-center pl-2 border-l-2 border-blue-500">
-                           <span>Driver Salary & Bata</span> <span>{formatCur(modalExpenses[3].value)}</span>
-                         </div>
-                         <div className="flex justify-between items-center pl-2">
-                           <span className="text-slate-500">AdBlue / DEF</span> <span>{formatCur(modalExpenses[4].value * 0.3)}</span>
-                         </div>
-                         <div className="flex justify-between items-center pl-2 border-l-2 border-yellow-500">
-                           <span>Maintenance & Tyres</span> <span>{formatCur(modalExpenses[2].value)}</span>
-                         </div>
+                         {modalExpenses.map((exp, i) => (
+                           <div key={i} className="flex justify-between items-center pl-2 border-l-2" style={{ borderColor: exp.color }}>
+                             <span>{exp.name}</span> <span>{formatCur(exp.value)}</span>
+                           </div>
+                         ))}
+                         {modalExpenses.length === 0 && (
+                           <p className="text-xs text-slate-400">No expenses recorded.</p>
+                         )}
                        </div>
 
-                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-6 mb-3">Trip Expenses</p>
-                       <div className="space-y-3 font-medium text-slate-600">
-                         <div className="flex justify-between items-center pl-2 border-l-2 border-green-500">
-                           <span>Loading Charges</span> <span>{formatCur(modalExpenses[4].value * 0.4)}</span>
-                         </div>
-                         <div className="flex justify-between items-center pl-2 border-l-2 border-green-500">
-                           <span>Unloading Charges</span> <span>{formatCur(modalExpenses[4].value * 0.3)}</span>
-                         </div>
-                         <div className="flex justify-between items-center pl-2 border-l-2 border-slate-400">
-                           <span>Toll Charges</span> <span>{formatCur(modalExpenses[5].value * 0.6)}</span>
-                         </div>
-                         <div className="flex justify-between items-center pl-2 border-l-2 border-slate-400">
-                           <span>RTO / Challans</span> <span>{formatCur(modalExpenses[5].value * 0.4)}</span>
-                         </div>
-                       </div>
-                       
                        <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center">
                          <span className="font-bold text-slate-800">Total Expenses</span>
                          <span className="font-black text-red-500">-{formatCur(selectedTruck.expenses)}</span>
                        </div>
                     </div>
-                    
+
                     <div className="bg-slate-800 px-5 py-4 flex justify-between items-center text-white">
                        <span className="font-black tracking-widest uppercase">Net Profit</span>
                        <span className={`text-xl font-black ${isProfit ? 'text-green-400' : 'text-red-400'}`}>{formatCur(selectedTruck.profit)}</span>
@@ -397,6 +374,7 @@ export default function ProfitLossReports() {
                  <div className="w-full lg:w-72 space-y-6">
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5 text-center">
                        <h4 className="font-bold text-xs text-slate-500 uppercase tracking-wider mb-4">Expense Distribution</h4>
+                       {modalExpenses.length > 0 ? (
                        <div className="h-40 relative flex items-center justify-center">
                          <ResponsiveContainer width="100%" height="100%">
                            <PieChart>
@@ -418,25 +396,25 @@ export default function ProfitLossReports() {
                            </PieChart>
                          </ResponsiveContainer>
                        </div>
+                       ) : (
+                         <p className="text-xs text-slate-400 py-10">No data</p>
+                       )}
                        <div className="mt-4 flex flex-wrap justify-center gap-2 text-[9px] font-bold text-slate-500 uppercase leading-relaxed">
-                         <span className="flex items-center gap-1"><div className="w-2 h-2 bg-red-500"></div> Fuel</span>
-                         <span className="flex items-center gap-1"><div className="w-2 h-2 bg-purple-500"></div> EMI</span>
-                         <span className="flex items-center gap-1"><div className="w-2 h-2 bg-yellow-500"></div> Maint</span>
-                         <span className="flex items-center gap-1"><div className="w-2 h-2 bg-blue-500"></div> Driver</span>
-                         <span className="flex items-center gap-1"><div className="w-2 h-2 bg-green-500"></div> Ops</span>
-                         <span className="flex items-center gap-1"><div className="w-2 h-2 bg-slate-500"></div> Other</span>
+                         {modalExpenses.map((exp, i) => (
+                           <span key={i} className="flex items-center gap-1"><div className="w-2 h-2" style={{ backgroundColor: exp.color }}></div> {exp.name}</span>
+                         ))}
                        </div>
                     </div>
 
                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
                        <h4 className="font-bold text-xs text-slate-500 uppercase tracking-wider mb-4">Quick Stats</h4>
                        <div className="flex justify-between items-center text-sm font-medium border-b border-slate-100 pb-2 mb-2">
-                         <span className="text-slate-500">Days Active</span>
-                         <span className="font-bold text-slate-800">25 Days</span>
+                         <span className="text-slate-500">Completed Trips</span>
+                         <span className="font-bold text-slate-800">{selectedTruck.completedTrips ?? 0}</span>
                        </div>
                        <div className="flex justify-between items-center text-sm font-medium">
-                         <span className="text-slate-500">Avg. Trips/Day</span>
-                         <span className="font-bold text-slate-800">1.2</span>
+                         <span className="text-slate-500">Profit Margin</span>
+                         <span className="font-bold text-slate-800">{selectedTruck.margin}%</span>
                        </div>
                     </div>
                  </div>
@@ -450,30 +428,30 @@ export default function ProfitLossReports() {
 
   return (
     <div className="flex flex-col h-full animate-in fade-in duration-200">
-      
+
       {/* HEADER */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">Profit & Loss Reports</h1>
           <p className="text-slate-500 text-sm mt-1">Comprehensive financial performance across the fleet.</p>
         </div>
-        
+
         <div className="flex flex-wrap gap-2 items-center">
            <div className="bg-white p-1 rounded-xl shadow-sm border border-slate-200 flex">
-             <button 
-               onClick={()=>setActiveTab('dashboard')} 
+             <button
+               onClick={()=>setActiveTab('dashboard')}
                className={`px-3 sm:px-5 py-2 font-bold text-sm rounded-lg flex items-center gap-2 transition-colors ${activeTab === 'dashboard' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'} `}
              >
                <FiPieChart className="w-4 h-4"/> <span className="hidden sm:inline">Dashboard</span>
              </button>
-             <button 
-               onClick={()=>setActiveTab('list')} 
+             <button
+               onClick={()=>setActiveTab('list')}
                className={`px-3 sm:px-5 py-2 font-bold text-sm rounded-lg flex items-center gap-2 transition-colors ${activeTab === 'list' ? 'bg-slate-800 text-white' : 'text-slate-500 hover:bg-slate-50'} `}
              >
                <FiFileText className="w-4 h-4"/> <span className="hidden sm:inline">Trucks P&L</span>
              </button>
            </div>
-           
+
            {/* Period Selector */}
            <div className="relative">
              <button
@@ -526,12 +504,15 @@ export default function ProfitLossReports() {
 
       {/* CONTENT */}
       <div className="flex-1 overflow-auto pb-10">
+        {summaryError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm font-medium text-red-600">{summaryError}</div>
+        )}
         {activeTab === 'dashboard' ? renderDashboard() : renderTrucksList()}
       </div>
 
       {/* MODAL */}
       {renderTruckModal()}
-      
+
     </div>
   );
 }

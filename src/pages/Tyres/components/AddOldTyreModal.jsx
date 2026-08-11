@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Plus, AlertCircle, ChevronDown } from 'lucide-react';
 import axios from 'axios';
+import api from '../../../services/api';
 import { layoutPositions } from '../data/dummyData';
 
 const today = () => new Date().toISOString().split('T')[0];
@@ -91,7 +92,7 @@ export default function AddOldTyreModal({ isOpen, onClose }) {
 
   const fetchVehicles = async () => {
     try {
-      const res = await axios.get('http://localhost:5001/api/vehicles');
+      const res = await api.get('/vehicles');
       setVehicles(res.data.data || []);
     } catch (error) {
       console.log('Fetch Vehicles Error:', error);

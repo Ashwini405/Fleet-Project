@@ -28,6 +28,17 @@ exports.getSupervisors = async (req, res) => {
   }
 };
 
+// UPDATE
+exports.updateSupervisor = async (req, res) => {
+  try {
+    await Supervisor.update(req.params.id, req.body);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message || 'Update failed' });
+  }
+};
+
 // DELETE
 exports.deleteSupervisor = async (req, res) => {
   try {

@@ -9,7 +9,7 @@ const labelCls    = "block text-xs font-bold text-gray-500 uppercase tracking-wi
 const labelOptCls = "block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1";
 
 const EMPTY = {
-  name: '', mobile: '', email: '', address: '', status: 'Active',
+  name: '', mobile: '', email: '', address: '', status: 'Active', paymentTerms: 'credit',
   contactPerson: '', designation: '',
   bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '',
   openingBalance: '0',
@@ -55,6 +55,7 @@ export default function AddShowroomModal({ isOpen, onClose }) {
         email: form.email,
         address_location: form.address,
         status: form.status,
+        payment_terms: form.paymentTerms,
         contact_person: form.contactPerson,
         designation: form.designation,
         bank_name: form.bankName,
@@ -140,6 +141,29 @@ export default function AddShowroomModal({ isOpen, onClose }) {
                     </select>
                   </div>
                 </div>
+                <div>
+                  <label className={labelCls}>Payment Terms</label>
+                  <div className="flex gap-2">
+                    {['credit', 'cash'].map(pt => (
+                      <button key={pt} type="button" onClick={() => {
+                        set('paymentTerms', pt);
+                        if (pt === 'cash') {
+                          setForm(p => ({ ...p, paymentTerms: 'cash', bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '', openingBalance: '0' }));
+                        }
+                      }}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold capitalize border transition-colors ${
+                          form.paymentTerms === pt
+                            ? pt === 'cash' ? 'bg-violet-600 text-white border-violet-600' : 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                        }`}>
+                        {pt}
+                      </button>
+                    ))}
+                  </div>
+                  {form.paymentTerms === 'cash' && (
+                    <p className="text-[11px] text-violet-500 font-semibold mt-1.5">Cash showroom — payment is made upfront. No ledger balance tracking.</p>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -160,7 +184,8 @@ export default function AddShowroomModal({ isOpen, onClose }) {
               </div>
             </div>
 
-            {/* Bank Details */}
+            {/* Bank Details — credit only */}
+            {form.paymentTerms === 'credit' && (
             <div className="pt-2 border-t border-gray-100">
               <p className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
                 <FiHome size={12} /> Bank Details (Optional)
@@ -200,8 +225,10 @@ export default function AddShowroomModal({ isOpen, onClose }) {
                 </div>
               </div>
             </div>
+            )}
 
-            {/* Opening Balance */}
+            {/* Opening Balance — credit only */}
+            {form.paymentTerms === 'credit' && (
             <div className="pt-2 border-t border-gray-100">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Financial Details (Optional)</p>
               <div>
@@ -210,6 +237,7 @@ export default function AddShowroomModal({ isOpen, onClose }) {
                   min="0" placeholder="0" className={inputCls} />
               </div>
             </div>
+            )}
 
             <div className="pt-2">
               <button 

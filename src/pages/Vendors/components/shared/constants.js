@@ -19,6 +19,7 @@ export const TYPE_STYLES = {
   'Warranty Approved':     'bg-green-50 text-green-700 border border-green-100',
   'Warranty Rejected':     'bg-red-50 text-red-600 border border-red-100',
   'Warranty Settled':      'bg-teal-50 text-teal-600 border border-teal-100',
+  'Labour Charge':         'bg-orange-50 text-orange-600 border border-orange-100',
 };
 
 export const STATUS_STYLES = {

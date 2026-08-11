@@ -63,9 +63,9 @@ function getLifecycleDates(tyre) {
 
 function fmtDate(d) {
   if (!d) return null;
-  // accepts YYYY-MM-DD
-  const [y, m, day] = d.split('-');
-  return `${day}-${m}-${y}`;
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return null;
+  return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 export default function OldTyreDetailsModal({ tyre, onClose }) {
@@ -96,7 +96,7 @@ export default function OldTyreDetailsModal({ tyre, onClose }) {
   const st = STATUS_STYLE[mappedTyre.status] || STATUS_STYLE.OLD_STOCK;
   const statusLabel = STATUS_LABELS[mappedTyre.status] || mappedTyre.status;
   const tread = mappedTyre.remainingTread != null ? `${mappedTyre.remainingTread}%` : '—';
-  const removedDate = mappedTyre.removedDate || '—';
+  const removedDate = fmtDate(mappedTyre.removedDate) || '—';
   const rec = recommendation(mappedTyre);
 
   const treadColor = mappedTyre.remainingTread != null

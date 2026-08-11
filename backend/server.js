@@ -4,6 +4,7 @@ const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
+const fs = require('fs');
 
 const vehicleRoutes = require('./routes/vehicleRoutes');
 const stationRoutes = require('./routes/stationRoutes');
@@ -57,6 +58,8 @@ require("./routes/tyreVendorRoutes");
 
 const oilVendorRoutes =
 require("./routes/oilVendorRoutes");
+const labourVendorRoutes =
+require("./routes/labourVendorRoutes");
 
 const fuelVendorRoutes =
 require("./routes/fuelVendorRoutes");
@@ -74,6 +77,8 @@ const tyreLedgerRoutes = require("./routes/tyreLedgerRoutes");
 
 const oilLedgerRoutes =
 require("./routes/oilLedgerRoutes");
+const labourLedgerRoutes =
+require("./routes/labourLedgerRoutes");
 const fuelLedgerRoutes =
 require("./routes/fuelLedgerRoutes");
 
@@ -89,6 +94,11 @@ const driverSettlementRoutes =
 require("./routes/driverSettlementRoutes");
 
 const truckPLRoutes = require("./routes/truckPLRoutes");
+const reportsRoutes = require("./routes/reportsRoutes");
+const truckInventoryRoutes = require("./routes/truckInventoryRoutes");
+const fastagRoutes = require("./routes/fastagRoutes");
+const fastagNotificationRoutes = require("./routes/fastagNotificationRoutes");
+const tenderRoutes = require("./routes/tenderRoutes");
 const companyProfileRoutes =
 require("./routes/companyProfileRoutes");
 const userManagementRoutes = require("./routes/userManagementRoutes");
@@ -153,7 +163,11 @@ app.use(express.urlencoded({ extended: true })); // ✅ IMPORTANT for form-data
 
 
 // 🔥 STATIC FILE SERVING (FOR DOCUMENTS)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+app.use('/uploads', express.static(uploadsDir));
 
 
 // 🔥 API ROUTES
@@ -246,6 +260,10 @@ app.use(
   oilVendorRoutes
 );
 app.use(
+  "/api/labour-vendors",
+  labourVendorRoutes
+);
+app.use(
   "/api/fuel-vendors",
   fuelVendorRoutes
 );
@@ -270,6 +288,10 @@ app.use("/api/tyre-ledger", tyreLedgerRoutes);
 app.use(
   "/api/oil-ledger",
   oilLedgerRoutes
+);
+app.use(
+  "/api/labour-ledger",
+  labourLedgerRoutes
 );
 
 app.use(
@@ -296,6 +318,11 @@ app.use(
 );
 
 app.use("/api/truck-pl", truckPLRoutes);
+app.use("/api/reports", reportsRoutes);
+app.use("/api/truck-inventory", truckInventoryRoutes);
+app.use("/api/fastag", fastagRoutes);
+app.use("/api/fastag-notifications", fastagNotificationRoutes);
+app.use("/api/tenders", tenderRoutes);
 
 app.use(
     "/api/company-profile",

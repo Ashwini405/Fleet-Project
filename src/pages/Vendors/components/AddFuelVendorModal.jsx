@@ -12,7 +12,7 @@ const loCls = 'block text-xs font-bold text-gray-400 uppercase tracking-widest m
 
 const EMPTY = {
   name: '', contactPerson: '', mobile: '', email: '', address: '',
-  fuelTypes: [], gst: '', openingBalance: '0', status: 'Active',
+  fuelTypes: [], gst: '', openingBalance: '0', status: 'Active', paymentTerms: 'credit',
   bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '', notes: '',
 };
 
@@ -83,6 +83,7 @@ export default function AddFuelVendorModal({ isOpen, onClose, onAdd, existingVen
         gst_number: form.gst.trim().toUpperCase(),
         opening_balance: Number(form.openingBalance) || 0,
         status: form.status,
+        payment_terms: form.paymentTerms,
         bank_name: form.bankName === 'Others' ? form.customBank : form.bankName,
         custom_bank_name: form.bankName === 'Others' ? form.customBank : null,
         account_number: form.accountNo.trim(),
@@ -206,6 +207,22 @@ export default function AddFuelVendorModal({ isOpen, onClose, onAdd, existingVen
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
                   </select>
+                </div>
+              </div>
+
+              <div>
+                <label className={lCls}>Payment Terms</label>
+                <div className="flex gap-2">
+                  {['credit', 'cash'].map(pt => (
+                    <button key={pt} type="button" onClick={() => set('paymentTerms', pt)}
+                      className={`flex-1 py-2.5 rounded-xl text-sm font-bold capitalize border transition-colors ${
+                        form.paymentTerms === pt
+                          ? 'bg-yellow-500 text-white border-yellow-500'
+                          : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                      }`}>
+                      {pt}
+                    </button>
+                  ))}
                 </div>
               </div>
 

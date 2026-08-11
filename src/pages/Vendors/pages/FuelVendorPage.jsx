@@ -22,6 +22,7 @@ function EditFuelVendorModal({ vendor, onClose, onSave }) {
     fuelTypes:     vendor.fuelTypes || [],
     gst:           vendor.gst_number || vendor.gst || '',
     status:        vendor.status || 'Active',
+    paymentTerms:  vendor.payment_terms || 'credit',
     notes:         vendor.notes || '',
     bankName:      vendor.bank_name || vendor.bank || '',
     accountNo:     vendor.account_number || vendor.account_number_or_upi || '',
@@ -66,6 +67,7 @@ function EditFuelVendorModal({ vendor, onClose, onSave }) {
       fuelTypes:      form.fuelTypes,
       gst_number:     form.gst.trim().toUpperCase(),
       status:         form.status,
+      payment_terms:  form.paymentTerms,
       notes:          form.notes.trim(),
       bank_name:      form.bankName,
       account_number: form.accountNo.trim(),
@@ -133,6 +135,21 @@ function EditFuelVendorModal({ vendor, onClose, onSave }) {
             </div>
           </div>
           <div>
+            <label className={lCls}>Payment Terms</label>
+            <div className="flex gap-2">
+              {['credit', 'cash'].map(pt => (
+                <button key={pt} type="button" onClick={() => set('paymentTerms', pt)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold capitalize border transition-colors ${
+                    form.paymentTerms === pt
+                      ? 'bg-yellow-500 text-white border-yellow-500'
+                      : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                  }`}>
+                  {pt}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
             <label className={loCls}>Notes</label>
             <input value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Optional notes…" className={iCls} />
           </div>
@@ -154,6 +171,7 @@ function ViewVendorModal({ vendor, onClose, onEdit }) {
     ['Email',          vendor.email || '—'],
     ['Address',        vendor.address_location || vendor.address || '—'],
     ['GST Number',     vendor.gst_number || vendor.gst || '—'],
+    ['Payment Terms',  vendor.payment_terms ? vendor.payment_terms.charAt(0).toUpperCase() + vendor.payment_terms.slice(1) : 'Credit'],
     ['Bank',           vendor.bank_name || vendor.bank || '—'],
     ['Account No.',    vendor.account_number || vendor.account_number_or_upi || '—'],
     ['IFSC',           vendor.ifsc_code || vendor.ifsc || '—'],
@@ -205,6 +223,7 @@ export default function FuelVendorPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [paymentFilter, setPaymentFilter] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
   const [editVendor, setEditVendor] = useState(null);
   const [viewVendor, setViewVendor] = useState(null);
@@ -241,13 +260,14 @@ export default function FuelVendorPage() {
     const q = search.trim().toLowerCase();
     return vendors.filter(v => {
       if (statusFilter !== 'All' && v.status !== statusFilter) return false;
+      if (paymentFilter !== 'all' && (v.payment_terms || 'credit') !== paymentFilter) return false;
       if (!q) return true;
       return (
         (v.vendor_name || '').toLowerCase().includes(q) ||
         (v.mobile_number || '').includes(q)
       );
     });
-  }, [vendors, search, statusFilter]);
+  }, [vendors, search, statusFilter, paymentFilter]);
 
   const handleAdd = async () => {
     await fetchFuelVendors();
@@ -358,7 +378,7 @@ export default function FuelVendorPage() {
       </div>
 
       {/* Status filter tabs */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {['All', 'Active', 'Inactive'].map(f => (
           <button key={f} onClick={() => setStatusFilter(f)}
             className={`px-4 py-2 rounded-xl text-xs font-bold border transition-colors ${
@@ -367,6 +387,17 @@ export default function FuelVendorPage() {
                 : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
             }`}>
             {f} <span className="ml-1 opacity-70">({counts[f]})</span>
+          </button>
+        ))}
+        <div className="w-px h-6 bg-gray-200 mx-1" />
+        {['all', 'credit', 'cash'].map(pf => (
+          <button key={pf} onClick={() => setPaymentFilter(pf)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold capitalize border transition-colors ${
+              paymentFilter === pf
+                ? 'bg-yellow-500 text-white border-yellow-500'
+                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+            }`}>
+            {pf}
           </button>
         ))}
       </div>
@@ -383,6 +414,9 @@ export default function FuelVendorPage() {
                   <FiDroplet size={18} />
                 </div>
                 <div className="flex items-center gap-1.5">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize ${
+                    (vendor.payment_terms || 'credit') === 'cash' ? 'bg-violet-50 text-violet-600 border-violet-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+                  }`}>{vendor.payment_terms || 'credit'}</span>
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                     vendor.status === 'Inactive' ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-600 border-green-100'
                   }`}>{vendor.status || 'Active'}</span>

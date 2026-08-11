@@ -58,18 +58,20 @@ export default function AddClaimModal({ isOpen, onClose, onSubmit }) {
     issueDescription: '',
     complaintNumber:  '',
     complaintDocket:  '',
+    claimAmount:      '',
   });
 
   const set = (f, v) => setFd(p => ({ ...p, [f]: v }));
 
   useEffect(() => {
+    if (!isOpen) return;
     fetch('http://localhost:5001/api/warranties')
       .then(r => r.json())
       .then(data => {
         if (data.success) setWarranties(data.data || []);
       })
       .catch(err => console.error('FETCH WARRANTIES ERROR:', err));
-  }, []);
+  }, [isOpen]);
 
   const handleWarrantySelect = (e) => {
     const id = Number(e.target.value);
@@ -82,8 +84,6 @@ export default function AddClaimModal({ isOpen, onClose, onSubmit }) {
     fd.warrantyId &&
     fd.submitDate &&
     fd.issueDescription &&
-    fd.complaintNumber &&
-    fd.complaintDocket &&
     files.itemPhotos.length > 0;
 
   const handleSubmit = async () => {
@@ -97,6 +97,7 @@ export default function AddClaimModal({ isOpen, onClose, onSubmit }) {
       formData.append('complaint_number',   fd.complaintNumber);
       formData.append('complaint_docket',   fd.complaintDocket);
       formData.append('claim_status',        'Submitted');
+      formData.append('claim_available_amount', fd.claimAmount || 0);
       formData.append('created_by',           'Admin');
 
       // Snapshot fields from selected warranty
@@ -188,8 +189,9 @@ export default function AddClaimModal({ isOpen, onClose, onSubmit }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Inp label="Submit Date"          required type="date" value={fd.submitDate}       onChange={e => set('submitDate', e.target.value)} />
                 <Inp label="Date Sent to Vendor"  type="date"          value={fd.dateSentToVendor} onChange={e => set('dateSentToVendor', e.target.value)} />
-                <Inp label="Complaint Number"     required placeholder="e.g. CMP-123456" value={fd.complaintNumber} onChange={e => set('complaintNumber', e.target.value)} />
-                <Inp label="Complaint Docket"     required placeholder="e.g. DOC-789012" value={fd.complaintDocket} onChange={e => set('complaintDocket', e.target.value)} />
+                <Inp label="Complaint Number"     placeholder="e.g. CMP-123456" value={fd.complaintNumber} onChange={e => set('complaintNumber', e.target.value)} />
+                <Inp label="Complaint Docket"     placeholder="e.g. DOC-789012" value={fd.complaintDocket} onChange={e => set('complaintDocket', e.target.value)} />
+                <Inp label="Claim Amount (₹)"     type="number" min="0" placeholder="Leave blank if not yet quoted" value={fd.claimAmount} onChange={e => set('claimAmount', e.target.value)} />
               </div>
               <div className="mt-3">
                 <Label required>Issue Description</Label>

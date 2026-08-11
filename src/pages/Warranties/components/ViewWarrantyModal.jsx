@@ -199,8 +199,10 @@ export default function ViewWarrantyModal({ isOpen, onClose, itemData, onUpdated
     setEditing(false);
   }, [itemData]);
 
-  // Fetch vehicles and showrooms for the edit form
+  // Fetch vehicles and showrooms for the edit form — only once the modal is actually opened
   useEffect(() => {
+    if (!isOpen || !itemData) return;
+
     fetch('http://localhost:5001/api/vehicles')
       .then(r => r.json())
       .then(data => { if (data.success) setVehicles(data.data || []); })
@@ -210,7 +212,7 @@ export default function ViewWarrantyModal({ isOpen, onClose, itemData, onUpdated
       .then(r => r.json())
       .then(data => { if (data.success) setShowrooms(data.data || []); })
       .catch(err => console.error('FETCH SHOWROOMS ERROR:', err));
-  }, []);
+  }, [isOpen, itemData]);
 
   if (!isOpen || !itemData) return null;
 

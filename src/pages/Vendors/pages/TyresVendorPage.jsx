@@ -1,23 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { FiSearch, FiPlus, FiBriefcase, FiPhone, FiMapPin, FiHome, FiChevronRight } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiBriefcase, FiPhone, FiMapPin, FiHome, FiChevronRight, FiEdit2 } from 'react-icons/fi';
 import axios from 'axios';
 import AddTyreVendorModal from '../components/AddTyreVendorModal';
+import EditTyreVendorModal from '../components/EditTyreVendorModal';
 import TyresLedger from '../components/TyresLedger';
-import TyreVendorDetailPage from '../components/TyreVendorDetailPage';
 
 export default function TyresVendorPage() {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [balances, setBalances] = useState({}); // vendorId -> { totalDebit, totalCredit }, null on fetch error
   const [search, setSearch] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
-  const [viewMode, setViewMode] = useState(null); // 'detail' | 'ledger'
+  const [editVendor, setEditVendor] = useState(null);
 
   // Fetch tyre vendors from database
   const fetchTyreVendors = async () => {
     try {
       const response = await axios.get("http://localhost:5001/api/tyre-vendors");
-      setVendors(response.data.data || []);
+      const vendorList = response.data.data || [];
+      setVendors(vendorList);
+      fetchBalances(vendorList);
     } catch (error) {
       console.error("TYRE VENDOR FETCH ERROR", error);
     } finally {
@@ -25,32 +29,43 @@ export default function TyresVendorPage() {
     }
   };
 
+  // Fetched for every vendor, cash included — credit vendors need it for
+  // their real outstanding balance (debit - credit); cash vendors are
+  // always settled, but the card still shows how much they were paid.
+  const fetchBalances = async (vendorList) => {
+    const entries = await Promise.all(
+      vendorList.map(async v => {
+        try {
+          const res = await axios.get(`http://localhost:5001/api/tyre-ledger/${v.id}`);
+          const txns = res.data.transactions || [];
+          const totalDebit  = txns.reduce((sum, t) => sum + (t.debit  || 0), 0);
+          const totalCredit = txns.reduce((sum, t) => sum + (t.credit || 0), 0);
+          return [v.id, { totalDebit, totalCredit }];
+        } catch (error) {
+          console.error(`TYRE LEDGER FETCH ERROR (vendor ${v.id})`, error);
+          return [v.id, null];
+        }
+      })
+    );
+    setBalances(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+  };
+
   useEffect(() => {
     fetchTyreVendors();
   }, []);
 
-  // Filter vendors based on search term
-  const filtered = search
-    ? vendors.filter(v => v.vendor_name?.toLowerCase().includes(search.toLowerCase()))
-    : vendors;
+  // Filter vendors based on search term and payment terms
+  const filtered = vendors
+    .filter(v => !search || v.vendor_name?.toLowerCase().includes(search.toLowerCase()))
+    .filter(v => paymentFilter === 'all' || (v.payment_terms || 'credit') === paymentFilter);
 
-  const clearSelection = () => { setSelectedVendor(null); setViewMode(null); };
+  const clearSelection = () => setSelectedVendor(null);
 
-  if (selectedVendor && viewMode === 'ledger') {
+  if (selectedVendor) {
     return (
       <TyresLedger
         vendor={selectedVendor}
-        onBack={() => setViewMode('detail')}
-      />
-    );
-  }
-
-  if (selectedVendor && viewMode === 'detail') {
-    return (
-      <TyreVendorDetailPage
-        vendor={selectedVendor}
         onBack={clearSelection}
-        onViewLedger={() => setViewMode('ledger')}
       />
     );
   }
@@ -98,7 +113,17 @@ export default function TyresVendorPage() {
           <h2 className="text-xl font-bold text-gray-800">Tyres Accounts</h2>
           <p className="text-sm text-gray-500">Manage tyre suppliers, retreading vendors &amp; scrap buyers</p>
         </div>
-        <div className="flex items-center gap-4 w-full sm:w-auto">
+        <div className="flex items-center gap-4 w-full sm:w-auto flex-wrap">
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg p-1">
+            {['all', 'credit', 'cash'].map(pf => (
+              <button key={pf} onClick={() => setPaymentFilter(pf)}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold capitalize transition-colors ${
+                  paymentFilter === pf ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100'
+                }`}>
+                {pf}
+              </button>
+            ))}
+          </div>
           <div className="relative flex-1 sm:w-64">
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
@@ -123,7 +148,7 @@ export default function TyresVendorPage() {
         {filtered.map(vendor => (
           <div
             key={vendor.id}
-            onClick={() => { setSelectedVendor(vendor); setViewMode('detail'); }}
+            onClick={() => setSelectedVendor(vendor)}
             className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all group flex flex-col justify-between"
           >
             <div>
@@ -131,7 +156,16 @@ export default function TyresVendorPage() {
                 <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center border border-blue-100">
                   <FiBriefcase size={20} />
                 </div>
-                <FiChevronRight className="text-gray-300 group-hover:text-blue-500 transition-colors" size={20} />
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setEditVendor(vendor); }}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
+                    title="Edit Vendor"
+                  >
+                    <FiEdit2 size={15} />
+                  </button>
+                  <FiChevronRight className="text-gray-300 group-hover:text-blue-500 transition-colors" size={20} />
+                </div>
               </div>
 
               <div className="flex items-center justify-between mb-1">
@@ -144,9 +178,18 @@ export default function TyresVendorPage() {
                   {vendor.status || 'Active'}
                 </span>
               </div>
-              <p className="text-[11px] font-semibold text-blue-500 mb-3">
-                {vendor.vendor_type}
-              </p>
+              <div className="flex items-center gap-2 mb-3">
+                <p className="text-[11px] font-semibold text-blue-500">
+                  {vendor.vendor_type}
+                </p>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize ${
+                  (vendor.payment_terms || 'credit') === 'cash'
+                    ? 'bg-violet-50 text-violet-600 border-violet-100'
+                    : 'bg-amber-50 text-amber-600 border-amber-100'
+                }`}>
+                  {vendor.payment_terms || 'credit'}
+                </span>
+              </div>
 
               <div className="space-y-1.5 mb-6">
                 <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
@@ -156,17 +199,42 @@ export default function TyresVendorPage() {
                   <FiMapPin className="text-gray-400 shrink-0" /> {vendor.address_location}
                 </div>
                 <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                  <FiHome className="text-gray-400 shrink-0" /> Not provided
+                  <FiHome className="text-gray-400 shrink-0" /> {vendor.bank_name || 'Not provided'}
                 </div>
               </div>
             </div>
 
             <div className="border-t border-gray-100 pt-4 flex justify-between items-end">
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ledger Balance</span>
-              <div className="flex flex-col items-end">
-                <span className="font-bold text-lg text-gray-400">₹0</span>
-                <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">Settled</span>
-              </div>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                {(vendor.payment_terms || 'credit') === 'cash' ? 'Total Paid' : 'Ledger Balance'}
+              </span>
+              {balances[vendor.id] === undefined ? (
+                <span className="text-xs text-gray-300 font-semibold">Loading…</span>
+              ) : balances[vendor.id] === null ? (
+                <span className="text-xs text-gray-300 font-semibold">—</span>
+              ) : (vendor.payment_terms || 'credit') === 'cash' ? (
+                <div className="flex flex-col items-end">
+                  <span className="font-bold text-lg text-violet-600">₹{balances[vendor.id].totalDebit.toLocaleString()}</span>
+                  <span className="text-[10px] font-bold text-violet-500 bg-violet-50 px-2 py-0.5 rounded-full">Paid Upfront</span>
+                </div>
+              ) : (() => {
+                const outstanding = balances[vendor.id].totalDebit - balances[vendor.id].totalCredit;
+                return !outstanding ? (
+                  <div className="flex flex-col items-end">
+                    <span className="font-bold text-lg text-gray-400">₹0</span>
+                    <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">Settled</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-end">
+                    <span className={`font-bold text-lg ${outstanding < 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      ₹{Math.abs(outstanding).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] font-medium text-gray-400">
+                      {outstanding < 0 ? 'Advance Balance' : 'Outstanding Payable'}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         ))}
@@ -182,6 +250,14 @@ export default function TyresVendorPage() {
         isOpen={addOpen}
         onClose={() => {
           setAddOpen(false);
+          fetchTyreVendors();
+        }}
+      />
+      <EditTyreVendorModal
+        isOpen={!!editVendor}
+        vendor={editVendor}
+        onClose={() => {
+          setEditVendor(null);
           fetchTyreVendors();
         }}
       />

@@ -447,16 +447,20 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Briefcase, Building2, CreditCard, FileUp } from 'lucide-react';
+import { X, User, Briefcase, Building2, CreditCard, FileUp, CheckCircle, AlertCircle } from 'lucide-react';
 
-export default function AddDriverModal({ isOpen, onClose }) {
+export default function AddDriverModal({ isOpen, onClose, onSuccess }) {
   const [activeTab, setActiveTab] = useState('personal');
   const [stations, setStations] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [toast, setToast] = useState(null); // { type: 'success' | 'error', message: string }
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     full_name: '',
     mobile: '',
     id_card_number: '',
+    license_no: '',
+    joining_date: '',
     status: 'active',
     address: '',
     station_id: '',
@@ -473,8 +477,10 @@ export default function AddDriverModal({ isOpen, onClose }) {
     bank_document: null
   });
 
-  // Fetch stations and vehicles from backend
+  // Fetch stations and vehicles from backend — only once the modal is actually opened
   useEffect(() => {
+    if (!isOpen) return;
+
     fetch('http://localhost:5001/api/stations')
       .then(res => res.json())
       .then(data => {
@@ -488,7 +494,7 @@ export default function AddDriverModal({ isOpen, onClose }) {
         if (data.success) setVehicles(data.data);
       })
       .catch(err => console.error('Error fetching vehicles:', err));
-  }, []);
+  }, [isOpen]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -521,6 +527,8 @@ export default function AddDriverModal({ isOpen, onClose }) {
     if (files.bank_document) form.append('bank_document', files.bank_document);
 
     try {
+      setSubmitting(true);
+
       const response = await fetch('http://localhost:5001/api/drivers', {
         method: 'POST',
         body: form  // ❗ no Content-Type header – browser will set multipart/form-data automatically
@@ -529,15 +537,22 @@ export default function AddDriverModal({ isOpen, onClose }) {
       const result = await response.json();
 
       if (result.success) {
-        alert('Driver added successfully!');
-        onClose();
-        window.location.reload();
+        setToast({ type: 'success', message: 'Driver added successfully!' });
+        onSuccess?.();
+        setTimeout(() => {
+          setToast(null);
+          onClose();
+        }, 1200);
       } else {
-        alert('Failed to add driver: ' + result.message);
+        setToast({ type: 'error', message: result.message || 'Failed to add driver' });
+        setTimeout(() => setToast(null), 3000);
       }
     } catch (error) {
       console.error('Error adding driver:', error);
-      alert('Could not connect to backend server.');
+      setToast({ type: 'error', message: 'Could not connect to backend server.' });
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -571,6 +586,18 @@ export default function AddDriverModal({ isOpen, onClose }) {
               <X className="w-5 h-5" />
             </button>
           </div>
+          {toast && (
+            <div
+              className={`flex items-center gap-2 px-5 py-3 text-sm font-semibold border-b shrink-0 ${
+                toast.type === 'success'
+                  ? 'bg-green-50 border-green-100 text-green-700'
+                  : 'bg-red-50 border-red-100 text-red-600'
+              }`}
+            >
+              {toast.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+              {toast.message}
+            </div>
+          )}
           <div className="flex border-b border-gray-100 px-2 shrink-0">
             {tabs.map(tab => (
               <button
@@ -627,8 +654,29 @@ export default function AddDriverModal({ isOpen, onClose }) {
                     />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">License Number</label>
+                    <input
+                      type="text"
+                      name="license_no"
+                      placeholder="Driving License No."
+                      value={formData.license_no}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
+                    />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Joining Date</label>
+                    <input
+                      type="date"
+                      name="joining_date"
+                      value={formData.joining_date}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all text-gray-700"
+                    />
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Status</label>
-                    <select 
+                    <select
                       name="status"
                       value={formData.status}
                       onChange={handleChange}
@@ -729,71 +777,50 @@ export default function AddDriverModal({ isOpen, onClose }) {
 
               {activeTab === 'uploads' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                  {/* Profile Photo */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 border-dashed rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
-                        <FileUp className="w-5 h-5" />
+                  {[
+                    { key: 'profile_photo', label: 'Profile Photo' },
+                    { key: 'id_proof', label: 'ID Card (Aadhar/Pan)' },
+                    { key: 'bank_document', label: 'Bank Passbook / Cheque' },
+                  ].map(({ key, label }) => {
+                    const selected = files[key];
+                    return (
+                      <div
+                        key={key}
+                        className={`flex items-center justify-between p-4 border rounded-xl ${
+                          selected
+                            ? 'bg-green-50 border-green-200'
+                            : 'bg-gray-50 border-gray-200 border-dashed'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                            selected ? 'bg-green-100 text-green-600' : 'bg-blue-50 text-blue-600'
+                          }`}>
+                            <FileUp className="w-5 h-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-semibold text-gray-800">{label}</p>
+                            <p className="text-[11px] text-gray-500 truncate">
+                              {selected ? selected.name : 'PNG, JPG or PDF (Max. 5MB)'}
+                            </p>
+                          </div>
+                        </div>
+                        <label className={`cursor-pointer px-4 py-2 border rounded-lg text-sm font-bold transition-colors shadow-sm shrink-0 ${
+                          selected
+                            ? 'bg-white border-green-300 text-green-700 hover:border-green-500'
+                            : 'bg-white border-gray-200 text-gray-600 hover:border-blue-500 hover:text-blue-600'
+                        }`}>
+                          {selected ? 'Change File' : 'Select File'}
+                          <input
+                            type="file"
+                            name={key}
+                            onChange={handleFileChange}
+                            className="hidden"
+                          />
+                        </label>
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">Profile Photo</p>
-                        <p className="text-[11px] text-gray-500">PNG, JPG or PDF (Max. 5MB)</p>
-                      </div>
-                    </div>
-                    <label className="cursor-pointer px-4 py-2 bg-white border border-gray-200 hover:border-blue-500 hover:text-blue-600 rounded-lg text-sm font-bold text-gray-600 transition-colors shadow-sm">
-                      Select File
-                      <input 
-                        type="file" 
-                        name="profile_photo" 
-                        onChange={handleFileChange}
-                        className="hidden" 
-                      />
-                    </label>
-                  </div>
-
-                  {/* ID Card */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 border-dashed rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
-                        <FileUp className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">ID Card (Aadhar/Pan)</p>
-                        <p className="text-[11px] text-gray-500">PNG, JPG or PDF (Max. 5MB)</p>
-                      </div>
-                    </div>
-                    <label className="cursor-pointer px-4 py-2 bg-white border border-gray-200 hover:border-blue-500 hover:text-blue-600 rounded-lg text-sm font-bold text-gray-600 transition-colors shadow-sm">
-                      Select File
-                      <input 
-                        type="file" 
-                        name="id_proof" 
-                        onChange={handleFileChange}
-                        className="hidden" 
-                      />
-                    </label>
-                  </div>
-
-                  {/* Bank Document */}
-                  <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 border-dashed rounded-xl">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
-                        <FileUp className="w-5 h-5" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">Bank Passbook / Cheque</p>
-                        <p className="text-[11px] text-gray-500">PNG, JPG or PDF (Max. 5MB)</p>
-                      </div>
-                    </div>
-                    <label className="cursor-pointer px-4 py-2 bg-white border border-gray-200 hover:border-blue-500 hover:text-blue-600 rounded-lg text-sm font-bold text-gray-600 transition-colors shadow-sm">
-                      Select File
-                      <input 
-                        type="file" 
-                        name="bank_document" 
-                        onChange={handleFileChange}
-                        className="hidden" 
-                      />
-                    </label>
-                  </div>
+                    );
+                  })}
                 </motion.div>
               )}
             </form>
@@ -803,8 +830,13 @@ export default function AddDriverModal({ isOpen, onClose }) {
             <button type="button" onClick={onClose} className="flex-1 py-3 text-sm font-bold text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition-colors">
               Cancel
             </button>
-            <button type="submit" form="add-driver-form" className="flex-1 py-3 text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-colors shadow-sm shadow-slate-900/20">
-              Complete Profile
+            <button
+              type="submit"
+              form="add-driver-form"
+              disabled={submitting}
+              className="flex-1 py-3 text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 rounded-xl transition-colors shadow-sm shadow-slate-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {submitting ? 'Saving...' : 'Complete Profile'}
             </button>
           </div>
         </motion.div>

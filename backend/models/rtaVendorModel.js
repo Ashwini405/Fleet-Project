@@ -32,6 +32,7 @@ const createVendor = async (vendorData) => {
     agent_type,
     opening_balance,
     status,
+    payment_terms,
     bank_name,
     custom_bank_name,
     account_number,
@@ -50,6 +51,7 @@ const createVendor = async (vendorData) => {
       agent_type,
       opening_balance,
       status,
+      payment_terms,
       bank_name,
       custom_bank_name,
       account_number,
@@ -57,7 +59,7 @@ const createVendor = async (vendorData) => {
       upi_id,
       notes
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       vendor_name,
@@ -67,6 +69,7 @@ const createVendor = async (vendorData) => {
       agent_type,
       opening_balance,
       status,
+      payment_terms || "credit",
       bank_name,
       custom_bank_name,
       account_number,
@@ -88,6 +91,7 @@ const updateVendor = async (id, vendorData) => {
     agent_type,
     opening_balance,
     status,
+    payment_terms,
     bank_name,
     custom_bank_name,
     account_number,
@@ -107,6 +111,7 @@ const updateVendor = async (id, vendorData) => {
       agent_type = ?,
       opening_balance = ?,
       status = ?,
+      payment_terms = ?,
       bank_name = ?,
       custom_bank_name = ?,
       account_number = ?,
@@ -123,6 +128,7 @@ const updateVendor = async (id, vendorData) => {
       agent_type,
       opening_balance,
       status,
+      payment_terms || "credit",
       bank_name,
       custom_bank_name,
       account_number,

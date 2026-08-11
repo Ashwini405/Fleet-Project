@@ -437,10 +437,19 @@ const updateClaimStatus = async (id, claim_status) => {
   return result;
 };
 
+const updateClaimAmount = async (id, claim_available_amount) => {
+  const [result] = await db.query(
+    'UPDATE warranty_claims SET claim_available_amount = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+    [claim_available_amount, id]
+  );
+  return result;
+};
+
 module.exports = {
   createWarrantyClaim,
   getWarrantyClaims,
   getWarrantyClaimById,
   updateWarrantyClaim,
-  updateClaimStatus
+  updateClaimStatus,
+  updateClaimAmount
 };

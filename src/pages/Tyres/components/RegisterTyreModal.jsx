@@ -6,6 +6,7 @@ import {
   Gauge, Activity, ShieldCheck,
 } from 'lucide-react';
 import axios from 'axios';
+import api from '../../../services/api';
 import { layoutPositions } from '../data/dummyData';
 import { createVendorTransaction } from '../../../services/vendorTransactionService';
 import { useVendorLedger } from '../../../context/VendorLedgerContext';
@@ -68,7 +69,7 @@ const PLACEMENTS = layoutPositions.map(p => ({ id: p.id, label: p.label }));
 const EMPTY_FORM = {
   serialNo: '', brand: '', model: '', tyreSize: '', material: '',
   status: 'In Stock', truckId: '', placement: '', dateOfIssue: '',
-  fittedOdo: '', expectedLife: '',
+  fittedOdo: '', expectedLife: '', warrantyMonths: '',
   vendor: '', vendorId: '', purchaseDate: '', invoiceNo: '', tyreCost: '',
   files: [],
 };
@@ -374,16 +375,17 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
   const [activeTyres, setActiveTyres] = useState([]);
   const [tyreVendors, setTyreVendors] = useState([]);
 
-  // Fetch vehicles, tyres & tyre vendors from database
+  // Fetch vehicles, tyres & tyre vendors from database — only once the modal is actually opened
   useEffect(() => {
+    if (!isOpen) return;
     fetchVehicles();
     fetchActiveTyres();
     fetchTyreVendors();
-  }, []);
+  }, [isOpen]);
 
   const fetchVehicles = async () => {
     try {
-      const res = await axios.get('http://localhost:5001/api/vehicles');
+      const res = await api.get('/vehicles');
       setVehicles(res.data.data);
     } catch (error) {
       console.log('Vehicle Fetch Error:', error);
@@ -505,34 +507,8 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
     const e = validate();
     if (Object.keys(e).length) { setErrors(e); return; }
 
-    // 1. Always fire frontend callback (updates local tyre state)
-    if (onRegister) onRegister(form);
-
-    // 2. Always create vendor ledger transaction if vendor + cost filled
-    if (form.vendorId && form.tyreCost) {
-      const vendor = tyreVendors.find(v => String(v.id) === String(form.vendorId));
-      createVendorTransaction({
-        vendorId:      form.vendorId,
-        vendorName:    vendor?.vendor_name || form.vendor,
-        date:          form.purchaseDate || form.dateOfIssue,
-        type:          'Tyre Purchase',
-        ref:           form.invoiceNo || `TYR-${Date.now()}`,
-        desc:          `${form.brand} ${form.model} ${form.tyreSize} — ${form.serialNo}`,
-        debit:         parseFloat(form.tyreCost),
-        onTransaction: addVendorTransaction,
-      });
-    }
-
-    // 3. Show toast & reset
-    setToast(true);
-    setTimeout(() => {
-      setToast(false);
-      onClose();
-      setForm(EMPTY_FORM);
-      setErrors({});
-    }, 2000);
-
-    // 4. Try backend (optional — fails silently when not running)
+    // 1. Save to backend FIRST — the parent tab refetches its list when this
+    // modal closes, so that refetch must not race ahead of the save landing.
     try {
       const sv = vehicles.find(v => String(v.id) === String(form.truckId));
       const formData = new FormData();
@@ -549,6 +525,7 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
       formData.append('date_of_issue',    form.dateOfIssue);
       formData.append('fitted_odometer',  form.fittedOdo);
       formData.append('expected_life_km', form.expectedLife);
+      formData.append('warranty_months',  form.warrantyMonths || '');
       formData.append('running_km',       '0');
       formData.append('remaining_life_km',form.expectedLife);
       formData.append('tyre_health',      health.label);
@@ -558,7 +535,38 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
       formData.append('tyre_cost',        form.tyreCost || 0);
       form.files.forEach(f => formData.append('tyre_files', f.file));
       await axios.post('http://localhost:5001/api/tyres', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
-    } catch { /* backend not running — frontend already updated */ }
+    } catch (err) {
+      console.error('Tyre Save Error:', err);
+      setErrors({ serialNo: 'Failed to save tyre — check connection and try again' });
+      return;
+    }
+
+    // 2. Frontend callback (updates local tyre state, if the caller uses it)
+    if (onRegister) onRegister(form);
+
+    // 3. Create vendor ledger transaction if vendor + cost filled
+    if (form.vendorId && form.tyreCost) {
+      const vendor = tyreVendors.find(v => String(v.id) === String(form.vendorId));
+      createVendorTransaction({
+        vendorId:      form.vendorId,
+        vendorName:    vendor?.vendor_name || form.vendor,
+        date:          form.purchaseDate || form.dateOfIssue,
+        type:          'Tyre Purchase',
+        ref:           form.invoiceNo || `TYR-${Date.now()}`,
+        desc:          `${form.brand} ${form.model} ${form.tyreSize} — ${form.serialNo}`,
+        debit:         parseFloat(form.tyreCost),
+        onTransaction: addVendorTransaction,
+      });
+    }
+
+    // 4. Show toast, then close — parent's refetch now sees the saved tyre
+    setToast(true);
+    setTimeout(() => {
+      setToast(false);
+      onClose();
+      setForm(EMPTY_FORM);
+      setErrors({});
+    }, 1200);
   };
 
   const handleDraft = () => {
@@ -765,6 +773,12 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
                     <Input type="number" placeholder="100000" value={form.expectedLife} error={errors.expectedLife}
                       onChange={e => set('expectedLife', e.target.value)} className="font-mono" />
                     <FieldError msg={errors.expectedLife} />
+                  </div>
+
+                  <div>
+                    <Label>Warranty Period (months)</Label>
+                    <Input type="number" placeholder="e.g. 24" value={form.warrantyMonths}
+                      onChange={e => set('warrantyMonths', e.target.value)} className="font-mono" />
                   </div>
 
                   {/* Live Health Card */}

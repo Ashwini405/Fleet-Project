@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, CheckCircle, AlertTriangle } from 'lucide-react';
 
-export default function AddStationModal({ isOpen, onClose }) {
+export default function AddStationModal({ isOpen, onClose, onSuccess }) {
 
   const [formData, setFormData] = useState({
     station_name: '',
@@ -12,7 +12,14 @@ export default function AddStationModal({ isOpen, onClose }) {
     contact_number: ''
   });
 
+  const [toast, setToast] = useState(null);
+
   if (!isOpen) return null;
+
+  const showToast = (type, title, message) => {
+    setToast({ type, title, message });
+    window.setTimeout(() => setToast(null), 3200);
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -31,15 +38,16 @@ export default function AddStationModal({ isOpen, onClose }) {
       const data = await res.json();
 
       if (data.success) {
-        alert("Station added successfully");
-        onClose();
+        showToast('success', 'Station added', 'New station has been successfully added to your network.');
+        onSuccess?.();
+        window.setTimeout(() => onClose(), 1200);
       } else {
-        alert("Failed to add station");
+        showToast('error', 'Save failed', data.message || 'Unable to add station. Please try again.');
       }
 
     } catch (err) {
       console.error(err);
-      alert("Server error");
+      showToast('error', 'Server error', 'Unable to reach the server. Check your connection and try again.');
     }
   };
 
@@ -62,8 +70,28 @@ export default function AddStationModal({ isOpen, onClose }) {
             </button>
           </div>
           
-          <div className="p-6">
-             <form className="space-y-4" onSubmit={handleSubmit}>
+          <div className="relative p-6">
+            <AnimatePresence>
+              {toast && (
+                <motion.div
+                  initial={{ opacity: 0, y: -12, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -12, scale: 0.95 }}
+                  className={`absolute right-6 top-0 z-20 w-full max-w-sm rounded-2xl border p-4 shadow-xl backdrop-blur-sm text-sm font-medium ${toast.type === 'success' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-rose-600 border-rose-500 text-white'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5">
+                      {toast.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+                    </span>
+                    <div className="flex-1">
+                      <p className="font-semibold">{toast.title}</p>
+                      <p className="mt-1 text-sm text-white/90">{toast.message}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+             <form className="space-y-4 pt-8" onSubmit={handleSubmit}>
                <div className="grid grid-cols-2 gap-4">
 
                  <div className="col-span-2">

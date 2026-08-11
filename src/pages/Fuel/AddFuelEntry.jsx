@@ -347,7 +347,7 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
               <div>
                 <label className={labelClass}>Fuel Type</label>
                 <select name="fuelType" value={addForm.fuelType} onChange={handleFormChange} className={inputClass}>
-                  <option>Diesel</option><option>Petrol</option><option>CNG</option>
+                  <option>Diesel</option><option>Petrol</option><option>CNG</option><option>AdBlue</option>
                 </select>
               </div>
               <div>

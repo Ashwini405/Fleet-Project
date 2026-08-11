@@ -31,6 +31,10 @@ router.post('/stock-out',         inventoryController.stockOutPart);
 router.get('/movement-history',   inventoryController.getMovementHistory);
 router.get('/issue-history',      inventoryController.getIssueHistory);
 
+// Part returns (restock ledger)
+router.get('/returns',            inventoryController.getPartReturns);
+router.post('/returns',           inventoryController.createPartReturn);
+
 // Purchase orders
 router.get('/purchase-orders',                    inventoryController.getPurchaseOrders);
 router.post('/purchase-orders',                   inventoryController.createPurchaseOrder);

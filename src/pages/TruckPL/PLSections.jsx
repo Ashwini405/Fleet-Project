@@ -395,6 +395,46 @@ export function RTASection({ data, total, prevTotal }) {
   );
 }
 
+// ── EMI Section ────────────────────────────────────────────────────────────────
+export function EmiSection({ data, total, prevTotal }) {
+  const emiAmount = data?.emiAmount || 0;
+  const paymentsCount = data?.paymentsCount || 0;
+  const loanTenure = data?.loanTenure;
+
+  return (
+    <PLSection
+      title="Vehicle EMI" subtitle="Loan Installments Paid"
+      total={total} totalLabel="Total EMI Paid" accent="amber" prevTotal={prevTotal}
+      source="Vehicle Master / EMI Tracker"
+      records={`${paymentsCount} Payment${paymentsCount !== 1 ? 's' : ''}${loanTenure ? ` of ${loanTenure}` : ''}`}
+      viewLabel="View Vehicle →" viewPath="/vehicles"
+    >
+      {emiAmount > 0 ? (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Financier</p>
+            <p className="text-sm font-bold text-slate-800">{data?.financierName || '—'}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Monthly Installment</p>
+            <p className="text-sm font-bold text-slate-800">{INR(emiAmount)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Installments Paid</p>
+            <p className="text-sm font-bold text-slate-800">{paymentsCount}{loanTenure ? ` / ${loanTenure}` : ''}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Paid</p>
+            <p className="text-sm font-bold text-amber-700">{INR(total)}</p>
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-400 py-2">This vehicle has no financing/EMI on record.</p>
+      )}
+    </PLSection>
+  );
+}
+
 // ── 8. Miscellaneous Section ──────────────────────────────────────────────────
 export function MiscExpenseSection({ data, total, prevTotal }) {
   return (

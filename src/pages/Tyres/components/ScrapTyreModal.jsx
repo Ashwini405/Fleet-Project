@@ -56,10 +56,11 @@ export default function ScrapTyreModal({ tyre, onClose, onConfirm }) {
   const [done, setDone]     = useState(false);
   const [vendors, setVendors] = useState([]);
 
-  // Fetch scrap buyer vendors from database
+  // Fetch scrap buyer vendors from database — only once the modal is actually opened
   useEffect(() => {
+    if (!tyre) return;
     fetchScrapVendors();
-  }, []);
+  }, [tyre]);
 
   const fetchScrapVendors = async () => {
     try {

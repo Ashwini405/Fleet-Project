@@ -37,6 +37,16 @@ router.get(
 );
 
 // =====================================================
+// GET INCOME BY TRIP
+// =====================================================
+
+router.get(
+  '/trip/:tripId',
+  ...protect('Income & Expense', 'view'),
+  incomeController.getIncomeByTrip
+);
+
+// =====================================================
 // GET COMPLETED TRIPS BY VEHICLE
 // =====================================================
 

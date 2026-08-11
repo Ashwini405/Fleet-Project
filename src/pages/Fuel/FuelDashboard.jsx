@@ -90,8 +90,14 @@ export default function FuelDashboard() {
       // ── Fuel validation: skip entries with qty <= 0 ──
       const validEntries = tripEntries.filter(e => Number(e.quantity || 0) > 0);
 
-      const actualFuel  = validEntries.reduce((s, e) => s + Number(e.quantity), 0);
-      const totalCost   = validEntries.reduce((s, e) => s + Number(e.total_cost || 0), 0);
+      // AdBlue/DEF is not propulsion fuel — track it separately, exclude from mileage math
+      const propulsionEntries = validEntries.filter(e => e.fuel_type !== 'AdBlue');
+      const adBlueEntries     = validEntries.filter(e => e.fuel_type === 'AdBlue');
+
+      const actualFuel  = propulsionEntries.reduce((s, e) => s + Number(e.quantity), 0);
+      const totalCost   = propulsionEntries.reduce((s, e) => s + Number(e.total_cost || 0), 0);
+      const adBlueQty    = adBlueEntries.reduce((s, e) => s + Number(e.quantity), 0);
+      const adBlueCost   = adBlueEntries.reduce((s, e) => s + Number(e.total_cost || 0), 0);
 
       // expectedFuel = distance / expectedMileage  (from trip plan)
       const expectedFuel  = distance > 0 && expectedMileage > 0 ? distance / expectedMileage : 0;
@@ -133,6 +139,8 @@ export default function FuelDashboard() {
         expectedFuel:    fmt1(expectedFuel),
         actualFuel:      fmt1(actualFuel),
         totalCost,
+        adBlueQty:       fmt1(adBlueQty),
+        adBlueCost,
         actualMileage:   fmt2(actualMileage),
         overFuel:        overFuel !== null ? fmt1(overFuel) : null,
         mileageVariance: mileageVariance !== null ? fmt2(mileageVariance) : null,
@@ -158,7 +166,13 @@ export default function FuelDashboard() {
     const avgMileage  = totalFuel > 0 ? totalDist / totalFuel : 0;
     const alertCount  = fueledTrips.filter(t => t.status !== 'normal').length;
     const noFuelCount = tripRows.filter(t => t.status === 'no-fuel').length;
-    return { totalFuel: fmt1(totalFuel), totalCost, avgMileage: fmt2(avgMileage), activeTrips: fueledTrips.length, alertCount, noFuelCount };
+    const totalAdBlueQty  = tripRows.reduce((s, t) => s + Number(t.adBlueQty || 0), 0);
+    const totalAdBlueCost = tripRows.reduce((s, t) => s + Number(t.adBlueCost || 0), 0);
+    return {
+      totalFuel: fmt1(totalFuel), totalCost, avgMileage: fmt2(avgMileage),
+      activeTrips: fueledTrips.length, alertCount, noFuelCount,
+      totalAdBlueQty: fmt1(totalAdBlueQty), totalAdBlueCost,
+    };
   }, [tripRows]);
 
   // ─── Unique vehicles for filter dropdown ─────────────────────────────────
@@ -227,7 +241,7 @@ export default function FuelDashboard() {
       </div>
 
       {/* ── Summary Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card
           icon={<FiDroplet className="w-5 h-5 text-blue-600" />}
           label="Total Fuel Used" accent="bg-blue-50"
@@ -251,6 +265,12 @@ export default function FuelDashboard() {
           label="Trips w/ Fuel" accent="bg-indigo-50"
           value={fleet.activeTrips}
           sub={`${fleet.alertCount} alert${fleet.alertCount !== 1 ? 's' : ''} · ${fleet.noFuelCount} no-fuel`}
+        />
+        <Card
+          icon={<FiDroplet className="w-5 h-5 text-cyan-600" />}
+          label="AdBlue Consumption" accent="bg-cyan-50"
+          value={`${fleet.totalAdBlueQty} L`}
+          sub={INR(fleet.totalAdBlueCost)}
         />
       </div>
 

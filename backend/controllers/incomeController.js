@@ -50,6 +50,28 @@ const createIncome = async (req, res) => {
     }
 
     // ============================================
+    // PLANT / STATION DETAILS (Plant Receivable)
+    // ============================================
+
+    let station = null;
+
+    if (body.plant_id) {
+
+      const [stationRows] = await db.query(
+
+        `SELECT *
+         FROM stations
+         WHERE id = ?`,
+
+        [body.plant_id]
+
+      );
+
+      station = stationRows[0];
+
+    }
+
+    // ============================================
     // GENERATE INCOME NUMBER
     // ============================================
 
@@ -80,6 +102,12 @@ const createIncome = async (req, res) => {
       income_category:
         body.income_category,
 
+      refund_type:
+        body.refund_type || null,
+
+      refund_reference:
+        body.refund_reference || null,
+
       vehicle_id:
         vehicle?.id || null,
 
@@ -97,6 +125,12 @@ const createIncome = async (req, res) => {
 
       supervisor_name:
         trip?.supervisor_name || '',
+
+      station_id:
+        station?.id || null,
+
+      station_name:
+        station?.station_name || null,
 
       trip_id:
         trip?.id || null,
@@ -263,6 +297,45 @@ const getIncomeById = async (req, res) => {
 };
 
 // =====================================================
+// GET INCOME BY TRIP
+// =====================================================
+
+const getIncomeByTrip = async (req, res) => {
+
+  try {
+
+    const income =
+      await IncomeModel.getIncomeByTrip(
+        req.params.tripId
+      );
+
+    res.status(200).json({
+
+      success: true,
+
+      count: income.length,
+
+      data: income
+
+    });
+
+  } catch (error) {
+
+    console.log(error);
+
+    res.status(500).json({
+
+      success: false,
+
+      message: 'Server Error'
+
+    });
+
+  }
+
+};
+
+// =====================================================
 // GET COMPLETED TRIPS BY VEHICLE
 // =====================================================
 
@@ -306,6 +379,7 @@ module.exports = {
   createIncome,
   getAllIncome,
   getIncomeById,
+  getIncomeByTrip,
   getCompletedTripsByVehicle
 
 };

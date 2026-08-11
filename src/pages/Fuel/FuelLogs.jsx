@@ -205,6 +205,7 @@ export default function FuelLogs() {
   const [search, setSearch] = useState('');
   const [vehicleFilter, setVehicle] = useState('all');
   const [statusFilter, setStatus] = useState('all');
+  const [fuelTypeFilter, setFuelType] = useState('all');
   const [isAddModalOpen, setAddModal] = useState(false);
   const [trips, setTrips] = useState([]);
   const [selectedTrip, setSelectedTrip] = useState(null);   // 🔥 ADD THIS
@@ -242,7 +243,8 @@ export default function FuelLogs() {
                   rate: Number(f.rate || 0),
                   amount: Number(f.total_cost || 0),      // ✅ FIX
                   vendor: f.vendor,
-                  addedBy: f.supervisor_name || '—'       // ✅ works after backend fix
+                  addedBy: f.supervisor_name || '—',      // ✅ works after backend fix
+                  fuelType: f.fuel_type || 'Diesel'
                 }))
                 : []
             };
@@ -261,20 +263,26 @@ export default function FuelLogs() {
 
   const vehicles = useMemo(() => ['all', ...new Set(trips.map(t => t.vehicle))], [trips]);
   const statuses = ['all', 'Active', 'Completed', 'Delayed', 'Planned'];
+  const fuelTypes = ['all', 'Diesel', 'Petrol', 'CNG', 'AdBlue'];
 
   const filtered = useMemo(() => {
-    return trips.filter(t => {
-      const q = search.toLowerCase();
-      const matchSearch = !q ||
-        t.tripId.toLowerCase().includes(q) ||
-        t.vehicle.toLowerCase().includes(q) ||
-        t.driver.toLowerCase().includes(q) ||
-        t.destination.toLowerCase().includes(q);
-      const matchVehicle = vehicleFilter === 'all' || t.vehicle === vehicleFilter;
-      const matchStatus = statusFilter === 'all' || t.status === statusFilter;
-      return matchSearch && matchVehicle && matchStatus;
-    });
-  }, [search, vehicleFilter, statusFilter, trips]);
+    return trips
+      .filter(t => {
+        const q = search.toLowerCase();
+        const matchSearch = !q ||
+          t.tripId.toLowerCase().includes(q) ||
+          t.vehicle.toLowerCase().includes(q) ||
+          t.driver.toLowerCase().includes(q) ||
+          t.destination.toLowerCase().includes(q);
+        const matchVehicle = vehicleFilter === 'all' || t.vehicle === vehicleFilter;
+        const matchStatus = statusFilter === 'all' || t.status === statusFilter;
+        const matchFuelType = fuelTypeFilter === 'all' || t.entries.some(e => e.fuelType === fuelTypeFilter);
+        return matchSearch && matchVehicle && matchStatus && matchFuelType;
+      })
+      .map(t => fuelTypeFilter === 'all'
+        ? t
+        : { ...t, entries: t.entries.filter(e => e.fuelType === fuelTypeFilter) });
+  }, [search, vehicleFilter, statusFilter, fuelTypeFilter, trips]);
 
   const handleAddEntry = () => setAddModal(true);
 
@@ -328,6 +336,17 @@ export default function FuelLogs() {
               className="text-sm font-medium text-slate-700 bg-transparent border-none outline-none cursor-pointer"
             >
               {statuses.map(s => <option key={s} value={s}>{s === 'all' ? 'All Status' : s}</option>)}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+            <FiDroplet className="w-3.5 h-3.5 text-slate-400" />
+            <select
+              value={fuelTypeFilter}
+              onChange={e => setFuelType(e.target.value)}
+              className="text-sm font-medium text-slate-700 bg-transparent border-none outline-none cursor-pointer"
+            >
+              {fuelTypes.map(f => <option key={f} value={f}>{f === 'all' ? 'All Fuel Types' : f}</option>)}
             </select>
           </div>
         </div>

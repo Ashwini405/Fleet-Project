@@ -98,6 +98,7 @@ function TxnDetailModal({ txn, agentName, onClose }) {
 
 /* ════════════════════════════════════════════════════════════════════════ */
 export default function RTALedger({ vendor, onBack }) {
+  const isCash = (vendor.payment_terms || 'credit') === 'cash';
   const [rawTxns, setRawTxns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Ledger');
@@ -167,13 +168,13 @@ export default function RTALedger({ vendor, onBack }) {
       .sort((a, b) => new Date(a.date) - new Date(b.date))
       .map(t => {
         running += (t.debit || 0) - (t.credit || 0);
-        return { ...t, runningBalance: running };
+        return { ...t, runningBalance: isCash ? 0 : running };
       });
-  }, [rawTxns]);
+  }, [rawTxns, isCash]);
 
   const totalDebit = rawTxns.reduce((s, t) => s + (t.debit || 0), 0);
   const totalCredit = rawTxns.reduce((s, t) => s + (t.credit || 0), 0);
-  const outstanding = totalDebit - totalCredit;
+  const outstanding = isCash ? 0 : totalDebit - totalCredit;
   const lastDate = txnsWithBalance.length ? txnsWithBalance[txnsWithBalance.length - 1].date : null;
 
   const filteredLedger = useMemo(() => txnsWithBalance.filter(t => {
@@ -217,10 +218,12 @@ export default function RTALedger({ vendor, onBack }) {
             className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors">
             <FiPlus size={13} /> Add Expense
           </button>
-          <button onClick={() => setPaymentOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors">
-            <FiPlus size={13} /> Add Payment
-          </button>
+          {!isCash && (
+            <button onClick={() => setPaymentOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors">
+              <FiPlus size={13} /> Add Payment
+            </button>
+          )}
         </div>
       </div>
 
@@ -267,7 +270,7 @@ export default function RTALedger({ vendor, onBack }) {
       </div>
 
       {/* ── Summary Cards ── */}
-      <SummaryCards totalDebit={totalDebit} totalCredit={totalCredit} lastDate={lastDate} />
+      <SummaryCards totalDebit={totalDebit} totalCredit={totalCredit} lastDate={lastDate} isCash={isCash} />
 
       {/* ── Tabs ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -352,10 +355,12 @@ export default function RTALedger({ vendor, onBack }) {
           <div>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50">
               <span className="text-xs font-semibold text-gray-500">{payments.length} total payments</span>
-              <button onClick={() => setPaymentOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition-colors">
-                <FiPlus size={12} /> Add Payment
-              </button>
+              {!isCash && (
+                <button onClick={() => setPaymentOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition-colors">
+                  <FiPlus size={12} /> Add Payment
+                </button>
+              )}
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">

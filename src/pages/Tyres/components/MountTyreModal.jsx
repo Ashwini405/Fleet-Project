@@ -130,8 +130,9 @@ export default function MountTyreModal({ isOpen, onClose, truckData, positionId 
   };
 
   useEffect(() => {
+    if (!isOpen) return;
     fetchTyres();
-  }, []);
+  }, [isOpen]);
 
   // Combine available tyres (stock + reusable old tyres) excluding those already mounted
   const allTyres = useMemo(() => {

@@ -85,21 +85,26 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   const [vehicles, setVehicles] = useState([]);
   const [garages, setGarages] = useState([]);
 
-  // Fetch vehicles and garages from backend
+  // Fetch vehicles and garages from backend — only once the modal is actually opened
   useEffect(() => {
+    if (!isOpen) return;
+
     fetch('http://localhost:5001/api/vehicles')
       .then(res => res.json())
       .then(data => setVehicles(data.data || []))
       .catch(err => console.error('Vehicle fetch error:', err));
 
-    fetch('http://localhost:5001/api/vendors')
-      .then(res => res.json())
-      .then(data => {
-        const all = data.data || [];
-        setGarages(all.filter(v => String(v.category).toLowerCase() === 'garages'));
-      })
-      .catch(err => console.error('Garage fetch error:', err));
-  }, []);
+    Promise.all([
+      fetch('http://localhost:5001/api/vendors').then(res => res.json()).catch(() => ({ data: [] })),
+      fetch('http://localhost:5001/api/labour-vendors').then(res => res.json()).catch(() => ({ data: [] })),
+    ]).then(([vendorsRes, labourRes]) => {
+      const garageVendors = (vendorsRes.data || [])
+        .filter(v => String(v.category).toLowerCase() === 'garages');
+      const labourVendors = (labourRes.data || [])
+        .map(v => ({ id: `labour-${v.id}`, garage_name: v.vendor_name, isLabour: true }));
+      setGarages([...garageVendors, ...labourVendors]);
+    }).catch(err => console.error('Garage fetch error:', err));
+  }, [isOpen]);
 
   // ─── Populate fields when editing an existing repair (logData) ─────────
   useEffect(() => {
@@ -809,7 +814,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                     >
                       <option value="">Select Service Provider</option>
                       {garages.map(g => (
-                        <option key={g.id} value={g.id}>{g.garage_name}</option>
+                        <option key={g.id} value={g.id}>{g.garage_name}{g.isLabour ? ' (Labour)' : ''}</option>
                       ))}
                     </select>
                     {errors.garage && <p className="text-xs text-red-600 mt-1">{errors.garage}</p>}

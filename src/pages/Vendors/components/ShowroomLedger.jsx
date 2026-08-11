@@ -1,8 +1,296 @@
 import React, { useState, useEffect } from 'react';
-import { FiArrowLeft, FiEye, FiX, FiInbox, FiPhone, FiMapPin, FiHome, FiUser, FiMail, FiShoppingBag } from 'react-icons/fi';
+import { FiArrowLeft, FiEye, FiX, FiInbox, FiPhone, FiMapPin, FiHome, FiUser, FiMail, FiShoppingBag, FiDollarSign, FiUpload, FiFileText, FiCheckCircle, FiCalendar, FiCreditCard, FiRefreshCw } from 'react-icons/fi';
 import axios from 'axios';
 import { TypeBadge, StatusBadge } from './shared';
 import { STATUS_PILL, MODAL_ANIM } from './shared/constants';
+
+const fmtDate = (d) => {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const DocLink = ({ filename, label }) => {
+  if (!filename) return <span className="text-xs text-gray-400">Not uploaded</span>;
+  return (
+    <a href={`http://localhost:5001/uploads/${filename}`} target="_blank" rel="noreferrer"
+      className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline">
+      <FiFileText size={13}/> {label}
+    </a>
+  );
+};
+
+function PurchaseDetailPanel({ activity: a, isCash, onSaved }) {
+  const [uploading, setUploading] = useState(false);
+  const [files, setFiles] = useState({ purchase_receipt: null, purchase_proof: null });
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = async () => {
+    try {
+      setUploading(true);
+      const fd = new FormData();
+      if (files.purchase_receipt)  fd.append('purchase_receipt',  files.purchase_receipt);
+      if (files.purchase_proof)    fd.append('purchase_proof',    files.purchase_proof);
+      await axios.patch(`http://localhost:5001/api/vehicles/${a.vehicleId}/purchase-docs`, fd);
+      setSaved(true);
+      setFiles({ purchase_receipt: null, purchase_proof: null });
+      onSaved();
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const monthsRemaining = () => {
+    if (!a.loan_tenure || !a.purchase_date) return null;
+    const start = new Date(a.purchase_date);
+    const end = new Date(start);
+    end.setMonth(end.getMonth() + Number(a.loan_tenure));
+    const now = new Date();
+    const diff = Math.max(0, Math.round((end - now) / (1000 * 60 * 60 * 24 * 30)));
+    return { total: a.loan_tenure, remaining: diff, end };
+  };
+  const emi = monthsRemaining();
+  const emiCompleted = a.loan_tenure && a.emi_paid_count >= Number(a.loan_tenure);
+
+  return (
+    <div className="space-y-5">
+      {/* Basic info */}
+      <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-100">
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Purchase Date</p>
+          <p className="font-bold text-gray-800 text-sm">{fmtDate(a.date)}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Vehicle No</p>
+          <span className="font-bold text-gray-800 text-sm bg-gray-100 px-2 py-1 inline-block rounded">{a.vehicleNo}</span>
+        </div>
+      </div>
+      <div>
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Purchase Amount</p>
+        <p className="text-3xl font-extrabold text-indigo-600">₹{a.amount.toLocaleString()}</p>
+      </div>
+      {a.desc && (
+        <div>
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Vehicle</p>
+          <p className="text-sm font-semibold text-gray-700">{a.desc}</p>
+        </div>
+      )}
+
+      {/* EMI / Loan — credit only */}
+      {!isCash && a.financier_name && (
+        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-3">
+          <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest flex items-center gap-1.5"><FiCreditCard size={12}/> Loan / EMI Details</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Financier</p>
+              <p className="text-sm font-bold text-gray-700">{a.financier_name}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Loan A/C</p>
+              <p className="text-sm font-bold text-gray-700">{a.loan_account_number || '—'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">EMI Amount</p>
+              <p className="text-sm font-bold text-indigo-600">₹{Number(a.emi_amount || 0).toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">EMI Date</p>
+              <p className="text-sm font-bold text-gray-700">{a.emi_date ? `${a.emi_date}th of every month` : '—'}</p>
+            </div>
+          </div>
+          {emiCompleted ? (
+            <div className="pt-2 border-t border-amber-100 flex items-center gap-2">
+              <FiCheckCircle size={14} className="text-green-500"/>
+              <p className="text-xs font-bold text-green-600">Loan Fully Paid — {a.emi_paid_count}/{a.loan_tenure} EMIs completed</p>
+            </div>
+          ) : emi && (
+            <div className="pt-2 border-t border-amber-100">
+              <div className="flex justify-between items-center mb-1.5">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Loan Progress</p>
+                <p className="text-[11px] font-bold text-amber-600">{a.emi_paid_count}/{a.loan_tenure} EMIs paid</p>
+              </div>
+              <div className="w-full bg-amber-100 rounded-full h-2">
+                <div className="bg-amber-500 h-2 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, Math.round((a.emi_paid_count / Number(a.loan_tenure)) * 100))}%` }}/>
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1">Ends {fmtDate(emi.end)}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Warranties from Warranty Module */}
+      {a.warranties?.length > 0 && (
+        <div className="border-t border-gray-100 pt-4 space-y-2">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5"><FiCalendar size={12}/> Warranties (from Warranty Module)</p>
+          {a.warranties.map(w => (
+            <div key={w.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-xs font-bold text-gray-700">{w.item_title}</p>
+                  <p className="text-[10px] text-gray-400">{w.category} · {w.warranty_type}</p>
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                  w.warranty_status === 'Active' ? 'bg-green-50 text-green-600 border-green-100' :
+                  w.warranty_status === 'Expired' ? 'bg-red-50 text-red-500 border-red-100' :
+                  'bg-gray-100 text-gray-500 border-gray-200'
+                }`}>{w.warranty_status}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Start</p>
+                  <p className="text-xs font-bold text-gray-700">{fmtDate(w.start_date)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">End</p>
+                  <p className="text-xs font-bold text-gray-700">{fmtDate(w.end_date)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Period</p>
+                  <p className="text-xs font-bold text-gray-700">{w.warranty_period || '—'}</p>
+                </div>
+              </div>
+              {(w.warranty_card || w.invoice_file) && (
+                <div className="flex gap-3">
+                  {w.warranty_card && <DocLink filename={w.warranty_card} label="Warranty Card" />}
+                  {w.invoice_file && <DocLink filename={w.invoice_file} label="Invoice" />}
+                </div>
+              )}
+            </div>
+          ))}
+          <p className="text-[10px] text-blue-500 font-bold">To add/edit warranties, use the Warranty Module.</p>
+        </div>
+      )}
+
+      {/* Document uploads */}
+      <div className="border-t border-gray-100 pt-4 space-y-3">
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5"><FiUpload size={12}/> Documents</p>
+        {[
+          { key: 'purchase_receipt',  label: 'Purchase Receipt',   existing: a.purchase_receipt },
+          { key: 'purchase_proof',    label: 'Purchase Proof',     existing: a.purchase_proof },
+        ].map(({ key, label, existing }) => (
+          <div key={key} className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+            <div>
+              <p className="text-xs font-bold text-gray-600">{label}</p>
+              {files[key] ? (
+                <p className="text-xs font-bold text-emerald-600 flex items-center gap-1.5">
+                  <FiCheckCircle size={13}/> {files[key].name} — click Save to upload
+                </p>
+              ) : (
+                <DocLink filename={existing} label="View uploaded" />
+              )}
+            </div>
+            <label className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-bold text-gray-500 hover:bg-gray-100 cursor-pointer transition-colors shrink-0">
+              <FiUpload size={12}/>
+              {files[key] ? 'Change' : 'Upload'}
+              <input type="file" accept=".jpg,.jpeg,.png,.pdf" className="hidden"
+                onChange={e => setFiles(p => ({ ...p, [key]: e.target.files[0] || null }))} />
+            </label>
+          </div>
+        ))}
+      </div>
+
+      {saved && (
+        <div className="flex items-center gap-2 text-green-600 text-sm font-bold bg-green-50 border border-green-100 rounded-lg px-3 py-2">
+          <FiCheckCircle size={15}/> Saved successfully
+        </div>
+      )}
+
+      <button onClick={handleSave} disabled={uploading}
+        className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm transition-colors disabled:opacity-50">
+        {uploading ? 'Saving…' : 'Save Documents'}
+      </button>
+    </div>
+  );
+}
+
+// Tracks what this showroom has actually paid back on a claim — a running
+// history (a claim is often settled in installments), not a single figure.
+function ClaimPaymentsPanel({ claimId, claimAmount, onSaved }) {
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState({ amount: '', payment_date: '', notes: '' });
+  const [adding, setAdding] = useState(false);
+
+  const loadPayments = () => {
+    if (!claimId) return;
+    setLoading(true);
+    axios.get(`http://localhost:5001/api/warranty-claims/${claimId}/payments`)
+      .then(res => setPayments(res.data?.data || []))
+      .catch(err => console.error('FETCH CLAIM PAYMENTS ERROR:', err))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(loadPayments, [claimId]);
+
+  const totalReceived = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+  const handleAdd = async () => {
+    const amt = Number(form.amount);
+    if (!form.amount || Number.isNaN(amt) || amt <= 0) return alert('Enter a valid amount');
+    if (!form.payment_date) return alert('Pick the date received');
+    try {
+      setAdding(true);
+      await axios.post(`http://localhost:5001/api/warranty-claims/${claimId}/payments`, form);
+      setForm({ amount: '', payment_date: '', notes: '' });
+      loadPayments();
+      onSaved?.();
+    } catch (err) {
+      console.error(err);
+      alert('Failed to record payment');
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  return (
+    <div className="border-t border-gray-100 pt-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5"><FiCreditCard size={12}/> Amount Received From Showroom</p>
+        {claimAmount > 0 && (
+          claimAmount > totalReceived
+            ? <span className="text-[11px] font-bold text-yellow-600">₹{(claimAmount - totalReceived).toLocaleString()} pending</span>
+            : <span className="text-[11px] font-bold text-green-600">Fully received</span>
+        )}
+      </div>
+
+      {loading ? (
+        <p className="text-xs text-gray-400">Loading payment history…</p>
+      ) : payments.length > 0 ? (
+        <div className="space-y-1.5">
+          {payments.map(p => (
+            <div key={p.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100 text-sm">
+              <span className="font-bold text-gray-700">₹{Number(p.amount).toLocaleString()}</span>
+              <span className="text-gray-400 text-xs">{fmtDate(p.payment_date)}</span>
+              {p.notes && <span className="text-gray-400 text-xs truncate">· {p.notes}</span>}
+            </div>
+          ))}
+          <p className="text-[11px] text-gray-500 font-bold pt-0.5">Total received: ₹{totalReceived.toLocaleString()}</p>
+        </div>
+      ) : (
+        <p className="text-xs text-gray-400">No payments recorded yet.</p>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
+        <input type="number" min="0" placeholder="Amount (₹)" value={form.amount}
+          onChange={e => setForm(p => ({ ...p, amount: e.target.value }))} disabled={adding}
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
+        <input type="date" value={form.payment_date}
+          onChange={e => setForm(p => ({ ...p, payment_date: e.target.value }))} disabled={adding}
+          className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
+        <button onClick={handleAdd} disabled={adding}
+          className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold disabled:opacity-50">
+          {adding ? 'Adding…' : '+ Add Payment'}
+        </button>
+        <input type="text" placeholder="Notes (optional) — e.g. reference number" value={form.notes}
+          onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} disabled={adding}
+          className="sm:col-span-3 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" />
+      </div>
+    </div>
+  );
+}
 
 export default function ShowroomLedger({ vendor, onBack }) {
   const [activeFilter, setActiveFilter] = useState('All');
@@ -10,6 +298,7 @@ export default function ShowroomLedger({ vendor, onBack }) {
   const [showVehiclesModal, setShowVehiclesModal] = useState(false);
   const [ledgerData, setLedgerData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Load ledger data from database
   useEffect(() => {
@@ -17,15 +306,26 @@ export default function ShowroomLedger({ vendor, onBack }) {
     loadLedger();
   }, [vendor]);
 
-  const loadLedger = async () => {
+  // Refetch when the tab regains focus, so status changes made
+  // elsewhere (e.g. Warranty module) show up without a full remount
+  useEffect(() => {
+    if (!vendor?.id) return;
+    const onFocus = () => loadLedger(true);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [vendor]);
+
+  const loadLedger = async (isRefresh = false) => {
     try {
-      setLoading(true);
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
       const res = await axios.get(`http://localhost:5001/api/showroom-ledger/${vendor.id}`);
       setLedgerData(res.data.data);
     } catch (error) {
       console.error("LEDGER LOAD ERROR:", error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -36,13 +336,31 @@ export default function ShowroomLedger({ vendor, onBack }) {
   const activities = [
     ...(ledgerData?.vehicles || []).map(v => ({
       id: `vehicle-${v.id}`,
+      vehicleId: v.id,
       type: 'Vehicle Purchase',
       vehicleNo: v.vehicle_no,
       date: v.purchase_date,
       amount: Number(v.purchase_amount || 0),
-      desc: `${v.make_brand || ''} ${v.model || ''}`,
+      desc: `${v.make_brand || ''} ${v.model_year || ''}`.trim(),
       ref: v.vehicle_no,
-      status: 'Purchased'
+      status: 'Purchased',
+      // documents
+      purchase_receipt: v.purchase_receipt,
+      warranty_document: v.warranty_document,
+      purchase_proof: v.purchase_proof,
+      // warranty dates
+      warranty_start_date: v.warranty_start_date,
+      warranty_end_date: v.warranty_end_date,
+      warranty_period_months: v.warranty_period_months,
+      // EMI / loan
+      financier_name: v.financier_name,
+      loan_account_number: v.loan_account_number,
+      emi_amount: v.emi_amount,
+      emi_date: v.emi_date ? new Date(v.emi_date).getDate() : null,
+      loan_tenure: v.loan_tenure,
+      emi_paid_count: Number(v.emi_paid_count || 0),
+      // warranties from warranties table
+      warranties: (ledgerData?.warranties || []).filter(w => w.vehicle_no === v.vehicle_no),
     })),
     ...(ledgerData?.claims || []).map(c => ({
       id: `claim-${c.id}`,
@@ -53,6 +371,8 @@ export default function ShowroomLedger({ vendor, onBack }) {
       desc: c.issue_description,
       ref: c.claim_number,
       claimId: c.claim_number,
+      claimDbId: c.id,
+      receivedAmount: Number(c.approved_amount || 0),
       category: c.category,
       status: c.claim_status,
       submittedDate: c.claim_date,
@@ -60,10 +380,15 @@ export default function ShowroomLedger({ vendor, onBack }) {
     }))
   ];
 
-  console.log("LEDGER DATA", ledgerData);
-  console.log("VEHICLES", vehicles);
-  console.log("CLAIMS", claims);
-  console.log("SUMMARY", ledgerData?.summary);
+  // Keep the open detail modal in sync with freshly reloaded ledger data
+  // (selectedActivity is a snapshot taken at click-time and won't otherwise
+  // pick up e.g. newly uploaded document filenames after a save/refresh)
+  useEffect(() => {
+    setSelectedActivity(prev => {
+      if (!prev) return prev;
+      return activities.find(x => x.id === prev.id) || prev;
+    });
+  }, [ledgerData]);
 
   // Summary values from database
   const vehiclesPurchased = ledgerData?.summary?.totalVehicles || 0;
@@ -73,6 +398,7 @@ export default function ShowroomLedger({ vendor, onBack }) {
   const approvedClaims = ledgerData?.summary?.approvedClaims || 0;
   const rejectedClaims = ledgerData?.summary?.rejectedClaims || 0;
   const pendingWarrantyAmt = ledgerData?.summary?.pendingAmount || 0;
+  const totalReceivedAmt = ledgerData?.summary?.totalReceived || 0;
 
   const FILTERS = [
     { label: 'All' },
@@ -99,12 +425,13 @@ export default function ShowroomLedger({ vendor, onBack }) {
         return a.status?.toLowerCase() === 'rejected';
       }
       if (activeFilter === 'Settled') {
-        return a.status?.toLowerCase() === 'settled';
+        return a.status?.toLowerCase() === 'resolved';
       }
       return true;
     });
 
   const showroom = ledgerData?.showroom || {};
+  const isCash = (showroom.payment_terms || vendor?.payment_terms) === 'cash';
   const bankName =
     showroom.bank_name ||
     showroom.custom_bank_name ||
@@ -128,9 +455,16 @@ export default function ShowroomLedger({ vendor, onBack }) {
   return (
     <div className="space-y-6 animate-fade-in pb-12">
       {/* Nav */}
-      <div className="flex items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div className="flex items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-100">
         <button onClick={onBack} className="flex items-center gap-2 text-sm font-bold text-gray-500 hover:text-gray-800 transition-colors">
           <FiArrowLeft /> Showroom Accounts
+        </button>
+        <button
+          onClick={() => loadLedger(true)}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-gray-800 transition-colors disabled:opacity-50"
+        >
+          <FiRefreshCw size={13} className={refreshing ? 'animate-spin' : ''}/> Refresh
         </button>
       </div>
 
@@ -161,7 +495,7 @@ export default function ShowroomLedger({ vendor, onBack }) {
             </div>
           </div>
 
-          {/* Pending warranty card */}
+          {/* Pending warranty card — the showroom owes this to us, not the other way around */}
           <div className="p-6 bg-gray-50 border border-gray-100 rounded-2xl md:min-w-[210px] text-right shrink-0">
             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Pending Warranty Amount</div>
             {pendingWarrantyAmt === 0 ? (
@@ -174,6 +508,9 @@ export default function ShowroomLedger({ vendor, onBack }) {
                 <div className="text-xs font-bold text-yellow-600 mb-1">{pendingClaims} Claim{pendingClaims !== 1 ? 's' : ''} Pending</div>
                 <div className="text-4xl font-black tracking-tighter text-yellow-600">₹{pendingWarrantyAmt.toLocaleString()}</div>
               </>
+            )}
+            {totalReceivedAmt > 0 && (
+              <div className="text-[11px] text-gray-400 font-medium mt-2">₹{totalReceivedAmt.toLocaleString()} received so far</div>
             )}
           </div>
         </div>
@@ -242,7 +579,7 @@ export default function ShowroomLedger({ vendor, onBack }) {
               <tbody className="divide-y divide-gray-50">
                 {visible.map(a => (
                   <tr key={a.id} className="hover:bg-gray-50/70 transition-colors">
-                    <td className="py-3 px-2 md:px-4"><span className="text-xs font-bold text-gray-600 whitespace-nowrap">{a.date}</span></td>
+                    <td className="py-3 px-2 md:px-4"><span className="text-xs font-bold text-gray-600 whitespace-nowrap">{fmtDate(a.date)}</span></td>
                     <td className="py-3 px-2 md:px-4"><TypeBadge type={a.type}/></td>
                     <td className="py-3 px-2 md:px-4 hidden sm:table-cell"><span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">{a.vehicleNo}</span></td>
                     <td className="py-3 px-2 md:px-4">
@@ -251,7 +588,12 @@ export default function ShowroomLedger({ vendor, onBack }) {
                     </td>
                     <td className="py-3 px-2 md:px-4 text-right">
                       {a.amount > 0 ? (
-                        <span className={`font-bold text-xs md:text-sm ${isPurchase(a) ? 'text-indigo-600' : 'text-yellow-600'}`}>
+                        <span className={`inline-flex items-center gap-1 font-bold text-xs md:text-sm ${
+                          isPurchase(a)
+                            ? 'text-indigo-600'
+                            : a.receivedAmount >= a.amount ? 'text-green-600' : 'text-yellow-600'
+                        }`}>
+                          {!isPurchase(a) && a.receivedAmount >= a.amount && <FiCheckCircle size={12}/>}
                           ₹{a.amount.toLocaleString()}
                         </span>
                       ) : (
@@ -309,8 +651,8 @@ export default function ShowroomLedger({ vendor, onBack }) {
                         <tr key={i} className="hover:bg-gray-50/70 transition-colors">
                           <td className="py-3 px-3"><span className="text-xs font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded">{v.vehicle_no}</span></td>
                           <td className="py-3 px-3 text-sm font-semibold text-gray-700">{v.make_brand}</td>
-                          <td className="py-3 px-3 text-sm text-gray-500 hidden sm:table-cell">{v.model}</td>
-                          <td className="py-3 px-3 text-xs text-gray-500 hidden sm:table-cell">{v.purchase_date}</td>
+                          <td className="py-3 px-3 text-sm text-gray-500 hidden sm:table-cell">{v.model_year}</td>
+                          <td className="py-3 px-3 text-xs text-gray-500 hidden sm:table-cell">{fmtDate(v.purchase_date)}</td>
                           <td className="py-3 px-3 text-right font-bold text-indigo-600 text-sm">₹{Number(v.purchase_amount).toLocaleString()}</td>
                           <td className="py-3 px-3 text-center">
                             <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${STATUS_PILL[v.vehicle_status] || 'bg-gray-100 text-gray-500 border-gray-200'}`}>
@@ -340,39 +682,16 @@ export default function ShowroomLedger({ vendor, onBack }) {
       {/* Activity Detail Modal */}
       {selectedActivity && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden" style={{ animation: 'modalSlideIn 0.2s ease-out' }}>
-            <div className="flex justify-between items-center p-4 bg-slate-50 border-b border-gray-100">
-              <h3 className="text-sm font-bold text-gray-800">{isPurchase(selectedActivity) ? 'Purchase Details' : 'Warranty Claim Details'}</h3>
-              <button onClick={() => setSelectedActivity(null)} className="p-1 rounded-full hover:bg-gray-200 text-gray-500">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden" style={{ animation: 'modalSlideIn 0.2s ease-out' }}>
+            <div className="flex justify-between items-center p-4 bg-gray-900">
+              <h3 className="text-sm font-bold text-white">{isPurchase(selectedActivity) ? 'Purchase Details' : 'Warranty Claim Details'}</h3>
+              <button onClick={() => setSelectedActivity(null)} className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white transition-colors">
                 <FiX size={18}/>
               </button>
             </div>
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+            <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
               {isPurchase(selectedActivity) ? (
-                <>
-                  <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-100">
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Purchase Date</p>
-                      <p className="font-bold text-gray-800 text-sm">{selectedActivity.date}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Vehicle No</p>
-                      <span className="font-bold text-gray-800 text-sm bg-gray-100 px-2 py-1 inline-block rounded">{selectedActivity.vehicleNo}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Purchase Amount</p>
-                    <p className="text-3xl font-extrabold text-indigo-600">₹{selectedActivity.amount.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Reference</p>
-                    <p className="font-bold text-gray-700 text-sm">{selectedActivity.ref}</p>
-                  </div>
-                  <div className="border-t border-gray-100 pt-3">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Description</p>
-                    <div className="bg-gray-50 text-gray-600 p-3 rounded-lg border border-gray-100 text-sm">{selectedActivity.desc}</div>
-                  </div>
-                </>
+                <PurchaseDetailPanel activity={selectedActivity} isCash={isCash} onSaved={() => loadLedger(true)} />
               ) : (
                 <>
                   <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-100">
@@ -404,17 +723,22 @@ export default function ShowroomLedger({ vendor, onBack }) {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Submitted</p>
-                      <p className="font-bold text-gray-700 text-sm">{selectedActivity.submittedDate || selectedActivity.date}</p>
+                      <p className="font-bold text-gray-700 text-sm">{fmtDate(selectedActivity.submittedDate || selectedActivity.date)}</p>
                     </div>
                     <div>
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Last Updated</p>
-                      <p className="font-bold text-gray-700 text-sm">{selectedActivity.lastUpdated || '—'}</p>
+                      <p className="font-bold text-gray-700 text-sm">{fmtDate(selectedActivity.lastUpdated)}</p>
                     </div>
                   </div>
                   <div className="border-t border-gray-100 pt-3">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Description</p>
                     <div className="bg-gray-50 text-gray-600 p-3 rounded-lg border border-gray-100 text-sm">{selectedActivity.desc}</div>
                   </div>
+                  <ClaimPaymentsPanel
+                    claimId={selectedActivity.claimDbId}
+                    claimAmount={selectedActivity.amount}
+                    onSaved={() => loadLedger(true)}
+                  />
                   <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
                     <p className="text-[10px] font-bold text-blue-500">Status can only be updated in the Warranty Module.</p>
                   </div>

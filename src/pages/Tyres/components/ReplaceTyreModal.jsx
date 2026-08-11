@@ -195,8 +195,9 @@ if (oldData.success) {
   };
 
   useEffect(() => {
+    if (!isOpen) return;
     fetchTyres();
-  }, []);
+  }, [isOpen]);
 
   // ──────────────────────────────────────────────────────────────────────────
   // Combine available tyres for replacement (exclude currently mounted ones)

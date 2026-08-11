@@ -90,9 +90,10 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
   };
 
   useEffect(() => {
+    if (!isOpen) return;
     fetchPartsVendors();
     fetchOilVendors();
-  }, []);
+  }, [isOpen]);
 
   // ── Early return AFTER all hooks ──
   if (!isOpen) return null;

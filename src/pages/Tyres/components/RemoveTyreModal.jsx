@@ -102,6 +102,16 @@ export default function RemoveTyreModal({ tyre, onClose }) {
       setForm(p => ({ ...p, storeLocation: ACTION_LOCATION[form.nextAction] || '' }));
   }, [form.nextAction]);
 
+  // "Reason For Removal" and "Next Action" are separate fields, but picking
+  // Retreading as the reason with a different Next Action silently drops the
+  // tyre into the wrong bucket (e.g. Reusable) and it never gets a retreading
+  // record — so default Next Action to match when the reason is Retreading.
+  useEffect(() => {
+    if (form.reason === 'Retreading' && form.nextAction !== 'Send For Retreading') {
+      setForm(p => ({ ...p, nextAction: 'Send For Retreading' }));
+    }
+  }, [form.reason]);
+
   const set = (k, v) => {
     setForm(p => ({ ...p, [k]: v }));
     setErrors(p => ({ ...p, [k]: '' }));
@@ -163,14 +173,18 @@ export default function RemoveTyreModal({ tyre, onClose }) {
 
           0,
         remaining_tread_percent: form.remainingTread || 0,
+        // Note: 'Send For Retreading' intentionally maps to OLD_STOCK, not
+        // RETREADING — removal alone doesn't create a tyre_retreading record
+        // (no vendor/cost chosen yet). RETREADING status is only set once the
+        // actual "Send for Retreading" action in Old Tyres Stock completes;
+        // setting it here would tag the tyre as "At Vendor" with nothing
+        // behind it, and there'd be no way to complete the real step.
         tyre_status:
           form.nextAction === 'Scrap Tyre'
             ? 'SCRAP'
-            : form.nextAction === 'Send For Retreading'
-              ? 'RETREADING'
-              : form.nextAction === 'Reusable Spare'
-                ? 'REUSABLE'
-                : 'OLD_STOCK',
+            : form.nextAction === 'Reusable Spare'
+              ? 'REUSABLE'
+              : 'OLD_STOCK',
         store_location: form.storeLocation,
         notes: form.notes,
       };

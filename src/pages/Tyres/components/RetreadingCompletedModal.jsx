@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, AlertCircle, ArrowRight, PackageCheck } from 'lucide-react';
-import { useVendorLedger } from '../../../context/VendorLedgerContext';
-import { createVendorTransaction } from '../../../services/vendorTransactionService';
+import axios from 'axios';
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -34,7 +33,6 @@ function Err({ msg }) {
 }
 
 export default function RetreadingCompletedModal({ record, onClose, onConfirm }) {
-  const { addVendorTransaction } = useVendorLedger();
   const [form, setForm] = useState({
     returnDate:     today(),
     actualCost:     '',
@@ -44,6 +42,7 @@ export default function RetreadingCompletedModal({ record, onClose, onConfirm })
   });
   const [errors, setErrors] = useState({});
   const [done, setDone]     = useState(false);
+  const [saving, setSaving] = useState(false);
 
   if (!record) return null;
 
@@ -64,35 +63,43 @@ export default function RetreadingCompletedModal({ record, onClose, onConfirm })
     return e;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     const actualCost = Number(form.actualCost);
 
-    // Create ledger entry now with actual cost — only on successful completion
-    createVendorTransaction({
-      vendorId:      record.vendorId,
-      vendorName:    record.vendorName,
-      date:          form.returnDate,
-      type:          'Retreading Service',
-      ref:           record.orderNo || record.id,
-      desc:          `Retreading — ${record.tyreNo} (${record.brand} ${record.tyreSize})`,
-      debit:         actualCost,
-      onTransaction: addVendorTransaction,
-    });
+    try {
+      setSaving(true);
+      // Persist the completion — the vendor ledger's Retreading cost reads
+      // actual_cost/status straight from this table, so this is what actually
+      // makes the retreading charge show up there.
+      await axios.put(`http://localhost:5001/api/tyre-retreading/${record.id}`, {
+        status:            'RETURNED',
+        actual_cost:       actualCost,
+        return_date:       form.returnDate,
+        new_tread_percent: Number(form.newTreadPercent),
+        tyre_condition:    form.condition,
+        notes:             form.remarks || null,
+      });
 
-    onConfirm?.({
-      ...record,
-      returnDate:      form.returnDate,
-      actualCost,
-      newTreadPercent: Number(form.newTreadPercent),
-      condition:       form.condition,
-      remarks:         form.remarks,
-      status:          'RETURNED',
-      completedAt:     new Date().toISOString(),
-    });
-    setDone(true);
+      onConfirm?.({
+        ...record,
+        returnDate:      form.returnDate,
+        actualCost,
+        newTreadPercent: Number(form.newTreadPercent),
+        condition:       form.condition,
+        remarks:         form.remarks,
+        status:          'RETURNED',
+        completedAt:     new Date().toISOString(),
+      });
+      setDone(true);
+    } catch (err) {
+      console.error('RETREADING COMPLETE ERROR:', err);
+      setErrors({ actualCost: 'Failed to save — check connection and try again' });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleClose = () => { setForm({ returnDate: today(), actualCost: '', newTreadPercent: '', condition: '', remarks: '' }); setErrors({}); setDone(false); onClose(); };
@@ -216,11 +223,11 @@ export default function RetreadingCompletedModal({ record, onClose, onConfirm })
           {!done && (
             <div className="shrink-0 flex items-center justify-end gap-2.5 px-5 py-4 border-t border-slate-100 bg-slate-50/60">
               <button onClick={handleClose} className="h-10 px-5 text-sm font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">Cancel</button>
-              <button onClick={handleSubmit}
-                className="h-10 px-6 text-sm font-extrabold text-white rounded-xl flex items-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+              <button onClick={handleSubmit} disabled={saving}
+                className="h-10 px-6 text-sm font-extrabold text-white rounded-xl flex items-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0 disabled:shadow-md"
                 style={{ background: 'linear-gradient(135deg, #059669 0%, #047857 100%)' }}>
                 <PackageCheck className="w-4 h-4" />
-                Mark as Returned
+                {saving ? 'Saving...' : 'Mark as Returned'}
               </button>
             </div>
           )}

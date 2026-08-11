@@ -3,12 +3,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   TrendingUp, ArrowLeft, MapPin, Calendar, CreditCard,
   Truck, FileText, ChevronDown, Key, RefreshCw, UserCheck,
-  MoreHorizontal, Link2, CheckCircle2,
+  MoreHorizontal, Link2, CheckCircle2, Factory, ShieldCheck,
 } from "lucide-react";
 import IncomeCategoryBadge from "./IncomeCategoryBadge";
 
-const CATEGORIES   = ["Freight", "Return Load", "Client Payment", "Rental Income", "Miscellaneous"];
+const CATEGORIES   = ["Freight", "Return Load", "Client Payment", "Rental Income", "Plant Receivable", "Refund/Claim", "Miscellaneous"];
 const TRIP_CATS    = ["Freight", "Return Load"];
+const REFUND_TYPES = ["Insurance", "Toll", "Security Deposit", "Guarantee", "Other"];
 
 // ── Design tokens
 const label = "block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1";
@@ -79,6 +80,8 @@ const BANNER_CFG = {
   "Return Load":  { Icon: RefreshCw,     cls: "bg-teal-50 border-teal-200 text-teal-700",         text: "Return trip income — select the trip first, then record payment." },
   "Client Payment":{ Icon: UserCheck,    cls: "bg-blue-50 border-blue-200 text-blue-700",          text: "Invoice settlement — link the customer invoice, then record payment." },
   "Rental Income":{ Icon: Key,           cls: "bg-violet-50 border-violet-200 text-violet-700",    text: "Manual rental entry — fill rental details, then record payment." },
+  "Plant Receivable":{ Icon: Factory,    cls: "bg-cyan-50 border-cyan-200 text-cyan-700",          text: "Plant/contract receivable — select the plant, trip is optional." },
+  "Refund/Claim": { Icon: ShieldCheck,   cls: "bg-rose-50 border-rose-200 text-rose-700",          text: "Refund or claim — select the type and reference, then record amount." },
   Miscellaneous:  { Icon: MoreHorizontal,cls: "bg-amber-50 border-amber-200 text-amber-700",       text: "Manual entry — fill amount, date and a short description." },
 };
 
@@ -123,6 +126,7 @@ const EMPTY = {
   linkedTrip: "", route: "", freightStart: "", freightEnd: "",
   linkedInvoice: "",
   rentalDesc: "", rentalStart: "", rentalEnd: "",
+  plantId: "", refundType: "", refundReference: "",
   amount: "", paymentDate: "", paymentStatus: "", refNumber: "", desc: "",
 };
 
@@ -132,6 +136,7 @@ export default function AddIncomeForm({ onBack }) {
   const [vehicles, setVehicles] = useState([]);
   const [trips, setTrips] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [plants, setPlants] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -146,6 +151,19 @@ export default function AddIncomeForm({ onBack }) {
       }
     } catch (error) {
       console.log('Fetch vehicles error:', error);
+    }
+  };
+
+  // Fetch plants/stations from database
+  const fetchPlants = async () => {
+    try {
+      const res = await fetch('http://localhost:5001/api/stations');
+      const data = await res.json();
+      if (data.success) {
+        setPlants(data.data || []);
+      }
+    } catch (error) {
+      console.log('Fetch plants error:', error);
     }
   };
 
@@ -164,12 +182,14 @@ export default function AddIncomeForm({ onBack }) {
 
   useEffect(() => {
     fetchVehicles();
+    fetchPlants();
   }, []);
 
   const onCategory = (val) => setForm(f => ({
     ...f, category: val,
     linkedTrip: "", route: "", freightStart: "", freightEnd: "",
     linkedInvoice: "", rentalDesc: "", rentalStart: "", rentalEnd: "",
+    plantId: "", refundType: "", refundReference: "",
   }));
 
   const onTrip = (id) => {
@@ -206,7 +226,10 @@ export default function AddIncomeForm({ onBack }) {
         rental_description: form.rentalDesc,
         rental_start_date: form.rentalStart,
         rental_end_date: form.rentalEnd,
-        linked_invoice_no: form.linkedInvoice
+        linked_invoice_no: form.linkedInvoice,
+        plant_id: form.plantId || null,
+        refund_type: form.refundType || null,
+        refund_reference: form.refundReference || null,
       };
 
       const res = await fetch('http://localhost:5001/api/income', {
@@ -234,7 +257,10 @@ export default function AddIncomeForm({ onBack }) {
   const isTripBased = TRIP_CATS.includes(form.category);
   const isClient    = form.category === "Client Payment";
   const isRental    = form.category === "Rental Income";
+  const isPlant     = form.category === "Plant Receivable";
+  const isRefund    = form.category === "Refund/Claim";
   const hasCat      = !!form.category;
+  const hasStep2    = isTripBased || isClient || isRental || isPlant || isRefund;
 
   // tinted input for auto-filled fields
   const autoInput = input + (trip ? " bg-emerald-50/60 border-emerald-200 text-emerald-800" : "");
@@ -430,9 +456,54 @@ export default function AddIncomeForm({ onBack }) {
           </div>
         </Slide>
 
+        {/* ── STEP 2D — Plant Receivable */}
+        <Slide show={isPlant}>
+          <Divider step="2" title="Plant / Contract Details" color="text-blue-600" />
+          <F label="Plant / Contract" required hint="Trip link below is optional for plant receivables">
+            <Sel>
+              <select value={form.plantId} onChange={e => set("plantId", e.target.value)} className={sel}>
+                <option value="">— Select Plant —</option>
+                {plants.map(p => <option key={p.id} value={p.id}>{p.station_name}</option>)}
+              </select>
+            </Sel>
+          </F>
+          <F label="Linked Trip (optional)" hint="Only if this receivable is tied to a specific trip">
+            <Sel>
+              <select value={form.linkedTrip} onChange={e => onTrip(e.target.value)} className={sel}>
+                <option value="">— No Trip Link —</option>
+                {trips.map((trip) => (
+                  <option key={trip.id} value={trip.id}>
+                    {trip.trip_id} - {trip.source} → {trip.destination}
+                  </option>
+                ))}
+              </select>
+            </Sel>
+          </F>
+        </Slide>
+
+        {/* ── STEP 2E — Refund / Claim */}
+        <Slide show={isRefund}>
+          <Divider step="2" title="Refund / Claim Details" color="text-violet-600" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <F label="Refund Type" required>
+              <Sel>
+                <select value={form.refundType} onChange={e => set("refundType", e.target.value)} className={sel}>
+                  <option value="">— Select Type —</option>
+                  {REFUND_TYPES.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </Sel>
+            </F>
+            <F label="Related Reference" hint="Policy / toll / deposit ref number">
+              <input type="text" placeholder="e.g. POL-88221"
+                value={form.refundReference} onChange={e => set("refundReference", e.target.value)}
+                className={input} />
+            </F>
+          </div>
+        </Slide>
+
         {/* ── STEP 3 — Payment (always last) */}
         <Slide show={hasCat}>
-          <Divider step={isTripBased || isClient || isRental ? "3" : "2"} title="Payment Details" color="text-slate-500" />
+          <Divider step={hasStep2 ? "3" : "2"} title="Payment Details" color="text-slate-500" />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <F label="Amount (₹)" required>

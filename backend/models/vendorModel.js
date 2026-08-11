@@ -67,6 +67,7 @@ const Vendor = {
     gst_number,
     opening_balance,
     status,
+    payment_terms,
 
     bank_name,
     custom_bank_name,
@@ -86,6 +87,7 @@ const Vendor = {
     gst_number,
     opening_balance,
     status,
+    payment_terms,
     bank_name,
     custom_bank_name,
     account_number_or_upi,
@@ -105,6 +107,7 @@ const Vendor = {
       gst_number,
       opening_balance,
       status,
+      payment_terms,
       bank_name,
       custom_bank_name,
       account_number_or_upi,
@@ -112,7 +115,7 @@ const Vendor = {
       upi_id
     )
     VALUES
-    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       category,
@@ -123,6 +126,7 @@ const Vendor = {
       gst_number || null,
       opening_balance || 0,
       status || "Active",
+      payment_terms || "credit",
       bank_name || null,
       custom_bank_name || null,
       account_number_or_upi || null,
@@ -153,6 +157,7 @@ const Vendor = {
       gst_number,
       opening_balance,
       status,
+      payment_terms,
 
       bank_name,
       custom_bank_name,
@@ -175,6 +180,7 @@ const Vendor = {
         gst_number = ?,
         opening_balance = ?,
         status = ?,
+        payment_terms = ?,
 
         bank_name = ?,
         custom_bank_name = ?,
@@ -193,6 +199,7 @@ const Vendor = {
         gst_number,
         opening_balance,
         status,
+        payment_terms || "credit",
 
         bank_name,
         custom_bank_name,

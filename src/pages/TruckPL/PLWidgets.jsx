@@ -163,6 +163,7 @@ export function ExpenseSummary({ totals }) {
     { label: 'Tyres',         value: totals.totalTyres,      color: '#8b5cf6', bar: 'bg-purple-500' },
     { label: 'Battery',       value: totals.totalBattery,    color: '#3b82f6', bar: 'bg-blue-500'   },
     { label: 'Driver',        value: totals.totalDriver,     color: '#0d9488', bar: 'bg-teal-500'   },
+    { label: 'EMI',           value: totals.totalEMI,        color: '#d97706', bar: 'bg-amber-600'  },
     { label: 'RTA',           value: totals.totalRTA,        color: '#64748b', bar: 'bg-slate-500'  },
     { label: 'Miscellaneous', value: totals.totalMisc,       color: '#f97316', bar: 'bg-orange-500' },
   ];
@@ -239,6 +240,7 @@ export function ProfitCalculationCard({ totals }) {
     { label: 'Tyres',            value: totals.totalTyres || 0 },
     { label: 'Battery',          value: totals.totalBattery || 0 },
     { label: 'Driver Settlement',value: totals.totalDriver || 0 },
+    { label: 'Vehicle EMI',      value: totals.totalEMI || 0 },
     { label: 'RTA Expenses',     value: totals.totalRTA || 0 },
     { label: 'Miscellaneous',    value: totals.totalMisc || 0 },
   ];

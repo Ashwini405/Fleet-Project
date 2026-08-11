@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, UploadCloud, ShieldCheck, ChevronDown } from 'lucide-react';
 
-const CATEGORIES = ['Battery', 'Engine', 'Tyres', 'Brakes', 'Transmission', 'Electrical', 'AC System', 'Suspension', 'Fuel System', 'Other'];
+const CATEGORIES = ['Vehicle', 'Battery', 'Engine', 'Tyres', 'Brakes', 'Transmission', 'Electrical', 'AC System', 'Suspension', 'Fuel System', 'Other'];
 
 const BRANDS_BY_CATEGORY = {
    Battery: ['Amaron', 'Exide', 'Bosch'],
@@ -59,6 +59,15 @@ const Inp = ({ label, required, ...props }) => (
    </div>
 );
 
+const ReadField = ({ label, value }) => (
+   <div>
+      <Label>{label}</Label>
+      <div className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-600 min-h-9 flex items-center">
+         {value || <span className="text-slate-400 italic">Not recorded</span>}
+      </div>
+   </div>
+);
+
 const UploadBox = ({ label, required, onChange, fileName }) => (
    <label className="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center bg-white hover:border-green-400 hover:bg-green-50/30 transition-colors cursor-pointer group block">
       <UploadCloud className="w-5 h-5 mx-auto mb-1 text-green-600 group-hover:scale-110 transition-transform" />
@@ -75,42 +84,109 @@ const SectionTitle = ({ children }) => (
    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 pb-1.5 border-b border-slate-100">{children}</p>
 );
 
+// Which vendor list applies to each warranty category (Vehicle has no
+// entry here — its purchase showroom is shown separately, see
+// isVehicleCategory below). Falls back to Parts Vendors for anything
+// without its own dedicated vendor table.
+const VENDOR_SOURCE_BY_CATEGORY = {
+   Tyres:         { endpoint: 'tyre-vendors',  nameField: 'vendor_name',   label: 'Tyre Vendors' },
+   'Fuel System': { endpoint: 'fuel-vendors',  nameField: 'vendor_name',   label: 'Fuel Vendors' },
+};
+const DEFAULT_VENDOR_SOURCE = { endpoint: 'parts-vendors', nameField: 'vendor_name', label: 'Parts Vendors' };
+
 export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
    const [vehicles, setVehicles] = useState([]);
+   const [tyres, setTyres] = useState([]);
+   const [categoryVendors, setCategoryVendors] = useState([]);
+   const [purchaseShowroom, setPurchaseShowroom] = useState('');
    const [files, setFiles] = useState({ warrantyCard: null, invoiceFile: null });
    const [fd, setFd] = useState({
       category: '', brand: '', model: '', serialNo: '',
-      vehicle_id: '', vehicle_no: '', odometer: '',
+      vehicle_id: '', vehicle_no: '', odometer: '', tyreId: '',
       startDate: '', endDate: '', warrantyPeriod: '',
       description: '', dealerShowroom: '',
    });
 
    const set = (f, v) => setFd(p => ({ ...p, [f]: v }));
 
+   const isTyreCategory = fd.category === 'Tyres';
+   const isVehicleCategory = fd.category === 'Vehicle';
+
    const handleCategoryChange = (e) => {
       const cat = e.target.value;
-      setFd(p => ({ ...p, category: cat, brand: '', model: '' }));
+      setPurchaseShowroom('');
+      // Previous vendor/item selection belonged to the old category, so it
+      // no longer applies once the category changes.
+      setFd(p => ({
+         ...p, category: cat, brand: '', model: '', dealerShowroom: '',
+         vehicle_id: '', vehicle_no: '', odometer: '', tyreId: '',
+      }));
    };
 
    useEffect(() => {
+      if (!isOpen) return;
       fetch('http://localhost:5001/api/vehicles')
          .then(r => r.json())
          .then(data => { if (data.success) setVehicles(data.data || []); })
          .catch(err => console.error('FETCH VEHICLES ERROR:', err));
-   }, []);
+      fetch('http://localhost:5001/api/tyres')
+         .then(r => r.json())
+         .then(data => { if (data.success) setTyres(data.data || []); })
+         .catch(err => console.error('FETCH TYRES ERROR:', err));
+   }, [isOpen]);
+
+   // Vendor list depends on the selected category — Vehicle -> Showrooms,
+   // Tyres -> Tyre Vendors, Fuel System -> Fuel Vendors, everything else
+   // falls back to Parts Vendors.
+   useEffect(() => {
+      // Vehicle category has no separate vendor picker — the vehicle's own
+      // purchase showroom (below) already covers it.
+      if (!isOpen || !fd.category || fd.category === 'Vehicle') { setCategoryVendors([]); return; }
+      const source = VENDOR_SOURCE_BY_CATEGORY[fd.category] || DEFAULT_VENDOR_SOURCE;
+      fetch(`http://localhost:5001/api/${source.endpoint}`)
+         .then(r => r.json())
+         .then(data => { if (data.success) setCategoryVendors(data.data || []); })
+         .catch(err => console.error('FETCH CATEGORY VENDORS ERROR:', err));
+   }, [isOpen, fd.category]);
+
+   const vendorSource = VENDOR_SOURCE_BY_CATEGORY[fd.category] || DEFAULT_VENDOR_SOURCE;
 
    const handleVehicleChange = (e) => {
       const selected = vehicles.find(v => v.id === Number(e.target.value));
+      setPurchaseShowroom(selected?.dealer_showroom || '');
       setFd(p => ({
          ...p,
          vehicle_id: selected?.id || '',
          vehicle_no: selected?.vehicle_no || '',
          odometer: selected?.initial_odometer || '',
-         dealerShowroom: selected?.dealer_showroom || '',
+         // Vehicle category: the item *is* the vehicle, so its brand/model
+         // and purchase showroom come straight from the vehicle record —
+         // no need to ask the user to re-enter what's already on file.
+         dealerShowroom: p.category === 'Vehicle' ? (selected?.dealer_showroom || '') : p.dealerShowroom,
+         brand: p.category === 'Vehicle' ? (selected?.make_brand || '') : p.brand,
+         model: p.category === 'Vehicle' ? (selected?.model_year || '') : p.model,
       }));
    };
 
-   const isValid = fd.category && fd.vehicle_id && fd.brand && fd.model && fd.startDate && fd.endDate && files.warrantyCard && files.invoiceFile;
+   // Tyres come from the tyre master, not the vehicle list — a tyre may
+   // still be sitting "In Stock" with no vehicle attached yet, and its
+   // vendor is already known from its own record.
+   const handleTyreChange = (e) => {
+      const selected = tyres.find(t => t.id === Number(e.target.value));
+      setFd(p => ({
+         ...p,
+         tyreId: selected?.id || '',
+         vehicle_id: selected?.vehicle_id || '',
+         vehicle_no: selected?.vehicle_number || '',
+         odometer: selected?.fitted_odometer || '',
+         serialNo: selected?.serial_no || '',
+         brand: selected?.brand || '',
+         model: selected?.model || '',
+         dealerShowroom: selected?.vendor_name || '',
+      }));
+   };
+
+   const isValid = fd.category && (isTyreCategory ? fd.tyreId : fd.vehicle_id) && fd.brand && fd.model && fd.startDate && fd.endDate && files.warrantyCard && files.invoiceFile;
 
    const handleSubmit = async () => {
       try {
@@ -181,26 +257,49 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
                            <option value="">Select Category</option>
                            {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                         </Sel>
-                        <Sel label="Truck / Vehicle" required value={fd.vehicle_id} onChange={handleVehicleChange}>
-                           <option value="">Select Vehicle</option>
-                           {vehicles.map(v => <option key={v.id} value={v.id}>{v.vehicle_no}</option>)}
-                        </Sel>
-                        {fd.vehicle_id && (
-                           <div>
-                              <Label>Dealer / Showroom</Label>
-                              <div className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-600">
-                                 {fd.dealerShowroom || <span className="text-slate-400 italic">Not recorded for this vehicle</span>}
-                              </div>
-                           </div>
+                        {isTyreCategory ? (
+                           <Sel label="Select Tyre" required value={fd.tyreId} onChange={handleTyreChange}>
+                              <option value="">Select Tyre</option>
+                              {tyres.map(t => (
+                                 <option key={t.id} value={t.id}>
+                                    {t.tyre_number} · {t.brand} {t.model} — {t.vehicle_number || 'In Stock'}
+                                 </option>
+                              ))}
+                           </Sel>
+                        ) : (
+                           <Sel label="Truck / Vehicle" required value={fd.vehicle_id} onChange={handleVehicleChange}>
+                              <option value="">Select Vehicle</option>
+                              {vehicles.map(v => <option key={v.id} value={v.id}>{v.vehicle_no}</option>)}
+                           </Sel>
                         )}
-                        <Sel label="Brand" required value={fd.brand} onChange={e => set('brand', e.target.value)} disabled={!fd.category}>
-                           <option value="">{fd.category ? 'Select Brand' : 'Select category first'}</option>
-                           {(BRANDS_BY_CATEGORY[fd.category] || []).map(b => <option key={b}>{b}</option>)}
-                        </Sel>
-                        <Sel label="Model" required value={fd.model} onChange={e => set('model', e.target.value)} disabled={!fd.category}>
-                           <option value="">{fd.category ? 'Select Model' : 'Select category first'}</option>
-                           {(MODELS_BY_CATEGORY[fd.category] || []).map(m => <option key={m}>{m}</option>)}
-                        </Sel>
+                        {isTyreCategory
+                           ? fd.tyreId && <ReadField label="Fitted On Vehicle" value={fd.vehicle_no || 'In Stock (not fitted)'} />
+                           : fd.vehicle_id && <ReadField label="Purchased From (Showroom)" value={purchaseShowroom} />
+                        }
+                        {!isVehicleCategory && (isTyreCategory ? fd.tyreId : fd.vehicle_id) && (
+                           <Sel label={vendorSource.label} value={fd.dealerShowroom} onChange={e => set('dealerShowroom', e.target.value)} disabled={!fd.category}>
+                              <option value="">{fd.category ? `Select ${vendorSource.label.toLowerCase()}` : 'Select category first'}</option>
+                              {categoryVendors.map(v => (
+                                 <option key={v.id} value={v[vendorSource.nameField]}>{v[vendorSource.nameField]}</option>
+                              ))}
+                           </Sel>
+                        )}
+                        {isVehicleCategory ? (
+                           <ReadField label="Brand" value={fd.brand} />
+                        ) : (
+                           <Sel label="Brand" required value={fd.brand} onChange={e => set('brand', e.target.value)} disabled={!fd.category}>
+                              <option value="">{fd.category ? 'Select Brand' : 'Select category first'}</option>
+                              {(BRANDS_BY_CATEGORY[fd.category] || []).map(b => <option key={b}>{b}</option>)}
+                           </Sel>
+                        )}
+                        {isVehicleCategory ? (
+                           <ReadField label="Model" value={fd.model} />
+                        ) : (
+                           <Sel label="Model" required value={fd.model} onChange={e => set('model', e.target.value)} disabled={!fd.category}>
+                              <option value="">{fd.category ? 'Select Model' : 'Select category first'}</option>
+                              {(MODELS_BY_CATEGORY[fd.category] || []).map(m => <option key={m}>{m}</option>)}
+                           </Sel>
+                        )}
                         <Inp label="Serial Number" value={fd.serialNo} onChange={e => set('serialNo', e.target.value)} placeholder="e.g. SN1234567890" />
                      </div>
                   </div>

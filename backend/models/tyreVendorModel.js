@@ -41,10 +41,16 @@ const TyreVendor = {
         gst_number,
         address_location,
         services,
-        status
+        status,
+        payment_terms,
+        bank_name,
+        custom_bank_name,
+        account_number,
+        ifsc_code,
+        upi_id
       )
       VALUES
-      (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         data.vendor_name,
@@ -55,7 +61,13 @@ const TyreVendor = {
         data.gst_number || null,
         data.address_location || null,
         JSON.stringify(data.services || []),
-        data.status || "Active"
+        data.status || "Active",
+        data.payment_terms || "credit",
+        data.bank_name || null,
+        data.custom_bank_name || null,
+        data.account_number || null,
+        data.ifsc_code || null,
+        data.upi_id || null
       ]
     );
 
@@ -76,7 +88,13 @@ const TyreVendor = {
         gst_number = ?,
         address_location = ?,
         services = ?,
-        status = ?
+        status = ?,
+        payment_terms = ?,
+        bank_name = ?,
+        custom_bank_name = ?,
+        account_number = ?,
+        ifsc_code = ?,
+        upi_id = ?
       WHERE id = ?
       `,
       [
@@ -89,6 +107,12 @@ const TyreVendor = {
         data.address_location,
         JSON.stringify(data.services || []),
         data.status,
+        data.payment_terms || "credit",
+        data.bank_name || null,
+        data.custom_bank_name || null,
+        data.account_number || null,
+        data.ifsc_code || null,
+        data.upi_id || null,
         id
       ]
     );

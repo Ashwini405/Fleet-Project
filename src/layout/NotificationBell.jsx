@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bell, CheckCheck, AlertTriangle, AlertCircle, Info, ShieldAlert } from 'lucide-react';
+import { Bell, CheckCheck, AlertTriangle, AlertCircle, Info, ShieldAlert, CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useNotifications } from '../context/NotificationContext';
 
@@ -12,6 +12,7 @@ const SEV_CONFIG = {
 
 function NotifIcon({ n }) {
   if (n._source === 'warranty') return <ShieldAlert className="w-3.5 h-3.5 text-orange-500" />;
+  if (n._source === 'fastag') return <CreditCard className="w-3.5 h-3.5 text-cyan-500" />;
   if (n.severity === 'Critical') return <AlertTriangle className="w-3.5 h-3.5 text-red-500" />;
   if (n.severity === 'High')     return <AlertCircle   className="w-3.5 h-3.5 text-orange-500" />;
   if (n.severity === 'Medium')   return <AlertCircle   className="w-3.5 h-3.5 text-yellow-500" />;

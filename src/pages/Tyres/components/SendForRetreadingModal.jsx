@@ -54,10 +54,11 @@ export default function SendForRetreadingModal({ tyre, onClose, onConfirm }) {
   const [retreadingVendors, setRetreadingVendors] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Fetch retreading vendors from database
+  // Fetch retreading vendors from database — only once the modal is actually opened
   useEffect(() => {
+    if (!tyre) return;
     fetchRetreadingVendors();
-  }, []);
+  }, [tyre]);
 
   const fetchRetreadingVendors = async () => {
     try {

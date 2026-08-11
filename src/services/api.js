@@ -103,7 +103,8 @@ api.interceptors.response.use(
                     localStorage.removeItem("accessToken");
                     localStorage.removeItem("user");
                     if (window.location.pathname !== "/login") {
-                        window.location.href = "/login";
+                        const returnTo = window.location.pathname + window.location.search;
+                        window.location.href = `/login?from=${encodeURIComponent(returnTo)}`;
                     }
                     return Promise.reject(error);
                 }

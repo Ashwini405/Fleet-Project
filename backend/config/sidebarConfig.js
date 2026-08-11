@@ -39,6 +39,7 @@ const SIDEBAR_CONFIG = [
             { name: 'Income & Expense', path: '/finance', module: 'Income & Expense' },
             { name: 'Vendor Ledgers', path: '/vendors', module: 'Vendor' },
             { name: 'Operational Payments', path: '/payments', module: 'Operational Payments' },
+            { name: 'Fastag Management', path: '/fastag', module: 'Fastag' },
             { name: 'P & L Reports', path: '/reports', module: 'Reports' },
             { name: 'Truck Profit & Loss', path: '/reports/trucks', module: 'Truck Profit & Loss' },
             { name: 'Staff Management', path: '/staff', module: 'Staff Management' },
@@ -50,6 +51,7 @@ const SIDEBAR_CONFIG = [
         icon: 'Settings',
         items: [
             { name: 'Administration', path: '/administration', module: 'Administration' },
+            { name: 'Tender Data', path: '/tenders', module: 'Tender Data' },
             { name: 'Company Profile', path: '/company-profile', module: 'Company Profile' },
             { name: 'User Management', path: '/user-management', module: 'User Management' },
             { name: 'Roles & Permissions', path: '/roles-permissions', module: 'Roles & Permissions' },

@@ -53,6 +53,8 @@ const CompanyProfile        = lazy(() => import("./pages/CompanyProfile/CompanyP
 const UserManagement        = lazy(() => import("./pages/UserManagement/UserManagement"));
 const RolesPermissions      = lazy(() => import("./pages/RolesPermissions"));
 const BackupRestore         = lazy(() => import("./pages/BackupRestore"));
+const Fastag                = lazy(() => import("./pages/Fastag"));
+const Tenders                = lazy(() => import("./pages/Tenders"));
 
 function PageLoader() {
   return (
@@ -162,6 +164,8 @@ function InnerApp() {
                     <Route path="/finance" element={<ProtectedRoute module="Income & Expense" action="view"><Finance /></ProtectedRoute>} />
                     <Route path="/vendors" element={<ProtectedRoute module="Vendor" action="view"><Vendors /></ProtectedRoute>} />
                     <Route path="/payments" element={<ProtectedRoute module="Operational Payments" action="view"><Payments /></ProtectedRoute>} />
+                    <Route path="/fastag" element={<ProtectedRoute module="Fastag" action="view"><Fastag /></ProtectedRoute>} />
+                    <Route path="/tenders" element={<ProtectedRoute module="Tender Data" action="view"><Tenders /></ProtectedRoute>} />
                     <Route path="/reports" element={<ProtectedRoute module="Reports" action="view"><Reports /></ProtectedRoute>} />
                     <Route path="/reports/trucks" element={<ProtectedRoute module="Truck Profit & Loss" action="view"><TruckPLList /></ProtectedRoute>} />
                     <Route path="/reports/trucks/:truckId" element={<ProtectedRoute module="Truck Profit & Loss" action="view"><TruckPLDetail /></ProtectedRoute>} />

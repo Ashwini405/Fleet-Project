@@ -1,7 +1,7 @@
 const db = require('./config/db');
 
 // ==========================================================
-// Canonical module list (23) — must match:
+// Canonical module list (25) — must match:
 //   - backend/config/sidebarConfig.js
 //   - src/pages/RolesPermissions/data.js (MODULES[].label)
 // ==========================================================
@@ -29,6 +29,8 @@ const MODULES = [
   'Document Vault',
   'System Settings',
   'Backup & Restore',
+  'Fastag',
+  'Tender Data',
 ];
 
 const NONE = { can_view: 0, can_create: 0, can_edit: 0, can_delete: 0, can_approve: 0, can_reject: 0, can_export: 0, can_print: 0 };

@@ -6,7 +6,8 @@ express.Router();
 
 const {
   createRetreading,
-  getRetreading
+  getRetreading,
+  updateRetreading
 } =
 require("../controllers/tyreRetreadingController");
 
@@ -18,6 +19,11 @@ router.post(
 router.get(
   "/",
   getRetreading
+);
+
+router.put(
+  "/:id",
+  updateRetreading
 );
 
 module.exports =

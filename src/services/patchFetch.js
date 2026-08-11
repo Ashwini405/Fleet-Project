@@ -82,7 +82,8 @@ window.fetch = async function patchedFetch(input, init = {}) {
             localStorage.removeItem("accessToken");
             localStorage.removeItem("user");
             if (window.location.pathname !== "/login") {
-                window.location.href = "/login";
+                const returnTo = window.location.pathname + window.location.search;
+                window.location.href = `/login?from=${encodeURIComponent(returnTo)}`;
             }
         }
     }

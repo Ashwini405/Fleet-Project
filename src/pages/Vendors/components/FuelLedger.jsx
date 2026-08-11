@@ -147,6 +147,7 @@ function FuelVendorCard({ vendor }) {
 
 /* ════════════════════════════════════════════════════════════════════════ */
 export default function FuelLedger({ vendor, onBack }) {
+  const isCash = (vendor.payment_terms || 'credit') === 'cash';
   const [rawTxns, setRawTxns] = useState([]);
   const [poList, setPoList] = useState([]);
   const [activeFilter, setActiveFilter] = useState('All');
@@ -192,18 +193,19 @@ export default function FuelLedger({ vendor, onBack }) {
       .map(t => {
         running += (t.debit || 0) - (t.credit || 0);
         const fuel = parseFuelDesc(t.desc);
+        const displayBalance = isCash ? 0 : running;
         return {
           ...t,
-          runningBalance: running,
+          runningBalance: displayBalance,
           fuelQty:   t.fuelQty   || (t.type === 'Fuel Fill' ? fuel.fuelQty  : null),
           ratePerL:  t.ratePerL  || (t.type === 'Fuel Fill' ? fuel.ratePerL : null),
           fuelType:  t.fuelType  || (t.type === 'Fuel Fill' ? fuel.fuelType : null),
           debitFmt:  t.debit  > 0 ? t.debit.toLocaleString('en-IN')  : '—',
           creditFmt: t.credit > 0 ? t.credit.toLocaleString('en-IN') : '—',
-          balanceFmt:`₹${Math.abs(running).toLocaleString('en-IN')} ${balanceLabel(running)}`,
+          balanceFmt: isCash ? '₹0 Settled' : `₹${Math.abs(running).toLocaleString('en-IN')} ${balanceLabel(running)}`,
         };
       });
-  }, [rawTxns]);
+  }, [rawTxns, isCash]);
 
   const totalDebit = txnsWithBalance.reduce((sum, txn) => sum + Number(txn.debit || 0), 0);
   const totalCredit = txnsWithBalance.reduce((sum, txn) => sum + Number(txn.credit || 0), 0);
@@ -227,16 +229,11 @@ export default function FuelLedger({ vendor, onBack }) {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  /* payment handler */
-  const handleSavePayment = (p) => {
-    const payRef = p.ref || `PAY-${Date.now()}`;
-    // Simple payment record without PO allocation for now
-    setRawTxns(prev => [...prev, {
-      id: p.id, date: p.date, truckId: '', type: 'Payment',
-      ref: payRef,
-      desc: `${p.method} Payment${p.remarks ? ' — ' + p.remarks : ''}`,
-      debit: 0, credit: p.amount,
-    }]);
+  /* payment handler — RecordPaymentModal already POSTs the payment itself and
+     calls onSave() with no arguments; refetch from the server instead of
+     faking a local row, so the ledger stays in sync with the DB. */
+  const handleSavePayment = async () => {
+    await fetchLedger();
     setPage(1);
   };
 
@@ -270,12 +267,14 @@ export default function FuelLedger({ vendor, onBack }) {
           >
             <FiPrinter size={13} /> Print
           </button>
-          <button
-            onClick={() => setPayModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors"
-          >
-            <FiPlus size={14} /> Record Payment
-          </button>
+          {!isCash && (
+            <button
+              onClick={() => setPayModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors"
+            >
+              <FiPlus size={14} /> Record Payment
+            </button>
+          )}
         </div>
       </div>
 
@@ -283,7 +282,7 @@ export default function FuelLedger({ vendor, onBack }) {
       <FuelVendorCard vendor={vendor} />
 
       {/* Summary cards */}
-      <SummaryCards totalDebit={totalDebit} totalCredit={totalCredit} lastDate={lastDate} />
+      <SummaryCards totalDebit={totalDebit} totalCredit={totalCredit} lastDate={lastDate} isCash={isCash} />
 
       {/* Ledger table card */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -518,7 +517,9 @@ export default function FuelLedger({ vendor, onBack }) {
         isOpen={payModalOpen}
         onClose={() => setPayModalOpen(false)}
         onSave={handleSavePayment}
+        vendor={vendor}
         vendorName={vendor.vendor_name}
+        vendorCategory="fuel"
         outstanding={totalDebit - totalCredit}
         poList={poList}
       />

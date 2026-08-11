@@ -24,6 +24,7 @@ const getTruckPL = async (req, res) => {
     const maintenance = await truckPLModel.getMaintenance(vehicleId);
     const tyres = await truckPLModel.getTyres(vehicleId);
     const battery = await truckPLModel.getBattery(vehicleId);
+    const emi = await truckPLModel.getEmiCost(vehicleId);
     const driverSettlement = await truckPLModel.getDriverSettlement(vehicleId);
     const rta = await truckPLModel.getRTAExpenses(info.vehicle_no);
     const misc = await truckPLModel.getMiscExpenses(vehicleId);
@@ -31,14 +32,20 @@ const getTruckPL = async (req, res) => {
     // ── STEP 3: Calculate totals ──
     const totalRevenue = revenue.totals.totalRevenue;
 
+    // misc.totalMisc already folds in any manually-logged 'EMI' expense rows
+    // (misc.totalEMI is that subset, split out for display only). emi.totalEMI
+    // is a separate, genuinely new source — actual EMI-paid records × the
+    // vehicle's fixed installment — so it's added on top, not double-counted.
     const totalExpenses =
       fuel.totalFuel +
+      fuel.totalAdBlue +
       maintenance.totalMaintenance +
       tyres.totalTyres +
       battery.totalBattery +
       driverSettlement.netDriverCost +
       rta.totalRTA +
-      misc.totalMisc;
+      misc.totalMisc +
+      emi.totalEMI;
 
     const netProfit = totalRevenue - totalExpenses;
 
@@ -49,12 +56,14 @@ const getTruckPL = async (req, res) => {
     const totals = {
       totalRevenue,
       totalFuel: fuel.totalFuel,
+      totalAdBlue: fuel.totalAdBlue,
       totalMaintenance: maintenance.totalMaintenance,
       totalTyres: tyres.totalTyres,
       totalBattery: battery.totalBattery,
       totalDriver: driverSettlement.netDriverCost,
       totalRTA: rta.totalRTA,
-      totalMisc: misc.totalMisc,
+      totalMisc: misc.totalMisc - misc.totalEMI,
+      totalEMI: misc.totalEMI + emi.totalEMI,
       totalExpenses,
       netProfit,
       profitMargin
@@ -70,6 +79,7 @@ const getTruckPL = async (req, res) => {
         maintenance,
         tyres,
         battery,
+        emi,
         driverSettlement,
         rta,
         misc,
@@ -92,11 +102,26 @@ const getTruckPL = async (req, res) => {
 const getTruckPLList = async (req, res) => {
   try {
 
-    const data = await truckPLModel.getTruckPLList();
+    const { page, pageSize, search, startDate, endDate } = req.query;
+
+    const { list, total } = await truckPLModel.getTruckPLList(
+      startDate || null,
+      endDate || null,
+      {
+        page: page || null,
+        pageSize: pageSize || null,
+        search: search || null
+      }
+    );
 
     res.json({
       success: true,
-      data
+      data: list,
+      meta: {
+        total,
+        page: page ? Number(page) : null,
+        pageSize: pageSize ? Number(pageSize) : null
+      }
     });
 
   } catch (error) {

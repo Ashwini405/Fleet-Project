@@ -8,6 +8,8 @@ router.post('/', controller.createStation);
 // Get all stations
 router.get('/', controller.getStations);
 
+router.get('/:id/vehicles', controller.getStationVehicles);
+
 router.delete('/:id', controller.deleteStation);
 router.put('/:id', controller.updateStation);
 

@@ -40,6 +40,7 @@ const OilVendor = {
         gst_number,
         opening_balance,
         status,
+        payment_terms,
         bank_name,
         custom_bank_name,
         account_number,
@@ -47,7 +48,7 @@ const OilVendor = {
         upi_id
       )
       VALUES
-      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         data.vendor_name,
@@ -57,6 +58,7 @@ const OilVendor = {
         data.gst_number || null,
         data.opening_balance || 0,
         data.status || "Active",
+        data.payment_terms || "credit",
         data.bank_name || null,
         data.custom_bank_name || null,
         data.account_number || null,
@@ -81,6 +83,7 @@ const OilVendor = {
         gst_number = ?,
         opening_balance = ?,
         status = ?,
+        payment_terms = ?,
         bank_name = ?,
         custom_bank_name = ?,
         account_number = ?,
@@ -96,6 +99,7 @@ const OilVendor = {
         data.gst_number,
         data.opening_balance,
         data.status,
+        data.payment_terms || "credit",
         data.bank_name,
         data.custom_bank_name,
         data.account_number,

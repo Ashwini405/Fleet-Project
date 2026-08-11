@@ -21,6 +21,10 @@ const BORDER_COLOR = {
 
   "Rental Income": "border-l-violet-400",
 
+  "Plant Receivable": "border-l-cyan-400",
+
+  "Refund/Claim": "border-l-rose-400",
+
   Miscellaneous: "border-l-amber-400",
 
 };
@@ -78,6 +82,18 @@ function getSource(txn) {
     case "Rental Income":
 
       return "Rental Operations";
+
+    case "Plant Receivable":
+
+      return txn.station_name
+        ? `Plant · ${txn.station_name}`
+        : "Plant Receivable";
+
+    case "Refund/Claim":
+
+      return txn.refund_type
+        ? `${txn.refund_type} Refund`
+        : "Refund/Claim";
 
     default:
 

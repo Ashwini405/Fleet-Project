@@ -9,7 +9,10 @@ const {
   getWarrantyClaims,
   getWarrantyClaimById,
   updateWarrantyClaim,
-  updateClaimStatus
+  updateClaimStatus,
+  updateClaimAmount,
+  getClaimPayments,
+  addClaimPayment
 } = require('../controllers/warrantyClaimController');
 
 
@@ -155,5 +158,8 @@ router.put(
 
 
 router.patch('/:id/status', updateClaimStatus);
+router.patch('/:id/amount', updateClaimAmount);
+router.get('/:id/payments', getClaimPayments);
+router.post('/:id/payments', addClaimPayment);
 
 module.exports = router;

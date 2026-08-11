@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShieldCheck, FileText, Eye, ChevronDown } from 'lucide-react';
 
@@ -56,11 +56,33 @@ const Field = ({ label, children }) => (
 export default function ViewClaimModal({ isOpen, onClose, itemData, onUpdated }) {
   const [status,  setStatus]  = useState(null); // null = use itemData value
   const [saving,  setSaving]  = useState(false);
+  const [amount,       setAmount]       = useState(null); // null = use itemData value
+  const [amountInput,  setAmountInput]  = useState(null); // draft text while editing
+  const [savingAmount, setSavingAmount] = useState(false);
+
+  // Payment history — a showroom often pays a claim back in more than one
+  // installment, so this is a running log rather than a single overwritable total.
+  const [payments,       setPayments]       = useState([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [newPayment,     setNewPayment]     = useState({ amount: '', payment_date: '', notes: '' });
+  const [addingPayment,  setAddingPayment]  = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !itemData?.id) return;
+    setLoadingPayments(true);
+    fetch(`http://localhost:5001/api/warranty-claims/${itemData.id}/payments`)
+      .then(r => r.json())
+      .then(data => { if (data.success) setPayments(data.data || []); })
+      .catch(err => console.error('FETCH CLAIM PAYMENTS ERROR:', err))
+      .finally(() => setLoadingPayments(false));
+  }, [isOpen, itemData?.id]);
 
   if (!isOpen || !itemData) return null;
 
   const d           = itemData;
   const currentStatus = status ?? (d.claim_status || 'Submitted');
+  const currentAmount = amount ?? (d.claim_available_amount || 0);
+  const totalReceived = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
   const itemPhotos  = safeParse(d.item_photos);
 
   const handleStatusChange = async (newStatus) => {
@@ -84,6 +106,69 @@ export default function ViewClaimModal({ isOpen, onClose, itemData, onUpdated })
       setStatus(d.claim_status);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAmountSave = async () => {
+    const newAmount = Number(amountInput);
+    if (amountInput === '' || Number.isNaN(newAmount) || newAmount < 0) {
+      alert('Enter a valid amount');
+      return;
+    }
+    setSavingAmount(true);
+    try {
+      const res  = await fetch(`http://localhost:5001/api/warranty-claims/${d.id}/amount`, {
+        method:  'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ claim_available_amount: newAmount }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.message || 'Failed to update claim amount');
+      } else {
+        setAmount(newAmount);
+        setAmountInput(null);
+        onUpdated?.();
+      }
+    } catch {
+      alert('Server Error');
+    } finally {
+      setSavingAmount(false);
+    }
+  };
+
+  // The showroom is the one who owes money here — this logs each payment
+  // they actually pay back on the claim (there can be more than one),
+  // which nothing previously tracked.
+  const handleAddPayment = async () => {
+    const amt = Number(newPayment.amount);
+    if (!newPayment.amount || Number.isNaN(amt) || amt <= 0) {
+      alert('Enter a valid amount');
+      return;
+    }
+    if (!newPayment.payment_date) {
+      alert('Pick the date received');
+      return;
+    }
+    setAddingPayment(true);
+    try {
+      const res  = await fetch(`http://localhost:5001/api/warranty-claims/${d.id}/payments`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(newPayment),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.message || 'Failed to record payment');
+      } else {
+        setPayments(prev => [{ ...newPayment, amount: amt, id: `tmp-${Date.now()}` }, ...prev]);
+        setNewPayment({ amount: '', payment_date: '', notes: '' });
+        onUpdated?.();
+      }
+    } catch {
+      alert('Server Error');
+    } finally {
+      setAddingPayment(false);
     }
   };
 
@@ -160,6 +245,29 @@ export default function ViewClaimModal({ isOpen, onClose, itemData, onUpdated })
                 <Field label="Complaint Number">{d.complaint_number}</Field>
                 <Field label="Complaint Docket">{d.complaint_docket}</Field>
                 <Field label="Date Sent to Vendor">{formatDate(d.date_sent_to_vendor)}</Field>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 mb-1">Claim Amount (₹)</p>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="Not yet quoted"
+                      value={amountInput ?? currentAmount}
+                      onChange={e => setAmountInput(e.target.value)}
+                      disabled={savingAmount}
+                      className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                    />
+                    {amountInput !== null && Number(amountInput) !== currentAmount && (
+                      <button
+                        onClick={handleAmountSave}
+                        disabled={savingAmount}
+                        className="shrink-0 px-3 py-2 rounded-lg bg-[#1a4731] hover:bg-[#153d28] text-white text-xs font-semibold disabled:opacity-50"
+                      >
+                        {savingAmount ? 'Saving...' : 'Save'}
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div className="mt-3">
@@ -167,6 +275,73 @@ export default function ViewClaimModal({ isOpen, onClose, itemData, onUpdated })
                 <div className="border border-slate-200 rounded-lg px-3 py-2.5 bg-slate-50 text-sm text-slate-700 min-h-[72px] leading-relaxed">
                   {d.issue_description || <span className="text-slate-300">No description provided.</span>}
                 </div>
+              </div>
+            </div>
+
+            {/* Amount Received — this is money the showroom pays back to you,
+                not the other way around. Logged as a history since a claim
+                is often settled in more than one installment. */}
+            <div>
+              <div className="flex items-center justify-between mb-3 pb-1.5 border-b border-slate-100">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Amount Received From Showroom</p>
+                <p className="text-[11px] font-semibold text-slate-400">
+                  {currentAmount > totalReceived
+                    ? <span className="text-amber-600">₹{(currentAmount - totalReceived).toLocaleString()} pending</span>
+                    : currentAmount > 0 ? <span className="text-green-600">Fully received</span> : null}
+                </p>
+              </div>
+
+              {loadingPayments ? (
+                <p className="text-xs text-slate-400">Loading payment history…</p>
+              ) : payments.length > 0 ? (
+                <div className="space-y-1.5 mb-3">
+                  {payments.map(p => (
+                    <div key={p.id} className="flex items-center justify-between px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="font-bold text-slate-700">₹{Number(p.amount).toLocaleString()}</span>
+                        <span className="text-slate-400 text-xs">{formatDate(p.payment_date)}</span>
+                        {p.notes && <span className="text-slate-400 text-xs truncate">· {p.notes}</span>}
+                      </div>
+                    </div>
+                  ))}
+                  <p className="text-[11px] text-slate-500 font-semibold pt-1">Total received: ₹{totalReceived.toLocaleString()}</p>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400 mb-3">No payments recorded yet.</p>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 p-3 bg-white border border-slate-200 rounded-xl">
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="Amount (₹)"
+                  value={newPayment.amount}
+                  onChange={e => setNewPayment(p => ({ ...p, amount: e.target.value }))}
+                  disabled={addingPayment}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                />
+                <input
+                  type="date"
+                  value={newPayment.payment_date}
+                  onChange={e => setNewPayment(p => ({ ...p, payment_date: e.target.value }))}
+                  disabled={addingPayment}
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                />
+                <button
+                  onClick={handleAddPayment}
+                  disabled={addingPayment}
+                  className="px-3 py-2 rounded-lg bg-[#1a4731] hover:bg-[#153d28] text-white text-xs font-semibold disabled:opacity-50"
+                >
+                  {addingPayment ? 'Adding…' : '+ Add Payment'}
+                </button>
+                <input
+                  type="text"
+                  placeholder="Notes (optional) — e.g. reference number"
+                  value={newPayment.notes}
+                  onChange={e => setNewPayment(p => ({ ...p, notes: e.target.value }))}
+                  disabled={addingPayment}
+                  className="sm:col-span-3 w-full border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 disabled:opacity-50"
+                />
               </div>
             </div>
 

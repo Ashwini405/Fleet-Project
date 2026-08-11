@@ -16,6 +16,8 @@ import {
   IndianRupee,
   ReceiptText,
   Landmark,
+  Factory,
+  ShieldCheck,
 } from "lucide-react";
 import IncomeCategoryBadge from "./IncomeCategoryBadge";
 
@@ -430,6 +432,9 @@ export default function IncomeDetailsModal({ txn, onClose, onUpdate }) {
                     />
                     <DetailItem icon={Landmark} label="Bank Reference" value={txn.bank_reference_number} mono />
                     <DetailItem icon={Truck} label="Vehicle" value={txn.vehicle_number} />
+                    <DetailItem icon={Factory} label="Plant" value={txn.station_name} />
+                    <DetailItem icon={ShieldCheck} label="Refund Type" value={txn.refund_type} />
+                    <DetailItem icon={Landmark} label="Refund Reference" value={txn.refund_reference} mono />
                     <DetailItem icon={FileText} label="Description" value={txn.description ? `"${txn.description}"` : null} />
                   </div>
                 </Section>

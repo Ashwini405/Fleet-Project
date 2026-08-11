@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, LayoutDashboard, ChevronDown } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import TruckTyreLayoutModal from '../components/TruckTyreLayoutModal';
 import TyreConfigCards from '../components/TyreConfigCards';
 
 export default function IndividualVehicleTab() {
+  const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingLayoutFor, setViewingLayoutFor] = useState(null);
   const [expandedRow, setExpandedRow] = useState(null);
@@ -41,6 +43,14 @@ export default function IndividualVehicleTab() {
         setLoading(false);
       });
   }, []);
+
+  // Auto-open layout modal when navigated from VehicleDetails with ?vehicle=
+  useEffect(() => {
+    const vehicleParam = searchParams.get('vehicle');
+    if (!vehicleParam || trucks.length === 0) return;
+    const match = trucks.find(t => t.id.toLowerCase() === vehicleParam.toLowerCase());
+    if (match) setViewingLayoutFor(match);
+  }, [trucks, searchParams]);
 
   const filteredTrucks = trucks.filter(truck =>
     truck.id.toLowerCase().includes(searchTerm.toLowerCase()) ||

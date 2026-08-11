@@ -15,7 +15,10 @@ const {
   checkAvailability,
   getVehicleHealthScore,
   getVehicleMaintenanceTimeline,
-  updateVehicleStatus
+  updateVehicleStatus,
+  getEmiPayments,
+  markEmiPaid,
+  updatePurchaseDocs
 } = require('../controllers/vehicleController');
 
 
@@ -65,6 +68,21 @@ router.get('/:id/maintenance-timeline', ...protect('Vehicle Master', 'view'), ge
 
 // ===================== UPDATE VEHICLE STATUS (repair / active) =====================
 router.patch('/:id/status', ...protect('Vehicle Master', 'edit'), updateVehicleStatus);
+
+// ===================== EMI PAYMENTS =====================
+router.get('/:id/emi-payments', ...protect('Vehicle Master', 'view'), getEmiPayments);
+router.post('/:id/emi-payments', ...protect('Vehicle Master', 'edit'), markEmiPaid);
+
+// ===================== PURCHASE DOCS =====================
+router.patch(
+  '/:id/purchase-docs',
+  upload.fields([
+    { name: 'purchase_receipt', maxCount: 1 },
+    { name: 'warranty_document', maxCount: 1 },
+    { name: 'purchase_proof', maxCount: 1 },
+  ]),
+  updatePurchaseDocs
+);
 
 // ===================== GET VEHICLE BY ID =====================
 router.get('/:id', ...protect('Vehicle Master', 'view'), getVehicleById);

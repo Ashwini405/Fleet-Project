@@ -1,4 +1,5 @@
 const db = require("../config/db");
+const driverAdvanceModel = require("./driverAdvanceModel");
 
 // =====================================
 // Get Plants
@@ -91,7 +92,14 @@ const getDriverDetails = async (
     ]
   );
 
-  return rows[0];
+  // Any manually-given ("Other") advances still outstanding are also due
+  // for recovery, regardless of which month they were given in.
+  const outstandingOther = await driverAdvanceModel.getOutstandingTotal(driverId);
+
+  return {
+    ...rows[0],
+    total_advance: Number(rows[0].total_advance) + outstandingOther
+  };
 };
 
 // =====================================
@@ -265,6 +273,17 @@ const markSettlementPaid = async (
       id
     ]
   );
+
+  // The driver advance deducted in this settlement has now actually been
+  // recovered from the driver's pay — clear any outstanding "Other" advances.
+  const [rows] = await db.query(
+    `SELECT driver_id FROM driver_settlements WHERE id = ?`,
+    [id]
+  );
+
+  if (rows[0]) {
+    await driverAdvanceModel.markRecovered(rows[0].driver_id, id);
+  }
 };
 
 // =====================================

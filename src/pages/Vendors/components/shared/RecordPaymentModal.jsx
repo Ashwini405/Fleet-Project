@@ -31,7 +31,7 @@ function poStatusLabel(po) {
   return 'Partially Paid';
 }
 
-export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, vendorName, outstanding, poList }) {
+export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, vendorName, vendorCategory, outstanding, poList }) {
   const today = new Date().toISOString().split('T')[0];
   const EMPTY = { date: today, amount: '', method: 'Bank Transfer', ref: '', remarks: '' };
   const [form, setForm]     = useState(EMPTY);
@@ -69,6 +69,7 @@ export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, ve
 
       await axios.post("http://localhost:5001/api/vendors/payments", {
         vendor_id: vendor?.id,
+        vendor_category: vendorCategory,
         payment_date: form.date,
         amount: totalAmt,
         payment_mode: form.method,

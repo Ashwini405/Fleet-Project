@@ -11,7 +11,7 @@ const labelOptCls = "block text-xs font-bold text-gray-400 uppercase tracking-wi
 
 const EMPTY = {
   name: '', mobile: '', email: '', address: '', gst: '',
-  openingBalance: '0', status: 'Active',
+  openingBalance: '0', status: 'Active', paymentTerms: 'credit',
   bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '',
 };
 
@@ -51,6 +51,7 @@ export default function AddPartsVendorModal({ isOpen, onClose }) {
         gst_number: form.gst,
         opening_balance: form.openingBalance,
         status: form.status,
+        payment_terms: form.paymentTerms,
         bank_name: form.bankName === 'Others' ? form.customBank : form.bankName,
         custom_bank_name: form.customBank,
         account_number: form.accountNo,
@@ -134,6 +135,21 @@ export default function AddPartsVendorModal({ isOpen, onClose }) {
                       <option value="Active">Active</option>
                       <option value="Inactive">Inactive</option>
                     </select>
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Payment Terms</label>
+                  <div className="flex gap-2">
+                    {['credit', 'cash'].map(pt => (
+                      <button key={pt} type="button" onClick={() => set('paymentTerms', pt)}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold capitalize border transition-colors ${
+                          form.paymentTerms === pt
+                            ? 'bg-indigo-600 text-white border-indigo-600'
+                            : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                        }`}>
+                        {pt}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>

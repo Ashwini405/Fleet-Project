@@ -22,6 +22,7 @@ export default function FuelAnalytics() {
 
           data.data.forEach(item => {
             if (!item.date) return;
+            if (item.fuel_type === 'AdBlue') return; // tracked separately, not propulsion fuel
             const date = new Date(item.date);
             if (isNaN(date.getTime())) return;
             const month = date.toLocaleString('default', { month: 'short' });
@@ -72,11 +73,15 @@ export default function FuelAnalytics() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Compute summary cards dynamically
-  const totalDistance = fuelData.reduce((sum, f) => sum + (Number(f.distance) || 0), 0);
-  const totalQuantity = fuelData.reduce((sum, f) => sum + (Number(f.quantity) || 0), 0);
+  // Compute summary cards dynamically (propulsion fuel only — AdBlue tracked separately)
+  const propulsionData = fuelData.filter(f => f.fuel_type !== 'AdBlue');
+  const adBlueData = fuelData.filter(f => f.fuel_type === 'AdBlue');
+  const totalDistance = propulsionData.reduce((sum, f) => sum + (Number(f.distance) || 0), 0);
+  const totalQuantity = propulsionData.reduce((sum, f) => sum + (Number(f.quantity) || 0), 0);
   const avgMileage = totalQuantity > 0 ? (totalDistance / totalQuantity).toFixed(2) : '0.00';
-  const totalCost = fuelData.reduce((sum, f) => sum + (Number(f.total_cost) || 0), 0);
+  const totalCost = propulsionData.reduce((sum, f) => sum + (Number(f.total_cost) || 0), 0);
+  const totalAdBlueQty = adBlueData.reduce((sum, f) => sum + (Number(f.quantity) || 0), 0);
+  const totalAdBlueCost = adBlueData.reduce((sum, f) => sum + (Number(f.total_cost) || 0), 0);
 
   if (loading) {
     return <div className="p-8 text-center text-slate-500">Loading analytics...</div>;
@@ -107,7 +112,7 @@ export default function FuelAnalytics() {
       </div>
 
       {/* Summary Cards (dynamic) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-indigo-500">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Distance Run</p>
           <h3 className="text-3xl font-black text-slate-800">{totalDistance.toLocaleString()} <span className="text-base text-slate-500 font-bold">KM</span></h3>
@@ -119,6 +124,11 @@ export default function FuelAnalytics() {
         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-rose-500">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Total Fuel Cost</p>
           <h3 className="text-3xl font-black text-slate-800"><span className="text-base text-slate-500 font-bold">₹</span> {totalCost.toLocaleString()}</h3>
+        </div>
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm border-l-4 border-l-cyan-500">
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">AdBlue Consumption</p>
+          <h3 className="text-3xl font-black text-cyan-600">{totalAdBlueQty.toLocaleString()} <span className="text-base text-cyan-500 font-bold">L</span></h3>
+          <p className="text-xs font-medium text-slate-500 mt-1">₹ {totalAdBlueCost.toLocaleString()}</p>
         </div>
       </div>
 

@@ -30,6 +30,7 @@ function printTbl(title, cols, rows) {
 }
 
 export default function PartsLedger({ vendor, onBack }) {
+  const isCash = (vendor.payment_terms || 'credit') === 'cash';
   const { getVendorTransactions } = useVendorLedger();
   const [rawTxns, setRawTxns] = useState([]);
   const [poList, setPoList] = useState([]);
@@ -90,9 +91,9 @@ export default function PartsLedger({ vendor, onBack }) {
     let running = 0;
     return [...rawTxns].sort((a, b) => new Date(a.date) - new Date(b.date)).map(t => {
       running += (t.debit || 0) - (t.credit || 0);
-      return { ...t, runningBalance: running };
+      return { ...t, runningBalance: isCash ? 0 : running };
     });
-  }, [rawTxns]);
+  }, [rawTxns, isCash]);
 
   const totalDebit = rawTxns.reduce((s, t) => s + (t.debit || 0), 0);
   const totalCredit = rawTxns.reduce((s, t) => s + (t.credit || 0), 0);
@@ -109,19 +110,11 @@ export default function PartsLedger({ vendor, onBack }) {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const handleSavePayment = (p) => {
-    const payRef = p.ref || `PAY-${Date.now()}`;
-    // Simple payment record without PO allocation for now
-    setRawTxns(prev => [...prev, {
-      id: p.id,
-      date: p.date,
-      truckId: '',
-      type: 'Payment',
-      ref: payRef,
-      desc: `${p.method} Payment${p.remarks ? ' — ' + p.remarks : ''}`,
-      debit: 0,
-      credit: p.amount,
-    }]);
+  // RecordPaymentModal already POSTs the payment itself and calls onSave()
+  // with no arguments; refetch from the server instead of faking a local
+  // row, so the ledger stays in sync with the DB.
+  const handleSavePayment = async () => {
+    await fetchLedger();
     setPage(1);
   };
 
@@ -160,14 +153,16 @@ export default function PartsLedger({ vendor, onBack }) {
           }} className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 text-gray-500 rounded-lg font-bold text-xs hover:bg-gray-50 transition-colors">
             <FiPrinter size={13} /> Print
           </button>
-          <button onClick={() => setPayModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors">
-            <FiPlus /> Record Payment
-          </button>
+          {!isCash && (
+            <button onClick={() => setPayModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors">
+              <FiPlus /> Record Payment
+            </button>
+          )}
         </div>
       </div>
 
       <VendorInfoPanel vendor={vendor} categoryLabel={CATEGORY_LABEL} />
-      <SummaryCards totalDebit={totalDebit} totalCredit={totalCredit} lastDate={lastDate} />
+      <SummaryCards totalDebit={totalDebit} totalCredit={totalCredit} lastDate={lastDate} isCash={isCash} />
 
       {/* Transaction Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -269,7 +264,9 @@ export default function PartsLedger({ vendor, onBack }) {
         isOpen={payModalOpen}
         onClose={() => setPayModalOpen(false)}
         onSave={handleSavePayment}
+        vendor={vendor}
         vendorName={vendor.vendor_name || vendor.name}
+        vendorCategory="parts"
         outstanding={totalDebit - totalCredit}
         poList={poList}
       />

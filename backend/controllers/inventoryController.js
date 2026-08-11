@@ -1,5 +1,6 @@
 const Inventory = require('../models/inventoryModel');
 const db = require('../config/db');
+const { logAudit } = require('../middleware/auditMiddleware');
 
 
 // ======================================================
@@ -823,6 +824,147 @@ exports.getIssueHistory = async (req, res) => {
   }
 };
 
+
+// ======================================================
+// ✅ CREATE PART RETURN (restock old/returned parts)
+// ======================================================
+exports.createPartReturn = async (req, res) => {
+
+  try {
+
+    const {
+      original_issue_id,
+      part_id,
+      vehicle_number,
+      quantity_returned,
+      return_date,
+      condition_on_return,
+      restocked,
+      notes,
+      created_by,
+    } = req.body;
+
+    if (!part_id || !quantity_returned || !return_date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Part, quantity returned and return date are required',
+      });
+    }
+
+    const [parts] = await db.query(
+      `SELECT * FROM inventory_parts WHERE id = ?`,
+      [part_id]
+    );
+
+    if (parts.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Inventory part not found',
+      });
+    }
+
+    const part = parts[0];
+    const shouldRestock = !!restocked;
+
+    if (shouldRestock) {
+      const newStock = Number(part.current_stock || 0) + Number(quantity_returned);
+      const inventoryValue = newStock * Number(part.cost_price || 0);
+
+      await db.query(
+        `UPDATE inventory_parts
+         SET current_stock = ?, inventory_value = ?, updated_at = NOW()
+         WHERE id = ?`,
+        [newStock, inventoryValue, part_id]
+      );
+    }
+
+    const [result] = await db.query(
+      `INSERT INTO part_returns (
+        original_issue_id, part_id, vehicle_number, quantity_returned,
+        return_date, condition_on_return, restocked, notes, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        original_issue_id || null,
+        part_id,
+        vehicle_number || null,
+        quantity_returned,
+        return_date,
+        condition_on_return || 'Good',
+        shouldRestock ? 1 : 0,
+        notes || null,
+        created_by || 'Admin',
+      ]
+    );
+
+    await logAudit(req, {
+      module_name: 'Inventory',
+      action: 'CREATE',
+      description: `Returned ${quantity_returned} × "${part.part_name}" from ${vehicle_number || 'vehicle'}${shouldRestock ? ' (restocked)' : ''}.`,
+      new_data: { part_id, vehicle_number, quantity_returned, condition_on_return, restocked: shouldRestock },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Part return recorded successfully',
+      data: { id: result.insertId },
+    });
+
+  } catch (error) {
+    console.error('CREATE PART RETURN ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// ======================================================
+// ✅ GET PART RETURNS (filterable ledger)
+// ======================================================
+exports.getPartReturns = async (req, res) => {
+
+  try {
+
+    const { vehicle, part, from, to } = req.query;
+
+    const conditions = [];
+    const params = [];
+
+    if (vehicle) {
+      conditions.push('r.vehicle_number = ?');
+      params.push(vehicle);
+    }
+    if (part) {
+      conditions.push('p.part_name = ?');
+      params.push(part);
+    }
+    if (from) {
+      conditions.push('r.return_date >= ?');
+      params.push(from);
+    }
+    if (to) {
+      conditions.push('r.return_date <= ?');
+      params.push(to);
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const [rows] = await db.query(
+      `SELECT
+        r.*,
+        p.part_name,
+        p.category
+      FROM part_returns r
+      LEFT JOIN inventory_parts p ON r.part_id = p.id
+      ${whereClause}
+      ORDER BY r.created_at DESC`,
+      params
+    );
+
+    res.json({ success: true, count: rows.length, data: rows });
+
+  } catch (error) {
+    console.error('GET PART RETURNS ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
 
 // ── Status map ────────────────────────────────────────
 const STATUS_MAP = {

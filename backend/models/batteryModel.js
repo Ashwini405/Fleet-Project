@@ -211,7 +211,7 @@ const getVehicleActiveBattery = async (vehicleId) => {
 const getVehicleBatteryHistory = async (vehicleId) => {
   const [rows] = await db.query(
     `SELECT bi.*, b.serial_number, b.brand, b.model, b.capacity_ah, b.voltage,
-            b.battery_type, b.warranty_expiry, b.purchase_cost
+            b.battery_type, b.warranty_expiry, b.purchase_cost, b.vendor
      FROM battery_installations bi
      JOIN batteries b ON b.id = bi.battery_id
      WHERE bi.vehicle_id = ?

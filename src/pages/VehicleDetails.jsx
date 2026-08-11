@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import BatteryTab from './BatteryTab';
-import { useParams, useNavigate } from 'react-router-dom';
-import { FiArrowLeft, FiEdit2, FiMapPin, FiUser, FiActivity, FiSearch, FiPlus, FiX, FiUploadCloud, FiEye, FiDownload } from 'react-icons/fi';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { FiArrowLeft, FiEdit2, FiMapPin, FiUser, FiActivity, FiSearch, FiPlus, FiX, FiUploadCloud, FiEye, FiDownload, FiTrash2 } from 'react-icons/fi';
 import { axleLayouts, posLabel, AXLE_TYPE_STYLES } from './Tyres/data/axleLayouts';
 
 // ── Health helpers ────────────────────────────────────────────────────────────
@@ -134,13 +134,15 @@ function DynamicAxleLayout({ wheelConfig, mountedTyres, selectedPos, onSelect })
 }
 
 // ── TyresTab — full Tyres tab for VehicleDetails ──────────────────────────────
-function TyresTab({ vehicle }) {
+function TyresTab({ vehicle, navigate }) {
   const [selectedPos, setSelectedPos] = useState(null);
   const [mountedTyres, setMountedTyres] = useState([]);
+  const [addTyreOpen, setAddTyreOpen] = useState(false);
+  const [tyreForm, setTyreForm] = useState({ tyre_number: '', brand: '', model: '', tyre_position: '', date_of_issue: '', expected_life_km: '', tyre_cost: '' });
+  const [tyreSaving, setTyreSaving] = useState(false);
 
-  useEffect(() => {
+  const fetchTyres = () => {
     if (!vehicle?.id) return;
-
     fetch(`http://localhost:5001/api/tyres/vehicle/${vehicle.id}`)
       .then(res => res.json())
       .then(data => {
@@ -161,10 +163,42 @@ function TyresTab({ vehicle }) {
           setMountedTyres(formatted);
         }
       })
-      .catch(err => {
-        console.error('Failed to fetch tyres:', err);
+      .catch(err => console.error('Failed to fetch tyres:', err));
+  };
+
+  useEffect(() => { fetchTyres(); }, [vehicle]);
+
+  const handleAddTyre = async () => {
+    if (!tyreForm.tyre_number || !tyreForm.tyre_position) {
+      alert('Tyre number and position are required.');
+      return;
+    }
+    setTyreSaving(true);
+    try {
+      const res = await fetch('http://localhost:5001/api/tyres', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...tyreForm,
+          vehicle_id: vehicle.id,
+          vehicle_number: vehicle.vehicle_no,
+          status: 'Mounted',
+        })
       });
-  }, [vehicle]);
+      const data = await res.json();
+      if (data.success) {
+        setAddTyreOpen(false);
+        setTyreForm({ tyre_number: '', brand: '', model: '', tyre_position: '', date_of_issue: '', expected_life_km: '', tyre_cost: '' });
+        fetchTyres();
+      } else {
+        alert(data.message || 'Failed to add tyre');
+      }
+    } catch (err) {
+      alert('Failed to add tyre');
+    } finally {
+      setTyreSaving(false);
+    }
+  };
 
   const wheelConfig = vehicle.wheel_configuration;
   const layout = axleLayouts[wheelConfig];
@@ -211,7 +245,10 @@ function TyresTab({ vehicle }) {
             ? <p className="text-xs text-slate-500 mt-0.5">{wheelConfig} · {layout?.totalTyres ?? '—'} slots · {layout?.layoutType ?? '—'}</p>
             : <p className="text-xs text-amber-600 mt-0.5">No wheel configuration set — edit vehicle to configure</p>}
         </div>
-        <button className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm">
+        <button
+          onClick={() => navigate(`/tyres?tab=individual&vehicle=${encodeURIComponent(vehicle.vehicle_no)}`)}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm"
+        >
           <FiPlus className="w-4 h-4" /> Add Tyre
         </button>
       </div>
@@ -337,6 +374,64 @@ function TyresTab({ vehicle }) {
           </div>
         </div>
       </div>
+
+      {/* Add Tyre Modal */}
+      {addTyreOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setAddTyreOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold text-slate-800">Add Tyre</h2>
+              <button onClick={() => setAddTyreOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full"><FiX className="w-4 h-4" /></button>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Tyre Number *</label>
+                  <input type="text" value={tyreForm.tyre_number} onChange={e => setTyreForm(f => ({ ...f, tyre_number: e.target.value }))} placeholder="e.g. MRF-001" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Position *</label>
+                  <select value={tyreForm.tyre_position} onChange={e => setTyreForm(f => ({ ...f, tyre_position: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">Select Position</option>
+                    {(axleLayouts[vehicle.wheel_configuration]?.axles || []).flatMap(a => [...a.left, ...a.right]).map(pos => (
+                      <option key={pos} value={pos}>{pos}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Brand</label>
+                  <input type="text" value={tyreForm.brand} onChange={e => setTyreForm(f => ({ ...f, brand: e.target.value }))} placeholder="e.g. MRF" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Model</label>
+                  <input type="text" value={tyreForm.model} onChange={e => setTyreForm(f => ({ ...f, model: e.target.value }))} placeholder="e.g. ZLX" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Date of Issue</label>
+                  <input type="date" value={tyreForm.date_of_issue} onChange={e => setTyreForm(f => ({ ...f, date_of_issue: e.target.value }))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1">Expected Life (KM)</label>
+                  <input type="number" value={tyreForm.expected_life_km} onChange={e => setTyreForm(f => ({ ...f, expected_life_km: e.target.value }))} placeholder="e.g. 100000" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1">Cost (₹)</label>
+                <input type="number" value={tyreForm.tyre_cost} onChange={e => setTyreForm(f => ({ ...f, tyre_cost: e.target.value }))} placeholder="e.g. 24000" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setAddTyreOpen(false)} className="px-4 py-2 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50">Cancel</button>
+              <button onClick={handleAddTyre} disabled={tyreSaving} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-60">{tyreSaving ? 'Saving…' : 'Add Tyre'}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -345,21 +440,34 @@ const tabs = ['Overview', 'Service History', 'Timeline', 'Tyres', 'Documents', '
 
 export default function VehicleDetails({ vehicles: propVehicles }) {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
-  const [vehicle, setVehicle] = useState(null);
+
+  const initialVehicle = location.state?.vehicle || propVehicles?.find(v => String(v.id) === String(id)) || null;
+  const [vehicle, setVehicle] = useState(initialVehicle);
+  const [fetchingVehicle, setFetchingVehicle] = useState(false);
   const [serviceHistory, setServiceHistory] = useState([]);
   const [inventoryData, setInventoryData] = useState([]);
   const [healthScore, setHealthScore] = useState(null);
   const [maintenanceTimeline, setMaintenanceTimeline] = useState([]);
 
   useEffect(() => {
-    fetch(`http://localhost:5001/api/vehicles/${id}`)
-      .then(res => res.json())
-      .then(data => {
+    const fetchVehicle = async () => {
+      setFetchingVehicle(true);
+      try {
+        const res = await fetch(`http://localhost:5001/api/vehicles/${id}`);
+        const data = await res.json();
         if (data.success) {
           setVehicle(data.data);
         }
-      });
+      } catch (err) {
+        console.error('Error fetching vehicle:', err);
+      } finally {
+        setFetchingVehicle(false);
+      }
+    };
+
+    fetchVehicle();
   }, [id]);
 
   useEffect(() => {
@@ -388,20 +496,61 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
       .catch(err => console.error('Vehicle timeline fetch failed:', err));
   }, [vehicle]);
 
-  useEffect(() => {
-    if (!vehicle?.vehicle_no) return;
+  const [emiPayments, setEmiPayments] = useState([]);
+  const [emiModalOpen, setEmiModalOpen] = useState(false);
+  const [emiPaidDate, setEmiPaidDate] = useState(new Date().toISOString().slice(0, 10));
 
-    fetch(`http://localhost:5001/api/inventory/vehicle/${vehicle.vehicle_no}`)
+  useEffect(() => {
+    if (!vehicle?.id) return;
+    fetch(`http://localhost:5001/api/vehicles/${vehicle.id}/emi-payments`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setEmiPayments(d.data); })
+      .catch(() => {});
+  }, [vehicle]);
+
+  const handleMarkEmiPaid = async () => {
+    const res = await fetch(`http://localhost:5001/api/vehicles/${vehicle.id}/emi-payments`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ paid_date: emiPaidDate })
+    });
+    const data = await res.json();
+    if (data.success) {
+      setEmiPayments(prev => [{ paid_date: emiPaidDate }, ...prev]);
+      setEmiModalOpen(false);
+    }
+  };
+
+  const [fastagAccount, setFastagAccount] = useState(null);
+
+  useEffect(() => {
+    if (!vehicle?.id) return;
+
+    fetch(`http://localhost:5001/api/fastag/${vehicle.id}/transactions`)
       .then(res => res.json())
       .then(data => {
-        console.log('INVENTORY API:', data);
+        if (data.success) setFastagAccount(data.account);
+      })
+      .catch(() => {});
+  }, [vehicle]);
+
+  const loadTruckInventory = () => {
+    if (!vehicle?.id) return;
+
+    fetch(`http://localhost:5001/api/truck-inventory/vehicle/${vehicle.id}`)
+      .then(res => res.json())
+      .then(data => {
         if (data.success) {
           setInventoryData(data.data || []);
         }
       })
       .catch(err => {
-        console.log(err);
+        console.error('Truck inventory fetch failed:', err);
       });
+  };
+
+  useEffect(() => {
+    loadTruckInventory();
   }, [vehicle]);
 
   const [activeTab, setActiveTab] = useState('Overview');
@@ -449,11 +598,92 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
   };
 
   const [isAddInventoryModalOpen, setIsAddInventoryModalOpen] = useState(false);
-  const [inventoryForm, setInventoryForm] = useState({
-    itemName: '', category: '', quantity: '', assignedDate: '', condition: ''
-  });
+  const [editingInventoryId, setEditingInventoryId] = useState(null);
+  const [inventorySaving, setInventorySaving] = useState(false);
+  const emptyInventoryForm = { itemName: '', category: '', quantity: '', assignedDate: '', condition: '' };
+  const [inventoryForm, setInventoryForm] = useState(emptyInventoryForm);
   const handleInventoryFormChange = (e) => {
     setInventoryForm({ ...inventoryForm, [e.target.name]: e.target.value });
+  };
+
+  const openAddInventoryModal = () => {
+    setEditingInventoryId(null);
+    setInventoryForm(emptyInventoryForm);
+    setIsAddInventoryModalOpen(true);
+  };
+
+  const openEditInventoryModal = (item) => {
+    setEditingInventoryId(item.id);
+    setInventoryForm({
+      itemName: item.part_name,
+      category: item.category,
+      quantity: item.quantity,
+      assignedDate: item.assigned_date ? item.assigned_date.slice(0, 10) : '',
+      condition: item.condition,
+    });
+    setIsAddInventoryModalOpen(true);
+  };
+
+  const handleSaveInventoryItem = async () => {
+    if (!inventoryForm.itemName || !inventoryForm.category || !inventoryForm.quantity || !inventoryForm.condition) {
+      alert('Please fill in item name, category, quantity and condition.');
+      return;
+    }
+
+    const payload = {
+      vehicle_id: vehicle.id,
+      part_name: inventoryForm.itemName,
+      category: inventoryForm.category,
+      quantity: Number(inventoryForm.quantity),
+      assigned_date: inventoryForm.assignedDate || null,
+      condition: inventoryForm.condition,
+    };
+
+    setInventorySaving(true);
+    try {
+      const url = editingInventoryId
+        ? `http://localhost:5001/api/truck-inventory/${editingInventoryId}`
+        : `http://localhost:5001/api/truck-inventory`;
+      const method = editingInventoryId ? 'PUT' : 'POST';
+
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        setIsAddInventoryModalOpen(false);
+        setEditingInventoryId(null);
+        setInventoryForm(emptyInventoryForm);
+        loadTruckInventory();
+      } else {
+        alert(data.message || 'Failed to save item');
+      }
+    } catch (err) {
+      console.error('Save truck inventory item failed:', err);
+      alert('Failed to save item');
+    } finally {
+      setInventorySaving(false);
+    }
+  };
+
+  const handleDeleteInventoryItem = async (item) => {
+    if (!window.confirm(`Delete "${item.part_name}" from truck inventory?`)) return;
+
+    try {
+      const res = await fetch(`http://localhost:5001/api/truck-inventory/${item.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        loadTruckInventory();
+      } else {
+        alert(data.message || 'Failed to delete item');
+      }
+    } catch (err) {
+      console.error('Delete truck inventory item failed:', err);
+      alert('Failed to delete item');
+    }
   };
 
   const InfoItem = ({ label, value }) => (
@@ -510,7 +740,12 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
     ]
     : [];
 
-  if (!vehicle) return <div>Loading...</div>;
+  if (!vehicle) return (
+    <div className="p-8 text-center text-slate-500">
+      <div className="text-lg font-semibold mb-2">Loading vehicle details...</div>
+      <div className="text-sm text-slate-400">Please wait while we load the selected vehicle.</div>
+    </div>
+  );
 
   return (
     <div className="font-sans text-slate-800">
@@ -637,16 +872,28 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
 
             {/* Finance Details */}
             <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
-              <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200">
-                Finance Details
-              </h3>
+              <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
+                <h3 className="text-base font-semibold text-slate-800">Finance Details</h3>
+                {vehicle.loan_tenure && (
+                  <button
+                    onClick={() => setEmiModalOpen(true)}
+                    className="px-3 py-1 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
+                  >
+                    Mark EMI Paid
+                  </button>
+                )}
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-4 md:gap-y-6 gap-x-4">
                 <InfoItem label="Financier Name" value={vehicle.financier_name} />
                 <InfoItem label="Loan Account No" value={vehicle.loan_account_number} />
-                <InfoItem label="EMI Amount" value={vehicle.emi_amount} />
-                <InfoItem label="EMI Date" value={vehicle.emi_date} />
+                <InfoItem label="EMI Amount" value={vehicle.emi_amount ? `₹${Number(vehicle.emi_amount).toLocaleString('en-IN')}` : '—'} />
+                <InfoItem label="EMI Date" value={vehicle.emi_date ? `${new Date(vehicle.emi_date).getDate()}th of every month` : '—'} />
                 <InfoItem label="Loan Tenure" value={vehicle.loan_tenure ? `${vehicle.loan_tenure} Months` : '—'} />
-                <InfoItem label="Pending EMIs" value={'—'} /> {/* not in DB */}
+                <InfoItem label="Pending EMIs" value={(() => {
+                  if (!vehicle.loan_tenure) return '—';
+                  const pending = Number(vehicle.loan_tenure) - emiPayments.length;
+                  return pending > 0 ? `${pending} EMIs` : 'Completed';
+                })()} />
               </div>
             </div>
 
@@ -701,6 +948,19 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                   <InfoItem label="FASTag ID" value={vehicle.fastag_id} />
                   <InfoItem label="GPS Device ID" value={vehicle.gps_device_id} />
                 </div>
+
+                {fastagAccount && (
+                  <div className="mt-2">
+                    <p className="text-xs uppercase tracking-wider font-semibold text-slate-500">Fastag Balance</p>
+                    <button
+                      onClick={() => navigate('/fastag')}
+                      className={`text-sm font-bold hover:underline ${Number(fastagAccount.balance) < Number(fastagAccount.low_balance_threshold || 200) ? 'text-red-600' : 'text-slate-900'}`}
+                    >
+                      ₹{Number(fastagAccount.balance).toLocaleString('en-IN')}
+                      {Number(fastagAccount.balance) < Number(fastagAccount.low_balance_threshold || 200) && ' (Low)'}
+                    </button>
+                  </div>
+                )}
 
               </div>
             </div>
@@ -766,12 +1026,12 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                 Compliance Summary
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 md:gap-y-6 gap-x-4">
-                <InfoItem label="Insurance Validity" value={vehicle.insurance_validity || '—'} />
-                <InfoItem label="FC Validity" value={vehicle.fc_validity || '—'} />
-                <InfoItem label="Tax Validity" value={vehicle.tax_validity || '—'} />
-                <InfoItem label="Pollution Validity" value={vehicle.pollution_validity || '—'} />
-                <InfoItem label="Permit Validity" value={vehicle.permit_validity || '—'} />
-                <InfoItem label="CLL Validity" value={vehicle.cll_validity || '—'} />
+                <InfoItem label="Insurance Validity" value={formatDate(vehicle.insurance_validity)} />
+                <InfoItem label="FC Validity" value={formatDate(vehicle.fc_validity)} />
+                <InfoItem label="Tax Validity" value={formatDate(vehicle.tax_validity)} />
+                <InfoItem label="Pollution Validity" value={formatDate(vehicle.pollution_validity)} />
+                <InfoItem label="Permit Validity" value={formatDate(vehicle.permit_validity)} />
+                <InfoItem label="CLL Validity" value={formatDate(vehicle.cll_validity)} />
                 <InfoItem label="Insurance Doc" value={vehicle.insurance_document ? 'Uploaded' : 'Missing'} />
                 <InfoItem label="FC Doc" value={vehicle.fc_document ? 'Uploaded' : 'Missing'} />
                 <InfoItem label="Tax Doc" value={vehicle.tax_document ? 'Uploaded' : 'Missing'} />
@@ -904,7 +1164,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
 
         {/* Tyres Tab */}
         {activeTab === 'Tyres' && (
-          <TyresTab vehicle={vehicle} />
+          <TyresTab vehicle={vehicle} navigate={navigate} />
         )}
 
         {/* Documents Tab (now dynamic) */}
@@ -991,7 +1251,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-slate-800 tracking-tight">Truck Inventory</h2>
               <button
-                onClick={() => setIsAddInventoryModalOpen(true)}
+                onClick={openAddInventoryModal}
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center shadow-sm sticky top-4"
               >
                 <FiPlus className="w-5 h-5 mr-1.5" />
@@ -1008,10 +1268,16 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                       <th className="px-6 py-4 whitespace-nowrap">Category</th>
                       <th className="px-6 py-4 text-center whitespace-nowrap">Quantity</th>
                       <th className="px-6 py-4 whitespace-nowrap">Assigned Date</th>
-                      <th className="px-6 py-4 text-right rounded-tr-xl whitespace-nowrap">Condition</th>
+                      <th className="px-6 py-4 whitespace-nowrap">Condition</th>
+                      <th className="px-6 py-4 text-right rounded-tr-xl whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
+                    {inventoryData.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-8 text-center text-slate-400 font-medium">No inventory items assigned to this truck yet.</td>
+                      </tr>
+                    )}
                     {inventoryData.map((item) => (
                       <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                         <td className="px-6 py-4 font-medium text-slate-900">{item.part_name}</td>
@@ -1021,18 +1287,36 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                           </span>
                         </td>
                         <td className="px-6 py-4 text-center font-medium text-slate-900">{item.quantity}</td>
-                        <td className="px-6 py-4 text-slate-700">{new Date(item.issue_date).toLocaleDateString('en-IN')}</td>
-                        <td className="px-6 py-4 text-right">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${item.service_type === 'Good' ? 'bg-green-50 text-green-700 border-green-200' :
-                            item.service_type === 'Average' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                        <td className="px-6 py-4 text-slate-700">{item.assigned_date ? new Date(item.assigned_date).toLocaleDateString('en-IN') : '-'}</td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${item.condition === 'Good' ? 'bg-green-50 text-green-700 border-green-200' :
+                            item.condition === 'Average' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                               'bg-red-50 text-red-700 border-red-200'
                             }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${item.service_type === 'Good' ? 'bg-green-500' :
-                              item.service_type === 'Average' ? 'bg-amber-500' :
+                            <span className={`w-1.5 h-1.5 rounded-full ${item.condition === 'Good' ? 'bg-green-500' :
+                              item.condition === 'Average' ? 'bg-amber-500' :
                                 'bg-red-500'
                               }`}></span>
-                            {item.service_type || 'Issued'}
+                            {item.condition}
                           </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => openEditInventoryModal(item)}
+                              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
+                              title="Edit"
+                            >
+                              <FiEdit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteInventoryItem(item)}
+                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                              title="Delete"
+                            >
+                              <FiTrash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1499,6 +1783,32 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
         </div>
       )}
 
+      {/* Mark EMI Paid Modal */}
+      {emiModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setEmiModalOpen(false)} />
+          <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-slate-800">Mark EMI Paid</h2>
+              <button onClick={() => setEmiModalOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full"><FiX className="w-4 h-4" /></button>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-slate-700 mb-1.5">Payment Date</label>
+              <input
+                type="date"
+                value={emiPaidDate}
+                onChange={e => setEmiPaidDate(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setEmiModalOpen(false)} className="px-4 py-2 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50">Cancel</button>
+              <button onClick={handleMarkEmiPaid} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">Confirm Payment</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add Inventory Modal */}
       {isAddInventoryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
@@ -1506,7 +1816,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
 
             <div className="flex items-center justify-between p-5 md:p-6 border-b border-slate-100">
-              <h2 className="text-xl font-bold text-slate-800 tracking-tight">Add Inventory Item</h2>
+              <h2 className="text-xl font-bold text-slate-800 tracking-tight">{editingInventoryId ? 'Edit Inventory Item' : 'Add Inventory Item'}</h2>
               <button
                 onClick={() => setIsAddInventoryModalOpen(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors"
@@ -1527,14 +1837,14 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                   <select name="category" value={inventoryForm.category} onChange={handleInventoryFormChange} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 appearance-none">
                     <option value="">Select Category</option>
                     <option value="Tools">Tools</option>
-                    <option value="Spare Parts">Spare Parts</option>
+                    <option value="Spare">Spare</option>
                     <option value="Tubes">Tubes</option>
                     <option value="Flaps">Flaps</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1.5">Quantity</label>
-                  <input type="number" name="quantity" value={inventoryForm.quantity} onChange={handleInventoryFormChange} placeholder="e.g. 2" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <input type="number" min="1" name="quantity" value={inventoryForm.quantity} onChange={handleInventoryFormChange} placeholder="e.g. 2" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                 </div>
               </div>
 
@@ -1549,7 +1859,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                     <option value="">Select Condition</option>
                     <option value="Good">Good</option>
                     <option value="Average">Average</option>
-                    <option value="Damaged">Damaged</option>
+                    <option value="Poor">Poor</option>
                   </select>
                 </div>
               </div>
@@ -1563,10 +1873,11 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                 Cancel
               </button>
               <button
-                onClick={() => { console.log("Added Item:", inventoryForm); setIsAddInventoryModalOpen(false); }}
-                className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+                onClick={handleSaveInventoryItem}
+                disabled={inventorySaving}
+                className="px-5 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm disabled:opacity-60"
               >
-                Add Item
+                {inventorySaving ? 'Saving…' : editingInventoryId ? 'Save Changes' : 'Add Item'}
               </button>
             </div>
 

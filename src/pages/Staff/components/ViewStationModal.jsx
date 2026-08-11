@@ -82,41 +82,49 @@
 // }
 
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Building2, MapPin, User, Phone, Edit, Trash2 } from 'lucide-react';
+import { X, Building2, MapPin, User, Phone, Edit, Trash2, Truck } from 'lucide-react';
 
-export default function ViewStationModal({ isOpen, onClose, station }) {
+export default function ViewStationModal({ isOpen, onClose, station, onEdit, onSuccess }) {
+  const [vehicles, setVehicles] = useState([]);
+  const [loadingVehicles, setLoadingVehicles] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen || !station?.id) {
+      setVehicles([]);
+      return;
+    }
+
+    setLoadingVehicles(true);
+    fetch(`http://localhost:5001/api/stations/${station.id}/vehicles`)
+      .then(res => res.json())
+      .then(data => { if (data.success) setVehicles(data.data); })
+      .catch(err => console.error('Error fetching station vehicles:', err))
+      .finally(() => setLoadingVehicles(false));
+  }, [isOpen, station?.id]);
+
   if (!isOpen || !station) return null;
 
   const handleDelete = async () => {
     if (!window.confirm("Delete this station?")) return;
 
-    await fetch(`http://localhost:5001/api/stations/${station.id}`, {
-      method: 'DELETE'
-    });
+    try {
+      const res = await fetch(`http://localhost:5001/api/stations/${station.id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
 
-    alert("Deleted successfully");
-    onClose();
-    window.location.reload(); // simple refresh
-  };
-
-  const handleEdit = async () => {
-    const updatedName = prompt("Enter new station name", station.station_name);
-    if (!updatedName) return;
-
-    await fetch(`http://localhost:5001/api/stations/${station.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...station,
-        station_name: updatedName
-      })
-    });
-
-    alert("Updated successfully");
-    onClose();
-    window.location.reload();
+      if (data.success) {
+        onSuccess?.();
+        onClose();
+      } else {
+        alert(data.message || "Failed to delete station");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Server error — could not delete station");
+    }
   };
 
   return (
@@ -126,7 +134,7 @@ export default function ViewStationModal({ isOpen, onClose, station }) {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
-          className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden relative"
+          className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden relative max-h-[85vh] flex flex-col"
         >
           <div className="absolute top-4 right-4 z-10">
             <button
@@ -152,7 +160,7 @@ export default function ViewStationModal({ isOpen, onClose, station }) {
             </span>
           </div>
 
-          <div className="p-6">
+          <div className="p-6 overflow-y-auto">
             <div className="space-y-4">
 
               <div className="flex items-center gap-4 p-3 rounded-xl bg-gray-50 border border-gray-100">
@@ -193,10 +201,45 @@ export default function ViewStationModal({ isOpen, onClose, station }) {
 
             </div>
 
+            <div className="mt-5 pt-5 border-t border-gray-100">
+              <div className="flex items-center justify-between mb-3">
+                <p className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                  <Truck className="w-3.5 h-3.5" /> Vehicles
+                </p>
+                <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                  {vehicles.length}
+                </span>
+              </div>
+
+              {loadingVehicles ? (
+                <p className="text-xs text-gray-400 py-3 text-center">Loading vehicles...</p>
+              ) : vehicles.length === 0 ? (
+                <p className="text-xs text-gray-400 py-3 text-center bg-gray-50 rounded-xl border border-gray-100">
+                  No vehicles assigned to this station
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                  {vehicles.map(v => (
+                    <div key={v.id} className="flex items-center justify-between gap-3 p-2.5 rounded-lg bg-gray-50 border border-gray-100">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-800 truncate">{v.vehicle_no}</p>
+                        <p className="text-[11px] text-gray-400 truncate">{v.driver_name || 'No driver assigned'}</p>
+                      </div>
+                      {v.vehicle_status && (
+                        <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide text-teal-700 bg-teal-50 border border-teal-100 px-2 py-0.5 rounded-full">
+                          {v.vehicle_status}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="pt-6 flex gap-3">
               <button
                 type="button"
-                onClick={handleEdit}
+                onClick={() => onEdit?.(station)}
                 className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-xl transition-colors"
               >
                 <Edit className="w-4 h-4" /> Edit

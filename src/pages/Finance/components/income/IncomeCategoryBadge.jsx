@@ -1,5 +1,5 @@
 import React from "react";
-import { Truck, RefreshCw, UserCheck, Key, MoreHorizontal } from "lucide-react";
+import { Truck, RefreshCw, UserCheck, Key, MoreHorizontal, Factory, ShieldCheck } from "lucide-react";
 
 const CATEGORY_CONFIG = {
   "Freight": {
@@ -29,6 +29,20 @@ const CATEGORY_CONFIG = {
     text: "text-violet-700",
     border: "border-violet-200",
     dot: "bg-violet-500",
+  },
+  "Plant Receivable": {
+    icon: Factory,
+    bg: "bg-cyan-50",
+    text: "text-cyan-700",
+    border: "border-cyan-200",
+    dot: "bg-cyan-500",
+  },
+  "Refund/Claim": {
+    icon: ShieldCheck,
+    bg: "bg-rose-50",
+    text: "text-rose-700",
+    border: "border-rose-200",
+    dot: "bg-rose-500",
   },
   "Miscellaneous": {
     icon: MoreHorizontal,

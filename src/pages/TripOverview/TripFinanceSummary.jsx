@@ -1,54 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, CheckCircle2, Clock, AlertCircle,
   RefreshCw, ExternalLink, ChevronDown, ChevronUp,
   CreditCard, Calendar, MapPin, Link2,
 } from 'lucide-react';
-
-// ── Static dummy finance reference data keyed by trip ID
-const FINANCE_REF = {
-  'TRIP-2023-0041': {
-    status:        'Payment Received',
-    incomeLinked:  true,
-    freightAmount: 15000,
-    paymentStatus: 'Received',
-    entryDate:     '2023-11-01',
-    refNumber:     'NEFT-8822311',
-    route:         'Hyderabad – Mumbai',
-    incomeId:      'INC-2023-0041',
-  },
-  'TRIP-2023-0038': {
-    status:        'Partial Payment',
-    incomeLinked:  true,
-    freightAmount: 6500,
-    paymentStatus: 'Partial',
-    entryDate:     '2023-11-05',
-    refNumber:     'IMPS-4421009',
-    route:         'Pune – Hyderabad',
-    incomeId:      'INC-2023-0038',
-  },
-  'TRIP-2023-0035': {
-    status:        'Payment Pending',
-    incomeLinked:  true,
-    freightAmount: 22000,
-    paymentStatus: 'Pending',
-    entryDate:     '2023-10-22',
-    refNumber:     null,
-    route:         'Mumbai – Delhi',
-    incomeId:      'INC-2023-0035',
-  },
-  'TRIP-2023-0031': {
-    status:        'Income Linked',
-    incomeLinked:  true,
-    freightAmount: 7200,
-    paymentStatus: 'Pending',
-    entryDate:     '2023-11-12',
-    refNumber:     'IMPS-9988001',
-    route:         'Hyderabad – Bangalore',
-    incomeId:      'INC-2023-0031',
-  },
-};
 
 // ── Status badge config
 const STATUS_CFG = {
@@ -66,11 +22,6 @@ const STATUS_CFG = {
     icon: AlertCircle,
     cls:  'bg-red-50 text-red-700 border-red-200',
     dot:  'bg-red-500',
-  },
-  'Income Linked': {
-    icon: Link2,
-    cls:  'bg-blue-50 text-blue-700 border-blue-200',
-    dot:  'bg-blue-500',
   },
   'Income Pending': {
     icon: Clock,
@@ -104,12 +55,76 @@ function RefRow({ icon: Icon, label, value, mono, valueClass = 'text-slate-700' 
   );
 }
 
+// Summarize one or more income entries linked to this trip into a single view model
+function summarizeEntries(entries) {
+  const freightAmount = entries.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const receivedAmount = entries.reduce((s, e) => s + (Number(e.received_amount) || 0), 0);
+
+  let paymentStatus = 'Pending';
+  if (receivedAmount > 0 && receivedAmount >= freightAmount) paymentStatus = 'Received';
+  else if (receivedAmount > 0) paymentStatus = 'Partial';
+
+  const status = paymentStatus === 'Received' ? 'Payment Received'
+    : paymentStatus === 'Partial' ? 'Partial Payment'
+    : 'Payment Pending';
+
+  // Most recent entry drives the reference details shown in the expanded view
+  const latest = entries[0];
+
+  return {
+    status,
+    freightAmount,
+    paymentStatus,
+    entryDate: latest.created_at ? new Date(latest.created_at).toLocaleDateString('en-IN') : '—',
+    refNumber: latest.bank_reference_number || null,
+    route: (latest.route_from || latest.route_to) ? `${latest.route_from || '—'} – ${latest.route_to || '—'}` : null,
+    incomeId: latest.income_number,
+    entryCount: entries.length,
+  };
+}
+
 export default function TripFinanceSummary({ tripId }) {
   const [expanded, setExpanded] = useState(false);
-  const ref = FINANCE_REF[tripId];
+  const [loading, setLoading] = useState(true);
+  const [entries, setEntries] = useState([]);
 
-  // No finance data for this trip
-  if (!ref) {
+  useEffect(() => {
+    if (!tripId) { setLoading(false); return; }
+
+    let cancelled = false;
+    setLoading(true);
+
+    fetch(`http://localhost:5001/api/income/trip/${tripId}`)
+      .then(r => r.json())
+      .then(res => {
+        if (cancelled) return;
+        setEntries(res.success ? res.data : []);
+      })
+      .catch(err => {
+        console.error(err);
+        if (!cancelled) setEntries([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [tripId]);
+
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
+          <TrendingUp className="w-4 h-4 text-emerald-600" />
+          <h2 className="text-sm font-bold text-slate-800 tracking-tight">Finance Summary</h2>
+        </div>
+        <div className="px-5 py-4 text-xs text-slate-400">Loading finance details…</div>
+      </div>
+    );
+  }
+
+  // No income entry linked to this trip
+  if (entries.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="flex items-center gap-2.5 px-5 py-3.5 border-b border-slate-100 bg-slate-50/60">
@@ -138,9 +153,9 @@ export default function TripFinanceSummary({ tripId }) {
     );
   }
 
+  const ref = summarizeEntries(entries);
   const isReceived = ref.paymentStatus === 'Received';
   const isPartial  = ref.paymentStatus === 'Partial';
-  const isPending  = ref.paymentStatus === 'Pending';
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -204,6 +219,9 @@ export default function TripFinanceSummary({ tripId }) {
           >
             <div className="px-5 py-3 border-t border-slate-100 space-y-0.5">
               <RefRow icon={Link2}      label="Income Entry ID"  value={ref.incomeId}      mono />
+              {ref.entryCount > 1 && (
+                <RefRow icon={TrendingUp} label="Income Entries" value={`${ref.entryCount} entries`} />
+              )}
               <RefRow icon={MapPin}     label="Route"            value={ref.route} />
               <RefRow icon={CreditCard} label="Bank Reference"   value={ref.refNumber}     mono />
               <RefRow icon={Calendar}   label="Entry Date"       value={ref.entryDate}     mono />

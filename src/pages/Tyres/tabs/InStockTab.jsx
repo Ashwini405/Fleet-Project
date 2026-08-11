@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, Eye, Package, X, ChevronDown, Truck, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react';
 import axios from 'axios';
+import api from '../../../services/api';
 import { layoutPositions } from '../data/dummyData'; // only static positions
 import RegisterTyreModal from '../components/RegisterTyreModal';
 import TyreDatasheetModal from '../components/TyreDatasheetModal';
@@ -40,7 +41,7 @@ function MountModal({ tyre, onClose, onMounted }) {
 
   const fetchVehicles = async () => {
     try {
-      const res = await axios.get('http://localhost:5001/api/vehicles');
+      const res = await api.get('/vehicles');
       setVehicles(res.data.data || []);
     } catch (error) {
       console.log('Fetch vehicles error:', error);
@@ -352,7 +353,7 @@ export default function InStockTab() {
 
   const fetchVehicles = async () => {
     try {
-      const res = await axios.get('http://localhost:5001/api/vehicles');
+      const res = await api.get('/vehicles');
       setVehicles(res.data.data || []);
     } catch (error) {
       console.log('Fetch Vehicles Error:', error);

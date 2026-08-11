@@ -14,6 +14,7 @@ const FILTERS = [
 ];
 
 export default function GarageLedger({ vendor, onBack }) {
+  const isCash = (vendor.payment_terms || 'credit') === 'cash';
   const [rawTxns, setRawTxns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState('All');
@@ -59,9 +60,9 @@ export default function GarageLedger({ vendor, onBack }) {
     let running = 0;
     return [...rawTxns].sort((a, b) => new Date(a.date) - new Date(b.date)).map(t => {
       running += (t.debit || 0) - (t.credit || 0);
-      return { ...t, runningBalance: running };
+      return { ...t, runningBalance: isCash ? 0 : running };
     });
-  }, [rawTxns]);
+  }, [rawTxns, isCash]);
 
   const totalDebit = rawTxns.reduce((s, t) => s + (t.debit || 0), 0);
   const totalCredit = rawTxns.reduce((s, t) => s + (t.credit || 0), 0);
@@ -113,14 +114,16 @@ export default function GarageLedger({ vendor, onBack }) {
           <button onClick={() => setExceptionOpen(true)} className="flex items-center gap-2 px-4 py-2 border border-gray-200 text-gray-600 rounded-lg font-bold text-sm hover:bg-gray-50 transition-colors">
             <FiPlus /> Exception Entry
           </button>
-          <button onClick={() => setPayModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors">
-            <FiDollarSign size={14} /> Record Payment
-          </button>
+          {!isCash && (
+            <button onClick={() => setPayModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors">
+              <FiDollarSign size={14} /> Record Payment
+            </button>
+          )}
         </div>
       </div>
 
       <VendorInfoPanel vendor={vendor} categoryLabel="GARAGE" />
-      <SummaryCards totalDebit={totalDebit} totalCredit={totalCredit} lastDate={lastDate} />
+      <SummaryCards totalDebit={totalDebit} totalCredit={totalCredit} lastDate={lastDate} isCash={isCash} />
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-4 border-b border-gray-100 space-y-3">
@@ -203,6 +206,7 @@ export default function GarageLedger({ vendor, onBack }) {
         onSave={handleSavePayment}
         vendor={vendor}
         vendorName={vendor.garage_name}
+        vendorCategory="garages"
         outstanding={totalDebit - totalCredit}
       />
 

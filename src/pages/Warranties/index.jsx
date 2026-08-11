@@ -15,7 +15,7 @@ export default function WarrantiesModule() {
   const refreshClaimsRef     = useRef(null);
   const [stats, setStats]             = useState({ total: 0, active: 0, expiring: 0, expired: 0, claims: 0 });
   const [alertList, setAlertList]     = useState([]);
-  const [alertOpen, setAlertOpen]     = useState(true);
+  const [alertOpen, setAlertOpen]     = useState(false);
 
   const [isAddWarrantyOpen, setIsAddWarrantyOpen] = useState(false);
   const [isAddClaimOpen,    setIsAddClaimOpen]    = useState(false);

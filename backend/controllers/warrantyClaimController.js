@@ -1,4 +1,5 @@
 const WarrantyClaimModel = require('../models/warrantyClaimModel');
+const WarrantyClaimPaymentModel = require('../models/warrantyClaimPaymentModel');
 
 // ======================================================
 // CREATE CLAIM
@@ -209,10 +210,64 @@ const updateClaimStatus = async (req, res) => {
   }
 };
 
+// ======================================================
+// UPDATE CLAIM AMOUNT ONLY
+// ======================================================
+
+const updateClaimAmount = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { claim_available_amount } = req.body;
+    if (claim_available_amount === undefined || claim_available_amount === null || claim_available_amount === '') {
+      return res.status(400).json({ success: false, message: 'claim_available_amount is required' });
+    }
+    await WarrantyClaimModel.updateClaimAmount(id, claim_available_amount);
+    res.json({ success: true, message: 'Claim amount updated' });
+  } catch (error) {
+    console.error('UPDATE CLAIM AMOUNT ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// ======================================================
+// PAYMENTS RECEIVED FROM VENDOR (history, not a single total)
+// ======================================================
+
+const getClaimPayments = async (req, res) => {
+  try {
+    const payments = await WarrantyClaimPaymentModel.getByClaimId(req.params.id);
+    res.json({ success: true, data: payments });
+  } catch (error) {
+    console.error('GET CLAIM PAYMENTS ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+const addClaimPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, payment_date, notes } = req.body;
+    if (amount === undefined || amount === null || amount === '' || Number(amount) <= 0) {
+      return res.status(400).json({ success: false, message: 'A valid amount is required' });
+    }
+    if (!payment_date) {
+      return res.status(400).json({ success: false, message: 'payment_date is required' });
+    }
+    await WarrantyClaimPaymentModel.create(id, { amount, payment_date, notes });
+    res.status(201).json({ success: true, message: 'Payment recorded' });
+  } catch (error) {
+    console.error('ADD CLAIM PAYMENT ERROR:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
 module.exports = {
   createWarrantyClaim,
   getWarrantyClaims,
   getWarrantyClaimById,
   updateWarrantyClaim,
-  updateClaimStatus
+  updateClaimStatus,
+  updateClaimAmount,
+  getClaimPayments,
+  addClaimPayment
 };

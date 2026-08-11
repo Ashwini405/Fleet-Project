@@ -60,3 +60,34 @@ async (req, res) => {
   }
 
 };
+
+exports.updateRetreading =
+async (req, res) => {
+
+  try {
+
+    await TyreRetreading.update(
+      req.params.id,
+      req.body
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Retreading record updated"
+    });
+
+  } catch (error) {
+
+    console.error(
+      "RETREADING UPDATE ERROR:",
+      error
+    );
+
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+
+  }
+
+};

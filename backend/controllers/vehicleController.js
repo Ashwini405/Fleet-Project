@@ -457,6 +457,72 @@ const updateVehicleStatus = async (req, res) => {
   }
 };
 
+// GET EMI PAYMENTS
+const getEmiPayments = async (req, res) => {
+  try {
+    const [rows] = await db.query(
+      'SELECT * FROM vehicle_emi_payments WHERE vehicle_id = ? ORDER BY paid_date DESC',
+      [req.params.id]
+    );
+    res.json({ success: true, data: rows });
+  } catch (error) {
+    console.error('getEmiPayments error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// PATCH PURCHASE DOCS
+const updatePurchaseDocs = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const files = req.files || {};
+    const { warranty_start_date, warranty_end_date, warranty_period_months } = req.body;
+
+    const existing = await Vehicle.getById(id);
+    if (!existing) return res.status(404).json({ success: false, message: 'Vehicle not found' });
+
+    await db.query(
+      `UPDATE vehicles SET
+        purchase_receipt = COALESCE(?, purchase_receipt),
+        warranty_document = COALESCE(?, warranty_document),
+        purchase_proof = COALESCE(?, purchase_proof),
+        warranty_start_date = COALESCE(?, warranty_start_date),
+        warranty_end_date = COALESCE(?, warranty_end_date),
+        warranty_period_months = COALESCE(?, warranty_period_months)
+      WHERE id = ?`,
+      [
+        files.purchase_receipt?.[0]?.filename || null,
+        files.warranty_document?.[0]?.filename || null,
+        files.purchase_proof?.[0]?.filename || null,
+        warranty_start_date || null,
+        warranty_end_date || null,
+        warranty_period_months || null,
+        id
+      ]
+    );
+
+    res.json({ success: true, message: 'Purchase documents updated' });
+  } catch (error) {
+    console.error('updatePurchaseDocs error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
+// MARK EMI PAID
+const markEmiPaid = async (req, res) => {
+  try {
+    const { paid_date, note } = req.body;
+    await db.query(
+      'INSERT INTO vehicle_emi_payments (vehicle_id, paid_date, note) VALUES (?, ?, ?)',
+      [req.params.id, paid_date, note || null]
+    );
+    res.json({ success: true, message: 'EMI marked as paid' });
+  } catch (error) {
+    console.error('markEmiPaid error:', error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
+};
+
 module.exports = {
   getVehicles,
   getVehicleById,
@@ -468,5 +534,8 @@ module.exports = {
   checkAvailability,
   getVehicleHealthScore,
   getVehicleMaintenanceTimeline,
-  updateVehicleStatus
+  updateVehicleStatus,
+  getEmiPayments,
+  markEmiPaid,
+  updatePurchaseDocs
 };

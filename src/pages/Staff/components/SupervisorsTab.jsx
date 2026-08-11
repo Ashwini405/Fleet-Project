@@ -3,14 +3,16 @@ import { motion } from 'framer-motion';
 import { UsersRound, Plus, Search, MapPin, Eye } from 'lucide-react';
 import AddSupervisorModal from './AddSupervisorModal';
 import ViewSupervisorModal from './ViewSupervisorModal';
+import EditSupervisorModal from './EditSupervisorModal';
 
 export default function SupervisorsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [viewStaff, setViewStaff] = useState(null);
+  const [editStaff, setEditStaff] = useState(null);
   const [staffData, setStaffData] = useState([]);
 
-  useEffect(() => {
+  const fetchSupervisors = () => {
     fetch('http://localhost:5001/api/supervisors')
       .then(res => res.json())
       .then(data => {
@@ -21,6 +23,10 @@ export default function SupervisorsTab() {
         }
       })
       .catch(err => console.error("Error fetching supervisors:", err));
+  };
+
+  useEffect(() => {
+    fetchSupervisors();
   }, []);
 
   const filteredStaff = staffData.filter(s => 
@@ -138,8 +144,20 @@ export default function SupervisorsTab() {
         </div>
       </div>
 
-      <AddSupervisorModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />
-      <ViewSupervisorModal isOpen={!!viewStaff} onClose={() => setViewStaff(null)} staff={viewStaff} />
+      <AddSupervisorModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} onSuccess={fetchSupervisors} />
+      <ViewSupervisorModal
+        isOpen={!!viewStaff}
+        onClose={() => setViewStaff(null)}
+        staff={viewStaff}
+        onSuccess={fetchSupervisors}
+        onEdit={(staff) => { setViewStaff(null); setEditStaff(staff); }}
+      />
+      <EditSupervisorModal
+        isOpen={!!editStaff}
+        onClose={() => setEditStaff(null)}
+        staff={editStaff}
+        onSuccess={fetchSupervisors}
+      />
     </div>
   );
 }

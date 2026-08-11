@@ -12,6 +12,13 @@ import { Toast, useToast, TableSkeleton, EmptyState, StickyTable, StickyThead } 
 
 const posLabel = (id) => layoutPositions.find(p => p.id === id)?.label ?? id ?? '—';
 
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 const STATUS_STYLE = {
   SCRAP:      { badge: 'bg-red-100    text-red-700    ring-1 ring-red-300',    dot: 'bg-red-500'    },
   RETREADING: { badge: 'bg-amber-100  text-amber-700  ring-1 ring-amber-300',  dot: 'bg-amber-500'  },
@@ -444,7 +451,7 @@ export default function OldTyresStockTab({ onNewRetreadingRecord, returnedRetrea
                     {/* Removed Date */}
                     <td className="py-2.5 px-3 whitespace-nowrap">
                       <span className="text-[11px] font-medium text-gray-500 tabular-nums">
-                        {tyre.removedDate || '—'}
+                        {fmtDate(tyre.removedDate)}
                       </span>
                     </td>
 

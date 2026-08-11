@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 
 const TYRE_API     = 'http://localhost:5001/api/notifications';
 const WARRANTY_API = 'http://localhost:5001/api/warranty-notifications';
+const FASTAG_API   = 'http://localhost:5001/api/fastag-notifications';
 const POLL_MS      = 15000;
 
 const NotificationContext = createContext(null);
@@ -14,13 +15,15 @@ export function NotificationProvider({ children }) {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const [tyreRes, warrantyRes] = await Promise.all([
+      const [tyreRes, warrantyRes, fastagRes] = await Promise.all([
         fetch(`${TYRE_API}?limit=50`),
         fetch(`${WARRANTY_API}`),
+        fetch(`${FASTAG_API}`),
       ]);
-      const [tyreData, warrantyData] = await Promise.all([
+      const [tyreData, warrantyData, fastagData] = await Promise.all([
         tyreRes.json(),
         warrantyRes.json(),
+        fastagRes.json(),
       ]);
 
       // Normalise tyre notifications
@@ -39,8 +42,15 @@ export function NotificationProvider({ children }) {
         // map severity for consistent display
       }));
 
+      // Normalise fastag notifications
+      const fastagItems = (fastagData.success ? fastagData.data : []).map(n => ({
+        ...n,
+        _source: 'fastag',
+        status:  n.is_read ? 'Read' : 'Unread',
+      }));
+
       // Merge and sort by created_at descending
-      const merged = [...tyreItems, ...warrantyItems].sort(
+      const merged = [...tyreItems, ...warrantyItems, ...fastagItems].sort(
         (a, b) => new Date(b.created_at) - new Date(a.created_at)
       );
 
@@ -68,9 +78,10 @@ export function NotificationProvider({ children }) {
   }, [fetchNotifications]);
 
   const markRead = useCallback(async (id, source) => {
-    const url    = source === 'warranty' ? `${WARRANTY_API}/${id}/read` : `${TYRE_API}/${id}/read`;
-    const method = source === 'warranty' ? 'PATCH' : 'PATCH';
-    await fetch(url, { method });
+    const url = source === 'warranty' ? `${WARRANTY_API}/${id}/read`
+      : source === 'fastag' ? `${FASTAG_API}/${id}/read`
+      : `${TYRE_API}/${id}/read`;
+    await fetch(url, { method: 'PATCH' });
     setNotifications(prev =>
       prev.map(n =>
         n.id === id && n._source === source
@@ -85,6 +96,7 @@ export function NotificationProvider({ children }) {
     await Promise.all([
       fetch(`${TYRE_API}/read-all`,    { method: 'PATCH' }),
       fetch(`${WARRANTY_API}/read-all`, { method: 'PATCH' }),
+      fetch(`${FASTAG_API}/read-all`, { method: 'PATCH' }),
     ]);
     setNotifications(prev => prev.map(n => ({ ...n, status: 'Read', is_read: true })));
     setUnreadCount(0);

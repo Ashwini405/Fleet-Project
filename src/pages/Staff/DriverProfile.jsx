@@ -6,6 +6,7 @@ import {
   FiTruck, FiFileText, FiCheck, FiClock, FiDownload, FiEye, FiX,
   FiAlertCircle, FiCheckCircle, FiDollarSign,
 } from 'react-icons/fi';
+import EditDriverModal from './components/EditDriverModal';
 
 // ─── Reusable status badge ───────────────────────────────────────────────────
 function StatusBadge({ status }) {
@@ -66,12 +67,16 @@ function TabBtn({ label, icon: Icon, active, onClick }) {
 
 // ─── Overview Tab ────────────────────────────────────────────────────────────
 function OverviewTab({ driver, trips, advances, payments }) {
+  const RECOVERED_STATUSES = ['Recovered', 'Included in Settlement'];
+
   const totalTrips       = trips.length;
-  const totalAdvGiven    = advances.reduce((s, a) => s + a.amount, 0);
-  const totalAdvRecovered = payments.reduce((s, p) => s + p.deductions, 0);
+  const totalAdvGiven    = advances.reduce((s, a) => s + Number(a.amount), 0);
+  const totalAdvRecovered = advances
+    .filter(a => RECOVERED_STATUSES.includes(a.status))
+    .reduce((s, a) => s + Number(a.amount), 0);
   const outstandingAdv   = Math.max(0, totalAdvGiven - totalAdvRecovered);
   const totalSettlements = payments.filter(p => p.status === 'Paid').length;
-  const totalPaid        = payments.filter(p => p.status === 'Paid').reduce((s, p) => s + p.net_payable, 0);
+  const totalPaid        = payments.filter(p => p.status === 'Paid').reduce((s, p) => s + Number(p.net_payable), 0);
 
   const info = [
     ['Driver Name',      driver.full_name],
@@ -159,11 +164,120 @@ function TripsTab({ trips }) {
   );
 }
 
+// ─── Give Advance Modal ────────────────────────────────────────────────────
+function GiveAdvanceModal({ driverId, onClose, onSuccess }) {
+  const [amount, setAmount] = useState('');
+  const [advanceDate, setAdvanceDate] = useState(new Date().toISOString().slice(0, 10));
+  const [reason, setReason] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!amount || Number(amount) <= 0) {
+      setError('Enter a valid amount');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setError('');
+
+      const res = await axios.post(`http://localhost:5001/api/drivers/${driverId}/advances`, {
+        amount,
+        advance_date: advanceDate,
+        reason
+      });
+
+      if (res.data.success) {
+        onSuccess?.();
+        onClose();
+      } else {
+        setError(res.data.message || 'Failed to record advance');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to record advance');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+        <div className="flex justify-between items-center p-5 border-b border-slate-100">
+          <h3 className="text-lg font-bold text-slate-800">Give Advance</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors">
+            <FiX className="w-5 h-5" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {error && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 border border-red-100 text-red-600 text-xs font-semibold">
+              <FiAlertCircle className="w-4 h-4 shrink-0" /> {error}
+            </div>
+          )}
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Amount (₹)</label>
+            <input
+              type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)}
+              placeholder="e.g. 5000"
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Date</label>
+            <input
+              type="date" value={advanceDate} onChange={e => setAdvanceDate(e.target.value)}
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Reason</label>
+            <textarea
+              rows="2" value={reason} onChange={e => setReason(e.target.value)}
+              placeholder="e.g. Family emergency, medical expense..."
+              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm resize-none"
+            />
+          </div>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            This will show as outstanding until it's deducted in the driver's next settlement (Operational Payments → Prepare Settlement).
+          </p>
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-colors">
+              Cancel
+            </button>
+            <button type="submit" disabled={submitting} className="flex-1 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl transition-colors disabled:opacity-50">
+              {submitting ? 'Saving...' : 'Give Advance'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // ─── Advances Tab ────────────────────────────────────────────────────────────
-function AdvancesTab({ advances, payments }) {
-  const totalGiven     = advances.reduce((s, a) => s + a.amount, 0);
-  const totalRecovered = payments.reduce((s, p) => s + p.total_deductions, 0);
+function AdvancesTab({ advances, driverId, onChanged }) {
+  const navigate = useNavigate();
+  const [isGiveOpen, setIsGiveOpen] = useState(false);
+
+  const RECOVERED_STATUSES = ['Recovered', 'Included in Settlement'];
+
+  const totalGiven     = advances.reduce((s, a) => s + Number(a.amount), 0);
+  const totalRecovered = advances
+    .filter(a => RECOVERED_STATUSES.includes(a.status))
+    .reduce((s, a) => s + Number(a.amount), 0);
   const outstanding    = Math.max(0, totalGiven - totalRecovered);
+
+  const statusStyles = {
+    'Outstanding':            'bg-red-50 text-red-600 border-red-200',
+    'Pending Settlement':     'bg-orange-50 text-orange-600 border-orange-200',
+    'Recovered':              'bg-green-50 text-green-700 border-green-200',
+    'Included in Settlement': 'bg-indigo-50 text-indigo-600 border-indigo-200',
+  };
 
   return (
     <div className="space-y-5">
@@ -174,38 +288,79 @@ function AdvancesTab({ advances, payments }) {
         <StatCard label="Outstanding Advance"   value={`₹ ${outstanding.toLocaleString()}`}    color="red"    />
       </div>
 
+      {outstanding > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-red-50 border border-red-100 rounded-xl px-5 py-4">
+          <p className="text-xs text-red-600 font-medium leading-relaxed">
+            ₹ {outstanding.toLocaleString()} outstanding will be auto-deducted the next time a settlement is prepared for this driver.
+          </p>
+          <button
+            onClick={() => navigate('/payments')}
+            className="shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors"
+          >
+            Prepare Settlement <FiTruck className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md bg-orange-50 flex items-center justify-center">
-            <FiDollarSign className="w-3.5 h-3.5 text-orange-500" />
+        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-md bg-orange-50 flex items-center justify-center">
+              <FiDollarSign className="w-3.5 h-3.5 text-orange-500" />
+            </div>
+            <h3 className="text-sm font-bold text-slate-800">Advance Records</h3>
           </div>
-          <h3 className="text-sm font-bold text-slate-800">Advance Records</h3>
+          <button
+            onClick={() => setIsGiveOpen(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition-colors"
+          >
+            + Give Advance
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
-                {['Date', 'Reference No', 'Amount', 'Remarks'].map(h => (
+                {['Date', 'Type', 'Amount', 'Reason', 'Status'].map(h => (
                   <th key={h} className="py-3 px-5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {advances.length === 0 ? (
-                <tr><td colSpan={4} className="py-12 text-center text-slate-400 text-sm">No advance records</td></tr>
-              ) : advances.map((a, i) => (
-                <tr key={i} className="hover:bg-slate-50/60 transition-colors">
-                  <td className="py-3 px-5 text-slate-700 font-medium">{new Date(a.advance_date).toLocaleDateString()}</td>
-                  <td className="py-3 px-5 font-bold text-indigo-600 text-xs">{a.ref_no || 'N/A'}</td>
+                <tr><td colSpan={5} className="py-12 text-center text-slate-400 text-sm">No advance records</td></tr>
+              ) : advances.map((a) => (
+                <tr key={a.id} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="py-3 px-5 text-slate-700 font-medium">{a.advance_date ? new Date(a.advance_date).toLocaleDateString() : 'N/A'}</td>
+                  <td className="py-3 px-5">
+                    <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full border ${
+                      a.type === 'Trip' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-purple-50 text-purple-600 border-purple-200'
+                    }`}>
+                      {a.type}
+                    </span>
+                  </td>
                   <td className="py-3 px-5 font-bold text-orange-600">₹ {Number(a.amount).toLocaleString()}</td>
-                  <td className="py-3 px-5 text-slate-600">{a.remarks || '—'}</td>
+                  <td className="py-3 px-5 text-slate-600">{a.reason || '—'}</td>
+                  <td className="py-3 px-5">
+                    <span className={`inline-flex items-center border text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${statusStyles[a.status] || 'bg-slate-50 text-slate-500 border-slate-200'}`}>
+                      {a.status}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </div>
+
+      {isGiveOpen && (
+        <GiveAdvanceModal
+          driverId={driverId}
+          onClose={() => setIsGiveOpen(false)}
+          onSuccess={onChanged}
+        />
+      )}
     </div>
   );
 }
@@ -271,7 +426,7 @@ function PaymentsTab({ payments }) {
 }
 
 // ─── Documents Tab ───────────────────────────────────────────────────────────
-function DocumentsTab({ documents }) {
+function DocumentsTab({ documents, driver }) {
   const docIcons = {
     'Driving License':      '🪪',
     'Aadhaar Card':         '🆔',
@@ -280,13 +435,43 @@ function DocumentsTab({ documents }) {
     'Insurance':            '📋',
   };
 
+  const uploadedFiles = [
+    { label: 'Profile Photo',          file: driver?.profile_photo },
+    { label: 'ID Proof',               file: driver?.id_document },
+    { label: 'Bank Passbook / Cheque', file: driver?.bank_document },
+  ].filter(f => f.file);
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {uploadedFiles.length > 0 && (
+        <div>
+          <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Uploaded Files</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {uploadedFiles.map((f) => (
+              <div key={f.label} className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FiFileText className="w-4 h-4 text-slate-400 shrink-0" />
+                  <p className="text-sm font-semibold text-slate-700 truncate">{f.label}</p>
+                </div>
+                <a
+                  href={`http://localhost:5001/uploads/${f.file}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 text-xs font-bold text-indigo-600 hover:text-indigo-800"
+                >
+                  View
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {documents.length === 0 ? (
         <div className="bg-white rounded-xl border border-slate-200 p-12 text-center text-slate-400">
           <FiFileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
-          <p className="text-sm font-medium">No documents uploaded</p>
-          <p className="text-xs mt-1">Document upload feature coming soon</p>
+          <p className="text-sm font-medium">No compliance documents on file</p>
+          <p className="text-xs mt-1">Document expiry tracking coming soon</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -340,6 +525,7 @@ export default function DriverProfile() {
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
 
   // ── Fetch driver profile from API ──
   useEffect(() => {
@@ -466,7 +652,10 @@ export default function DriverProfile() {
             >
               <FiArrowLeft className="w-4 h-4" /> Back
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 shadow-sm transition-colors">
+            <button
+              onClick={() => setIsEditOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 shadow-sm transition-colors"
+            >
               <FiEdit2 className="w-4 h-4" /> Edit Driver
             </button>
           </div>
@@ -489,9 +678,16 @@ export default function DriverProfile() {
       {/* ── Tab Content ─────────────────────────────────────────────────── */}
       {activeTab === 'Overview'  && <OverviewTab  driver={driver} trips={trips} advances={advances} payments={payments} />}
       {activeTab === 'Trips'     && <TripsTab     trips={trips} />}
-      {activeTab === 'Advances'  && <AdvancesTab  advances={advances} payments={payments} />}
+      {activeTab === 'Advances'  && <AdvancesTab  advances={advances} driverId={id} onChanged={fetchDriverProfile} />}
       {activeTab === 'Payments'  && <PaymentsTab  payments={payments} />}
-      {activeTab === 'Documents' && <DocumentsTab documents={documents} />}
+      {activeTab === 'Documents' && <DocumentsTab documents={documents} driver={driver} />}
+
+      <EditDriverModal
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        onSuccess={fetchDriverProfile}
+        driver={driver}
+      />
 
     </div>
   );

@@ -10,6 +10,7 @@ import TyresVendorPage  from './pages/TyresVendorPage';
 import OilsPage         from './pages/OilsPage';
 import FuelVendorPage   from './pages/FuelVendorPage';
 import RTAPage          from './pages/RTAPage';
+import LabourPage       from './pages/LabourPage';
 import {
   FiGrid, FiTool, FiUsers, FiBriefcase,
   FiSettings, FiCircle, FiDroplet, FiFeather, FiFileText,
@@ -98,6 +99,8 @@ export default function Vendors() {
           <FuelVendorPage />
         ) : activePage === 'rta' ? (
           <RTAPage />
+        ) : activePage === 'labour' ? (
+          <LabourPage />
         ) : null}
       </div>
     </div>

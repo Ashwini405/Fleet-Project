@@ -249,7 +249,7 @@ export default function AddVehicle() {
 
     fetch('http://localhost:5001/api/drivers')
       .then(res => res.json())
-      .then(data => { if (data.success) setDrivers(data.data || []); })
+      .then(data => { if (data.success) setDrivers((data.data || []).filter(d => (d.status || '').toLowerCase() === 'active')); })
       .catch(err => console.error('Error fetching drivers:', err));
 
     fetch('http://localhost:5001/api/stations')
@@ -592,7 +592,7 @@ export default function AddVehicle() {
               <SelectGroup
                 label="Dealer / Showroom"
                 name="dealerShowroom"
-                options={showrooms.map(s => ({ label: s.showroom_name, value: s.showroom_name }))}
+                options={showrooms.map(s => ({ label: `${s.showroom_name}${s.payment_terms === 'cash' ? ' (Cash)' : ''}`, value: s.showroom_name }))}
                 formData={formData}
                 handleChange={handleChange}
                 error={formErrors.dealerShowroom}
@@ -648,19 +648,35 @@ export default function AddVehicle() {
           </section>
 
           {/* Section 5 - Financial */}
-          <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
-            <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
-              <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">5</div>
-              Financial Details
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <InputGroup label="Financier Name" name="financierName" placeholder="e.g. HDFC Bank" formData={formData} handleChange={handleChange} />
-              <InputGroup label="Loan Account Number" name="loanAccountNumber" placeholder="Enter loan account no" formData={formData} handleChange={handleChange} />
-              <InputGroup label="EMI Amount (₹)" name="emiAmount" type="number" placeholder="Enter monthly EMI" formData={formData} handleChange={handleChange} />
-              <InputGroup label="EMI Date" name="emiDate" type="date" formData={formData} handleChange={handleChange} />
-              <InputGroup label="Loan Tenure (months)" name="loanTenure" type="number" placeholder="e.g. 60" formData={formData} handleChange={handleChange} />
-            </div>
-          </section>
+          {(() => {
+            const selectedShowroom = showrooms.find(s => s.showroom_name === formData.dealerShowroom);
+            const isCashShowroom = selectedShowroom?.payment_terms === 'cash';
+            return isCashShowroom ? (
+              <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200 opacity-60">
+                <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-3 pb-4 border-b border-slate-100">
+                  <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">5</div>
+                  Financial Details
+                </h2>
+                <p className="text-sm text-violet-600 font-semibold bg-violet-50 border border-violet-100 rounded-lg px-4 py-3">
+                  Cash showroom selected — EMI / loan details are not applicable.
+                </p>
+              </section>
+            ) : (
+              <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">
+                <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2 mb-6 pb-4 border-b border-slate-100">
+                  <div className="w-8 h-8 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-sm font-bold">5</div>
+                  Financial Details
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <InputGroup label="Financier Name" name="financierName" placeholder="e.g. HDFC Bank" formData={formData} handleChange={handleChange} />
+                  <InputGroup label="Loan Account Number" name="loanAccountNumber" placeholder="Enter loan account no" formData={formData} handleChange={handleChange} />
+                  <InputGroup label="EMI Amount (₹)" name="emiAmount" type="number" placeholder="Enter monthly EMI" formData={formData} handleChange={handleChange} />
+                  <InputGroup label="EMI Date" name="emiDate" type="date" formData={formData} handleChange={handleChange} />
+                  <InputGroup label="Loan Tenure (months)" name="loanTenure" type="number" placeholder="e.g. 60" formData={formData} handleChange={handleChange} />
+                </div>
+              </section>
+            );
+          })()}
 
           {/* Section 6 - Tracking */}
           <section className="bg-white p-6 md:p-8 rounded-xl shadow-sm border border-slate-200">

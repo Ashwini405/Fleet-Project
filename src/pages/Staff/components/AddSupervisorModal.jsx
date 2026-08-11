@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Briefcase, Building2, CreditCard, FileUp } from 'lucide-react';
+import { X, User, Briefcase, Building2, CreditCard, FileUp, CheckCircle, AlertTriangle } from 'lucide-react';
 
-export default function AddSupervisorModal({ isOpen, onClose }) {
+export default function AddSupervisorModal({ isOpen, onClose, onSuccess }) {
   const [activeTab, setActiveTab] = useState('personal');
   const [stations, setStations] = useState([]);
   const [formData, setFormData] = useState({
@@ -14,12 +14,21 @@ export default function AddSupervisorModal({ isOpen, onClose }) {
     station_id: '',
     bank_name: '',
     account_number: '',
-    ifsc_code: ''
+    ifsc_code: '',
+    notes: ''
   });
   const [files, setFiles] = useState({ profile_photo: null, id_document: null, bank_document: null });
+  const [toast, setToast] = useState(null);
 
-  // Fetch stations from backend
+  const showToast = (type, title, message) => {
+    setToast({ type, title, message });
+    window.setTimeout(() => setToast(null), 3200);
+  };
+
+  // Fetch stations from backend — only once the modal is actually opened
   useEffect(() => {
+    if (!isOpen) return;
+
     fetch('http://localhost:5001/api/stations')
       .then(res => res.json())
       .then(data => {
@@ -28,7 +37,7 @@ export default function AddSupervisorModal({ isOpen, onClose }) {
         }
       })
       .catch(err => console.error('Error fetching stations:', err));
-  }, []);
+  }, [isOpen]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -47,15 +56,15 @@ export default function AddSupervisorModal({ isOpen, onClose }) {
       });
       const result = await response.json();
       if (result.success) {
-        alert('Supervisor saved successfully!');
-        onClose();
-        window.location.reload();
+        showToast('success', 'Supervisor saved', 'Supervisor record created successfully.');
+        onSuccess?.();
+        window.setTimeout(() => onClose(), 1200);
       } else {
-        alert('Failed to save: ' + result.message);
+        showToast('error', 'Save failed', result.message || 'Unable to save supervisor. Please try again.');
       }
     } catch (error) {
       console.error('Error saving supervisor:', error);
-      alert('Could not connect to backend.');
+      showToast('error', 'Connection error', 'Could not connect to backend. Please check your network.');
     }
   };
 
@@ -88,6 +97,28 @@ export default function AddSupervisorModal({ isOpen, onClose }) {
             >
               <X className="w-5 h-5" />
             </button>
+          </div>
+          <div className="relative p-6">
+            <AnimatePresence>
+              {toast && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.96 }}
+                  className={`absolute left-6 right-6 top-4 z-20 mx-auto max-w-xl rounded-2xl border p-4 shadow-xl backdrop-blur-sm text-sm font-medium ${toast.type === 'success' ? 'bg-emerald-600 border-emerald-500 text-white' : 'bg-rose-600 border-rose-500 text-white'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5">
+                      {toast.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+                    </span>
+                    <div className="flex-1">
+                      <p className="font-semibold">{toast.title}</p>
+                      <p className="mt-1 text-sm text-white/90">{toast.message}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
           <div className="flex border-b border-gray-100 px-2 shrink-0">
             {tabs.map(tab => (
@@ -163,6 +194,17 @@ export default function AddSupervisorModal({ isOpen, onClose }) {
                       rows="2" 
                       placeholder="Street, City, State, ZIP..." 
                       value={formData.address}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all resize-none"
+                    ></textarea>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Notes</label>
+                    <textarea
+                      name="notes"
+                      rows="2"
+                      placeholder="Any additional notes about this supervisor..."
+                      value={formData.notes}
                       onChange={handleChange}
                       className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all resize-none"
                     ></textarea>

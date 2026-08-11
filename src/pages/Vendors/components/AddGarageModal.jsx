@@ -9,7 +9,7 @@ const labelCls    = "block text-xs font-bold text-gray-500 uppercase tracking-wi
 const labelOptCls = "block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1";
 
 const EMPTY = {
-  name: '', mobile: '', email: '', address: '', gst: '', status: 'Active',
+  name: '', mobile: '', email: '', address: '', gst: '', status: 'Active', paymentTerms: 'credit',
   bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '',
   openingBalance: '0',
 };
@@ -57,6 +57,7 @@ export default function AddGarageModal({ isOpen, onClose }) {
         gst_number: form.gst,
         opening_balance: form.openingBalance,
         status: form.status,
+        payment_terms: form.paymentTerms,
         bank_name: form.bankName,
         custom_bank_name: form.customBank,
         account_number_or_upi: form.accountNo,
@@ -141,12 +142,29 @@ export default function AddGarageModal({ isOpen, onClose }) {
                       placeholder="e.g. 36AABCU9603R1ZX" className={inputCls} />
                   </div>
                 </div>
-                <div className="w-full sm:w-1/2">
-                  <label className={labelCls}>Status</label>
-                  <select value={form.status} onChange={e => set('status', e.target.value)} className={inputCls + ' text-gray-700'}>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className={labelCls}>Status</label>
+                    <select value={form.status} onChange={e => set('status', e.target.value)} className={inputCls + ' text-gray-700'}>
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Payment Terms</label>
+                    <div className="flex gap-2">
+                      {['credit', 'cash'].map(pt => (
+                        <button key={pt} type="button" onClick={() => set('paymentTerms', pt)}
+                          className={`flex-1 py-3 rounded-xl text-sm font-bold capitalize border transition-colors ${
+                            form.paymentTerms === pt
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                          }`}>
+                          {pt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

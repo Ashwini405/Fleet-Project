@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FiX, FiCheckCircle, FiCheck } from 'react-icons/fi';
+import { FiX, FiCheckCircle, FiCheck, FiHome } from 'react-icons/fi';
 import axios from 'axios';
 
 const VENDOR_TYPES = [
@@ -19,6 +19,8 @@ const SERVICES = [
   'Wheel Balancing',
 ];
 
+const BANK_OPTIONS = ['HDFC Bank','State Bank of India (SBI)','ICICI Bank','Axis Bank','Canara Bank','Union Bank','Indian Bank','Bank of Baroda','Others'];
+
 const inputCls    = "w-full p-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm";
 const inputErrCls = "w-full p-3 bg-white border border-red-300 rounded-xl focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-300 text-sm";
 const labelCls    = "block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1";
@@ -27,7 +29,8 @@ const labelOptCls = "block text-xs font-bold text-gray-400 uppercase tracking-wi
 const EMPTY = {
   vendorName: '', vendorType: '', contactPerson: '',
   mobileNumber: '', email: '', gstNumber: '', address: '',
-  services: [],
+  services: [], paymentTerms: 'credit',
+  bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '',
 };
 
 export default function AddTyreVendorModal({ isOpen, onClose, onAdd }) {
@@ -86,6 +89,12 @@ export default function AddTyreVendorModal({ isOpen, onClose, onAdd }) {
         gst_number: form.gstNumber,
         address_location: form.address,
         services: form.services,
+        payment_terms: form.paymentTerms,
+        bank_name: form.bankName,
+        custom_bank_name: form.customBank,
+        account_number: form.accountNo,
+        ifsc_code: form.ifsc,
+        upi_id: form.upi,
         status: 'Active'
       });
 
@@ -215,8 +224,75 @@ export default function AddTyreVendorModal({ isOpen, onClose, onAdd }) {
                   />
                 </div>
 
+                <div>
+                  <label className={labelCls}>Payment Terms</label>
+                  <div className="flex gap-2">
+                    {['credit', 'cash'].map(pt => (
+                      <button key={pt} type="button" onClick={() => {
+                        set('paymentTerms', pt);
+                        if (pt === 'cash') {
+                          setForm(p => ({ ...p, paymentTerms: 'cash', bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '' }));
+                        }
+                      }}
+                        className={`flex-1 py-2.5 rounded-xl text-sm font-bold capitalize border transition-colors ${
+                          form.paymentTerms === pt
+                            ? pt === 'cash' ? 'bg-violet-600 text-white border-violet-600' : 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                        }`}>
+                        {pt}
+                      </button>
+                    ))}
+                  </div>
+                  {form.paymentTerms === 'cash' && (
+                    <p className="text-[11px] text-violet-500 font-semibold mt-1.5">Cash vendor — payment is made upfront. No ledger balance tracking.</p>
+                  )}
+                </div>
+
               </div>
             </div>
+
+            {/* Bank Details — credit only */}
+            {form.paymentTerms === 'credit' && (
+            <div className="border-t border-gray-100 pt-5">
+              <p className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
+                <FiHome size={12} /> Bank Details (Optional)
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <label className={labelOptCls}>Bank Name</label>
+                  <select value={form.bankName} onChange={e => { set('bankName', e.target.value); set('customBank', ''); }}
+                    className={inputCls + ' text-gray-600'}>
+                    <option value="">Select Bank</option>
+                    {BANK_OPTIONS.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </div>
+                {form.bankName === 'Others' && (
+                  <div>
+                    <label className={labelOptCls}>Custom Bank Name</label>
+                    <input type="text" value={form.customBank} onChange={e => set('customBank', e.target.value)}
+                      placeholder="Enter bank name" className={inputCls} />
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className={labelOptCls}>Account Number</label>
+                    <input type="text" value={form.accountNo} onChange={e => set('accountNo', e.target.value)}
+                      placeholder="e.g. 1234567890" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelOptCls}>IFSC Code</label>
+                    <input type="text" value={form.ifsc} onChange={e => set('ifsc', e.target.value)}
+                      placeholder="e.g. ICIC0001234" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelOptCls}>UPI ID</label>
+                    <input type="text" value={form.upi} onChange={e => set('upi', e.target.value)}
+                      placeholder="e.g. vendor@upi" className={inputCls} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            )}
 
             {/* Section 2 — Services Offered */}
             <div className="border-t border-gray-100 pt-5">

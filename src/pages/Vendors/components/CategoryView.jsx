@@ -9,23 +9,20 @@ const isShowroom = (cat) => cat === 'showrooms';
 
 export default function CategoryView({ category, categoryName, vendors: allVendors = [], loading = false, onVendorClick, onRefresh }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState('all');
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [editVendor, setEditVendor] = useState(null);
 
-  // Filter vendors based on search term using database field name
-  const vendors = searchTerm
-  ? allVendors.filter(v =>
-      (
-        v.garage_name ||
-        v.showroom_name ||
-        v.vendor_name ||
-        v.name ||
-        ''
-      )
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-    )
-  : allVendors;
+  // Filter vendors based on search term and payment terms, using database field names
+  const vendors = allVendors
+    .filter(v => !searchTerm || (
+      v.garage_name ||
+      v.showroom_name ||
+      v.vendor_name ||
+      v.name ||
+      ''
+    ).toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter(v => paymentFilter === 'all' || (v.payment_terms || 'credit') === paymentFilter);
 
   const balanceLabel = isShowroom(category) ? 'Pending Warranty Amount' : 'Ledger Balance';
   const balanceTip   = isShowroom(category)
@@ -43,7 +40,17 @@ export default function CategoryView({ category, categoryName, vendors: allVendo
             {isShowroom(category) ? 'Manage showroom accounts and vehicle purchase history' : 'Manage your vendors and entities'}
           </p>
         </div>
-        <div className="flex items-center gap-4 w-full sm:w-auto">
+        <div className="flex items-center gap-4 w-full sm:w-auto flex-wrap">
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg p-1">
+            {['all', 'credit', 'cash'].map(pf => (
+              <button key={pf} onClick={() => setPaymentFilter(pf)}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold capitalize transition-colors ${
+                  paymentFilter === pf ? 'bg-blue-600 text-white' : 'text-gray-500 hover:bg-gray-100'
+                }`}>
+                {pf}
+              </button>
+            ))}
+          </div>
           <div className="relative flex-1 sm:w-64">
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
@@ -105,9 +112,18 @@ export default function CategoryView({ category, categoryName, vendors: allVendo
                   {vendor.status || 'Active'}
                 </span>
               </div>
-              <p className="text-[11px] font-semibold text-blue-500 mb-3">
-                {vendor.category || categoryName}
-              </p>
+              <div className="flex items-center gap-2 mb-3">
+                <p className="text-[11px] font-semibold text-blue-500">
+                  {vendor.category || categoryName}
+                </p>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize ${
+                  (vendor.payment_terms || 'credit') === 'cash'
+                    ? 'bg-violet-50 text-violet-600 border-violet-100'
+                    : 'bg-amber-50 text-amber-600 border-amber-100'
+                }`}>
+                  {vendor.payment_terms || 'credit'}
+                </span>
+              </div>
 
               <div className="space-y-1.5 mb-6">
                 <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">

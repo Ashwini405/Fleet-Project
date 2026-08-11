@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, Eye, QrCode, Truck, AlertTriangle, X, MinusCircle } from 'lucide-react';
 import axios from 'axios';
+import api from '../../../services/api';
 import RegisterTyreModal from '../components/RegisterTyreModal';
 import TyreDatasheetModal from '../components/TyreDatasheetModal';
 import QRScannerModal from '../components/QRScannerModal';
@@ -136,7 +137,7 @@ export default function AllTyresTab() {
 
   const fetchVehicles = async () => {
     try {
-      const res = await axios.get('http://localhost:5001/api/vehicles');
+      const res = await api.get('/vehicles');
       setVehicles(
         res.data.data ||
         res.data.vehicles ||

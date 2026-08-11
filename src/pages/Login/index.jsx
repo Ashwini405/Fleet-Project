@@ -13,7 +13,11 @@ export default function Login() {
     const [error, setError] = useState("");
     const [submitting, setSubmitting] = useState(false);
 
-    const from = location.state?.from?.pathname || "/";
+    // location.state.from is set by ProtectedRoute's client-side redirect;
+    // ?from= is set by the hard `window.location.href` redirect on refresh-token
+    // failure (api.js / patchFetch.js), which can't carry router state.
+    const queryFrom = new URLSearchParams(location.search).get("from");
+    const from = location.state?.from?.pathname || queryFrom || "/";
 
     const handleSubmit = async (e) => {
         e.preventDefault();

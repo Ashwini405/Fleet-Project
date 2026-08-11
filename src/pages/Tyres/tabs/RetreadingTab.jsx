@@ -1,13 +1,22 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import axios from 'axios';
 import {
   RotateCcw, PackageCheck, XCircle, AlertTriangle, Clock,
   Search, X, Archive, MoreVertical, Eye, ArrowRight,
 } from 'lucide-react';
 import { Toast, useToast, StickyTable, StickyThead, EmptyState } from '../components/ERPUtils';
 import RetreadingCompletedModal from '../components/RetreadingCompletedModal';
+import SendForRetreadingModal from '../components/SendForRetreadingModal';
 
 const todayStr = () => new Date().toISOString().split('T')[0];
+
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
 
 const STATUS_STYLE = {
   IN_PROGRESS: { badge: 'bg-amber-100 text-amber-700 ring-1 ring-amber-300',     dot: 'bg-amber-500',   label: 'In Progress' },
@@ -28,7 +37,7 @@ function isOverdue(r) {
 }
 
 // ── Actions dropdown ──────────────────────────────────────────────────────────
-function ActionMenu({ record, onView, onMarkReturned, onCancel, onReject }) {
+function ActionMenu({ record, onView, onMarkReturned, onCancel, onReject, onResend }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -75,7 +84,7 @@ function ActionMenu({ record, onView, onMarkReturned, onCancel, onReject }) {
               </>
             )}
             {record.status === 'REJECTED' && (
-              <button onClick={() => { onMarkReturned(); setOpen(false); }}
+              <button onClick={() => { onResend(); setOpen(false); }}
                 className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors">
                 <RotateCcw className="w-3.5 h-3.5 text-amber-500" /> Send Again
               </button>
@@ -159,8 +168,8 @@ function ViewRetreadingModal({ record, onClose }) {
             <div className="bg-amber-50 rounded-xl border border-amber-100 divide-y divide-amber-100">
               {[
                 ['Vendor',          record.vendorName],
-                ['Sent Date',       record.sentDate],
-                ['Expected Return', record.expectedReturnDate],
+                ['Sent Date',       fmtDate(record.sentDate)],
+                ['Expected Return', fmtDate(record.expectedReturnDate)],
                 ['Expected Cost',   `₹${(record.expectedCost || 0).toLocaleString()}`],
                 record.notes ? ['Notes', record.notes] : null,
               ].filter(Boolean).map(([label, val]) => (
@@ -178,7 +187,7 @@ function ViewRetreadingModal({ record, onClose }) {
               <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest mb-2">Return Details</p>
               <div className="bg-emerald-50 rounded-xl border border-emerald-100 divide-y divide-emerald-100">
                 {[
-                  ['Return Date',    record.returnDate],
+                  ['Return Date',    fmtDate(record.returnDate)],
                   ['Actual Cost',    `₹${(record.actualCost || 0).toLocaleString()}`],
                   ['New Tread %',    `${record.newTreadPercent}%`],
                   ['Condition',      record.condition],
@@ -226,6 +235,81 @@ function ViewRetreadingModal({ record, onClose }) {
   );
 }
 
+// ── Reject reason modal ─────────────────────────────────────────────────────
+function RejectRetreadingModal({ record, onClose, onConfirm }) {
+  const [reason, setReason]   = useState('');
+  const [error, setError]     = useState('');
+  const [saving, setSaving]   = useState(false);
+
+  useEffect(() => { setReason(''); setError(''); setSaving(false); }, [record]);
+
+  if (!record) return null;
+
+  const handleSubmit = async () => {
+    if (!reason.trim()) { setError('Reason for rejection is required'); return; }
+    setSaving(true);
+    await onConfirm(reason.trim());
+    setSaving(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 bg-black/60 backdrop-blur-sm"
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        className="bg-white rounded-2xl w-full overflow-hidden flex flex-col"
+        style={{ maxWidth: '440px', boxShadow: '0 32px 80px rgba(0,0,0,0.22)' }}
+      >
+        <div className="shrink-0 px-5 py-4 bg-gradient-to-r from-[#0f172a] to-[#1e293b] flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <XCircle className="w-4 h-4 text-rose-400" />
+              <h3 className="text-[15px] font-black text-white">Reject Retreading</h3>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">{record.tyreNo} · {record.vendorName}</p>
+          </div>
+          <button onClick={onClose} className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-all hover:rotate-90">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          <label className="block text-[10.5px] font-extrabold text-slate-400 uppercase tracking-widest">
+            Reason for Rejection<span className="text-rose-400 ml-0.5">*</span>
+          </label>
+          <textarea
+            rows={3}
+            autoFocus
+            value={reason}
+            onChange={e => { setReason(e.target.value); if (error) setError(''); }}
+            placeholder="e.g. Vendor found the casing unfit for retreading"
+            className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 transition-all resize-none ${
+              error ? 'border-red-300 focus:ring-red-100' : 'border-slate-200 hover:border-slate-300 focus:border-rose-500 focus:ring-rose-100'
+            }`}
+          />
+          {error && (
+            <p className="text-[11px] text-red-500 font-semibold flex items-center gap-1">
+              <AlertTriangle className="w-3 h-3 shrink-0" />{error}
+            </p>
+          )}
+        </div>
+
+        <div className="shrink-0 flex items-center justify-end gap-2.5 px-5 py-4 border-t border-slate-100 bg-slate-50/60">
+          <button onClick={onClose}
+            className="h-10 px-5 text-sm font-bold text-slate-500 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all">
+            Cancel
+          </button>
+          <button onClick={handleSubmit} disabled={saving}
+            className="h-10 px-6 text-sm font-extrabold text-white bg-rose-600 hover:bg-rose-700 rounded-xl flex items-center gap-2 transition-all shadow-md disabled:opacity-60">
+            <XCircle className="w-4 h-4" /> {saving ? 'Rejecting...' : 'Reject Retreading'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ── Main Tab ──────────────────────────────────────────────────────────────────
 export default function RetreadingTab({ records = [], onRecordUpdate, onRejected }) {
   const { toasts, push, dismiss } = useToast();
@@ -233,6 +317,8 @@ export default function RetreadingTab({ records = [], onRecordUpdate, onRejected
   const [filterStatus, setFilterStatus] = useState('all');
   const [completing, setCompleting]     = useState(null);
   const [viewing, setViewing]           = useState(null);
+  const [rejecting, setRejecting]       = useState(null);
+  const [resending, setResending]       = useState(null);
 
   const filtered = useMemo(() => records.filter(r => {
     const matchSearch = !search ||
@@ -257,15 +343,46 @@ export default function RetreadingTab({ records = [], onRecordUpdate, onRejected
     setCompleting(null);
   };
 
-  const handleCancel = (record) => {
-    onRecordUpdate?.({ ...record, status: 'CANCELLED' });
-    push(`${record.tyreNo} retreading cancelled`, 'warning');
+  const handleCancel = async (record) => {
+    try {
+      await axios.put(`http://localhost:5001/api/tyre-retreading/${record.id}`, { status: 'CANCELLED' });
+      onRecordUpdate?.({ ...record, status: 'CANCELLED' });
+      push(`${record.tyreNo} retreading cancelled`, 'warning');
+    } catch (err) {
+      console.error('CANCEL RETREADING ERROR:', err);
+      push('Failed to cancel — check connection and try again', 'error');
+    }
   };
 
-  const handleReject = (record) => {
-    onRecordUpdate?.({ ...record, status: 'REJECTED' });
-    onRejected?.(record.tyreNo);
-    push(`${record.tyreNo} rejected by vendor — moved back to Old Stock`, 'error');
+  const handleReject = async (record, reason) => {
+    try {
+      await axios.put(`http://localhost:5001/api/tyre-retreading/${record.id}`, { status: 'REJECTED', notes: reason });
+      onRecordUpdate?.({ ...record, status: 'REJECTED', notes: reason });
+      onRejected?.(record.tyreNo);
+      push(`${record.tyreNo} rejected by vendor — moved back to Old Stock`, 'error');
+      setRejecting(null);
+    } catch (err) {
+      console.error('REJECT RETREADING ERROR:', err);
+      push('Failed to reject — check connection and try again', 'error');
+    }
+  };
+
+  // "Send Again" after a rejection — this creates a genuinely NEW retreading
+  // attempt (its own tyre_retreading row, its own vendor/cost), distinct from
+  // the rejected one. It must not be confused with "Mark as Returned", which
+  // closes out an attempt that actually happened.
+  const handleResendConfirm = async (payload) => {
+    try {
+      await axios.put(`http://localhost:5001/api/old-tyres/${payload.tyre_no}`, {
+        tyre_status: 'RETREADING',
+        store_location: 'Retreading Area',
+      });
+      push(`${payload.tyre_no} sent to ${payload.vendor_name} for retreading`, 'warning');
+    } catch (err) {
+      console.error('RESEND OLD-TYRE STATUS ERROR:', err);
+    }
+    await onRecordUpdate?.();
+    setResending(null);
   };
 
   return (
@@ -375,11 +492,11 @@ export default function RetreadingTab({ records = [], onRecordUpdate, onRejected
                     <span className="text-xs font-semibold text-gray-700">{rec.vendorName}</span>
                   </td>
                   <td className="py-2.5 px-3 whitespace-nowrap">
-                    <span className="text-[11px] font-medium text-gray-500 tabular-nums">{rec.sentDate}</span>
+                    <span className="text-[11px] font-medium text-gray-500 tabular-nums">{fmtDate(rec.sentDate)}</span>
                   </td>
                   <td className="py-2.5 px-3 whitespace-nowrap">
                     <span className={`text-[11px] font-medium tabular-nums ${ov ? 'text-red-600 font-bold' : 'text-gray-500'}`}>
-                      {rec.expectedReturnDate}
+                      {fmtDate(rec.expectedReturnDate)}
                     </span>
                   </td>
                   <td className="py-2.5 px-3 text-right whitespace-nowrap">
@@ -408,7 +525,8 @@ export default function RetreadingTab({ records = [], onRecordUpdate, onRejected
                       onView={() => setViewing(rec)}
                       onMarkReturned={() => setCompleting(rec)}
                       onCancel={() => handleCancel(rec)}
-                      onReject={() => handleReject(rec)}
+                      onReject={() => setRejecting(rec)}
+                      onResend={() => setResending(rec)}
                     />
                   </td>
                 </motion.tr>
@@ -433,6 +551,26 @@ export default function RetreadingTab({ records = [], onRecordUpdate, onRejected
         onConfirm={handleRetreadingComplete}
       />
       <ViewRetreadingModal record={viewing} onClose={() => setViewing(null)} />
+      <RejectRetreadingModal
+        record={rejecting}
+        onClose={() => setRejecting(null)}
+        onConfirm={(reason) => handleReject(rejecting, reason)}
+      />
+      <SendForRetreadingModal
+        tyre={resending ? {
+          id:             resending.tyre_id,
+          tyreNo:         resending.tyreNo,
+          make:           resending.brand,
+          model:          resending.model,
+          tyreSize:       resending.tyre_size,
+          vehicleNo:      resending.vehicle_no,
+          lastPosition:   resending.last_position,
+          runningKm:      resending.running_km,
+          remainingTread: resending.remaining_tread,
+        } : null}
+        onClose={() => setResending(null)}
+        onConfirm={handleResendConfirm}
+      />
     </div>
   );
 }

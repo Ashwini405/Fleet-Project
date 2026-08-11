@@ -14,6 +14,8 @@ const Income = {
 
         income_number,
         income_category,
+        refund_type,
+        refund_reference,
 
         vehicle_id,
         vehicle_number,
@@ -23,6 +25,9 @@ const Income = {
 
         supervisor_id,
         supervisor_name,
+
+        station_id,
+        station_name,
 
         trip_id,
         trip_number,
@@ -53,7 +58,7 @@ const Income = {
 
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?
 
       )`,
 
@@ -61,6 +66,8 @@ const Income = {
 
         data.income_number,
         data.income_category,
+        data.refund_type,
+        data.refund_reference,
 
         data.vehicle_id,
         data.vehicle_number,
@@ -70,6 +77,9 @@ const Income = {
 
         data.supervisor_id,
         data.supervisor_name,
+
+        data.station_id,
+        data.station_name,
 
         data.trip_id,
         data.trip_number,
@@ -139,6 +149,27 @@ const Income = {
     );
 
     return rows[0];
+
+  },
+
+  // =====================================================
+  // GET INCOME BY TRIP
+  // =====================================================
+
+  getIncomeByTrip: async (tripId) => {
+
+    const [rows] = await db.query(
+
+      `SELECT *
+       FROM income_entries
+       WHERE trip_id = ?
+       ORDER BY created_at DESC`,
+
+      [tripId]
+
+    );
+
+    return rows;
 
   },
 

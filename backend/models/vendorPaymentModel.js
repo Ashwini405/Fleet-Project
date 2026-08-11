@@ -2,17 +2,19 @@ const db = require("../config/db");
 
 const VendorPayment = {
 
-  // GET PAYMENTS BY VENDOR
-  getByVendorId: async (vendorId) => {
+  // GET PAYMENTS BY VENDOR (scoped to a category — vendor_id is not
+  // globally unique across vendor tables, e.g. a tyre vendor and a garage
+  // vendor can share the same numeric id)
+  getByVendorId: async (vendorId, vendorCategory) => {
 
     const [rows] = await db.query(
       `
       SELECT *
       FROM vendor_payments
-      WHERE vendor_id = ?
+      WHERE vendor_id = ? AND vendor_category = ?
       ORDER BY payment_date DESC, id DESC
       `,
-      [vendorId]
+      [vendorId, vendorCategory]
     );
 
     return rows;
@@ -23,6 +25,7 @@ const VendorPayment = {
 
     const {
       vendor_id,
+      vendor_category,
       payment_date,
       amount,
       payment_mode,
@@ -35,6 +38,7 @@ const VendorPayment = {
       INSERT INTO vendor_payments
       (
         vendor_id,
+        vendor_category,
         payment_date,
         amount,
         payment_mode,
@@ -42,10 +46,11 @@ const VendorPayment = {
         notes
       )
       VALUES
-      (?, ?, ?, ?, ?, ?)
+      (?, ?, ?, ?, ?, ?, ?)
       `,
       [
         vendor_id,
+        vendor_category || null,
         payment_date,
         amount,
         payment_mode,

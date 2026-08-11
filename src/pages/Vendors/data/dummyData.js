@@ -6,8 +6,8 @@ export const vendorCategories = [
   { id: "tyres",     label: "Tyres",          short: "Tyres",          icon: "FiCircle" },
   { id: "oils",      label: "Oils & Lubes",   short: "Oils & Lubes",   icon: "FiDroplet" },
   { id: "fuel",      label: "Fuel Stations",  short: "Fuel Stations",  icon: "FiFeather" },
-  { id: "rta",       label: "RTA Expenses",   short: "RTA Expenses",   icon: "FiFileText" }
-  // Labour removed: no vendor mapping in Service/Maintenance modules yet.
+  { id: "rta",       label: "RTA Expenses",   short: "RTA Expenses",   icon: "FiFileText" },
+  { id: "labour",    label: "Labour",         short: "Labour",         icon: "FiUsers" },
 ];
 
 export const dummyVendors = [

@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
-import { Truck, Eye, TrendingUp, TrendingDown, List } from "lucide-react";
+import { Truck, Eye, TrendingUp, TrendingDown, List, ArrowUpRight, ArrowDownRight, Minus, ChevronRight } from "lucide-react";
 import Modal from "../components/Modal";
+import IncomeDetailsModal from "../components/income/IncomeDetailsModal";
 
 function DetailRow({ label, value }) {
   return (
@@ -13,6 +14,7 @@ function DetailRow({ label, value }) {
 
 export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
   const [modalTruck, setModalTruck] = useState(null);
+  const [detailTxn, setDetailTxn] = useState(null);
   const [vehicles, setVehicles] = useState([]);
   const [incomeList, setIncomeList] = useState([]);
   const [expenseList, setExpenseList] = useState([]);
@@ -144,72 +146,100 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
         <p className="text-xs text-gray-500 mt-0.5">Profit &amp; loss analysis by vehicle</p>
       </div>
 
-      {/* ── Trucks table ── */}
-      <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
-        {/* Head */}
-        <div className="hidden md:grid grid-cols-[2.5fr_1fr_1fr_1fr_auto] gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wide">
-          <span>Vehicle</span>
-          <span className="text-center">Income</span>
-          <span className="text-center">Expense</span>
-          <span className="text-center">Net Profit</span>
-          <span />
+      {/* ── Trucks grid ── */}
+      {truckStats.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm py-14 text-center text-gray-400 text-sm">
+          No vehicle records found.
         </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {truckStats.map(truck => {
+            const isProfit = truck.netProfit > 0;
+            const isLoss = truck.netProfit < 0;
+            const statusCls = isProfit
+              ? "border-emerald-200 hover:border-emerald-300"
+              : isLoss
+                ? "border-red-200 hover:border-red-300"
+                : "border-gray-200 hover:border-gray-300";
+            const badgeCls = isProfit
+              ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+              : isLoss
+                ? "bg-red-50 text-red-600 border-red-200"
+                : "bg-gray-50 text-gray-500 border-gray-200";
+            const BadgeIcon = isProfit ? ArrowUpRight : isLoss ? ArrowDownRight : Minus;
+            const badgeLabel = isProfit ? "Profit" : isLoss ? "Loss" : "Break-even";
 
-        {truckStats.length === 0 ? (
-          <div className="py-14 text-center text-gray-400 text-sm">No vehicle records found.</div>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {truckStats.map(truck => (
+            // Expense share of income, for a quick visual read (capped at 100%)
+            const spendRatio = truck.totalIncome > 0
+              ? Math.min(100, Math.round((truck.totalExpense / truck.totalIncome) * 100))
+              : truck.totalExpense > 0 ? 100 : 0;
+
+            return (
               <div
                 key={truck.id}
-                className="flex flex-col md:grid md:grid-cols-[2.5fr_1fr_1fr_1fr_auto] gap-3 md:gap-4 items-start md:items-center px-5 py-4 hover:bg-gray-50/70 transition-colors"
+                className={`bg-white border rounded-2xl shadow-sm p-5 flex flex-col gap-4 transition-colors ${statusCls}`}
               >
-                {/* Vehicle info */}
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
-                    <Truck className="w-5 h-5" />
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+                      <Truck className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-gray-900 truncate">{truck.vehicle_no}</p>
+                      <p className="text-xs text-gray-400 truncate">{truck.driver_name || "No Driver"}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-bold text-gray-900">{truck.vehicle_no}</p>
-                    <p className="text-xs text-gray-400">
-                      {truck.id} &nbsp;·&nbsp; {truck.driver_name || "No Driver"}
-                    </p>
-                  </div>
+                  <button
+                    onClick={() => setModalTruck(truck)}
+                    className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors shrink-0"
+                    title="View truck report"
+                  >
+                    <Eye className="w-4 h-4" />
+                  </button>
                 </div>
 
-                {/* Income */}
-                <div className="md:text-center">
-                  <p className="text-xs text-gray-400 font-semibold uppercase md:hidden">Income</p>
-                  <p className="text-sm font-bold text-gray-800">₹{truck.totalIncome.toLocaleString()}</p>
-                </div>
-
-                {/* Expense */}
-                <div className="md:text-center">
-                  <p className="text-xs text-gray-400 font-semibold uppercase md:hidden">Expense</p>
-                  <p className="text-sm font-bold text-red-500">₹{truck.totalExpense.toLocaleString()}</p>
-                </div>
-
-                {/* Net profit */}
-                <div className="md:text-center">
-                  <p className="text-xs text-gray-400 font-semibold uppercase md:hidden">Net Profit</p>
-                  <p className={`text-sm font-extrabold ${truck.netProfit >= 0 ? "text-blue-600" : "text-red-500"}`}>
-                    {truck.netProfit >= 0 ? "+" : ""}₹{truck.netProfit.toLocaleString()}
+                {/* Status badge + net profit */}
+                <div className="flex items-center justify-between">
+                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg border text-[11px] font-bold uppercase tracking-wide ${badgeCls}`}>
+                    <BadgeIcon className="w-3 h-3" /> {badgeLabel}
+                  </span>
+                  <p className={`text-xl font-extrabold tabular-nums ${isProfit ? "text-emerald-600" : isLoss ? "text-red-500" : "text-gray-500"}`}>
+                    {isProfit ? "+" : isLoss ? "−" : ""}₹{Math.abs(truck.netProfit).toLocaleString()}
                   </p>
                 </div>
 
-                {/* View */}
-                <button
-                  onClick={() => setModalTruck(truck)}
-                  className="p-1.5 rounded-lg text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                  title="View truck report"
-                >
-                  <Eye className="w-4 h-4" />
-                </button>
+                {/* Income vs Expense */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-emerald-50/60 border border-emerald-100 px-3 py-2.5">
+                    <p className="text-[10px] font-bold text-emerald-700/70 uppercase tracking-widest mb-0.5">Income</p>
+                    <p className="text-sm font-extrabold text-emerald-700 tabular-nums">₹{truck.totalIncome.toLocaleString()}</p>
+                  </div>
+                  <div className="rounded-xl bg-red-50/60 border border-red-100 px-3 py-2.5">
+                    <p className="text-[10px] font-bold text-red-600/70 uppercase tracking-widest mb-0.5">Expense</p>
+                    <p className="text-sm font-extrabold text-red-600 tabular-nums">₹{truck.totalExpense.toLocaleString()}</p>
+                  </div>
+                </div>
+
+                {/* Expense-share bar */}
+                <div>
+                  <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${spendRatio >= 100 ? "bg-red-500" : spendRatio >= 70 ? "bg-amber-400" : "bg-emerald-400"}`}
+                      style={{ width: `${spendRatio}%` }}
+                    />
+                  </div>
+                  <p className="mt-1 text-[10px] text-gray-400 font-medium">
+                    {truck.totalIncome > 0
+                      ? `${spendRatio}% of income spent`
+                      : truck.totalExpense > 0 ? "No income recorded yet" : "No transactions yet"}
+                  </p>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* ── Truck report modal ── */}
       <Modal
@@ -264,9 +294,11 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
                   {modalTruck.history.map((txn, i) => {
                     const isInc = txn._type === "income";
                     return (
-                      <div
+                      <button
                         key={i}
-                        className="flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors"
+                        onClick={() => setDetailTxn(txn)}
+                        title="View full record"
+                        className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-left"
                       >
                         <div className="flex items-center gap-2.5">
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isInc ? "bg-green-50 text-green-500" : "bg-red-50 text-red-500"}`}>
@@ -277,10 +309,13 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
                             <p className="text-xs text-gray-400">{txn.date || "—"}</p>
                           </div>
                         </div>
-                        <p className={`text-sm font-bold ${isInc ? "text-green-600" : "text-red-500"}`}>
-                          {isInc ? "+" : "−"}₹{Math.abs(txn.amount).toLocaleString()}
-                        </p>
-                      </div>
+                        <div className="flex items-center gap-1.5">
+                          <p className={`text-sm font-bold ${isInc ? "text-green-600" : "text-red-500"}`}>
+                            {isInc ? "+" : "−"}₹{Math.abs(txn.amount).toLocaleString()}
+                          </p>
+                          <ChevronRight className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+                        </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -290,6 +325,45 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
             <div className="pt-3 border-t border-gray-100 flex justify-end">
               <button
                 onClick={() => setModalTruck(null)}
+                className="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white text-sm font-bold rounded-xl transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Drill into the actual income record ── */}
+      {detailTxn && detailTxn._type === "income" && (
+        <IncomeDetailsModal txn={detailTxn} onClose={() => setDetailTxn(null)} />
+      )}
+
+      {/* ── Drill into the actual expense record ── */}
+      <Modal
+        isOpen={!!(detailTxn && detailTxn._type === "expense")}
+        onClose={() => setDetailTxn(null)}
+        title="Expense Transaction Details"
+      >
+        {detailTxn && detailTxn._type === "expense" && (
+          <div>
+            <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4">
+              <p className="text-xs font-semibold text-gray-500 mb-0.5">Amount</p>
+              <p className="text-3xl font-extrabold text-red-500">
+                -₹{Number(detailTxn.amount || 0).toLocaleString("en-IN")}
+              </p>
+            </div>
+
+            <DetailRow label="Date" value={detailTxn.expense_date || detailTxn.date || "—"} />
+            <DetailRow label="Category" value={detailTxn.expense_category || "—"} />
+            <DetailRow label="Vehicle" value={detailTxn.vehicle_number || "—"} />
+            <DetailRow label="Payment Method" value={detailTxn.payment_method || "—"} />
+            <DetailRow label="Vendor/Payee" value={detailTxn.vendor_payee || "—"} />
+            <DetailRow label="Description" value={`"${detailTxn.description || "—"}"`} />
+
+            <div className="pt-4 flex justify-end">
+              <button
+                onClick={() => setDetailTxn(null)}
                 className="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white text-sm font-bold rounded-xl transition-colors"
               >
                 Close

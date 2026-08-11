@@ -26,6 +26,7 @@ function printTbl(title, cols, rows) {
 }
 
 export default function OilsLedger({ vendor, onBack }) {
+  const isCash = (vendor.payment_terms || 'credit') === 'cash';
   const [rawTxns, setRawTxns] = useState([]);
   const [activeFilter, setActiveFilter] = useState('All');
   const [search, setSearch] = useState('');
@@ -55,9 +56,9 @@ export default function OilsLedger({ vendor, onBack }) {
     let running = 0;
     return [...rawTxns].sort((a, b) => new Date(a.date) - new Date(b.date)).map(t => {
       running += (t.debit || 0) - (t.credit || 0);
-      return { ...t, runningBalance: running };
+      return { ...t, runningBalance: isCash ? 0 : running };
     });
-  }, [rawTxns]);
+  }, [rawTxns, isCash]);
 
   const totalDebit = rawTxns.reduce((s, t) => s + (t.debit || 0), 0);
   const totalCredit = rawTxns.reduce((s, t) => s + (t.credit || 0), 0);
@@ -105,7 +106,7 @@ export default function OilsLedger({ vendor, onBack }) {
       </div>
 
       <VendorInfoPanel vendor={vendor} categoryLabel={CATEGORY_LABEL} />
-      <SummaryCards totalDebit={totalDebit} totalCredit={totalCredit} lastDate={lastDate} />
+      <SummaryCards totalDebit={totalDebit} totalCredit={totalCredit} lastDate={lastDate} isCash={isCash} />
 
       {/* Transaction Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">

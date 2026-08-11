@@ -145,7 +145,7 @@ export default function DriversTab() {
   const [staffData, setStaffData] = useState([]);
 
   // Fetch drivers from backend
-  useEffect(() => {
+  const fetchDrivers = () => {
     fetch('http://localhost:5001/api/drivers')
       .then(res => res.json())
       .then(data => {
@@ -156,6 +156,10 @@ export default function DriversTab() {
         }
       })
       .catch(err => console.error("Error fetching drivers:", err));
+  };
+
+  useEffect(() => {
+    fetchDrivers();
   }, []);
 
   // Filter based on search term (name, mobile, or ID card)
@@ -275,7 +279,7 @@ export default function DriversTab() {
         </div>
       </div>
 
-      <AddDriverModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} />
+      <AddDriverModal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} onSuccess={fetchDrivers} />
     </div>
   );
 }

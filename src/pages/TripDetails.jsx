@@ -422,7 +422,7 @@ export default function TripDetails() {
   const [modal, setModal] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [fuelEntries, setFuelEntries] = useState([]);
-  const [expForm, setExpForm] = useState({ type: 'Toll', amount: '', note: '' });
+  const [expForm, setExpForm] = useState({ type: 'Food', amount: '', note: '' });
 
   if (!trip) {
     return <div className="p-5 text-center text-slate-500">Loading trip details...</div>;
@@ -548,7 +548,7 @@ export default function TripDetails() {
       setExpenses(refreshedData.data);
     }
 
-    setExpForm({ type: 'Toll', amount: '', note: '' });
+    setExpForm({ type: 'Food', amount: '', note: '' });
     setModal(null);
   };
 
@@ -643,7 +643,7 @@ export default function TripDetails() {
       <TripStepper status={mappedTrip.status} />
 
       {/* ── Finance Summary ── */}
-      <TripFinanceSummary tripId={mappedTrip.id} />
+      <TripFinanceSummary tripId={trip.id} />
 
       {/* ── Planned-only notice (hide execution sections) ── */}
       {mappedTrip.status === 'Planned' && (
@@ -893,7 +893,7 @@ export default function TripDetails() {
                 {expenses.map(e => (
                   <div key={e.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                     <div>
-                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold mr-2 ${e.type === 'Toll' ? 'bg-blue-100 text-blue-700'
+                      <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold mr-2 ${e.type === 'Food' ? 'bg-blue-100 text-blue-700'
                         : e.type === 'Maintenance' ? 'bg-orange-100 text-orange-700'
                           : 'bg-slate-100 text-slate-600'
                         }`}>{e.type}</span>
@@ -1067,7 +1067,7 @@ export default function TripDetails() {
             <div>
               <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Type</label>
               <select className={inp} value={expForm.type} onChange={e => setExpForm(p => ({ ...p, type: e.target.value }))}>
-                {['Toll', 'Maintenance', 'Misc'].map(t => <option key={t}>{t}</option>)}
+                {['Food', 'Maintenance', 'Misc'].map(t => <option key={t}>{t}</option>)}
               </select>
             </div>
             <div>

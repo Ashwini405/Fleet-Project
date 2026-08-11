@@ -74,6 +74,7 @@ function EditAgentModal({ vendor, onClose, onSave }) {
     address:    vendor.address_location || vendor.address || '',
     agentType:  vendor.agent_type || vendor.agentType || vendor.vendorCategory || '',
     status:     vendor.status || 'Active',
+    paymentTerms: vendor.payment_terms || 'credit',
     notes:      vendor.notes || '',
   });
   const [errors, setErrors] = useState({});
@@ -101,6 +102,7 @@ function EditAgentModal({ vendor, onClose, onSave }) {
       address_location: form.address.trim(),
       agent_type:       form.agentType,
       status:           form.status,
+      payment_terms:    form.paymentTerms,
       notes:            form.notes.trim(),
     });
   };
@@ -155,6 +157,21 @@ function EditAgentModal({ vendor, onClose, onSave }) {
             </div>
           </div>
           <div>
+            <label className={lCls}>Payment Terms</label>
+            <div className="flex gap-2">
+              {['credit', 'cash'].map(pt => (
+                <button key={pt} type="button" onClick={() => set('paymentTerms', pt)}
+                  className={`flex-1 py-2 rounded-xl text-sm font-bold capitalize border transition-colors ${
+                    form.paymentTerms === pt
+                      ? 'bg-rose-600 text-white border-rose-600'
+                      : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                  }`}>
+                  {pt}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
             <label className={loCls}>Notes</label>
             <textarea rows={2} value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Optional notes…" className={iCls + ' resize-none'} />
           </div>
@@ -174,6 +191,7 @@ export default function RTAPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [paymentFilter, setPaymentFilter] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
   const [editVendor, setEditVendor] = useState(null);
   const [viewVendor, setViewVendor] = useState(null);
@@ -208,13 +226,14 @@ export default function RTAPage() {
     const q = search.trim().toLowerCase();
     return vendors.filter(v => {
       if (statusFilter !== 'All' && v.status !== statusFilter) return false;
+      if (paymentFilter !== 'all' && (v.payment_terms || 'credit') !== paymentFilter) return false;
       if (!q) return true;
       return (
         (v.vendor_name || '').toLowerCase().includes(q) ||
         (v.mobile_number || '').includes(q)
       );
     });
-  }, [vendors, search, statusFilter]);
+  }, [vendors, search, statusFilter, paymentFilter]);
 
   // ── Add handler ──────────────────────────────────────────────────────────
   const handleAdd = async () => {
@@ -232,6 +251,7 @@ export default function RTAPage() {
         address_location: updated.address_location,
         agent_type: updated.agent_type,
         status: updated.status,
+        payment_terms: updated.payment_terms,
         notes: updated.notes,
       });
       await fetchRTAVendors();
@@ -326,7 +346,7 @@ export default function RTAPage() {
       </div>
 
       {/* Status filter tabs */}
-      <div className="flex gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {['All', 'Active', 'Inactive'].map(f => (
           <button key={f} onClick={() => setStatusFilter(f)}
             className={`px-4 py-2 rounded-xl text-xs font-bold border transition-colors ${
@@ -335,6 +355,17 @@ export default function RTAPage() {
                 : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
             }`}>
             {f} <span className="ml-1 opacity-70">({counts[f]})</span>
+          </button>
+        ))}
+        <div className="w-px h-6 bg-gray-200 mx-1" />
+        {['all', 'credit', 'cash'].map(pf => (
+          <button key={pf} onClick={() => setPaymentFilter(pf)}
+            className={`px-4 py-2 rounded-xl text-xs font-bold capitalize border transition-colors ${
+              paymentFilter === pf
+                ? 'bg-rose-600 text-white border-rose-600'
+                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+            }`}>
+            {pf}
           </button>
         ))}
       </div>

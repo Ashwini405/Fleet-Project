@@ -184,6 +184,7 @@ export function AuditTrail({ totals }) {
     { label: 'Tyres',             value: totals.totalTyres || 0,         sign: '−', color: 'text-red-600',    dot: 'bg-purple-500'  },
     { label: 'Battery',           value: totals.totalBattery || 0,       sign: '−', color: 'text-red-600',    dot: 'bg-blue-500'    },
     { label: 'Driver Settlement', value: totals.totalDriver || 0,      sign: '−', color: 'text-red-600',    dot: 'bg-teal-500'    },
+    { label: 'Vehicle EMI',       value: totals.totalEMI || 0,           sign: '−', color: 'text-red-600',    dot: 'bg-amber-600'   },
     { label: 'RTA Expenses',      value: totals.totalRTA || 0,           sign: '−', color: 'text-red-600',    dot: 'bg-slate-500'   },
     { label: 'Miscellaneous',     value: totals.totalMisc || 0,          sign: '−', color: 'text-red-600',    dot: 'bg-orange-500'  },
   ];

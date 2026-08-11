@@ -299,6 +299,7 @@ export default function VehicleMaster() {
   const [visibleCols, setVisibleCols] = useState(defaultVisible);
   const [showColSettings, setShowColSettings] = useState(false);
   const [vehicles, setVehicles] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [docFilter, setDocFilter] = useState(null);
   const colSettingsBtnRef = useRef(null);
@@ -321,6 +322,8 @@ export default function VehicleMaster() {
 
   // Fetch vehicles from backend
   useEffect(() => {
+    setLoading(true);
+
     fetch('http://localhost:5001/api/vehicles')
       .then(res => res.json())
       .then(data => {
@@ -360,7 +363,8 @@ export default function VehicleMaster() {
           console.error("Failed to fetch vehicles:", data.message);
         }
       })
-      .catch(err => console.error("Error fetching vehicles:", err));
+      .catch(err => console.error("Error fetching vehicles:", err))
+      .finally(() => setLoading(false));
   }, []);
 
   const toggleCol = (key) => setVisibleCols(prev => ({ ...prev, [key]: !prev[key] }));
@@ -499,11 +503,24 @@ export default function VehicleMaster() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {filteredData.length > 0 ? (
+              {loading ? (
+                Array.from({ length: 6 }).map((_, index) => (
+                  <tr key={`skeleton-${index}`} className="animate-pulse">
+                    <td colSpan={activeColumns.length} className="px-5 py-4">
+                      <div className="h-4 rounded-full bg-slate-200/80 w-1/3 mb-3" />
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {Array.from({ length: Math.max(1, activeColumns.length - 1) }).map((__, colIndex) => (
+                          <div key={colIndex} className="h-3 rounded-full bg-slate-200/80" />
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : filteredData.length > 0 ? (
                 filteredData.map(vehicle => (
                   <tr
                     key={vehicle.id}
-                    onClick={() => navigate(`/vehicles/${vehicle.id}`)}
+                    onClick={() => navigate(`/vehicles/${vehicle.id}`, { state: { vehicle } })}
                     className="hover:bg-indigo-50/40 transition-colors cursor-pointer"
                   >
                     {activeColumns.map(col => (

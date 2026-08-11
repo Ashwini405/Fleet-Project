@@ -72,8 +72,9 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
   const isInProgress = status === 'In Progress';
   const isCompleted  = status === 'Completed';
 
-  // Fetch vehicles + garages once
+  // Fetch vehicles + garages — only once the modal is actually opened
   useEffect(() => {
+    if (!isOpen) return;
     fetch(`${API}/vehicles`).then(r => r.json()).then(d => setTrucks(d.data || []));
     fetch(`${API}/vendors`)
       .then(r => r.json())
@@ -82,7 +83,7 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
         setGarages(all.filter(v => String(v.category).toLowerCase() === 'garages'));
       })
       .catch(() => {});
-  }, []);
+  }, [isOpen]);
 
   // Fetch vehicle service status when truck selected
   useEffect(() => {

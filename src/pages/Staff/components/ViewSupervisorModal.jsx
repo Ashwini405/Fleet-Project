@@ -90,10 +90,31 @@
 
 import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, MapPin, Phone, Briefcase, CalendarCheck } from 'lucide-react';
+import { X, MapPin, Phone, Briefcase, CalendarCheck, Trash2, Edit } from 'lucide-react';
 
-export default function ViewSupervisorModal({ isOpen, onClose, staff }) {
+export default function ViewSupervisorModal({ isOpen, onClose, staff, onSuccess, onEdit }) {
   if (!isOpen || !staff) return null;
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Remove supervisor "${staff.full_name}"?`)) return;
+
+    try {
+      const res = await fetch(`http://localhost:5001/api/supervisors/${staff.id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        onSuccess?.();
+        onClose();
+      } else {
+        alert(data.message || "Failed to remove supervisor");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Server error — could not remove supervisor");
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -123,7 +144,7 @@ export default function ViewSupervisorModal({ isOpen, onClose, staff }) {
                   </div>
                   <div>
                     <h3 className="font-bold text-gray-900">{staff.full_name}</h3>
-                    <p className="text-sm text-gray-500">Supervisor ID • {staff.id_card_number}</p>
+                    <p className="text-sm text-gray-500">Supervisor ID • {staff.supervisor_code || '—'}</p>
                   </div>
                 </div>
               </div>
@@ -139,6 +160,11 @@ export default function ViewSupervisorModal({ isOpen, onClose, staff }) {
                     <MapPin className="w-4 h-4 text-slate-400" />
                     <span>{staff.station_name || 'Unassigned'}</span>
                   </div>
+                  {staff.id_card_number && (
+                    <p className="text-xs text-slate-400 font-medium mt-3">
+                      ID Card: <span className="text-slate-600 font-semibold">{staff.id_card_number}</span>
+                    </p>
+                  )}
                 </div>
 
                 <div className="p-5 bg-white rounded-3xl border border-gray-100">
@@ -203,6 +229,23 @@ export default function ViewSupervisorModal({ isOpen, onClose, staff }) {
                 <p className="text-sm text-slate-600">{staff.notes || 'No additional notes available.'}</p>
               </div>
             </div>
+          </div>
+
+          <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => onEdit?.(staff)}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-xl transition-colors"
+            >
+              <Edit className="w-4 h-4" /> Edit
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-xl transition-colors"
+            >
+              <Trash2 className="w-4 h-4" /> Remove Supervisor
+            </button>
           </div>
         </motion.div>
       </div>

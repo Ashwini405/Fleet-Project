@@ -6,7 +6,7 @@ import { TruckKpiCards, ExpenseSummary, ProfitCalculationCard } from './PLWidget
 import {
   RevenueSection, FuelSection, MaintenanceSection,
   TyreSection, BatterySection, DriverSettlementSection,
-  RTASection, MiscExpenseSection,
+  RTASection, MiscExpenseSection, EmiSection,
 } from './PLSections';
 import { OperationalInsights, ReportFooter } from './PLEnhancements';
 
@@ -141,6 +141,11 @@ export default function TruckPLDetail() {
             data={d.driverSettlement}
             prevTotal={0}
             settlementRef={d.driverSettlement.settlement?.settlement_no}
+          />
+          <EmiSection
+            data={d.emi}
+            total={d.totals.totalEMI}
+            prevTotal={0}
           />
           <RTASection
             data={d.rta}

@@ -7,6 +7,21 @@ const db = require('../config/db');
 
 const createTyre = async (data) => {
 
+  // Cash vendors are paid in full at time of purchase — mark the tyre paid
+  // immediately rather than leaving it defaulted to Unpaid. (Previously this
+  // was only ever applied as a one-off historical backfill, never at the
+  // moment a new tyre from a cash vendor was actually purchased.)
+  let isCashVendor = false;
+  if (data.vendor_name) {
+    const [vendorRows] = await db.query(
+      `SELECT payment_terms FROM tyre_vendors WHERE vendor_name = ? LIMIT 1`,
+      [data.vendor_name]
+    );
+    isCashVendor = vendorRows[0]?.payment_terms === 'cash';
+  }
+  const paymentStatus = isCashVendor ? 'Paid' : 'Unpaid';
+  const paidAmount = isCashVendor ? (data.tyre_cost || 0) : 0;
+
   const [result] = await db.query(
 
     `
@@ -53,13 +68,19 @@ const createTyre = async (data) => {
 
       tyre_cost,
 
-      tyre_files
+      tyre_files,
+
+      warranty_months,
+
+      payment_status,
+
+      paid_amount
 
     )
 
     VALUES (
 
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 
     )
 
@@ -109,7 +130,13 @@ const createTyre = async (data) => {
 
       data.tyre_cost,
 
-      data.tyre_files
+      data.tyre_files,
+
+      data.warranty_months || null,
+
+      paymentStatus,
+
+      paidAmount
 
     ]
 
@@ -318,6 +345,44 @@ const removeTyre = async (data) => {
   return result;
 };
 
+// ======================================================
+// ALLOCATE A VENDOR PAYMENT AGAINST OUTSTANDING PURCHASES
+// Applies the paid amount to this vendor's tyre purchases,
+// oldest purchase_date first, until the amount is used up.
+// ======================================================
+
+const allocatePayment = async (vendorName, amount) => {
+  let remaining = Number(amount) || 0;
+  if (remaining <= 0 || !vendorName) return;
+
+  const [rows] = await db.query(
+    `SELECT id, tyre_cost, paid_amount
+     FROM tyres
+     WHERE vendor_name = ? AND COALESCE(paid_amount, 0) < tyre_cost
+     ORDER BY purchase_date ASC, id ASC`,
+    [vendorName]
+  );
+
+  for (const row of rows) {
+    if (remaining <= 0) break;
+    const cost = Number(row.tyre_cost || 0);
+    const alreadyPaid = Number(row.paid_amount || 0);
+    const due = cost - alreadyPaid;
+    if (due <= 0) continue;
+
+    const apply = Math.min(remaining, due);
+    const newPaid = alreadyPaid + apply;
+    const status = newPaid >= cost ? 'Paid' : newPaid > 0 ? 'Partially Paid' : 'Unpaid';
+
+    await db.query(
+      `UPDATE tyres SET paid_amount = ?, payment_status = ? WHERE id = ?`,
+      [newPaid, status, row.id]
+    );
+
+    remaining -= apply;
+  }
+};
+
 module.exports = {
 
   createTyre,
@@ -326,6 +391,7 @@ module.exports = {
   mountTyre,
   removeTyre,
   getTyresByVehicle,
-  getTyreActivitiesByVehicle
+  getTyreActivitiesByVehicle,
+  allocatePayment
 
 };
