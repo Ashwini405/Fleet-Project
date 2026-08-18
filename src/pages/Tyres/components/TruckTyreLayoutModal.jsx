@@ -18,7 +18,14 @@ const HEALTH = {
 const healthColor = { Good: 'bg-green-500', Medium: 'bg-yellow-500', Poor: 'bg-red-500' };
 const healthBorder = { Good: 'border-green-400', Medium: 'border-yellow-400', Poor: 'border-red-400' };
 
-function TyreOpsPopup({ tyre, truckData, onClose, onRemove, onReplace, onViewDetails, onSendOldStock, onFromInventory }) {
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function TyreOpsPopup({ tyre, truckData, onClose, onRemove, onReplace, onViewDetails }) {
   const h = HEALTH[tyre.health] || HEALTH.Good;
   const runKm = tyre.presentOdo - tyre.fittedOdo;
   const lifePct = Math.round((runKm / tyre.expectedLife) * 100);
@@ -29,7 +36,7 @@ function TyreOpsPopup({ tyre, truckData, onClose, onRemove, onReplace, onViewDet
     ['Brand / Model', `${tyre.make} ${tyre.model}`],
     ['Truck No', truckData.id],
     ['Axle Position', tyre.position],
-    ['Mounted Date', tyre.fittedDate],
+    ['Mounted Date', fmtDate(tyre.fittedDate)],
     ['Fitted Odo', `${tyre.fittedOdo.toLocaleString()} km`],
     ['Current Odo', `${tyre.presentOdo.toLocaleString()} km`],
     ['Running KM', `${runKm.toLocaleString()} km`],
@@ -103,10 +110,6 @@ function TyreOpsPopup({ tyre, truckData, onClose, onRemove, onReplace, onViewDet
             <ActionBtn icon={<MinusCircle className="w-3 h-3" />} label="Remove" cls="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200" onClick={() => { onClose(); onRemove(tyre); }} />
             <ActionBtn icon={<ArrowLeftRight className="w-3 h-3" />} label="Replace" cls="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200" onClick={() => { onClose(); onReplace(tyre); }} />
           </div>
-          <div className="grid grid-cols-2 gap-1.5">
-            <ActionBtn icon={<Archive className="w-3 h-3" />} label="Send to Old Stock" cls="bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200" onClick={() => { onClose(); onSendOldStock(tyre); }} />
-            <ActionBtn icon={<PackageCheck className="w-3 h-3" />} label="From Inventory" cls="bg-green-50 hover:bg-green-100 text-green-700 border border-green-200" onClick={() => { onClose(); onFromInventory(tyre.position); }} />
-          </div>
         </div>
       </div>
     </motion.div>
@@ -178,7 +181,7 @@ function TyreBlock({ posId, tyre, onMount, onPopup, activePopupId }) {
           </div>
         </div>
         <div className="text-[6px] text-gray-400 leading-none mt-auto pt-0.5 border-t border-gray-200/60 w-full">
-          {label} · {tyre.fittedDate}
+          {label} · {fmtDate(tyre.fittedDate)}
         </div>
       </motion.div>
 
@@ -225,6 +228,7 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
   const [selectedTyre, setSelectedTyre] = useState(null);
   const [mountSlot, setMountSlot] = useState(null);
   const [removingTyre, setRemovingTyre] = useState(null);
+  const [initialNextAction, setInitialNextAction] = useState('');
   const [replaceTyre, setReplaceTyre] = useState(null);
   const [viewingTyre, setViewingTyre] = useState(null);
   const [removeToast, setRemoveToast] = useState(null);
@@ -338,11 +342,10 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
     });
   };
 
-  // Placeholder for send to old stock – will be replaced with real API
+  // Open removal modal with "Move To Old Stock" preselected
   const handleSendOldStock = (tyre) => {
-    alert('Send to Old Stock API pending');
-    setRemoveToast(`${tyre.id} moved to Old Stock (demo)`);
-    setTimeout(() => setRemoveToast(null), 3500);
+    setInitialNextAction('Move To Old Stock');
+    setRemovingTyre(tyre);
   };
 
   const handleFromInventory = (posId) => {
@@ -437,7 +440,7 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
                   truckData.totalTyres ||
                   truckData.total_tyres ||
                   layout.totalTyres
-              }} size="sm" />
+              }} activeTyres={activeTyres} size="sm" />
             </div>
             <button onClick={onClose} className="ml-4 shrink-0 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors">
               <X className="w-4 h-4" />
@@ -492,11 +495,12 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
                       tyre={activePopup}
                       truckData={truckData}
                       onClose={() => setActivePopup(null)}
-                      onRemove={(t) => setRemovingTyre(t)}
+                      onRemove={(t) => {
+                        setInitialNextAction('');
+                        setRemovingTyre(t);
+                      }}
                       onReplace={(t) => setReplaceTyre(t)}
                       onViewDetails={handleViewDetails}
-                      onSendOldStock={handleSendOldStock}
-                      onFromInventory={handleFromInventory}
                     />
                   )}
                 </AnimatePresence>
@@ -521,7 +525,7 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
                     {[
                       ['Make', selectedTyre.make],
                       ['Model', selectedTyre.model],
-                      ['Fitted', selectedTyre.fittedDate],
+                      ['Fitted', fmtDate(selectedTyre.fittedDate)],
                       ['Vendor', selectedTyre.vendor || '—'],
                       ['Fitted Odo', `${selectedTyre.fittedOdo.toLocaleString()} km`],
                       ['Present Odo', `${selectedTyre.presentOdo.toLocaleString()} km`],
@@ -692,8 +696,13 @@ export default function TruckTyreLayoutModal({ isOpen, onClose, truckData }) {
         {removingTyre && (
           <RemoveTyreModal
             tyre={removingTyre}
-            onConfirm={handleRemoveConfirm}
-            onClose={() => setRemovingTyre(null)}
+            initialNextAction={initialNextAction}
+            onClose={async () => {
+              setRemovingTyre(null);
+              setInitialNextAction('');
+              await fetchTyres();
+              setRefreshKey(prev => prev + 1);
+            }}
           />
         )}
       </AnimatePresence>

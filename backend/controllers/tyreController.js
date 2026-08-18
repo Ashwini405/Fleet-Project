@@ -26,6 +26,9 @@ const createTyre = async (req, res) => {
 
   } catch (error) {
     console.error('CREATE TYRE ERROR:', error);
+    if (error.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ success: false, message: 'Tyre Serial Number already exists' });
+    }
     res.status(500).json({ success: false, message: 'Server Error' });
   }
 };

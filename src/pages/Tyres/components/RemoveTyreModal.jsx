@@ -58,7 +58,7 @@ function Err({ msg }) {
   );
 }
 
-export default function RemoveTyreModal({ tyre, onClose }) {
+export default function RemoveTyreModal({ tyre, onClose, initialNextAction }) {
   const [loading, setLoading] = useState(false);
   const [truck, setTruck] = useState(null);
 
@@ -90,10 +90,18 @@ export default function RemoveTyreModal({ tyre, onClose }) {
     reason: '',
     condition: '',
     remainingTread: '',
-    nextAction: '',
-    storeLocation: '',
+    nextAction: initialNextAction || '',
+    storeLocation: initialNextAction ? (ACTION_LOCATION[initialNextAction] || '') : '',
     notes: '',
   });
+
+  // Auto-populate currentOdo when truck loads
+  useEffect(() => {
+    if (truck) {
+      setForm(p => ({ ...p, currentOdo: String(truck.currentOdo || 0) }));
+    }
+  }, [truck]);
+
   const [errors, setErrors] = useState({});
 
   // Auto-update store location when next action changes
@@ -130,7 +138,6 @@ export default function RemoveTyreModal({ tyre, onClose }) {
     if (!form.reason) e.reason = 'Select a reason';
     if (!form.condition) e.condition = 'Select condition';
     if (!form.nextAction) e.nextAction = 'Select next action';
-    if (!form.storeLocation) e.storeLocation = 'Select store location';
     return e;
   };
 
@@ -379,15 +386,6 @@ export default function RemoveTyreModal({ tyre, onClose }) {
               <Err msg={errors.nextAction} />
             </Field>
 
-            <Field label="Store Location" required>
-              <div className="relative">
-                <select value={form.storeLocation} onChange={e => set('storeLocation', e.target.value)} className={selectCls(errors.storeLocation)}>
-                  <option value="">Select Location</option>
-                  {['Scrap Yard', 'Retreading Area', 'Warehouse Stock', 'Reusable Storage'].map(l => <option key={l}>{l}</option>)}
-                </select>
-              </div>
-              <Err msg={errors.storeLocation} />
-            </Field>
 
             <Field label="Notes / Remarks">
               <textarea rows={3} value={form.notes} onChange={e => set('notes', e.target.value)}

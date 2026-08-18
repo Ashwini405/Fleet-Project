@@ -17,7 +17,14 @@ function calcHealth(runningKm, expectedLife) {
   return 'Critical';
 }
 
-export default function AllTyresTab() {
+const fmtDate = (d) => {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+export default function AllTyresTab({ activeTab }) {
   const { toasts, push, dismiss } = useToast();
 
   const [loading, setLoading] = useState(true);
@@ -38,7 +45,7 @@ export default function AllTyresTab() {
   useEffect(() => {
     fetchTyres();
     fetchVehicles();
-  }, []);
+  }, [activeTab]);
 
   const fetchTyres = async () => {
     try {
@@ -93,7 +100,7 @@ export default function AllTyresTab() {
   position: tyre.tyre_position,
   tyre_position: tyre.tyre_position,
 
-  fittedDate: tyre.date_of_issue,
+  fittedDate: fmtDate(tyre.date_of_issue),
   date_of_issue: tyre.date_of_issue,
 
   purchase_date: tyre.purchase_date,
@@ -463,7 +470,15 @@ export default function AllTyresTab() {
       <TyreDatasheetModal isOpen={!!viewingTyre} onClose={() => setViewingTyre(null)} tyreData={viewingTyre} />
       <QRScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onTyreFound={handleTyreFound} />
       <AnimatePresence>
-        {removingTyre && <RemoveTyreModal tyre={removingTyre} onConfirm={handleRemoveConfirm} onClose={() => setRemovingTyre(null)} />}
+        {removingTyre && (
+          <RemoveTyreModal
+            tyre={removingTyre}
+            onClose={() => {
+              setRemovingTyre(null);
+              fetchTyres();
+            }}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

@@ -296,7 +296,7 @@ function MountModal({ tyre, onClose, onMounted }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Main InStockTab component
 // ─────────────────────────────────────────────────────────────────────────────
-export default function InStockTab() {
+export default function InStockTab({ activeTab }) {
   const { toasts, push, dismiss } = useToast();
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -363,7 +363,7 @@ export default function InStockTab() {
   useEffect(() => {
     fetchStockTyres();
     fetchVehicles();
-  }, []);
+  }, [activeTab]);
 
   // Filtering
   const uniqueBrands = useMemo(() => [...new Set(stockTyres.map(t => t.make))], [stockTyres]);

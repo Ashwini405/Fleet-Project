@@ -5,15 +5,31 @@ import { useSearchParams } from 'react-router-dom';
 import TruckTyreLayoutModal from '../components/TruckTyreLayoutModal';
 import TyreConfigCards from '../components/TyreConfigCards';
 
-export default function IndividualVehicleTab() {
+export default function IndividualVehicleTab({ activeTab }) {
   const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
   const [viewingLayoutFor, setViewingLayoutFor] = useState(null);
   const [expandedRow, setExpandedRow] = useState(null);
   const [trucks, setTrucks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTyres, setActiveTyres] = useState([]);
+
+  const fetchTyres = () => {
+    fetch('http://localhost:5001/api/tyres')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          const mountedTyres = (data.data || data.tyres || []).filter(
+            tyre => String(tyre.status || '').trim().toLowerCase() === 'mounted'
+          );
+          setActiveTyres(mountedTyres);
+        }
+      })
+      .catch(err => console.error('Error fetching tyres:', err));
+  };
 
   useEffect(() => {
+    fetchTyres();
     fetch('http://localhost:5001/api/vehicles')
       .then(res => res.json())
       .then(data => {
@@ -42,7 +58,7 @@ export default function IndividualVehicleTab() {
         console.error('Error fetching vehicles:', err);
         setLoading(false);
       });
-  }, []);
+  }, [activeTab]);
 
   // Auto-open layout modal when navigated from VehicleDetails with ?vehicle=
   useEffect(() => {
@@ -176,7 +192,7 @@ export default function IndividualVehicleTab() {
                           transition={{ duration: 0.15 }}
                         >
                           <td colSpan={6} className="px-4 pb-4 pt-1 bg-slate-50 border-b border-gray-100">
-                            <TyreConfigCards truckData={truck} size="md" className="max-w-2xl" />
+                            <TyreConfigCards truckData={truck} activeTyres={activeTyres} size="md" className="max-w-2xl" />
                           </td>
                         </motion.tr>
                       )}
@@ -189,7 +205,14 @@ export default function IndividualVehicleTab() {
         </div>
       </div>
 
-      <TruckTyreLayoutModal isOpen={!!viewingLayoutFor} onClose={() => setViewingLayoutFor(null)} truckData={viewingLayoutFor} />
+      <TruckTyreLayoutModal
+        isOpen={!!viewingLayoutFor}
+        onClose={() => {
+          setViewingLayoutFor(null);
+          fetchTyres();
+        }}
+        truckData={viewingLayoutFor}
+      />
     </div>
   );
 }

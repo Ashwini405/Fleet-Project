@@ -512,7 +512,7 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
     try {
       const sv = vehicles.find(v => String(v.id) === String(form.truckId));
       const formData = new FormData();
-      formData.append('tyre_number',      `TYR-${Date.now()}`);
+      formData.append('tyre_number',      form.serialNo.trim().toUpperCase());
       formData.append('serial_no',        form.serialNo);
       formData.append('brand',            form.brand);
       formData.append('model',            form.model);
@@ -537,7 +537,8 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
       await axios.post('http://localhost:5001/api/tyres', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
     } catch (err) {
       console.error('Tyre Save Error:', err);
-      setErrors({ serialNo: 'Failed to save tyre — check connection and try again' });
+      const errMsg = err.response?.data?.message || 'Failed to save tyre — check connection and try again';
+      setErrors({ serialNo: errMsg });
       return;
     }
 
@@ -552,7 +553,7 @@ export default function RegisterTyreModal({ isOpen, onClose, onRegister, existin
         vendorName:    vendor?.vendor_name || form.vendor,
         date:          form.purchaseDate || form.dateOfIssue,
         type:          'Tyre Purchase',
-        ref:           form.invoiceNo || `TYR-${Date.now()}`,
+        ref:           form.invoiceNo || form.serialNo.trim().toUpperCase(),
         desc:          `${form.brand} ${form.model} ${form.tyreSize} — ${form.serialNo}`,
         debit:         parseFloat(form.tyreCost),
         onTransaction: addVendorTransaction,

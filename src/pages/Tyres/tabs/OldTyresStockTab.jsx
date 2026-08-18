@@ -132,7 +132,7 @@ function ActionMenu({ tyre, onView, onRemount, onMarkReusable, onRetread, onScra
 
 const filterCls = 'h-[38px] bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all';
 
-export default function OldTyresStockTab({ onNewRetreadingRecord, returnedRetreadTyre, onNewScrapRecord }) {
+export default function OldTyresStockTab({ activeTab, onNewRetreadingRecord, returnedRetreadTyre, onNewScrapRecord }) {
   const { toasts, push, dismiss } = useToast();
 
   const [loading, setLoading]           = useState(true);
@@ -183,7 +183,7 @@ export default function OldTyresStockTab({ onNewRetreadingRecord, returnedRetrea
 
   useEffect(() => {
     fetchOldTyres();
-  }, []);
+  }, [activeTab]);
 
   // When a retreading tyre is returned, update its local status to REUSABLE
   useEffect(() => {

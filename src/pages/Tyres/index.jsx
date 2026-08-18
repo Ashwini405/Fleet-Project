@@ -399,12 +399,12 @@ export default function TyresModule() {
       <div className="flex flex-col min-h-[calc(100vh-4rem)] bg-[#f8fafc]">
         <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24">
           <div>
-            <div className={activeTab === 'active' ? '' : 'hidden'}><ActiveTyresTab /></div>
-            <div className={activeTab === 'stock' ? '' : 'hidden'}><InStockTab /></div>
-            <div className={activeTab === 'old' ? '' : 'hidden'}><OldTyresStockTab onNewRetreadingRecord={addRetreadingRecord} returnedRetreadTyre={lastReturnedTyre} onNewScrapRecord={addScrapRecord} /></div>
+            <div className={activeTab === 'active' ? '' : 'hidden'}><ActiveTyresTab activeTab={activeTab} /></div>
+            <div className={activeTab === 'stock' ? '' : 'hidden'}><InStockTab activeTab={activeTab} /></div>
+            <div className={activeTab === 'old' ? '' : 'hidden'}><OldTyresStockTab activeTab={activeTab} onNewRetreadingRecord={addRetreadingRecord} returnedRetreadTyre={lastReturnedTyre} onNewScrapRecord={addScrapRecord} /></div>
             <div className={activeTab === 'retreading' ? '' : 'hidden'}><RetreadingTab records={retreadingRecords} onRecordUpdate={updateRetreadingRecord} onRejected={handleRetreadingRejected} /></div>
             <div className={activeTab === 'scrap' ? '' : 'hidden'}><ScrapHistoryTab records={scrapRecords} /></div>
-            <div className={activeTab === 'individual' ? '' : 'hidden'}><IndividualVehicleTab /></div>
+            <div className={activeTab === 'individual' ? '' : 'hidden'}><IndividualVehicleTab activeTab={activeTab} /></div>
           </div>
         </div>
       </div>

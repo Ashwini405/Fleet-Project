@@ -231,6 +231,13 @@ if (oldData.success) {
   const currentTreadPct = Math.max(0, 100 - currentLifePct);
   const currentHealth = currentTyre ? calcHealth(currentRunningKm, currentTyre.expectedLife) : 'Good';
 
+  // Auto-update store location when next action changes
+  useEffect(() => {
+    if (removeForm.nextAction) {
+      setRemoveForm(p => ({ ...p, storeLocation: ACTION_LOCATION[removeForm.nextAction] || '' }));
+    }
+  }, [removeForm.nextAction]);
+
   // ──────────────────────────────────────────────────────────────────────────
   // Form handlers
   // ──────────────────────────────────────────────────────────────────────────
@@ -254,7 +261,6 @@ if (oldData.success) {
     if (!removeForm.reason) e.reason = 'Select a reason';
     if (!removeForm.condition) e.condition = 'Select condition';
     if (!removeForm.nextAction) e.nextAction = 'Select next action';
-    if (!removeForm.storeLocation) e.storeLocation = 'Select store location';
     return e;
   };
 
@@ -639,15 +645,7 @@ onSuccess?.();
                         <Err msg={errors.nextAction} />
                       </Field>
 
-                      <Field label="Store Location" required>
-                        <div className="relative">
-                          <select value={removeForm.storeLocation} onChange={e => setRemove('storeLocation', e.target.value)} className={selectCls(errors.storeLocation)}>
-                            <option value="">Select Location</option>
-                            {['Scrap Yard', 'Retreading Area', 'Warehouse Stock', 'Reusable Storage'].map(l => <option key={l}>{l}</option>)}
-                          </select>
-                        </div>
-                        <Err msg={errors.storeLocation} />
-                      </Field>
+
 
                       <Field label="Notes">
                         <textarea rows={2} value={removeForm.notes} onChange={e => setRemove('notes', e.target.value)}

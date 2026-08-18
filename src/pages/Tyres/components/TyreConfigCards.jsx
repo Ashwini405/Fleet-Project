@@ -54,15 +54,17 @@ const CARDS = [
 
     ) =>
 
-      mountedCount ||
+      typeof mountedCount === 'number'
 
-      layout?.totalTyres ||
+        ? mountedCount
 
-      truck.totalTyres ||
+        : (layout?.totalTyres ||
 
-      truck.total_tyres ||
+          truck.totalTyres ||
 
-      '—',
+          truck.total_tyres ||
+
+          '—'),
   },
 
   {
@@ -168,7 +170,7 @@ export default function TyreConfigCards({
 
   truckData,
 
-  activeTyres = [],
+  activeTyres,
 
   className = '',
 
@@ -212,20 +214,49 @@ export default function TyreConfigCards({
   // LIVE MOUNTED TYRE COUNT
   // ======================================================
 
-  const mountedCount = activeTyres.filter(
+  const hasActiveTyres = Array.isArray(activeTyres);
 
-    tyre =>
+  const mountedCount = hasActiveTyres
 
-      tyre.vehicle_number ===
-        truckData.vehicle_no ||
+    ? activeTyres.filter(tyre => {
 
-      tyre.truckNo ===
-        truckData.vehicle_no ||
+        const tyreTruck = String(
 
-      tyre.vehicle_id ===
-        truckData.id
+          tyre.truckNo ||
 
-  ).length;
+          tyre.vehicle_number ||
+
+          tyre.vehicle_no ||
+
+          ''
+
+        )
+
+          .trim()
+
+          .toLowerCase();
+
+        const targetTruck = String(
+
+          truckData.vehicle_no ||
+
+          truckData.vehicleNumber ||
+
+          truckData.id ||
+
+          ''
+
+        )
+
+          .trim()
+
+          .toLowerCase();
+
+        return tyreTruck && targetTruck && tyreTruck === targetTruck;
+
+      }).length
+
+    : null;
 
   return (
 
