@@ -34,11 +34,11 @@ export default function UserManagement() {
   const [saved, setSaved]               = useState(false);
   const [loading, setLoading]           = useState(true);
   const [dashboard, setDashboard]       = useState({
-    total: 0,
-    active: 0,
-    disabled: 0,
-    loggedIn: 0,
-    admins: 0,
+    totalUsers: 0,
+    activeUsers: 0,
+    disabledUsers: 0,
+    lockedUsers: 0,
+    administrators: 0,
     pendingReset: 0
   });
 
@@ -243,12 +243,12 @@ export default function UserManagement() {
       <div>
         <SectionLabel title="System Overview" sub="User accounts across all plants and roles" />
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-          <KpiCard label="Total Users"            value={dashboard.total}        icon={Users}        iconBg="bg-blue-50 text-blue-600"     valueColor="text-blue-700"   />
-          <KpiCard label="Active Users"           value={dashboard.active}       icon={CheckCircle2} iconBg="bg-green-50 text-green-600"   valueColor="text-green-700"  />
-          <KpiCard label="Disabled Users"         value={dashboard.disabled}     icon={XCircle}      iconBg="bg-red-50 text-red-500"       valueColor="text-red-600"    />
-          <KpiCard label="Logged In Today"        value={dashboard.loggedIn}     icon={LogIn}        iconBg="bg-indigo-50 text-indigo-600" valueColor="text-indigo-700" />
-          <KpiCard label="Administrators"         value={dashboard.admins}       icon={Shield}       iconBg="bg-purple-50 text-purple-600" valueColor="text-purple-700" />
-          <KpiCard label="Password Reset Pending" value={dashboard.pendingReset} icon={Key}          iconBg="bg-amber-50 text-amber-600"   valueColor="text-amber-700"  sub="Force reset on login" />
+          <KpiCard label="Total Users"            value={dashboard.totalUsers}        icon={Users}        iconBg="bg-blue-50 text-blue-600"     valueColor="text-blue-700"   />
+          <KpiCard label="Active Users"           value={dashboard.activeUsers}       icon={CheckCircle2} iconBg="bg-green-50 text-green-600"   valueColor="text-green-700"  />
+          <KpiCard label="Disabled Users"         value={dashboard.disabledUsers}     icon={XCircle}      iconBg="bg-red-50 text-red-500"       valueColor="text-red-600"    />
+          <KpiCard label="Locked Users"           value={dashboard.lockedUsers}       icon={LogIn}        iconBg="bg-indigo-50 text-indigo-600" valueColor="text-indigo-700" />
+          <KpiCard label="Administrators"         value={dashboard.administrators}    icon={Shield}       iconBg="bg-purple-50 text-purple-600" valueColor="text-purple-700" />
+          <KpiCard label="Password Reset Pending" value={dashboard.pendingReset}      icon={Key}          iconBg="bg-amber-50 text-amber-600"   valueColor="text-amber-700"  sub="Force reset on login" />
         </div>
       </div>
 
