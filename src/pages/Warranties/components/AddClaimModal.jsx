@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, ShieldCheck, UploadCloud, ChevronDown } from 'lucide-react';
+import { X, ShieldCheck, UploadCloud, ChevronDown, CheckCircle2 } from 'lucide-react';
 
 // ── Shared styles ─────────────────────────────────────────────────────────────
 const inputCls  = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent placeholder-slate-300';
@@ -51,6 +51,7 @@ export default function AddClaimModal({ isOpen, onClose, onSubmit }) {
   const [warranties, setWarranties]           = useState([]);
   const [selectedWarranty, setSelectedWarranty] = useState(null);
   const [files, setFiles]                     = useState({ itemPhotos: [] });
+  const [successNumber, setSuccessNumber]     = useState('');
   const [fd, setFd] = useState({
     warrantyId:       '',
     submitDate:       '',
@@ -73,6 +74,10 @@ export default function AddClaimModal({ isOpen, onClose, onSubmit }) {
       .catch(err => console.error('FETCH WARRANTIES ERROR:', err));
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) setSuccessNumber('');
+  }, [isOpen]);
+
   const handleWarrantySelect = (e) => {
     const id = Number(e.target.value);
     const w  = warranties.find(x => x.id === id) || null;
@@ -89,7 +94,8 @@ export default function AddClaimModal({ isOpen, onClose, onSubmit }) {
   const handleSubmit = async () => {
     try {
       const formData = new FormData();
-      formData.append('claim_number',       `CL-${Date.now()}`);
+      const claimNumber = `CL-${Date.now()}`;
+      formData.append('claim_number',       claimNumber);
       formData.append('warranty_id',        fd.warrantyId);
       formData.append('submit_date',        fd.submitDate);
       formData.append('date_sent_to_vendor',fd.dateSentToVendor);
@@ -118,9 +124,8 @@ export default function AddClaimModal({ isOpen, onClose, onSubmit }) {
       const data = await res.json();
 
       if (data.success) {
-        alert('Warranty Claim Submitted Successfully');
+        setSuccessNumber(claimNumber);
         onSubmit?.(data.data);
-        onClose();
       } else {
         alert(data.message || 'Failed to submit claim');
       }
@@ -150,7 +155,7 @@ export default function AddClaimModal({ isOpen, onClose, onSubmit }) {
               <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">
                 <ShieldCheck className="w-4 h-4 text-white" />
               </div>
-              <h2 className="text-base font-bold text-white">New Claim Entry</h2>
+              <h2 className="text-base font-bold text-white">{successNumber ? 'Claim Submitted' : 'New Claim Entry'}</h2>
             </div>
             <button onClick={onClose}
               className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
@@ -159,6 +164,16 @@ export default function AddClaimModal({ isOpen, onClose, onSubmit }) {
           </div>
 
           {/* Body */}
+          {successNumber ? (
+            <div className="flex-1 flex items-center justify-center px-6 py-10">
+              <div className="text-center max-w-sm">
+                <CheckCircle2 className="w-11 h-11 mx-auto text-emerald-600" />
+                <h3 className="mt-3 text-lg font-bold text-slate-800">Claim submitted successfully</h3>
+                <p className="mt-1.5 text-sm text-slate-500">Your warranty claim has been recorded.</p>
+                <p className="mt-3 inline-flex items-center rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-bold font-mono text-emerald-700">{successNumber}</p>
+              </div>
+            </div>
+          ) : (
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 bg-white">
 
             {/* Warranty Selection */}
@@ -189,8 +204,8 @@ export default function AddClaimModal({ isOpen, onClose, onSubmit }) {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Inp label="Submit Date"          required type="date" value={fd.submitDate}       onChange={e => set('submitDate', e.target.value)} />
                 <Inp label="Date Sent to Vendor"  type="date"          value={fd.dateSentToVendor} onChange={e => set('dateSentToVendor', e.target.value)} />
-                <Inp label="Complaint Number"     placeholder="e.g. CMP-123456" value={fd.complaintNumber} onChange={e => set('complaintNumber', e.target.value)} />
-                <Inp label="Complaint Docket"     placeholder="e.g. DOC-789012" value={fd.complaintDocket} onChange={e => set('complaintDocket', e.target.value)} />
+                {/* <Inp label="Complaint Number"     placeholder="e.g. CMP-123456" value={fd.complaintNumber} onChange={e => set('complaintNumber', e.target.value)} />
+                <Inp label="Complaint Docket"     placeholder="e.g. DOC-789012" value={fd.complaintDocket} onChange={e => set('complaintDocket', e.target.value)} /> */}
                 <Inp label="Claim Amount (₹)"     type="number" min="0" placeholder="Leave blank if not yet quoted" value={fd.claimAmount} onChange={e => set('claimAmount', e.target.value)} />
               </div>
               <div className="mt-3">
@@ -228,20 +243,30 @@ export default function AddClaimModal({ isOpen, onClose, onSubmit }) {
               </label>
             </div>
           </div>
+          )}
 
           {/* Footer */}
           <div className="border-t border-slate-100 px-5 py-3 flex items-center justify-between bg-white shrink-0">
-            <button onClick={onClose}
-              className="px-5 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
-              Cancel
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={!isValid}
-              className="flex items-center gap-2 px-6 py-2 bg-[#1a4731] hover:bg-[#153d28] text-white rounded-lg text-sm font-semibold shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ShieldCheck className="w-4 h-4" /> Submit Claim
-            </button>
+            {successNumber ? (
+              <button onClick={onClose}
+                className="ml-auto px-6 py-2 bg-[#1a4731] hover:bg-[#153d28] text-white rounded-lg text-sm font-semibold shadow-sm transition-colors">
+                Done
+              </button>
+            ) : (
+              <>
+                <button onClick={onClose}
+                  className="px-5 py-2 rounded-lg border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={!isValid}
+                  className="flex items-center gap-2 px-6 py-2 bg-[#1a4731] hover:bg-[#153d28] text-white rounded-lg text-sm font-semibold shadow-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ShieldCheck className="w-4 h-4" /> Submit Claim
+                </button>
+              </>
+            )}
           </div>
         </motion.div>
       </div>

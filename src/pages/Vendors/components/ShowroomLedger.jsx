@@ -9,10 +9,19 @@ const fmtDate = (d) => {
   return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
+const buildDocumentUrl = (value) => {
+  if (!value) return null;
+  const clean = String(value)
+    .replace(/^\s*["'\[]+|["'\]]+\s*$/g, '')
+    .replace(/\\/g, '/')
+    .replace(/^\/?uploads\//, '');
+  return `http://localhost:5001/uploads/${clean}`;
+};
+
 const DocLink = ({ filename, label }) => {
   if (!filename) return <span className="text-xs text-gray-400">Not uploaded</span>;
   return (
-    <a href={`http://localhost:5001/uploads/${filename}`} target="_blank" rel="noreferrer"
+    <a href={buildDocumentUrl(filename)} target="_blank" rel="noreferrer"
       className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline">
       <FiFileText size={13}/> {label}
     </a>

@@ -7,6 +7,13 @@ const db = require('../config/db');
 
 const createWarrantyClaim = async (data) => {
 
+  data = Object.fromEntries(
+    Object.entries(data).map(([key, value]) => [
+      key,
+      value === undefined || value === '' ? null : value
+    ])
+  );
+
   const [result] = await db.query(
 
     `
