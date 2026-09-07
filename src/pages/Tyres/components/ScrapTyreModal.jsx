@@ -161,7 +161,7 @@ export default function ScrapTyreModal({ tyre, onClose, onConfirm }) {
         store_location: 'Scrap Yard',
       });
 
-      onConfirm?.();
+      onConfirm?.(record);
       setDone(true);
     } catch (error) {
       console.error('SCRAP SAVE ERROR:', error);

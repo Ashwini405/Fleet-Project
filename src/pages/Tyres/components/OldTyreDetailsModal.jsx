@@ -18,11 +18,12 @@ const posLabel = (id) => layoutPositions.find(p => p.id === id)?.label ?? id ?? 
 
 const STATUS_STYLE = {
   SCRAP:      { badge: 'bg-red-100    text-red-700    ring-1 ring-red-300',    dot: 'bg-red-500',    topBorder: '#ef4444' },
+  SCRAPPED:   { badge: 'bg-slate-100  text-slate-500  ring-1 ring-slate-300',  dot: 'bg-slate-400',  topBorder: '#64748b' },
   RETREADING: { badge: 'bg-amber-100  text-amber-700  ring-1 ring-amber-300',  dot: 'bg-amber-500',  topBorder: '#f59e0b' },
   REUSABLE:   { badge: 'bg-blue-100   text-blue-700   ring-1 ring-blue-300',   dot: 'bg-blue-500',   topBorder: '#3b82f6' },
   OLD_STOCK:  { badge: 'bg-slate-100  text-slate-600  ring-1 ring-slate-300',  dot: 'bg-slate-400',  topBorder: '#94a3b8' },
 };
-const STATUS_LABELS = { SCRAP: 'Scrap', RETREADING: 'Retreading', REUSABLE: 'Reusable', OLD_STOCK: 'Old Stock' };
+const STATUS_LABELS = { SCRAP: 'Scrap (In Yard)', SCRAPPED: 'Scrapped (Sold)', RETREADING: 'Retreading', REUSABLE: 'Reusable', OLD_STOCK: 'Old Stock' };
 
 function SpecRow({ label, value, accent }) {
   return (
@@ -213,7 +214,12 @@ export default function OldTyreDetailsModal({ tyre, onClose }) {
                 <SpecRow label="Removal Reason"   value={mappedTyre.removalReason} />
                 <SpecRow label="Removed Date"     value={removedDate} />
                 <SpecRow label="Tyre Condition"   value={mappedTyre.condition} />
-                {mappedTyre.notes && <SpecRow label="Remarks" value={mappedTyre.notes} />}
+                {mappedTyre.notes && (
+                  <div className="py-2.5 border-b border-gray-100 last:border-0">
+                    <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block mb-1">Maintenance & Resolution</span>
+                    <p className="text-xs font-semibold text-slate-700 bg-slate-50 p-2.5 rounded-xl border border-slate-100 whitespace-pre-wrap leading-relaxed">{mappedTyre.notes}</p>
+                  </div>
+                )}
               </div>
             </div>
 

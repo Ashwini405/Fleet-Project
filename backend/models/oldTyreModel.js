@@ -135,23 +135,33 @@ const getAllOldTyres = async () => {
 const updateOldTyreStatus = async (
   tyreNo,
   tyreStatus,
-  storeLocation
+  storeLocation,
+  remainingTreadPercent = null,
+  notes = null
 ) => {
 
-  const [result] = await db.query(
-    `
+  let query = `
     UPDATE old_tyres
     SET
       tyre_status = ?,
       store_location = ?
-    WHERE old_tyre_number = ?
-    `,
-    [
-      tyreStatus,
-      storeLocation,
-      tyreNo
-    ]
-  );
+  `;
+  const params = [tyreStatus, storeLocation];
+
+  if (remainingTreadPercent !== null && remainingTreadPercent !== undefined) {
+    query += `, remaining_tread_percent = ?`;
+    params.push(remainingTreadPercent);
+  }
+
+  if (notes !== null && notes !== undefined) {
+    query += `, notes = ?`;
+    params.push(notes);
+  }
+
+  query += ` WHERE old_tyre_number = ?`;
+  params.push(tyreNo);
+
+  const [result] = await db.query(query, params);
 
   return result;
 
