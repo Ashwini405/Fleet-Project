@@ -1,6 +1,9 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'fleet_default_jwt_secret_dev_key_2026';
+if (!process.env.JWT_SECRET) {
+    console.warn('⚠️  [WARN] JWT_SECRET is not set in .env! Using default fallback secret for development.');
+}
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
 
 function signAccessToken(user) {

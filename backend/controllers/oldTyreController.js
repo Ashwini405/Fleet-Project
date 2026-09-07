@@ -101,13 +101,17 @@ const updateOldTyreStatus = async (req, res) => {
 
     const {
       tyre_status,
-      store_location
+      store_location,
+      remaining_tread_percent,
+      notes
     } = req.body;
 
     await OldTyreModel.updateOldTyreStatus(
       tyreNo,
       tyre_status,
-      store_location
+      store_location,
+      remaining_tread_percent,
+      notes
     );
 
     res.status(200).json({

@@ -6,6 +6,13 @@ import { StickyTable, StickyThead, EmptyState } from '../components/ERPUtils';
 const todayStr = () => new Date().toISOString().split('T')[0];
 const thisMonth = () => new Date().toISOString().slice(0, 7); // YYYY-MM
 
+function fmtDate(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return String(d);
+  return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
 export default function ScrapHistoryTab({ records = [] }) {
   const [search, setSearch]   = useState('');
   const [dateFrom, setDateFrom] = useState('');
@@ -18,14 +25,18 @@ export default function ScrapHistoryTab({ records = [] }) {
       r.vendorName?.toLowerCase().includes(q) ||
       r.reason?.toLowerCase().includes(q) ||
       r.make?.toLowerCase().includes(q);
-    const matchFrom = !dateFrom || r.scrapDate >= dateFrom;
-    const matchTo   = !dateTo   || r.scrapDate <= dateTo;
+    const dateOnly = r.scrapDate ? (r.scrapDate.includes('T') ? r.scrapDate.split('T')[0] : r.scrapDate) : '';
+    const matchFrom = !dateFrom || dateOnly >= dateFrom;
+    const matchTo   = !dateTo   || dateOnly <= dateTo;
     return matchSearch && matchFrom && matchTo;
   }), [records, search, dateFrom, dateTo]);
 
   const totalRevenue   = records.reduce((s, r) => s + (r.saleAmount || 0), 0);
   const monthRevenue   = records
-    .filter(r => r.scrapDate?.startsWith(thisMonth()))
+    .filter(r => {
+      const d = r.scrapDate ? (r.scrapDate.includes('T') ? r.scrapDate.split('T')[0] : r.scrapDate) : '';
+      return d.startsWith(thisMonth());
+    })
     .reduce((s, r) => s + (r.saleAmount || 0), 0);
 
   const hasFilters = search || dateFrom || dateTo;
@@ -128,7 +139,7 @@ export default function ScrapHistoryTab({ records = [] }) {
                   <span className="text-xs font-semibold text-gray-700">{rec.vendorName}</span>
                 </td>
                 <td className="py-2.5 px-3 whitespace-nowrap">
-                  <span className="text-[11px] font-medium text-gray-500 tabular-nums">{rec.scrapDate}</span>
+                  <span className="text-[11px] font-medium text-gray-500 tabular-nums">{fmtDate(rec.scrapDate)}</span>
                 </td>
                 <td className="py-2.5 px-3 whitespace-nowrap">
                   <span className="text-[11px] text-red-600 font-semibold bg-red-50 px-2 py-0.5 rounded-full">{rec.reason}</span>

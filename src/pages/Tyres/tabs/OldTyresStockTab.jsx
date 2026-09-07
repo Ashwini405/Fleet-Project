@@ -8,6 +8,7 @@ import ReMountModal from '../components/ReMountModal';
 import AddOldTyreModal from '../components/AddOldTyreModal';
 import SendForRetreadingModal from '../components/SendForRetreadingModal';
 import ScrapTyreModal from '../components/ScrapTyreModal';
+import MarkReusableModal from '../components/MarkReusableModal';
 import { Toast, useToast, TableSkeleton, EmptyState, StickyTable, StickyThead } from '../components/ERPUtils';
 
 const posLabel = (id) => layoutPositions.find(p => p.id === id)?.label ?? id ?? '—';
@@ -21,11 +22,12 @@ function fmtDate(d) {
 
 const STATUS_STYLE = {
   SCRAP:      { badge: 'bg-red-100    text-red-700    ring-1 ring-red-300',    dot: 'bg-red-500'    },
+  SCRAPPED:   { badge: 'bg-slate-100  text-slate-500  ring-1 ring-slate-300',  dot: 'bg-slate-400'  },
   RETREADING: { badge: 'bg-amber-100  text-amber-700  ring-1 ring-amber-300',  dot: 'bg-amber-500'  },
   REUSABLE:   { badge: 'bg-blue-100   text-blue-700   ring-1 ring-blue-300',   dot: 'bg-blue-500'   },
   OLD_STOCK:  { badge: 'bg-slate-100  text-slate-600  ring-1 ring-slate-300',  dot: 'bg-slate-400'  },
 };
-const STATUS_LABELS = { SCRAP: 'Scrap', RETREADING: 'Retreading', REUSABLE: 'Reusable', OLD_STOCK: 'Old Stock' };
+const STATUS_LABELS = { SCRAP: 'Scrap (In Yard)', SCRAPPED: 'Scrapped (Sold)', RETREADING: 'Retreading', REUSABLE: 'Reusable', OLD_STOCK: 'Old Stock' };
 
 // Smart ERP recommendation
 function recommendation(tyre) {
@@ -64,7 +66,7 @@ function ActionMenu({ tyre, onView, onRemount, onMarkReusable, onRetread, onScra
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -4 }}
             transition={{ duration: 0.12 }}
-            className="absolute right-0 top-8 z-30 bg-white rounded-xl shadow-xl border border-gray-200 py-1 min-w-[160px]"
+            className="absolute right-0 top-8 z-30 bg-white rounded-xl shadow-xl border border-gray-200 py-1 min-w-[170px]"
           >
             {/* View Details — always */}
             <button onClick={() => { onView(); setOpen(false); }}
@@ -86,7 +88,7 @@ function ActionMenu({ tyre, onView, onRemount, onMarkReusable, onRetread, onScra
                 <div className="my-1 border-t border-gray-100" />
                 <button onClick={() => { onScrap(); setOpen(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5 text-red-500" /> Mark as Scrap
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" /> Sell to Scrap Buyer
                 </button>
               </>
             )}
@@ -105,7 +107,21 @@ function ActionMenu({ tyre, onView, onRemount, onMarkReusable, onRetread, onScra
                 <div className="my-1 border-t border-gray-100" />
                 <button onClick={() => { onScrap(); setOpen(false); }}
                   className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors">
-                  <Trash2 className="w-3.5 h-3.5 text-red-500" /> Mark as Scrap
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" /> Sell to Scrap Buyer
+                </button>
+              </>
+            )}
+
+            {/* SCRAP actions — Awaiting sale in scrap yard */}
+            {tyre.status === 'SCRAP' && (
+              <>
+                <button onClick={() => { onScrap(); setOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors">
+                  <Trash2 className="w-3.5 h-3.5 text-red-500" /> Sell to Scrap Buyer
+                </button>
+                <button onClick={() => { onRetread(); setOpen(false); }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-amber-700 hover:bg-amber-50 transition-colors">
+                  <RotateCcw className="w-3.5 h-3.5 text-amber-500" /> Send for Retreading
                 </button>
               </>
             )}
@@ -117,10 +133,10 @@ function ActionMenu({ tyre, onView, onRemount, onMarkReusable, onRetread, onScra
               </div>
             )}
 
-            {/* SCRAP — view only */}
-            {tyre.status === 'SCRAP' && (
+            {/* SCRAPPED — already sold to scrap buyer */}
+            {tyre.status === 'SCRAPPED' && (
               <div className="px-3.5 py-2">
-                <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">Scrapped</span>
+                <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Sold to Scrap Buyer</span>
               </div>
             )}
           </motion.div>
@@ -143,6 +159,7 @@ export default function OldTyresStockTab({ activeTab, onNewRetreadingRecord, ret
   const [remountingTyre, setRemountingTyre] = useState(null);
   const [retreadingTyre, setRetreadingTyre] = useState(null);
   const [scrappingTyre, setScrappingTyre]   = useState(null);
+  const [reusableTyre, setReusableTyre]     = useState(null);
   const [isAddOpen, setIsAddOpen]       = useState(false);
 
   const [oldTyres, setOldTyres] = useState([]);
@@ -226,18 +243,23 @@ export default function OldTyresStockTab({ activeTab, onNewRetreadingRecord, ret
   const hasFilters = search !== '' || filterStatus !== 'all' || filterLocation !== 'all';
   const clearFilters = () => { setSearch(''); setFilterStatus('all'); setFilterLocation('all'); };
 
-  // API update helpers
-  const handleMarkReusable = async (tyreNo) => {
-    try {
-      await axios.put(`http://localhost:5001/api/old-tyres/${tyreNo}`, {
-        tyre_status: 'REUSABLE',
-        store_location: 'Reusable Storage',
-      });
-      push(`${tyreNo} marked as reusable`, 'success');
-    } catch (_) {}
+  // Handler when tyre is confirmed ready for reuse after inspection/repair
+  const handleMarkReusableConfirm = (updatedRecord) => {
+    if (!updatedRecord) return;
     setOldTyres(prev => prev.map(t =>
-      t.tyreNo === tyreNo ? { ...t, status: 'REUSABLE', storeLocation: 'Reusable Storage' } : t
+      (t.tyreNo === updatedRecord.tyreNo || t.id === updatedRecord.tyreNo)
+        ? {
+            ...t,
+            status: 'REUSABLE',
+            storeLocation: updatedRecord.storeLocation || 'Reusable Storage',
+            remainingTread: updatedRecord.remainingTread,
+            condition: updatedRecord.condition,
+            notes: updatedRecord.notes,
+          }
+        : t
     ));
+    push(`${updatedRecord.tyreNo} ready for reuse — ${updatedRecord.resolutionType || 'Inspection OK'}`, 'success');
+    setReusableTyre(null);
   };
 
   const handleRetreadConfirm = async (record) => {
@@ -281,10 +303,11 @@ export default function OldTyresStockTab({ activeTab, onNewRetreadingRecord, ret
 };
 
   const handleScrapConfirm = (record) => {
+    if (!record) return;
     setOldTyres(prev => prev.map(t =>
-      t.tyreNo === record.tyreNo ? { ...t, status: 'SCRAP', storeLocation: 'Scrap Yard' } : t
+      (t.tyreNo === record.tyreNo || t.id === record.tyreNo) ? { ...t, status: 'SCRAPPED', storeLocation: 'Scrap Yard' } : t
     ));
-    push(`${record.tyreNo} scrapped — ₹${record.saleAmount.toLocaleString()} sale recorded`, 'error');
+    push(`${record.tyreNo} scrapped — ₹${Number(record.saleAmount || 0).toLocaleString()} sale recorded`, 'error');
     setScrappingTyre(null);
     onNewScrapRecord?.(record);
   };
@@ -299,7 +322,7 @@ export default function OldTyresStockTab({ activeTab, onNewRetreadingRecord, ret
           { label: 'Total Old Tyres', value: oldTyres.length,
             icon: Layers,    bg: 'bg-slate-800', text: 'text-white',       sub: 'text-slate-400',
             iconBg: 'bg-white/10', iconColor: 'text-white', border: 'border-slate-700' },
-          { label: 'Scrap Tyres',     value: oldTyres.filter(t => t.status === 'SCRAP').length,
+          { label: 'Scrap Tyres (In Yard)', value: oldTyres.filter(t => t.status === 'SCRAP').length,
             icon: Trash2,    bg: 'bg-white', text: 'text-red-700',         sub: 'text-red-400',
             iconBg: 'bg-red-100',    iconColor: 'text-red-600',    border: 'border-red-200',    accent: 'border-t-2 border-t-red-500'    },
           { label: 'Reusable Tyres',  value: oldTyres.filter(t => t.status === 'REUSABLE').length,
@@ -331,13 +354,13 @@ export default function OldTyresStockTab({ activeTab, onNewRetreadingRecord, ret
           <div className="flex flex-wrap items-center gap-2 mt-1.5">
             <span className="text-xs text-gray-500 font-medium">{oldTyres.length} Records</span>
             <span className="w-px h-3 bg-gray-300" />
-            {['SCRAP','RETREADING','REUSABLE','OLD_STOCK'].map(s => {
+            {['SCRAP','SCRAPPED','RETREADING','REUSABLE','OLD_STOCK'].map(s => {
               const cnt = oldTyres.filter(t => t.status === s).length;
               if (!cnt) return null;
-              const st = STATUS_STYLE[s];
+              const st = STATUS_STYLE[s] || STATUS_STYLE.OLD_STOCK;
               return (
                 <span key={s} className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2 py-0.5 rounded-full ${st.badge}`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{cnt} {STATUS_LABELS[s]}
+                  <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} />{cnt} {STATUS_LABELS[s] || s}
                 </span>
               );
             })}
@@ -360,9 +383,10 @@ export default function OldTyresStockTab({ activeTab, onNewRetreadingRecord, ret
               value={search} onChange={e => setSearch(e.target.value)}
               className={`w-full pl-8 pr-3 ${filterCls}`} />
           </div>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={`w-36 px-3 ${filterCls}`}>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className={`w-44 px-3 ${filterCls}`}>
             <option value="all">All Status</option>
-            <option value="SCRAP">Scrap</option>
+            <option value="SCRAP">Scrap (In Yard)</option>
+            <option value="SCRAPPED">Scrapped (Sold)</option>
             <option value="RETREADING">Retreading</option>
             <option value="REUSABLE">Reusable</option>
             <option value="OLD_STOCK">Old Stock</option>
@@ -506,7 +530,7 @@ export default function OldTyresStockTab({ activeTab, onNewRetreadingRecord, ret
                         tyre={tyre}
                         onView={()          => setViewingTyre(tyre)}
                         onRemount={()       => setRemountingTyre(tyre)}
-                        onMarkReusable={()  => handleMarkReusable(tyre.tyreNo)}
+                        onMarkReusable={()  => setReusableTyre(tyre)}
                         onRetread={()       => setRetreadingTyre(tyre)}
                         onScrap={()         => setScrappingTyre(tyre)}
                       />
@@ -552,6 +576,11 @@ export default function OldTyresStockTab({ activeTab, onNewRetreadingRecord, ret
           setIsAddOpen(false);
           fetchOldTyres();
         }}
+      />
+      <MarkReusableModal
+        tyre={reusableTyre}
+        onClose={() => setReusableTyre(null)}
+        onConfirm={handleMarkReusableConfirm}
       />
     </div>
   );
