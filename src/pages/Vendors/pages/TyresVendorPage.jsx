@@ -66,6 +66,7 @@ export default function TyresVendorPage() {
       <TyresLedger
         vendor={selectedVendor}
         onBack={clearSelection}
+        onLedgerUpdated={() => fetchBalances([selectedVendor])}
       />
     );
   }

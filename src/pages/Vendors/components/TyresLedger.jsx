@@ -36,7 +36,7 @@ const WarrantyDocLink = ({ filename, label }) => {
   );
 };
 
-export default function TyresLedger({ vendor, onBack }) {
+export default function TyresLedger({ vendor, onBack, onLedgerUpdated }) {
   const isCash = (vendor.payment_terms || 'credit') === 'cash';
   const FILTERS = isCash ? BASE_FILTERS.filter(f => f !== 'Payments') : BASE_FILTERS;
   const [rawTxns, setRawTxns] = useState([]);
@@ -85,6 +85,11 @@ export default function TyresLedger({ vendor, onBack }) {
     } catch (error) {
       console.error('Ledger Fetch Error:', error);
     }
+  };
+
+  const handlePaymentSaved = async () => {
+    await fetchLedger();
+    await onLedgerUpdated?.();
   };
 
   // ── Computed values ───────────────────────────────────────────────────────
@@ -245,7 +250,7 @@ export default function TyresLedger({ vendor, onBack }) {
       <RecordPaymentModal
         isOpen={payModalOpen}
         onClose={() => setPayModalOpen(false)}
-        onSave={fetchLedger}
+        onSave={handlePaymentSaved}
         vendor={vendor}
         vendorName={vendor.vendor_name || vendor.name}
         vendorCategory="tyres"
@@ -272,7 +277,7 @@ export default function TyresLedger({ vendor, onBack }) {
                 ['Date', fmtDate(selectedTxn.date), null],
                 ['Type', null, <TypeBadge type={selectedTxn.type} />],
                 ['Vendor', null, <span className="text-sm font-bold text-gray-800">{vendor.vendor_name || vendor.name}</span>],
-                selectedTxn.ref ? ['Reference', null, <span className="text-sm font-bold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.ref}</span>] : null,
+                selectedTxn.ref ? [selectedTxn.type === 'Retreading Service' ? 'Tyre Number' : 'Reference', null, <span className="text-sm font-bold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.ref}</span>] : null,
                 selectedTxn.truckId ? ['Vehicle', null, <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.truckId}</span>] : null,
               ].filter(Boolean).map(([label, text, node]) => (
                 <div key={label} className="flex justify-between items-center py-2.5 border-b border-gray-50">
