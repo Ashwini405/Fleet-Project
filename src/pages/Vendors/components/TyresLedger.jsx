@@ -277,7 +277,22 @@ export default function TyresLedger({ vendor, onBack, onLedgerUpdated }) {
                 ['Date', fmtDate(selectedTxn.date), null],
                 ['Type', null, <TypeBadge type={selectedTxn.type} />],
                 ['Vendor', null, <span className="text-sm font-bold text-gray-800">{vendor.vendor_name || vendor.name}</span>],
-                selectedTxn.ref ? [selectedTxn.type === 'Retreading Service' ? 'Tyre Number' : 'Reference', null, <span className="text-sm font-bold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.ref}</span>] : null,
+                selectedTxn.ref ? [
+                  selectedTxn.type === 'Retreading Service'
+                    ? 'Tyre Number'
+                    : selectedTxn.type === 'Scrap Sale'
+                    ? 'Receipt / Txn Ref'
+                    : 'Reference',
+                  null,
+                  <span className="text-sm font-bold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.ref}</span>
+                ] : null,
+                selectedTxn.type === 'Scrap Sale' && (selectedTxn.scrapProfile?.tyreNo || selectedTxn.tyreNo) ? [
+                  'Tyre Number',
+                  null,
+                  <span className="text-sm font-black text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg font-mono">
+                    {selectedTxn.scrapProfile?.tyreNo || selectedTxn.tyreNo}
+                  </span>
+                ] : null,
                 selectedTxn.truckId ? ['Vehicle', null, <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.truckId}</span>] : null,
               ].filter(Boolean).map(([label, text, node]) => (
                 <div key={label} className="flex justify-between items-center py-2.5 border-b border-gray-50">
@@ -339,6 +354,67 @@ export default function TyresLedger({ vendor, onBack, onLedgerUpdated }) {
                   <p className="text-[11px] text-gray-400 pt-2">
                     Manage status updates and payments for this claim in the Warranty Module.
                   </p>
+                </div>
+              )}
+
+              {selectedTxn.scrapProfile && (
+                <div className="pt-4">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Scrapped Tyre Details</p>
+
+                  <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                    <span className="text-xs font-semibold text-gray-400">Tyre Number</span>
+                    <span className="text-sm font-black text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 font-mono">
+                      {selectedTxn.scrapProfile.tyreNo || '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                    <span className="text-xs font-semibold text-gray-400">Brand / Model</span>
+                    <span className="text-sm font-bold text-gray-800">
+                      {[selectedTxn.scrapProfile.make, selectedTxn.scrapProfile.model].filter(Boolean).join(' ') || '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                    <span className="text-xs font-semibold text-gray-400">Tyre Size</span>
+                    <span className="text-sm font-bold text-gray-800 font-mono">
+                      {selectedTxn.scrapProfile.tyreSize || '—'}
+                    </span>
+                  </div>
+                  {selectedTxn.scrapProfile.vehicleNo && (
+                    <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                      <span className="text-xs font-semibold text-gray-400">Last Fitted Vehicle</span>
+                      <span className="text-sm font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded">
+                        {selectedTxn.scrapProfile.vehicleNo}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                    <span className="text-xs font-semibold text-gray-400">Running KM</span>
+                    <span className="text-sm font-bold text-gray-800 font-mono">
+                      {selectedTxn.scrapProfile.runningKm ? `${Number(selectedTxn.scrapProfile.runningKm).toLocaleString()} km` : '—'}
+                    </span>
+                  </div>
+                  {selectedTxn.scrapProfile.remainingTread != null && (
+                    <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                      <span className="text-xs font-semibold text-gray-400">Remaining Tread</span>
+                      <span className="text-sm font-bold text-amber-600">
+                        {selectedTxn.scrapProfile.remainingTread}%
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                    <span className="text-xs font-semibold text-gray-400">Reason for Scrapping</span>
+                    <span className="text-sm font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded">
+                      {selectedTxn.scrapProfile.reason || '—'}
+                    </span>
+                  </div>
+                  {selectedTxn.scrapProfile.remarks && (
+                    <div className="flex justify-between items-start py-2.5 border-b border-gray-50">
+                      <span className="text-xs font-semibold text-gray-400 shrink-0">Remarks</span>
+                      <span className="text-sm font-semibold text-gray-700 text-right ml-4">
+                        {selectedTxn.scrapProfile.remarks}
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 

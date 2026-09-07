@@ -116,11 +116,12 @@ const getAllOldTyres = async () => {
 
   const [rows] = await db.query(`
 
-    SELECT *
-
-    FROM old_tyres
-
-    ORDER BY created_at DESC
+    SELECT 
+      ot.*,
+      COALESCE(t.vendor_name, '') AS vendor_name
+    FROM old_tyres ot
+    LEFT JOIN tyres t ON t.tyre_number = ot.old_tyre_number
+    ORDER BY ot.created_at DESC
 
   `);
 
