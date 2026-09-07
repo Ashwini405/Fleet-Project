@@ -51,13 +51,9 @@ function Err({ msg }) {
 export default function MarkReusableModal({ tyre, onClose, onConfirm }) {
   const [form, setForm] = useState({
     resolutionType: 'Puncture Repaired',
-    technician: '',
     readyDate: today(),
-    repairCost: '0',
     remainingTread: '',
     condition: 'Good',
-    storeLocation: 'Reusable Storage',
-    remarks: '',
   });
 
   const [errors, setErrors] = useState({});
@@ -79,13 +75,9 @@ export default function MarkReusableModal({ tyre, onClose, onConfirm }) {
 
       setForm({
         resolutionType: defaultRes,
-        technician: '',
         readyDate: today(),
-        repairCost: '0',
         remainingTread: tyre.remainingTread != null ? String(tyre.remainingTread) : '70',
         condition: (tyre.remainingTread && tyre.remainingTread > 70) ? 'Excellent' : 'Good',
-        storeLocation: tyre.storeLocation || 'Reusable Storage',
-        remarks: '',
       });
       setErrors({});
       setDone(false);
@@ -107,7 +99,6 @@ export default function MarkReusableModal({ tyre, onClose, onConfirm }) {
     else if (Number(form.remainingTread) < 1 || Number(form.remainingTread) > 100)
       e.remainingTread = 'Enter a valid tread (1–100%)';
     if (!form.condition)      e.condition      = 'Select condition';
-    if (Number(form.repairCost) < 0) e.repairCost = 'Cost cannot be negative';
     return e;
   };
 
@@ -121,17 +112,15 @@ export default function MarkReusableModal({ tyre, onClose, onConfirm }) {
     try {
       setSaving(true);
 
-      const costText = Number(form.repairCost) > 0 ? ` [Repair Cost: ₹${Number(form.repairCost).toLocaleString()}]` : '';
-      const techText = form.technician ? ` [By: ${form.technician}]` : '';
       const combinedNotes = [
-        `Resolution: ${form.resolutionType}${techText}${costText}`,
-        form.remarks ? `Notes: ${form.remarks}` : '',
+        `Resolution: ${form.resolutionType}`,
+        `Condition: ${form.condition}`,
         tyre.notes ? `(Prev: ${tyre.notes})` : '',
       ].filter(Boolean).join(' | ');
 
       await axios.put(`http://localhost:5001/api/old-tyres/${tyre.tyreNo}`, {
         tyre_status: 'REUSABLE',
-        store_location: form.storeLocation || 'Reusable Storage',
+        store_location: tyre.storeLocation || 'Reusable Storage',
         remaining_tread_percent: Number(form.remainingTread),
         notes: combinedNotes,
       });
@@ -139,13 +128,11 @@ export default function MarkReusableModal({ tyre, onClose, onConfirm }) {
       const updatedRecord = {
         ...tyre,
         status: 'REUSABLE',
-        storeLocation: form.storeLocation || 'Reusable Storage',
+        storeLocation: tyre.storeLocation || 'Reusable Storage',
         remainingTread: Number(form.remainingTread),
         condition: form.condition,
         notes: combinedNotes,
         resolutionType: form.resolutionType,
-        repairCost: Number(form.repairCost || 0),
-        technician: form.technician,
         readyDate: form.readyDate,
       };
 
@@ -304,52 +291,6 @@ export default function MarkReusableModal({ tyre, onClose, onConfirm }) {
                     <Err msg={errors.condition} />
                   </Field>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Repair / Service Cost (₹)">
-                      <div className="relative">
-                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 pointer-events-none">₹</span>
-                        <input
-                          type="number"
-                          min="0"
-                          placeholder="0"
-                          value={form.repairCost}
-                          onChange={e => set('repairCost', e.target.value)}
-                          className={inputCls(errors.repairCost) + ' pl-7 font-mono'}
-                        />
-                      </div>
-                      <Err msg={errors.repairCost} />
-                    </Field>
-
-                    <Field label="Inspected / Repaired By">
-                      <input
-                        type="text"
-                        placeholder="Technician / Workshop"
-                        value={form.technician}
-                        onChange={e => set('technician', e.target.value)}
-                        className={inputCls(false)}
-                      />
-                    </Field>
-                  </div>
-
-                  <Field label="Storage Location">
-                    <input
-                      type="text"
-                      placeholder="e.g. Reusable Storage, Bay A Rack"
-                      value={form.storeLocation}
-                      onChange={e => set('storeLocation', e.target.value)}
-                      className={inputCls(false)}
-                    />
-                  </Field>
-
-                  <Field label="Resolution Remarks / Inspection Notes">
-                    <textarea
-                      rows={2}
-                      placeholder="Details of repair, pressure test results, or fitment recommendation..."
-                      value={form.remarks}
-                      onChange={e => set('remarks', e.target.value)}
-                      className={inputCls(false).replace('h-[40px]', 'min-h-[54px]') + ' resize-none pt-2'}
-                    />
-                  </Field>
                 </div>
 
               </div>
