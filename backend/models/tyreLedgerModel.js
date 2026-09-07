@@ -191,24 +191,53 @@ const getVendorLedger = async (vendorId) => {
     const [scrapRows] = await db.query(
       `
       SELECT
+        id,
         scrap_date,
         txn_no,
-        sale_amount
+        tyre_no,
+        make,
+        model,
+        tyre_size,
+        vehicle_no,
+        running_km,
+        remaining_tread,
+        sale_amount,
+        reason,
+        remarks
       FROM tyre_scrap_history
-      WHERE vendor_name = ?
+      WHERE vendor_name = ? OR (vendor_id IS NOT NULL AND vendor_id = ?)
       `,
-      [vendor.vendor_name]
+      [vendor.vendor_name, vendor.id]
     );
 
     scrapRows.forEach((row, index) => {
+      const tyreDetails = [row.make, row.model, row.tyre_size].filter(Boolean).join(' ');
+      const descText = row.tyre_no
+        ? `Scrap Tyre Sale — ${row.tyre_no}${tyreDetails ? ` (${tyreDetails})` : ''}`
+        : 'Scrap Tyre Sale';
+
       transactions.push({
-        id: `SCR-${index}`,
+        id: `SCR-${row.id || index}`,
         date: row.scrap_date,
         type: "Scrap Sale",
         ref: row.txn_no || "-",
-        desc: "Scrap Tyre Sale",
+        desc: descText,
+        truckId: row.vehicle_no || null,
         debit: 0,
         credit: Number(row.sale_amount || 0),
+        tyreNo: row.tyre_no,
+        scrapProfile: {
+          tyreNo: row.tyre_no,
+          make: row.make,
+          model: row.model,
+          tyreSize: row.tyre_size,
+          vehicleNo: row.vehicle_no,
+          runningKm: row.running_km,
+          remainingTread: row.remaining_tread,
+          reason: row.reason,
+          remarks: row.remarks,
+          saleAmount: Number(row.sale_amount || 0),
+        },
       });
     });
 

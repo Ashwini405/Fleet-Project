@@ -188,6 +188,7 @@ export default function OldTyresStockTab({ activeTab, onNewRetreadingRecord, ret
         status: tyre.tyre_status,
         storeLocation: tyre.store_location,
         notes: tyre.notes,
+        vendor: tyre.vendor_name || '',
         createdAt: tyre.created_at,
       }));
       setOldTyres(formatted);

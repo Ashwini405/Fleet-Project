@@ -4,6 +4,11 @@ import { X, RotateCcw, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react
 import axios from 'axios';
 
 const today = () => new Date().toISOString().split('T')[0];
+const defaultReturnDate = () => {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toISOString().split('T')[0];
+};
 
 const inputCls = (err) =>
   `w-full px-3.5 h-[40px] bg-white border rounded-xl text-sm font-medium text-slate-800
@@ -45,16 +50,17 @@ export default function SendForRetreadingModal({ tyre, onClose, onConfirm }) {
     vendorId:           '',
     vendorName:         '',
     sentDate:           today(),
-    expectedReturnDate: '',
+    expectedReturnDate: defaultReturnDate(),
     expectedCost:       '',
     notes:              '',
   });
   const [errors, setErrors] = useState({});
   const [done, setDone]     = useState(false);
   const [retreadingVendors, setRetreadingVendors] = useState([]);
+  const [autoSource, setAutoSource] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Fetch retreading vendors from database — only once the modal is actually opened
+  // Fetch retreading vendors from database & auto-select matching vendor
   useEffect(() => {
     if (!tyre) return;
     fetchRetreadingVendors();
@@ -65,17 +71,94 @@ export default function SendForRetreadingModal({ tyre, onClose, onConfirm }) {
       const response = await axios.get('http://localhost:5001/api/tyre-vendors');
       const vendors = response.data.data || [];
 
-      // Filter vendors that offer Retreading service
+      // Filter vendors that offer Retreading service or are Retreading Vendors
       const filtered = vendors.filter(vendor => {
-        const services = Array.isArray(vendor.services)
-          ? vendor.services
-          : [];
-        return services.includes("Retreading");
+        let services = vendor.services;
+        if (typeof services === 'string') {
+          try { services = JSON.parse(services); } catch (_) { services = []; }
+        }
+        if (!Array.isArray(services)) services = [];
+        return services.includes('Retreading') || vendor.vendor_type === 'Retreading Vendor' || vendor.vendor_type === 'Tyre Vendor';
       });
 
-      setRetreadingVendors(filtered);
+      const vendorList = filtered.length > 0 ? filtered : vendors;
+      setRetreadingVendors(vendorList);
+
+      // Auto-detect / auto-select the best matching retreading vendor
+      let matchedVendor = null;
+      let matchLabel = '';
+
+      // 1. Check if tyre object already has vendor name / id
+      const tyreVendorName = tyre.vendor || tyre.vendorName || tyre.vendor_name;
+      const tyreVendorId = tyre.vendorId || tyre.vendor_id;
+
+      if (tyreVendorId) {
+        matchedVendor = vendorList.find(v => String(v.id) === String(tyreVendorId));
+        if (matchedVendor) matchLabel = 'Auto-detected from tyre assignment';
+      }
+      if (!matchedVendor && tyreVendorName) {
+        matchedVendor = vendorList.find(v => v.vendor_name.toLowerCase().trim() === tyreVendorName.toLowerCase().trim());
+        if (matchedVendor) matchLabel = 'Auto-matched from tyre vendor';
+      }
+
+      // 2. Fetch tyre master & past retreading history to match vendor
+      if (!matchedVendor && (tyre.tyreNo || tyre.old_tyre_number || tyre.id)) {
+        const tyreIdentifier = tyre.tyreNo || tyre.old_tyre_number || tyre.id;
+        try {
+          const [retreadRes, tyreRes] = await Promise.all([
+            axios.get('http://localhost:5001/api/tyre-retreading').catch(() => null),
+            axios.get('http://localhost:5001/api/tyres').catch(() => null),
+          ]);
+
+          // Check if tyre was previously retreaded by a vendor
+          if (retreadRes?.data?.success && Array.isArray(retreadRes.data.data)) {
+            const pastRec = retreadRes.data.data.find(r => r.tyre_no === tyreIdentifier || r.tyre_id === tyreIdentifier);
+            if (pastRec?.vendor_id || pastRec?.vendor_name) {
+              matchedVendor = vendorList.find(v =>
+                (pastRec.vendor_id && String(v.id) === String(pastRec.vendor_id)) ||
+                (pastRec.vendor_name && v.vendor_name.toLowerCase().trim() === pastRec.vendor_name.toLowerCase().trim())
+              );
+              if (matchedVendor) matchLabel = 'Auto-selected from previous retreading history';
+            }
+          }
+
+          // Check tyre master registration vendor
+          if (!matchedVendor && tyreRes?.data?.success && Array.isArray(tyreRes.data.data)) {
+            const masterTyre = tyreRes.data.data.find(t => t.tyre_number === tyreIdentifier || t.id === tyreIdentifier);
+            if (masterTyre?.vendor_name) {
+              matchedVendor = vendorList.find(v => v.vendor_name.toLowerCase().trim() === masterTyre.vendor_name.toLowerCase().trim());
+              if (matchedVendor) matchLabel = 'Auto-matched from tyre master record';
+            }
+          }
+        } catch (_) {}
+      }
+
+      // 3. If still not matched, check if there's a dedicated Retreading Vendor
+      if (!matchedVendor) {
+        const dedicated = vendorList.find(v => v.vendor_type === 'Retreading Vendor');
+        if (dedicated) {
+          matchedVendor = dedicated;
+          matchLabel = 'Default retreading vendor';
+        }
+      }
+
+      // 4. Fallback: Auto-select the first available retreading vendor (e.g. Yogi Tyres Station)
+      if (!matchedVendor && vendorList.length > 0) {
+        matchedVendor = vendorList[0];
+        matchLabel = 'Auto-selected retreading partner';
+      }
+
+      // If matched/selected, populate form automatically
+      if (matchedVendor) {
+        setForm(p => ({
+          ...p,
+          vendorId: String(matchedVendor.id),
+          vendorName: matchedVendor.vendor_name,
+        }));
+        setAutoSource(matchLabel);
+      }
     } catch (error) {
-      console.error("RETREADING VENDORS FETCH ERROR:", error);
+      console.error('RETREADING VENDORS FETCH ERROR:', error);
     }
   };
 
@@ -91,6 +174,7 @@ export default function SendForRetreadingModal({ tyre, onClose, onConfirm }) {
     const vendor = retreadingVendors.find(v => String(v.id) === String(id));
     set('vendorId', id);
     set('vendorName', vendor?.vendor_name || '');
+    setAutoSource('');
   };
 
   const validate = () => {
@@ -269,11 +353,18 @@ export default function SendForRetreadingModal({ tyre, onClose, onConfirm }) {
                           ))}
                         </select>
                       </div>
-                      {form.vendorId && (
-                        <p className="mt-1 text-[10px] text-emerald-600 font-semibold">
-                          📞 {retreadingVendors.find(v => String(v.id) === String(form.vendorId))?.mobile_number}
-                        </p>
-                      )}
+                      <div className="flex items-center justify-between gap-2 mt-1 flex-wrap">
+                        {form.vendorId && (
+                          <p className="text-[10px] text-emerald-600 font-semibold">
+                            📞 {retreadingVendors.find(v => String(v.id) === String(form.vendorId))?.mobile_number || 'No contact'}
+                          </p>
+                        )}
+                        {autoSource && form.vendorId && (
+                          <span className="text-[9.5px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200/80">
+                            ⚡ {autoSource}
+                          </span>
+                        )}
+                      </div>
                       <Err msg={errors.vendorId} />
                     </Field>
 

@@ -111,8 +111,9 @@ export default function ScrapTyreModal({ tyre, onClose, onConfirm }) {
       date:          form.scrapDate,
       type:          'Scrap Sale',
       ref:           txnNo,
-      desc:          `Scrap Sale — ${tyre.tyreNo} (${tyre.make || ''} ${tyre.tyreSize || ''})`,
+      desc:          `Scrap Sale — ${tyre.tyreNo} (${[tyre.make, tyre.model, tyre.tyreSize].filter(Boolean).join(' ')})`,
       credit:        saleAmount,
+      truckId:       tyre.vehicleNo || '',
       onTransaction: addVendorTransaction,
     });
 
