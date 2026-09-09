@@ -17,7 +17,8 @@ const Repair = {
     const [rows] = await db.query(`
       SELECT 
         r.*,
-        v.vehicle_no AS live_vehicle_no
+        v.vehicle_no AS live_vehicle_no,
+        r.garage AS vendor
       FROM repair_services r
       LEFT JOIN vehicles v ON r.vehicle_id = v.id
       ORDER BY r.created_at DESC

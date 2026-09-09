@@ -6,6 +6,7 @@ import OilsLedger from '../components/OilsLedger';
 
 export default function OilsPage() {
   const [search, setSearch] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState('all');
   const [addOpen, setAddOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [vendors, setVendors] = useState([]);
@@ -27,10 +28,10 @@ export default function OilsPage() {
     fetchOilVendors();
   }, []);
 
-  // Filter vendors based on search term
-  const filteredVendors = search
-    ? vendors.filter(v => v.vendor_name?.toLowerCase().includes(search.toLowerCase()))
-    : vendors;
+  // Filter vendors by search term and payment terms
+  const filteredVendors = vendors
+    .filter(v => !search || v.vendor_name?.toLowerCase().includes(search.toLowerCase()))
+    .filter(v => paymentFilter === 'all' || (v.payment_terms || 'credit') === paymentFilter);
 
   if (loading) {
     return (
@@ -77,7 +78,17 @@ export default function OilsPage() {
           <h2 className="text-xl font-bold text-gray-800">Oils & Lubes Accounts</h2>
           <p className="text-sm text-gray-500">Manage your lubricant vendors</p>
         </div>
-        <div className="flex items-center gap-4 w-full sm:w-auto">
+        <div className="flex items-center gap-4 w-full sm:w-auto flex-wrap">
+          <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg p-1">
+            {['all', 'credit', 'cash'].map(pf => (
+              <button key={pf} onClick={() => setPaymentFilter(pf)}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold capitalize transition-colors ${
+                  paymentFilter === pf ? 'bg-amber-600 text-white' : 'text-gray-500 hover:bg-gray-100'
+                }`}>
+                {pf}
+              </button>
+            ))}
+          </div>
           <div className="relative flex-1 sm:w-64">
             <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
@@ -121,7 +132,16 @@ export default function OilsPage() {
                   {vendor.status || 'Active'}
                 </span>
               </div>
-              <p className="text-[11px] font-semibold text-amber-500 mb-3">Oils & Lubes</p>
+              <div className="flex items-center gap-2 mb-3">
+                <p className="text-[11px] font-semibold text-amber-500">Oils & Lubes</p>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border capitalize ${
+                  (vendor.payment_terms || 'credit') === 'cash'
+                    ? 'bg-violet-50 text-violet-600 border-violet-100'
+                    : 'bg-blue-50 text-blue-600 border-blue-100'
+                }`}>
+                  {vendor.payment_terms || 'credit'}
+                </span>
+              </div>
               <div className="space-y-1.5 mb-6">
                 <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
                   <FiPhone className="text-gray-400 shrink-0" /> {vendor.mobile_number}

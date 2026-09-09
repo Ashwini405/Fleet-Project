@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { FiArrowLeft, FiPlus, FiEye, FiX, FiInbox, FiSearch, FiChevronLeft, FiChevronRight, FiDollarSign } from 'react-icons/fi';
+import { FiArrowLeft, FiPlus, FiEye, FiX, FiInbox, FiSearch, FiChevronLeft, FiChevronRight, FiDollarSign, FiCheckCircle } from 'react-icons/fi';
 import axios from 'axios';
 import { TypeBadge, RecordPaymentModal, VendorInfoPanel, SummaryCards } from './shared';
 import { PAGE_SIZE, MODAL_ANIM } from './shared/constants';
@@ -155,8 +155,7 @@ export default function GarageLedger({ vendor, onBack }) {
                   <th className="py-3 px-3 md:px-5">Type</th>
                   <th className="py-3 px-3 md:px-5 hidden sm:table-cell">Vehicle</th>
                   <th className="py-3 px-3 md:px-5">Description</th>
-                  <th className="py-3 px-3 md:px-5 text-right">Debit (+)</th>
-                  <th className="py-3 px-3 md:px-5 text-right">Credit (−)</th>
+                  <th className="py-3 px-3 md:px-5 text-right">Amount</th>
                   <th className="py-3 px-3 md:px-5 text-right hidden md:table-cell">Balance</th>
                   <th className="py-3 px-3 md:px-5 text-center hidden md:table-cell">Action</th>
                 </tr>
@@ -171,8 +170,17 @@ export default function GarageLedger({ vendor, onBack }) {
                       <div className="text-xs md:text-sm font-semibold text-gray-700">{txn.desc}</div>
                       {txn.ref && <div className="text-[10px] text-gray-400 mt-0.5">REF: {txn.ref}</div>}
                     </td>
-                    <td className="py-3 px-3 md:px-5 text-right">{txn.debit > 0 ? <span className="font-bold text-red-500 text-xs md:text-sm">₹{txn.debit.toLocaleString()}</span> : <span className="text-gray-300 font-bold">—</span>}</td>
-                    <td className="py-3 px-3 md:px-5 text-right">{txn.credit > 0 ? <span className="font-bold text-green-600 text-xs md:text-sm">₹{txn.credit.toLocaleString()}</span> : <span className="text-gray-300 font-bold">—</span>}</td>
+                    <td className="py-3 px-3 md:px-5 text-right">
+                      {txn.debit > 0 ? (
+                        <span className="font-bold text-green-600 text-xs md:text-sm">₹{txn.debit.toLocaleString()}</span>
+                      ) : txn.credit > 0 ? (
+                        <span className="inline-flex items-center gap-1 font-bold text-green-600 text-xs md:text-sm">
+                          <FiCheckCircle size={13} /> ₹{txn.credit.toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 font-bold">—</span>
+                      )}
+                    </td>
                     <td className="py-3 px-3 md:px-5 text-right hidden md:table-cell">
                       <span className={`text-xs font-bold ${txn.runningBalance > 0 ? 'text-red-500' : txn.runningBalance < 0 ? 'text-green-600' : 'text-gray-400'}`}>₹{Math.abs(txn.runningBalance).toLocaleString()}</span>
                     </td>

@@ -118,6 +118,15 @@ const CATEGORIES  = ['Spares', 'Batteries', 'Tubes', 'Lubricants', 'Electrical',
 const PAGE_TABS   = ['Inventory', 'Purchase Orders', 'Returns'];
 const API         = 'http://localhost:5001/api';
 
+function normalizeCategory(value) {
+  const normalized = String(value || '').trim();
+  if (!normalized) return '';
+  const key = normalized.toLowerCase();
+  if (key === 'electric') return 'Electrical';
+  if (key === 'electrical') return 'Electrical';
+  return normalized;
+}
+
 /* ── helpers ── */
 function qtyColor(qty) {
   if (qty <= 5)  return 'bg-red-50 text-red-600';
@@ -397,9 +406,7 @@ export default function PartsModule() {
   const categoryCounts = useMemo(() => {
     const c = {};
     CATEGORIES.forEach(cat => {
-      c[cat] = inventory.filter(i =>
-        (i.category || '').toLowerCase() === cat.toLowerCase()
-      ).length;
+      c[cat] = inventory.filter(i => normalizeCategory(i.category) === cat).length;
     });
     return c;
   }, [inventory]);
@@ -407,7 +414,7 @@ export default function PartsModule() {
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
     return inventory.filter(i => {
-      if ((i.category || '').toLowerCase() !== activeCategory.toLowerCase()) return false;
+      if (normalizeCategory(i.category) !== normalizeCategory(activeCategory)) return false;
       if (!q) return true;
       return (
         (i.part_name || '').toLowerCase().includes(q) ||

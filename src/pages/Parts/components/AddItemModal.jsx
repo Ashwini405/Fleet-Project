@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 
-const CATEGORIES = ['Spares', 'Tubes', 'Lubricants', 'Others'];
+const CATEGORIES = ['Spares', 'Tubes', 'Lubricants', 'Electric', 'Others'];
 const empty = {
   category: 'Spares',
   item_name: '',
