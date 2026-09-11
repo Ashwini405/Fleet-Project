@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 
+const API = 'http://localhost:5001/api';
 const CATEGORIES = ['Spares', 'Tubes', 'Lubricants', 'Electric', 'Others'];
 const empty = {
   category: 'Spares',
@@ -27,19 +28,21 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }) {
     setError('');
     setLoading(true);
     try {
-      const body = new FormData();
-      body.append('part_name', form.item_name.trim());
-      body.append('category', form.category);
-      body.append('brand', form.brand.trim());
-      body.append('sku', form.serial_number.trim());
-      body.append('current_stock', form.quantity);
-      body.append('opening_stock', form.quantity);
-      body.append('expiry_date', form.date_of_entry);
-      const res = await fetch('http://localhost:5001/api/inventory', { method: 'POST', body });
+      const res = await fetch(`${API}/purchase-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category:      form.category,
+          item_name:     form.item_name.trim(),
+          brand_name:    form.brand.trim(),
+          serial_number: form.serial_number.trim(),
+          quantity:      Number(form.quantity),
+        }),
+      });
       const data = await res.json();
-      if (!data.success) throw new Error(data.message || 'Failed to add item.');
+      if (!data.success) throw new Error(data.message);
       setForm(empty);
-      onSuccess();
+      onSuccess?.({ po_number: data.po_number });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -54,7 +57,10 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }) {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-200">
 
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="text-base font-bold text-slate-800">Add Inventory Item</h2>
+          <div>
+            <h2 className="text-base font-bold text-slate-800">Add Item</h2>
+            <p className="text-xs text-slate-500 mt-0.5">Creates a Pending Purchase Order</p>
+          </div>
           <button onClick={handleClose} disabled={loading} className="text-slate-400 hover:text-slate-600 transition disabled:opacity-40">
             <X className="h-5 w-5" />
           </button>
@@ -120,7 +126,7 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }) {
             <button type="submit" disabled={loading}
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition disabled:opacity-60">
               {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {loading ? 'Adding...' : 'Add Item'}
+              {loading ? 'Creating PO...' : 'Add Item'}
             </button>
           </div>
         </form>

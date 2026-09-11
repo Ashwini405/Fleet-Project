@@ -121,7 +121,7 @@ const getKpis = async (req, res) => {
     // purchase_orders table may not exist yet — fail gracefully
     let pendingPOs = { n: 0 };
     try {
-      const [[po]] = await db.query(`SELECT COUNT(*) AS n FROM purchase_orders WHERE status IN ('Pending','Approved')`);
+      const [[po]] = await db.query(`SELECT COUNT(*) AS n FROM pending_purchase_orders WHERE status IN ('Pending','Partially Received')`);
       pendingPOs = po;
     } catch (_) {}
     const [lowStockItems] = await db.query(

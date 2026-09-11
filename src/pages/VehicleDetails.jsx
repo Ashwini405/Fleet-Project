@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import BatteryTab from './BatteryTab';
+import TruckInventoryTab from './TruckInventoryTab';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FiArrowLeft, FiEdit2, FiMapPin, FiUser, FiActivity, FiSearch, FiPlus, FiX, FiUploadCloud, FiEye, FiDownload, FiTrash2 } from 'react-icons/fi';
 import { axleLayouts, posLabel, AXLE_TYPE_STYLES } from './Tyres/data/axleLayouts';
@@ -1247,83 +1248,11 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
 
         {/* Truck Inventory Tab */}
         {activeTab === 'Truck Inventory' && (
-          <div className="flex flex-col h-full animate-in fade-in duration-200">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-slate-800 tracking-tight">Truck Inventory</h2>
-              <button
-                onClick={openAddInventoryModal}
-                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center shadow-sm sticky top-4"
-              >
-                <FiPlus className="w-5 h-5 mr-1.5" />
-                Add Item
-              </button>
-            </div>
-
-            <div className="bg-white border flex-1 border-slate-200 rounded-xl shadow-sm overflow-hidden text-sm">
-              <div className="overflow-x-auto h-full">
-                <table className="w-full text-left whitespace-nowrap">
-                  <thead className="bg-slate-50/80 text-slate-500 text-xs uppercase font-semibold tracking-wider border-b border-slate-200">
-                    <tr>
-                      <th className="px-6 py-4 rounded-tl-xl whitespace-nowrap">Item Name</th>
-                      <th className="px-6 py-4 whitespace-nowrap">Category</th>
-                      <th className="px-6 py-4 text-center whitespace-nowrap">Quantity</th>
-                      <th className="px-6 py-4 whitespace-nowrap">Assigned Date</th>
-                      <th className="px-6 py-4 whitespace-nowrap">Condition</th>
-                      <th className="px-6 py-4 text-right rounded-tr-xl whitespace-nowrap">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {inventoryData.length === 0 && (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-8 text-center text-slate-400 font-medium">No inventory items assigned to this truck yet.</td>
-                      </tr>
-                    )}
-                    {inventoryData.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-6 py-4 font-medium text-slate-900">{item.part_name}</td>
-                        <td className="px-6 py-4">
-                          <span className="inline-flex px-2 py-1 rounded bg-slate-100 text-slate-600 font-medium text-xs border border-slate-200">
-                            {item.category}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-center font-medium text-slate-900">{item.quantity}</td>
-                        <td className="px-6 py-4 text-slate-700">{item.assigned_date ? new Date(item.assigned_date).toLocaleDateString('en-IN') : '-'}</td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${item.condition === 'Good' ? 'bg-green-50 text-green-700 border-green-200' :
-                            item.condition === 'Average' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                              'bg-red-50 text-red-700 border-red-200'
-                            }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${item.condition === 'Good' ? 'bg-green-500' :
-                              item.condition === 'Average' ? 'bg-amber-500' :
-                                'bg-red-500'
-                              }`}></span>
-                            {item.condition}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              onClick={() => openEditInventoryModal(item)}
-                              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors"
-                              title="Edit"
-                            >
-                              <FiEdit2 className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteInventoryItem(item)}
-                              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                              title="Delete"
-                            >
-                              <FiTrash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+          <div className="animate-in fade-in duration-200">
+            <TruckInventoryTab
+              vehicle={vehicle}
+              onAddItem={openAddInventoryModal}
+            />
           </div>
         )}
 

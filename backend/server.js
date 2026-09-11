@@ -96,6 +96,7 @@ require("./routes/driverSettlementRoutes");
 const truckPLRoutes = require("./routes/truckPLRoutes");
 const reportsRoutes = require("./routes/reportsRoutes");
 const truckInventoryRoutes = require("./routes/truckInventoryRoutes");
+const vehicleInventoryRoutes = require("./routes/vehicleInventoryRoutes");
 const fastagRoutes = require("./routes/fastagRoutes");
 const fastagNotificationRoutes = require("./routes/fastagNotificationRoutes");
 const tenderRoutes = require("./routes/tenderRoutes");
@@ -106,7 +107,41 @@ const employeeRoutes = require("./routes/employeeRoutes");
 const roleRoutes = require("./routes/roleRoutes");
 const backupRestoreRoutes = require("./routes/backupRestoreRoutes");
 const authRoutes = require("./routes/authRoutes");
+const pendingPurchaseOrderRoutes = require("./routes/pendingPurchaseOrderRoutes");
 
+
+// Auto-create pending_purchase_orders table
+db.query(`
+  CREATE TABLE IF NOT EXISTS pending_purchase_orders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    po_number VARCHAR(50) UNIQUE,
+    category VARCHAR(100),
+    item_name VARCHAR(255) NOT NULL,
+    brand_name VARCHAR(255),
+    serial_number VARCHAR(255),
+    ordered_quantity INT NOT NULL,
+    received_quantity INT DEFAULT 0,
+    pending_quantity INT NOT NULL,
+    status ENUM('Pending','Partially Received','Completed') DEFAULT 'Pending',
+    receive_date DATE NULL,
+    notes TEXT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  )
+`).then(() => {
+  console.log('pending_purchase_orders table ready');
+  // Fix any inventory_parts that landed in Others due to missing category mapping
+  return db.query(`
+    UPDATE inventory_parts ip
+    JOIN pending_purchase_orders ppo
+      ON LOWER(ip.part_name) = LOWER(ppo.item_name)
+    SET ip.category = ppo.category
+    WHERE (ip.category = 'Others' OR ip.category IS NULL OR ip.category = '')
+      AND ppo.category IS NOT NULL
+      AND ppo.category != ''
+  `);
+}).then(() => console.log('inventory_parts category sync done'))
+  .catch(e => console.error('pending_purchase_orders table error:', e.message));
 
 // Auto-create tyre_notifications table
 db.query(`
@@ -320,6 +355,67 @@ app.use(
 app.use("/api/truck-pl", truckPLRoutes);
 app.use("/api/reports", reportsRoutes);
 app.use("/api/truck-inventory", truckInventoryRoutes);
+app.use("/api/vehicle-inventory", vehicleInventoryRoutes);
+
+// Auto-create vehicle_inventory tables
+db.query(`
+  CREATE TABLE IF NOT EXISTS vehicle_inventory (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    vehicle_number VARCHAR(50) NOT NULL,
+    inventory_item_id INT DEFAULT NULL,
+    item_name VARCHAR(255) NOT NULL,
+    category VARCHAR(100) DEFAULT 'Spare',
+    quantity INT NOT NULL DEFAULT 1,
+    assigned_date DATE DEFAULT NULL,
+    condition_status VARCHAR(50) DEFAULT 'Good',
+    source VARCHAR(30) DEFAULT 'manual',
+    issue_history_id INT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_vehicle_number (vehicle_number),
+    INDEX idx_item (inventory_item_id)
+  )
+`).then(() => db.query(`
+  CREATE TABLE IF NOT EXISTS vehicle_inventory_returns (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    vehicle_inventory_id INT DEFAULT NULL,
+    inventory_item_id INT DEFAULT NULL,
+    part_name VARCHAR(255) NOT NULL,
+    vehicle_number VARCHAR(50) NOT NULL,
+    returned_quantity INT NOT NULL,
+    return_date DATE NOT NULL,
+    reason VARCHAR(255) DEFAULT NULL,
+    remarks TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_vehicle (vehicle_number)
+  )
+`)).then(() => db.query(`
+  CREATE TABLE IF NOT EXISTS vehicle_inventory_replacements (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    vehicle_number VARCHAR(50) NOT NULL,
+    old_part VARCHAR(255) NOT NULL,
+    new_part VARCHAR(255) NOT NULL,
+    old_inventory_item_id INT DEFAULT NULL,
+    new_inventory_item_id INT DEFAULT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    replace_date DATE NOT NULL,
+    reason VARCHAR(255) DEFAULT NULL,
+    remarks TEXT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_vehicle (vehicle_number)
+  )
+`)).then(() => db.query(`
+  CREATE TABLE IF NOT EXISTS vehicle_inventory_condition_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    vehicle_inventory_id INT NOT NULL,
+    old_condition VARCHAR(50) NOT NULL,
+    new_condition VARCHAR(50) NOT NULL,
+    remarks TEXT DEFAULT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_vi (vehicle_inventory_id)
+  )
+`)).then(() => console.log('vehicle_inventory tables ready'))
+  .catch(e => console.error('vehicle_inventory tables error:', e.message));
 app.use("/api/fastag", fastagRoutes);
 app.use("/api/fastag-notifications", fastagNotificationRoutes);
 app.use("/api/tenders", tenderRoutes);
@@ -340,6 +436,8 @@ app.use(
     "/api/backup-restore",
     backupRestoreRoutes
 );
+
+app.use("/api/purchase-orders", pendingPurchaseOrderRoutes);
 
 // 🔥 TEST ROUTE
 app.get('/', (req, res) => {

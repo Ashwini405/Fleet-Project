@@ -13,7 +13,7 @@ async function migrate() {
         vehicle_number VARCHAR(100) DEFAULT NULL,
         quantity_returned INT NOT NULL,
         return_date DATE NOT NULL,
-        condition_on_return ENUM('Good','Average','Damaged') NOT NULL DEFAULT 'Good',
+        condition_on_return VARCHAR(50) NOT NULL DEFAULT 'Good',
         restocked TINYINT(1) NOT NULL DEFAULT 0,
         notes TEXT,
         created_by VARCHAR(100) DEFAULT NULL,
@@ -22,6 +22,11 @@ async function migrate() {
         INDEX idx_vehicle (vehicle_number),
         INDEX idx_issue (original_issue_id)
       )
+    `);
+
+    await conn.query(`
+      ALTER TABLE part_returns
+      MODIFY COLUMN condition_on_return VARCHAR(50) NOT NULL DEFAULT 'Good'
     `);
 
     console.log('✅ part_returns table created successfully');

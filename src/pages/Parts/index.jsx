@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import AddItemModal      from './components/AddItemModal';
+import AddItemModal            from './components/AddItemModal';
+import PendingPurchaseOrders   from './components/PendingPurchaseOrders';
 import { useVendorLedger } from '../../context/VendorLedgerContext';
 import { dummyVendors } from '../Vendors/data/dummyData';
 
@@ -129,8 +130,6 @@ function normalizeCategory(value) {
 
 /* ── helpers ── */
 function qtyColor(qty) {
-  if (qty <= 5)  return 'bg-red-50 text-red-600';
-  if (qty <= 15) return 'bg-amber-50 text-amber-600';
   return 'bg-emerald-50 text-emerald-600';
 }
 
@@ -219,6 +218,9 @@ export default function PartsModule() {
   /* ── page-level tab ── */
   const [pageTab, setPageTab] = useState('Inventory');
 
+  /* ── pending PO refresh trigger ── */
+  const [ppoPendingRefresh, setPpoPendingRefresh] = useState(0);
+
   /* ── inventory state ── */
   const [activeCategory, setActiveCategory] = useState('Spares');
   const [search, setSearch]                 = useState('');
@@ -227,6 +229,8 @@ export default function PartsModule() {
   const [issueItem, setIssueItem]           = useState(null);
   const [deleteItem, setDeleteItem]         = useState(null);
   const [inventory, setInventory]           = useState([]);
+  const [pendingItems, setPendingItems]     = useState([]);
+  const [pendingPOCount, setPendingPOCount] = useState(0);
   const [history, setHistory]               = useState([]);
   const [invLoading, setInvLoading]         = useState(true);
   const [histLoading, setHistLoading]       = useState(true);
@@ -322,12 +326,23 @@ export default function PartsModule() {
     finally  { setPartReturnsLoading(false); }
   }, []);
 
+  const fetchPendingPOCount = useCallback(async () => {
+    try {
+      const res = await fetch(`${API}/purchase-orders`);
+      const data = await res.json();
+      setPendingPOCount((data.data || []).filter(order => order.status !== 'Completed').length);
+    } catch {
+      setPendingPOCount(0);
+    }
+  }, []);
+
   useEffect(() => {
     fetchInventory();
     fetchHistory();
     fetchPOs();
     fetchPartReturns();
-  }, [fetchInventory, fetchHistory, fetchPOs, fetchPartReturns]);
+    fetchPendingPOCount();
+  }, [fetchInventory, fetchHistory, fetchPOs, fetchPartReturns, fetchPendingPOCount]);
 
   const handleReturnPartSuccess = () => {
     setReturnPartRecord(null);
@@ -425,10 +440,11 @@ export default function PartsModule() {
   }, [inventory, activeCategory, search]);
 
   /* ── inventory handlers ── */
-  const handleAddSuccess = () => {
+  const handleAddSuccess = (result) => {
     setIsAddOpen(false);
-    showToast('Item added successfully.');
-    fetchInventory();
+    setPpoPendingRefresh(n => n + 1);
+    fetchPendingPOCount();
+    showToast(`Purchase order ${result?.po_number || ''} created. Receive stock to update inventory.`);
   };
   const handleEditSuccess = () => {
     setEditItem(null);
@@ -607,8 +623,22 @@ export default function PartsModule() {
   /* ── PO handlers ── */
   const handleCreatePOSuccess = (localPO) => {
     setIsCreatePOOpen(false);
+
     if (localPO) {
-      // Backend not connected — add to local list immediately
+      const itemName = localPO.item_name || localPO.items?.[0]?.partName || localPO.items?.[0]?.name || 'Item';
+      const addedQty = Number(localPO.quantity || localPO.items?.[0]?.qty || 0);
+
+      setInventory(prev => [{
+        id: `po-${Date.now()}`,
+        part_name: itemName,
+        brand: localPO.brand_name || localPO.brand || '',
+        category: localPO.category,
+        current_stock: addedQty,
+        min_stock: 0,
+      }, ...prev]);
+
+      setPendingItems(prev => prev.filter(item => item.part_name !== itemName || item.category !== localPO.category));
+
       setPoList(prev => [{
         ...localPO,
         po_number:       localPO.poNumber,
@@ -619,7 +649,8 @@ export default function PartsModule() {
     } else {
       fetchPOs();
     }
-    showToast('Purchase order created.');
+    fetchPendingPOCount();
+    showToast('Purchase order created and item moved to inventory.');
   };
 
   const openCommentModal = (po, action) => {
@@ -734,6 +765,7 @@ export default function PartsModule() {
         setPoList(prev => prev.map(p => p.id === id ? { ...p, status_id: 4, receivedBy: currentUser.name, receivedAt: now, updatedBy: currentUser.name, updatedAt: now } : p));
         showToast('PO received — inventory updated.');
         fetchInventory();
+        setPpoPendingRefresh(n => n + 1);
       } else if (succeeded) {
         showToast('Status updated.');
       }
@@ -856,7 +888,7 @@ export default function PartsModule() {
               { label: 'Total Items',    value: invSummary.total,      color: 'text-violet-600', bg: 'bg-violet-50' },
               { label: 'Low Stock',      value: invSummary.lowStock,   color: 'text-amber-600',  bg: 'bg-amber-50'  },
               { label: 'Out of Stock',   value: invSummary.outOfStock, color: 'text-red-600',    bg: 'bg-red-50'    },
-              { label: 'PO Pending',     value: poSummary.pending,     color: 'text-blue-600',   bg: 'bg-blue-50'   },
+              { label: 'PO Pending',     value: pendingPOCount,         color: 'text-blue-600',   bg: 'bg-blue-50'   },
             ].map(c => (
               <div key={c.label} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
                 <p className={`text-[10px] uppercase tracking-widest font-bold mb-1 ${c.color}`}>{c.label}</p>
@@ -864,6 +896,52 @@ export default function PartsModule() {
               </div>
             ))}
           </div>
+
+          {pendingItems.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <Package className="h-4 w-4 text-violet-600" />
+                  <h2 className="text-sm font-bold text-slate-800">Pending Inventory</h2>
+                </div>
+                <span className="text-xs text-slate-400">{pendingItems.length} item{pendingItems.length !== 1 ? 's' : ''}</span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[700px]">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Item Name</th>
+                      <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Category</th>
+                      <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Brand</th>
+                      <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Quantity</th>
+                      <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Date Added</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pendingItems.map(item => (
+                      <tr key={item.id} className="border-b border-slate-50 hover:bg-slate-50/70 transition">
+                        <td className="px-5 py-3.5 font-medium text-slate-800">{item.part_name}</td>
+                        <td className="px-5 py-3.5 text-slate-500">{item.category}</td>
+                        <td className="px-5 py-3.5 text-slate-500">{item.brand || '—'}</td>
+                        <td className="px-5 py-3.5">
+                          <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
+                            {item.current_stock}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-slate-500">{item.date_of_entry}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Pending Purchase Orders — above Inventory Management */}
+          <PendingPurchaseOrders
+            refreshTrigger={ppoPendingRefresh}
+          />
 
           {/* Inventory Management card */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100">

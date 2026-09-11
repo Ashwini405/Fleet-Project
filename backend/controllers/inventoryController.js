@@ -1,4 +1,5 @@
 const Inventory = require('../models/inventoryModel');
+const VehicleInventory = require('../models/vehicleInventoryModel');
 const db = require('../config/db');
 const { logAudit } = require('../middleware/auditMiddleware');
 
@@ -642,9 +643,10 @@ exports.stockOutPart = async (req, res) => {
         quantity,
         cost_per_unit,
         vendor,
-        issue_date
+        issue_date,
+        status
 
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Issued')`,
 
       [
 
@@ -712,6 +714,28 @@ exports.stockOutPart = async (req, res) => {
         current_stock: newStock
       }
     });
+
+    // ✅ SYNC vehicle_inventory
+    if (vehicleNumber) {
+      try {
+        const [issueRows] = await db.query(
+          `SELECT id FROM inventory_issue_history WHERE part_id = ? AND vehicle_number = ? ORDER BY id DESC LIMIT 1`,
+          [partId, vehicleNumber]
+        );
+        const issueHistoryId = issueRows[0]?.id || null;
+        await VehicleInventory.syncFromIssue({
+          issueHistoryId,
+          vehicleNumber,
+          inventoryItemId: partId,
+          itemName: part.part_name,
+          category: part.category,
+          quantity: issueQty,
+          issueDate: date || null,
+        });
+      } catch (syncErr) {
+        console.error('VEHICLE INVENTORY SYNC ERROR:', syncErr.message);
+      }
+    }
 
   } catch (error) {
 
@@ -875,6 +899,14 @@ exports.createPartReturn = async (req, res) => {
          SET current_stock = ?, inventory_value = ?, updated_at = NOW()
          WHERE id = ?`,
         [newStock, inventoryValue, part_id]
+      );
+    }
+
+    // Mark original issue record as Returned
+    if (original_issue_id) {
+      await db.query(
+        `UPDATE inventory_issue_history SET status = 'Returned' WHERE id = ?`,
+        [original_issue_id]
       );
     }
 
@@ -1162,7 +1194,7 @@ exports.orderPurchaseOrder = async (req, res) => {
 
 exports.createPurchaseOrder = async (req, res) => {
   try {
-    const { vendor, part_id, item_name, quantity, expected_delivery, notes, requested_by, requested_date } = req.body;
+    const { vendor, part_id, item_name, brand_name, category, quantity, expected_delivery, notes, requested_by, requested_date } = req.body;
 
     if (!vendor || !item_name || !quantity) {
       return res.status(400).json({ success: false, message: 'Vendor, item and quantity are required.' });
@@ -1172,7 +1204,14 @@ exports.createPurchaseOrder = async (req, res) => {
     const datePart    = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const po_number   = `PO-${datePart}-${Math.floor(1000 + Math.random() * 9000)}`;
 
-    const items = [{ part_id: part_id || null, partName: item_name, qty: Number(quantity), notes: notes || '' }];
+    const items = [{
+      part_id: part_id || null,
+      partName: item_name,
+      brand_name: brand_name || '',
+      category: category || 'Others',
+      qty: Number(quantity),
+      notes: notes || '',
+    }];
 
     await db.query(
       `INSERT INTO inventory_purchase_orders
@@ -1208,15 +1247,15 @@ exports.receivePurchaseOrder = async (req, res) => {
       `UPDATE inventory_purchase_orders SET status = 'Received', status_id = 4 WHERE id = ?`, [id]
     );
 
-    const items  = typeof po.items === 'string' ? JSON.parse(po.items || '[]') : po.items || [];
-    const item   = items[0] || {};
-    let   partId = item.part_id || item.partId || null;
-    const qty    = Number(item.qty ?? item.quantity ?? 0);
+    const items    = typeof po.items === 'string' ? JSON.parse(po.items || '[]') : po.items || [];
+    const item     = items[0] || {};
+    let   partId   = item.part_id || item.partId || null;
+    const qty      = Number(item.qty ?? item.quantity ?? 0);
     const itemName = item.partName || item.name || item.item_name || '';
 
-    if (qty > 0) {
-      // If no part_id, check if a part with this name already exists, else create it
-      if (!partId && itemName) {
+    if (qty > 0 && itemName) {
+      // Resolve or create inventory_parts record
+      if (!partId) {
         const [existing] = await db.query(
           `SELECT id FROM inventory_parts WHERE LOWER(part_name) = LOWER(?) LIMIT 1`,
           [itemName]
@@ -1224,19 +1263,56 @@ exports.receivePurchaseOrder = async (req, res) => {
         if (existing.length) {
           partId = existing[0].id;
         } else {
+          // Look up category from pending_purchase_orders first
+          let resolvedCategory = item.category || po.category || 'Others';
+          let resolvedBrand = item.brand_name || item.brand || null;
+          try {
+            const [pendingOrder] = await db.query(
+              `SELECT category, brand_name
+               FROM pending_purchase_orders
+               WHERE LOWER(item_name) = LOWER(?)
+               ORDER BY id DESC
+               LIMIT 1`,
+              [itemName]
+            );
+            if (pendingOrder.length) {
+              if (!item.category && pendingOrder[0].category) resolvedCategory = pendingOrder[0].category;
+              if (!resolvedBrand) resolvedBrand = pendingOrder[0].brand_name || null;
+            }
+          } catch (_) {}
           const [inserted] = await db.query(
-            `INSERT INTO inventory_parts (part_name, category, current_stock, opening_stock, preferred_vendor, created_by)
-             VALUES (?, 'Others', 0, 0, ?, 'PO Auto')`,
-            [itemName, po.vendor || '']
+            `INSERT INTO inventory_parts
+              (part_name, category, brand, current_stock, opening_stock, preferred_vendor, created_by)
+             VALUES (?, ?, ?, 0, 0, ?, 'PO Auto')`,
+            [itemName, resolvedCategory, resolvedBrand, po.vendor || '']
           );
           partId = inserted.insertId;
         }
       }
 
       if (partId) {
+        const [pendingBrand] = await db.query(
+          `SELECT category, brand_name
+           FROM pending_purchase_orders
+           WHERE LOWER(item_name) = LOWER(?)
+             AND NULLIF(TRIM(brand_name), '') IS NOT NULL
+           ORDER BY id DESC
+           LIMIT 1`,
+          [itemName]
+        );
         await db.query(
-          `UPDATE inventory_parts SET current_stock = current_stock + ?, updated_at = NOW() WHERE id = ?`,
-          [qty, partId]
+          `UPDATE inventory_parts
+           SET current_stock = current_stock + ?,
+               category = CASE WHEN category IS NULL OR TRIM(category) = '' OR category = 'Others' THEN COALESCE(?, category) ELSE category END,
+               brand = CASE WHEN brand IS NULL OR TRIM(brand) = '' OR brand = '—' THEN COALESCE(?, brand) ELSE brand END,
+               updated_at = NOW()
+           WHERE id = ?`,
+          [
+            qty,
+            item.category || pendingBrand[0]?.category || null,
+            item.brand_name || item.brand || pendingBrand[0]?.brand_name || null,
+            partId,
+          ]
         );
         await db.query(
           `INSERT INTO inventory_stock_movements (part_id, movement_type, quantity, vendor, movement_date)
@@ -1244,6 +1320,27 @@ exports.receivePurchaseOrder = async (req, res) => {
           [partId, qty, po.vendor || '']
         );
       }
+
+      // ── Mark matching pending_purchase_order as Completed ──
+      try {
+        const [ppoRows] = await db.query(
+          `SELECT id, ordered_quantity FROM pending_purchase_orders
+           WHERE LOWER(item_name) = LOWER(?) AND status != 'Completed'
+           ORDER BY created_at ASC LIMIT 1`,
+          [itemName]
+        );
+        if (ppoRows.length) {
+          const ppo = ppoRows[0];
+          const newReceived = Number(ppo.ordered_quantity);
+          await db.query(
+            `UPDATE pending_purchase_orders
+             SET received_quantity = ?, pending_quantity = 0,
+                 status = 'Completed', receive_date = CURDATE(), updated_at = NOW()
+             WHERE id = ?`,
+            [newReceived, ppo.id]
+          );
+        }
+      } catch (_) { /* pending_purchase_orders table may not exist yet — ignore */ }
     }
 
     res.json({ success: true, message: 'Purchase order received and stock updated.' });

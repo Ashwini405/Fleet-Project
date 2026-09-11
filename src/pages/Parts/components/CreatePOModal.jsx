@@ -1,36 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, AlertCircle } from 'lucide-react';
 
+const API   = 'http://localhost:5001/api';
 const today = () => new Date().toISOString().split('T')[0];
 
-// Two categories — mapped to vendor ledger category IDs
 const CATEGORIES = [
-  { id: 'Parts & Spares', vendorCat: 'parts',  color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  { id: 'Oils & Lubes',   vendorCat: 'oils',   color: 'bg-amber-50  text-amber-700  border-amber-200'  },
+  { id: 'Parts & Spares', vendorCat: 'parts', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  { id: 'Oils & Lubes',   vendorCat: 'oils',  color: 'bg-amber-50  text-amber-700  border-amber-200'  },
 ];
-
-// Items per category — matching inventory
-const ITEMS_BY_CATEGORY = {
-  'Parts & Spares': [
-    { id: 'i1',  name: 'Brake Pads',     unit: 'pcs',    price: 560  },
-    { id: 'i2',  name: 'Clutch Plate',   unit: 'pcs',    price: 2200 },
-    { id: 'i3',  name: 'Air Filter',     unit: 'pcs',    price: 180  },
-    { id: 'i4',  name: 'Wiper Blades',   unit: 'pcs',    price: 320  },
-    { id: 'i5',  name: 'Fuel Filter',    unit: 'pcs',    price: 420  },
-    { id: 'i6',  name: 'Headlight Bulb', unit: 'pcs',    price: 280  },
-  ],
-  'Oils & Lubes': [
-    { id: 'i7',  name: 'Engine Oil 15W40', unit: 'liters', price: 560 },
-    { id: 'i8',  name: 'Gear Oil',         unit: 'liters', price: 380 },
-    { id: 'i9',  name: 'Grease',           unit: 'kg',     price: 160 },
-    { id: 'i10', name: 'Coolant',          unit: 'liters', price: 220 },
-    { id: 'i11', name: 'Brake Fluid',      unit: 'liters', price: 310 },
-  ],
-};
 
 const EMPTY = {
   category: '', vendorId: '', vendor: '',
-  itemId: '', item_name: '', unit: '',
+  itemCategory: '', pendingOrderId: '', item_name: '', brand_name: '',
   quantity: '', unit_price: '', expected_delivery: '', notes: '',
 };
 
@@ -60,48 +41,39 @@ function Err({ msg }) {
 }
 
 export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy }) {
-  // ── All hooks MUST be declared before any early return ──
-  const [form, setForm] = useState(EMPTY);
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [form, setForm]                 = useState(EMPTY);
+  const [errors, setErrors]             = useState({});
+  const [loading, setLoading]           = useState(false);
   const [partsVendors, setPartsVendors] = useState([]);
-  const [oilVendors, setOilVendors] = useState([]);
-
-  // Fetch parts vendors from database
-  const fetchPartsVendors = async () => {
-    try {
-      const res = await fetch('http://localhost:5001/api/parts-vendors');
-      const data = await res.json();
-      setPartsVendors(data.data || []);
-    } catch (error) {
-      console.error('PARTS VENDORS ERROR', error);
-    }
-  };
-
-  // Fetch oil vendors from database
-  const fetchOilVendors = async () => {
-    try {
-      const res = await fetch('http://localhost:5001/api/oil-vendors');
-      const data = await res.json();
-      setOilVendors(data.data || []);
-    } catch (error) {
-      console.error('OIL VENDORS ERROR', error);
-    }
-  };
+  const [oilVendors, setOilVendors]     = useState([]);
+  const [pendingOrders, setPendingOrders] = useState([]);
 
   useEffect(() => {
     if (!isOpen) return;
-    fetchPartsVendors();
-    fetchOilVendors();
+    fetch(`${API}/parts-vendors`).then(r => r.json()).then(d => setPartsVendors(d.data || [])).catch(() => {});
+    fetch(`${API}/oil-vendors`).then(r => r.json()).then(d => setOilVendors(d.data || [])).catch(() => {});
+    fetch(`${API}/purchase-orders`).then(r => r.json()).then(d => {
+      setPendingOrders((d.data || []).filter(o => o.status !== 'Completed'));
+    }).catch(() => {});
   }, [isOpen]);
 
-  // ── Early return AFTER all hooks ──
   if (!isOpen) return null;
 
-  const set = (k, v) => {
-    setForm(f => ({ ...f, [k]: v }));
-    setErrors(e => ({ ...e, [k]: null }));
-  };
+  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: null })); };
+
+  const catMeta = CATEGORIES.find(c => c.id === form.category);
+
+  const vendorsForCategory = form.category === 'Parts & Spares'
+    ? partsVendors
+    : form.category === 'Oils & Lubes'
+    ? oilVendors
+    : [];
+
+  // Unique item categories from pending orders
+  const pendingCategories = [...new Set(pendingOrders.map(o => o.category).filter(Boolean))];
+
+  // Items filtered by selected item category
+  const itemsForItemCategory = pendingOrders.filter(o => o.category === form.itemCategory);
 
   const handleCategoryChange = (cat) => {
     setForm({ ...EMPTY, category: cat });
@@ -110,40 +82,36 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
 
   const handleVendorChange = (vendorId) => {
     const v = vendorsForCategory.find(x => String(x.id) === String(vendorId));
-    setForm(f => ({ ...f, vendorId, vendor: v?.vendor_name || '', itemId: '', item_name: '', unit: '', unit_price: '' }));
+    setForm(f => ({ ...f, vendorId, vendor: v?.vendor_name || '', itemCategory: '', pendingOrderId: '', item_name: '', brand_name: '', quantity: '', unit_price: '' }));
     setErrors(e => ({ ...e, vendorId: null }));
   };
 
-  const handleItemChange = (itemId) => {
-    const item = itemsForCategory.find(x => x.id === itemId);
-    setForm(f => ({
-      ...f, itemId,
-      item_name:  item?.name  || '',
-      unit:       item?.unit  || '',
-      unit_price: item ? String(item.price) : '',
-    }));
-    setErrors(e => ({ ...e, itemId: null }));
+  const handleItemCategoryChange = (itemCat) => {
+    setForm(f => ({ ...f, itemCategory: itemCat, pendingOrderId: '', item_name: '', brand_name: '', quantity: '', unit_price: '' }));
+    setErrors(e => ({ ...e, itemCategory: null }));
   };
 
-  const catMeta = CATEGORIES.find(c => c.id === form.category);
-  
-  // Vendors loaded from database based on selected category
-  const vendorsForCategory = form.category === 'Parts & Spares'
-    ? partsVendors
-    : form.category === 'Oils & Lubes'
-    ? oilVendors
-    : [];
-
-  const itemsForCategory = ITEMS_BY_CATEGORY[form.category] || [];
+  const handleItemChange = (pendingOrderId) => {
+    const po = itemsForItemCategory.find(o => String(o.id) === String(pendingOrderId));
+    setForm(f => ({
+      ...f,
+      pendingOrderId,
+      item_name: po?.item_name || '',
+      brand_name: po?.brand_name || '',
+      quantity:  po ? String(po.pending_quantity) : '',
+    }));
+    setErrors(e => ({ ...e, pendingOrderId: null }));
+  };
 
   const total = (Number(form.quantity) || 0) * (Number(form.unit_price) || 0);
 
   const validate = () => {
     const e = {};
-    if (!form.category)                              e.category = 'Select a category';
-    if (!form.vendorId)                              e.vendorId = 'Select a vendor';
-    if (!form.itemId && !form.item_name.trim())      e.itemId   = 'Select or enter an item';
-    if (!form.quantity || Number(form.quantity) <= 0) e.quantity = 'Enter a valid quantity';
+    if (!form.category)                                 e.category       = 'Select a category';
+    if (!form.vendorId)                                 e.vendorId       = 'Select a vendor';
+    if (!form.itemCategory)                             e.itemCategory   = 'Select an item category';
+    if (!form.pendingOrderId && !form.item_name.trim()) e.pendingOrderId = 'Select an item';
+    if (!form.quantity || Number(form.quantity) <= 0)   e.quantity       = 'Enter a valid quantity';
     return e;
   };
 
@@ -157,8 +125,10 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
       id:               `PO-LOCAL-${Date.now()}`,
       poNumber:         `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
       vendor:           form.vendor,
-      category:         form.category,
+      category:         form.itemCategory,
       item_name:        form.item_name,
+      brand_name:       form.brand_name,
+      brand:            form.brand_name,
       quantity:         Number(form.quantity),
       items:            [{ partName: form.item_name, qty: Number(form.quantity), unitPrice: Number(form.unit_price) || 0 }],
       totalAmount:      total,
@@ -170,13 +140,14 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
     };
 
     try {
-      const res = await fetch('http://localhost:5001/api/inventory/purchase-orders', {
+      const res = await fetch(`${API}/inventory/purchase-orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           vendor: form.vendor, item_name: form.item_name,
+          brand_name: form.brand_name,
           quantity: Number(form.quantity), unit_price: Number(form.unit_price) || 0,
-          total_amount: total, category: form.category,
+          total_amount: total, category: form.itemCategory,
           expected_delivery: form.expected_delivery || null,
           notes: form.notes, requested_by: requestedBy || 'Supervisor',
           requested_date: today(),
@@ -184,6 +155,9 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.message || 'Server error');
+      if (form.pendingOrderId) {
+        await fetch(`${API}/purchase-orders/${form.pendingOrderId}`, { method: 'DELETE' });
+      }
       onSuccess?.();
     } catch {
       onSuccess?.(localPO);
@@ -214,7 +188,7 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
 
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
 
-          {/* 1. Category */}
+          {/* 1. Category (Parts & Spares / Oils & Lubes) */}
           <div>
             <Label text="Category" required />
             <div className="grid grid-cols-2 gap-3">
@@ -256,42 +230,52 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
             </div>
           )}
 
-          {/* 3. Item */}
+          {/* 3. Item Category (from pending orders) */}
           {form.vendorId && (
             <div>
-              <Label text="Item" required />
-              <select value={form.itemId} onChange={e => handleItemChange(e.target.value)}
-                className={sCls(errors.itemId)}>
-                <option value="">— Select Item —</option>
-                {itemsForCategory.map(item => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} ({item.unit}) — ₹{item.price.toLocaleString()}
-                  </option>
+              <Label text="Item Category" required />
+              <select value={form.itemCategory} onChange={e => handleItemCategoryChange(e.target.value)}
+                className={sCls(errors.itemCategory)}>
+                <option value="">— Select Item Category —</option>
+                {pendingCategories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
-              <Err msg={errors.itemId} />
-              <div className="flex items-center gap-2 my-2">
-                <div className="flex-1 h-px bg-slate-100" />
-                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap">or type manually</span>
-                <div className="flex-1 h-px bg-slate-100" />
-              </div>
-              <input
-                value={form.itemId ? '' : form.item_name}
-                onChange={e => setForm(f => ({ ...f, itemId: '', item_name: e.target.value, unit: '', unit_price: '' }))}
-                placeholder="e.g. Custom part name…"
-                className={iCls(false)} />
+              {pendingCategories.length === 0 && (
+                <p className="text-[11px] text-amber-600 mt-1">No pending orders found. Add items first.</p>
+              )}
+              <Err msg={errors.itemCategory} />
             </div>
           )}
 
-          {/* 4. Qty + Unit Price */}
-          {form.vendorId && (
+          {/* 4. Item (from pending orders of selected item category) */}
+          {form.itemCategory && (
+            <div>
+              <Label text="Item" required />
+              <select value={form.pendingOrderId} onChange={e => handleItemChange(e.target.value)}
+                className={sCls(errors.pendingOrderId)}>
+                <option value="">— Select Item —</option>
+                {itemsForItemCategory.map(o => (
+                  <option key={o.id} value={o.id}>
+                    {o.item_name}{o.brand_name ? ` (${o.brand_name})` : ''} — Pending: {o.pending_quantity}
+                  </option>
+                ))}
+              </select>
+              {itemsForItemCategory.length === 0 && (
+                <p className="text-[11px] text-amber-600 mt-1">No pending items in this category.</p>
+              )}
+              <Err msg={errors.pendingOrderId} />
+            </div>
+          )}
+
+          {/* 5. Qty + Unit Price */}
+          {form.pendingOrderId && (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label text="Quantity" required />
                 <input type="number" min="1" value={form.quantity}
                   onChange={e => set('quantity', e.target.value)}
                   placeholder="0" className={iCls(errors.quantity)} />
-                {form.unit && <p className="text-[10px] text-slate-400 mt-1">Unit: {form.unit}</p>}
                 <Err msg={errors.quantity} />
               </div>
               <div>
@@ -314,8 +298,8 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
             </div>
           )}
 
-          {/* 5. Delivery + Remarks */}
-          {form.vendorId && (
+          {/* 6. Delivery + Remarks */}
+          {form.pendingOrderId && (
             <>
               <div>
                 <Label text="Expected Delivery" />
