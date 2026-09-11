@@ -18,6 +18,7 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
   const [vehicles, setVehicles] = useState([]);
   const [incomeList, setIncomeList] = useState([]);
   const [expenseList, setExpenseList] = useState([]);
+  const [fuelList, setFuelList] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Fetch vehicles from database
@@ -59,10 +60,20 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
     }
   };
 
+  const fetchFuel = async () => {
+    try {
+      const res = await fetch("http://localhost:5001/api/fuel");
+      const data = await res.json();
+      if (data.success) setFuelList(data.data || []);
+    } catch (error) {
+      console.error("Fuel fetch failed:", error);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
-      await Promise.all([fetchVehicles(), fetchIncome(), fetchExpenses()]);
+      await Promise.all([fetchVehicles(), fetchIncome(), fetchExpenses(), fetchFuel()]);
       setLoading(false);
     };
     loadData();
@@ -74,19 +85,24 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
       let inc = incomeList.filter(i => String(i.vehicle_id) === String(vehicle.id));
       // Filter expense by vehicle_id
       let exp = expenseList.filter(e => String(e.vehicle_id) === String(vehicle.id));
+      let fuel = fuelList.filter(f => String(f.vehicle_id) === String(vehicle.id));
 
       // Apply date filters
       if (dateFrom) {
         inc = inc.filter(i => i.payment_received_date >= dateFrom);
         exp = exp.filter(e => e.expense_date >= dateFrom);
+        fuel = fuel.filter(f => String(f.date || f.created_at).slice(0, 10) >= dateFrom);
       }
       if (dateTo) {
         inc = inc.filter(i => i.payment_received_date <= dateTo);
         exp = exp.filter(e => e.expense_date <= dateTo);
+        fuel = fuel.filter(f => String(f.date || f.created_at).slice(0, 10) <= dateTo);
       }
 
       const totalIncome = inc.reduce((s, i) => s + Number(i.amount || 0), 0);
-      const totalExpense = exp.reduce((s, e) => s + Number(e.amount || 0), 0);
+      const otherExpense = exp.reduce((s, e) => s + Number(e.amount || 0), 0);
+      const fuelExpense = fuel.reduce((s, f) => s + Number(f.total_cost || (Number(f.quantity || 0) * Number(f.rate || 0))), 0);
+      const totalExpense = otherExpense + fuelExpense;
       const netProfit = totalIncome - totalExpense;
 
       // Combine income and expense for transaction history
@@ -105,6 +121,14 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
           title: e.expense_category,
           date: e.expense_date,
         })),
+        ...fuel.map(f => ({
+          ...f,
+          _type: "expense",
+          _fuel: true,
+          amount: Number(f.total_cost || (Number(f.quantity || 0) * Number(f.rate || 0))),
+          title: "Fuel",
+          date: f.date || f.created_at,
+        })),
       ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
       return {
@@ -117,7 +141,7 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
     }).filter(
       t => selectedTruck === "All" || String(t.id) === String(selectedTruck)
     );
-  }, [vehicles, incomeList, expenseList, selectedTruck, dateFrom, dateTo]);
+  }, [vehicles, incomeList, expenseList, fuelList, selectedTruck, dateFrom, dateTo]);
 
   if (loading) {
     return (
@@ -264,6 +288,8 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
             </div>
 
             <DetailRow label="Assigned Station" value={modalTruck.station_name || "Not Assigned"} />
+            <DetailRow label="Fuel Expense" value={`₹${Number(modalTruck.fuelExpense || 0).toLocaleString("en-IN")}`} />
+            <DetailRow label="Other Expenses" value={`₹${Number(modalTruck.otherExpense || 0).toLocaleString("en-IN")}`} />
 
             {/* P&L summary */}
             <div className="grid grid-cols-3 gap-3">

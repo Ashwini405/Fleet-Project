@@ -7,7 +7,17 @@ import {
 import AddFuelEntry from './AddFuelEntry';
 import TripFuelOverview from './TripFuelOverview';
 
-const INR = (n) => `₹${Number(n).toLocaleString('en-IN')}`;
+const compactINR = (n) => {
+  const value = Number(n || 0);
+  if (value >= 10000000) return `₹${(value / 10000000).toFixed(1)}Cr`;
+  if (value >= 100000) return `₹${(value / 100000).toFixed(1)}L`;
+  if (value >= 1000) return `₹${(value / 1000).toFixed(1)}K`;
+  return `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+};
+const INR = (n) => `₹${Number(n).toLocaleString('en-IN', {
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+})}`;
 const fmt2 = (n) => +Number(n).toFixed(2);
 const fmt1 = (n) => +Number(n).toFixed(1);
 
@@ -35,12 +45,12 @@ const STATUS_CFG = {
 
 function Card({ icon, label, value, sub, accent, valueClass = '' }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex items-start gap-4">
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex items-center gap-4 min-w-0 h-full">
       <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${accent}`}>{icon}</div>
-      <div>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
-        <p className={`text-2xl font-black leading-tight ${valueClass || 'text-slate-800'}`}>{value}</p>
-        {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.16em] mb-1.5">{label}</p>
+        <p className={`text-[1.35rem] sm:text-[1.8rem] font-black leading-none tracking-[-0.03em] whitespace-nowrap overflow-hidden text-ellipsis ${valueClass || 'text-slate-800'}`}>{value}</p>
+        {sub && <p className="text-xs text-slate-500 mt-1.5 break-words">{sub}</p>}
       </div>
     </div>
   );
@@ -251,7 +261,7 @@ export default function FuelDashboard() {
         <Card
           icon={<FiDollarSign className="w-5 h-5 text-emerald-600" />}
           label="Total Fuel Cost" accent="bg-emerald-50"
-          value={INR(fleet.totalCost)}
+          value={compactINR(fleet.totalCost)}
           sub="Sum of all amounts"
         />
         <Card

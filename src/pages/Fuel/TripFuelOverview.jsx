@@ -70,12 +70,12 @@ export default function TripFuelOverview({ tripId, onBack }) {
 
   const fetchData = () => {
     setLoading(true);
-    Promise.all([
-      fetch(`http://localhost:5001/api/trips/${tripId}`).then(r => r.json()),
-      fetch(`http://localhost:5001/api/fuel?trip_id=${tripId}`).then(r => r.json()),
-    ])
-      .then(([tripRes, fuelRes]) => {
-        if (tripRes.success) setTrip(tripRes.data);
+    fetch(`http://localhost:5001/api/trips/${tripId}`)
+      .then(r => r.json())
+      .then(async (tripRes) => {
+        if (!tripRes.success) return;
+        setTrip(tripRes.data);
+        const fuelRes = await fetch(`http://localhost:5001/api/fuel/trip/${tripRes.data.id}`).then(r => r.json());
         if (fuelRes.success) setEntries(fuelRes.data);
       })
       .catch(err => console.error('TripFuelOverview fetch error:', err))

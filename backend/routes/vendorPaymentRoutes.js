@@ -1,4 +1,5 @@
 const express = require("express");
+const upload = require("../config/multer");
 
 const router = express.Router();
 
@@ -20,6 +21,7 @@ router.get(
 
 router.post(
   "/payments",
+  upload.single("bill_proof"),
   createPayment
 );
 

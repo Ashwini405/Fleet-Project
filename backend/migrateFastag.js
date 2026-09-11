@@ -55,6 +55,27 @@ async function migrate() {
     `);
     console.log('✅ fastag_notifications table ready');
 
+    await conn.query(`
+      ALTER TABLE fastag_transactions
+      MODIFY COLUMN type ENUM('recharge','toll_deduction','fuel_monthly') NOT NULL
+    `);
+    console.log('✅ fastag_transactions monthly fuel type ready');
+
+    await conn.query(`
+      CREATE TABLE IF NOT EXISTS fastag_monthly_postings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        fastag_account_id INT NOT NULL,
+        month DATE NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        transaction_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_fastag_month (fastag_account_id, month),
+        CONSTRAINT fk_monthly_posting_account FOREIGN KEY (fastag_account_id) REFERENCES fastag_accounts(id) ON DELETE CASCADE,
+        CONSTRAINT fk_monthly_posting_transaction FOREIGN KEY (transaction_id) REFERENCES fastag_transactions(id) ON DELETE CASCADE
+      )
+    `);
+    console.log('✅ fastag_monthly_postings table ready');
+
     console.log('✅ Fastag migration complete');
   } catch (err) {
     console.error('Migration error:', err.message);

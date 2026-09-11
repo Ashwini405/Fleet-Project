@@ -11,6 +11,8 @@ import { useVendorLedger } from '../../../context/VendorLedgerContext';
 
 const FUEL_TYPES = ['Diesel', 'Petrol', 'CNG', 'LNG', 'EV Charging'];
 
+const BANK_OPTIONS = ['HDFC Bank', 'State Bank of India (SBI)', 'ICICI Bank', 'Axis Bank', 'Canara Bank', 'Union Bank', 'Indian Bank', 'Bank of Baroda', 'Others'];
+
 // ── Edit Modal ──────────────────────────────────────────────────────────────
 function EditFuelVendorModal({ vendor, onClose, onSave }) {
   const [form, setForm] = useState({
@@ -25,11 +27,14 @@ function EditFuelVendorModal({ vendor, onClose, onSave }) {
     paymentTerms:  vendor.payment_terms || 'credit',
     notes:         vendor.notes || '',
     bankName:      vendor.bank_name || vendor.bank || '',
+    customBank:    vendor.custom_bank_name || '',
     accountNo:     vendor.account_number || vendor.account_number_or_upi || '',
     ifsc:          vendor.ifsc_code || vendor.ifsc || '',
     upi:           vendor.upi_id || vendor.upi || '',
   });
   const [errors, setErrors] = useState({});
+
+  const isCash = form.paymentTerms === 'cash';
 
   const iCls  = 'w-full p-2.5 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 text-sm';
   const iECls = 'w-full p-2.5 bg-white border border-red-300 rounded-xl focus:outline-none focus:border-red-400 text-sm';
@@ -37,6 +42,22 @@ function EditFuelVendorModal({ vendor, onClose, onSave }) {
   const loCls = 'block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1';
 
   const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: null })); };
+
+  const handlePaymentTermsChange = (pt) => {
+    if (pt === 'cash') {
+      setForm(p => ({
+        ...p,
+        paymentTerms: 'cash',
+        bankName: '',
+        customBank: '',
+        accountNo: '',
+        ifsc: '',
+        upi: '',
+      }));
+    } else {
+      setForm(p => ({ ...p, paymentTerms: 'credit' }));
+    }
+  };
 
   const toggleFT = (ft) => setForm(p => ({
     ...p,
@@ -59,20 +80,21 @@ function EditFuelVendorModal({ vendor, onClose, onSave }) {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     onSave({
       ...vendor,
-      vendor_name:    form.name.trim(),
-      contact_person: form.contactPerson.trim(),
-      mobile_number:  form.mobile.trim(),
-      email:          form.email.trim(),
+      vendor_name:      form.name.trim(),
+      contact_person:   form.contactPerson.trim() || null,
+      mobile_number:    form.mobile.trim(),
+      email:            form.email.trim() || null,
       address_location: form.address.trim(),
-      fuelTypes:      form.fuelTypes,
-      gst_number:     form.gst.trim().toUpperCase(),
-      status:         form.status,
-      payment_terms:  form.paymentTerms,
-      notes:          form.notes.trim(),
-      bank_name:      form.bankName,
-      account_number: form.accountNo.trim(),
-      ifsc_code:      form.ifsc.trim(),
-      upi_id:         form.upi.trim(),
+      fuelTypes:        form.fuelTypes,
+      gst_number:       form.gst.trim().toUpperCase() || null,
+      status:           form.status,
+      payment_terms:    form.paymentTerms,
+      notes:            form.notes.trim() || null,
+      bank_name:        isCash ? null : (form.bankName === 'Others' ? form.customBank : form.bankName) || null,
+      custom_bank_name: isCash ? null : (form.bankName === 'Others' ? form.customBank : null),
+      account_number:   isCash ? null : form.accountNo.trim() || null,
+      ifsc_code:        isCash ? null : form.ifsc.trim() || null,
+      upi_id:           isCash ? null : form.upi.trim() || null,
     });
   };
 
@@ -138,17 +160,59 @@ function EditFuelVendorModal({ vendor, onClose, onSave }) {
             <label className={lCls}>Payment Terms</label>
             <div className="flex gap-2">
               {['credit', 'cash'].map(pt => (
-                <button key={pt} type="button" onClick={() => set('paymentTerms', pt)}
+                <button key={pt} type="button" onClick={() => handlePaymentTermsChange(pt)}
                   className={`flex-1 py-2 rounded-xl text-sm font-bold capitalize border transition-colors ${
                     form.paymentTerms === pt
-                      ? 'bg-yellow-500 text-white border-yellow-500'
+                      ? pt === 'cash' ? 'bg-violet-600 text-white border-violet-600' : 'bg-yellow-500 text-white border-yellow-500'
                       : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
                   }`}>
-                  {pt}
+                  {pt === 'credit' ? 'Credit Account' : 'Cash (Spot Payment)'}
                 </button>
               ))}
             </div>
+            {isCash ? (
+              <p className="text-[11px] text-violet-600 font-semibold mt-1.5">Cash vendor — paid upfront. Bank details not required.</p>
+            ) : null}
           </div>
+
+          {!isCash && (
+            <div className="pt-3 border-t border-gray-100 space-y-3">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Bank Details (Optional)</p>
+              <div>
+                <label className={loCls}>Bank Name</label>
+                <select value={form.bankName} onChange={e => { set('bankName', e.target.value); set('customBank', ''); }}
+                  className={iCls + ' text-gray-600'}>
+                  <option value="">Select Bank</option>
+                  {BANK_OPTIONS.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+              {form.bankName === 'Others' && (
+                <div>
+                  <label className={loCls}>Custom Bank Name</label>
+                  <input value={form.customBank} onChange={e => set('customBank', e.target.value)}
+                    placeholder="Enter bank name" className={iCls} />
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className={loCls}>Account Number</label>
+                  <input value={form.accountNo} onChange={e => set('accountNo', e.target.value)}
+                    placeholder="Account No." className={iCls} />
+                </div>
+                <div>
+                  <label className={loCls}>IFSC Code</label>
+                  <input value={form.ifsc} onChange={e => set('ifsc', e.target.value.toUpperCase())}
+                    placeholder="IFSC" maxLength={11} className={iCls} />
+                </div>
+                <div>
+                  <label className={loCls}>UPI ID</label>
+                  <input value={form.upi} onChange={e => set('upi', e.target.value)}
+                    placeholder="station@upi" className={iCls} />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className={loCls}>Notes</label>
             <input value={form.notes} onChange={e => set('notes', e.target.value)} placeholder="Optional notes…" className={iCls} />
@@ -165,18 +229,21 @@ function EditFuelVendorModal({ vendor, onClose, onSave }) {
 
 // ── View Modal ──────────────────────────────────────────────────────────────
 function ViewVendorModal({ vendor, onClose, onEdit }) {
+  const isCash = (vendor.payment_terms || 'credit') === 'cash';
   const rows = [
     ['Mobile',         vendor.mobile_number || vendor.contact || vendor.mobile || '—'],
     ['Contact Person', vendor.contact_person || vendor.contactPerson || '—'],
     ['Email',          vendor.email || '—'],
     ['Address',        vendor.address_location || vendor.address || '—'],
     ['GST Number',     vendor.gst_number || vendor.gst || '—'],
-    ['Payment Terms',  vendor.payment_terms ? vendor.payment_terms.charAt(0).toUpperCase() + vendor.payment_terms.slice(1) : 'Credit'],
-    ['Bank',           vendor.bank_name || vendor.bank || '—'],
-    ['Account No.',    vendor.account_number || vendor.account_number_or_upi || '—'],
-    ['IFSC',           vendor.ifsc_code || vendor.ifsc || '—'],
-    ['UPI',            vendor.upi_id || vendor.upi || '—'],
-    ['Opening Bal.',   vendor.opening_balance != null ? `₹${Number(vendor.opening_balance).toLocaleString('en-IN')}` : '₹0'],
+    ['Payment Terms',  isCash ? 'Cash (Spot Payment)' : 'Credit (Ledger)'],
+    ...(!isCash ? [
+      ['Bank',           vendor.bank_name || vendor.bank || '—'],
+      ['Account No.',    vendor.account_number || vendor.account_number_or_upi || '—'],
+      ['IFSC',           vendor.ifsc_code || vendor.ifsc || '—'],
+      ['UPI',            vendor.upi_id || vendor.upi || '—'],
+      ['Opening Bal.',   vendor.opening_balance != null ? `₹${Number(vendor.opening_balance).toLocaleString('en-IN')}` : '₹0'],
+    ] : []),
     ['Notes',          vendor.notes || '—'],
   ];
   return (
@@ -194,6 +261,9 @@ function ViewVendorModal({ vendor, onClose, onEdit }) {
             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
               vendor.status === 'Inactive' ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-600 border-green-100'
             }`}>{vendor.status || 'Active'}</span>
+            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
+              isCash ? 'bg-violet-50 text-violet-600 border-violet-100' : 'bg-amber-50 text-amber-600 border-amber-100'
+            }`}>{isCash ? 'Cash' : 'Credit'}</span>
             {(vendor.fuelTypes || []).map(ft => (
               <span key={ft} className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 border border-yellow-100">{ft}</span>
             ))}
@@ -276,20 +346,24 @@ export default function FuelVendorPage() {
 
   const handleEdit = async (updated) => {
     try {
+      const isCash = (updated.payment_terms || updated.paymentTerms) === 'cash';
       await axios.put(`http://localhost:5001/api/fuel-vendors/${updated.id}`, {
-        vendor_name: updated.vendor_name,
-        contact_person: updated.contact_person,
-        mobile_number: updated.mobile_number,
-        email: updated.email,
+        vendor_name:      updated.vendor_name,
+        contact_person:   updated.contact_person,
+        mobile_number:    updated.mobile_number,
+        email:            updated.email,
         address_location: updated.address_location,
-        fuel_types: updated.fuelTypes,
-        gst_number: updated.gst_number,
-        status: updated.status,
-        bank_name: updated.bank_name,
-        account_number: updated.account_number,
-        ifsc_code: updated.ifsc_code,
-        upi_id: updated.upi_id,
-        notes: updated.notes,
+        fuel_types:       updated.fuelTypes,
+        gst_number:       updated.gst_number,
+        opening_balance:  isCash ? 0 : (Number(updated.opening_balance) || 0),
+        status:           updated.status,
+        payment_terms:    updated.payment_terms || updated.paymentTerms || 'credit',
+        bank_name:        isCash ? null : updated.bank_name,
+        custom_bank_name: isCash ? null : updated.custom_bank_name,
+        account_number:   isCash ? null : updated.account_number,
+        ifsc_code:        isCash ? null : updated.ifsc_code,
+        upi_id:           isCash ? null : updated.upi_id,
+        notes:            updated.notes,
       });
       await fetchFuelVendors();
       setEditVendor(null);
@@ -305,6 +379,7 @@ export default function FuelVendorPage() {
       const next = vendor.status === 'Active' ? 'Inactive' : 'Active';
       await axios.put(`http://localhost:5001/api/fuel-vendors/${vendor.id}`, {
         ...vendor,
+        fuel_types: vendor.fuelTypes || vendor.fuel_types,
         status: next,
       });
       await fetchFuelVendors();
@@ -505,10 +580,8 @@ export default function FuelVendorPage() {
       {/* Modals */}
       <AddFuelVendorModal
         isOpen={addOpen}
-        onClose={() => {
-          setAddOpen(false);
-          fetchFuelVendors();
-        }}
+        onClose={() => setAddOpen(false)}
+        onAdd={handleAdd}
         existingVendors={vendors}
       />
 

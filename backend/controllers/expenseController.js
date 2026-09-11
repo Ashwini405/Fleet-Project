@@ -77,6 +77,36 @@ async (req, res) => {
 
 };
 
+exports.updateExpense = async (req, res) => {
+  try {
+    const allowed = [
+      'expense_category', 'expense_date', 'amount', 'payment_method',
+      'vendor_payee', 'description', 'payment_status', 'vehicle_id',
+      'vehicle_number', 'trip_id', 'trip_number', 'updated_by'
+    ];
+    const fields = Object.fromEntries(
+      Object.entries(req.body).filter(([key]) => allowed.includes(key))
+    );
+    const result = await Expense.updateExpense(req.params.id, fields);
+    if (!result.affectedRows) return res.status(404).json({ success: false, message: 'Expense not found' });
+    res.json({ success: true, message: 'Expense updated successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to update expense' });
+  }
+};
+
+exports.deleteExpense = async (req, res) => {
+  try {
+    const result = await Expense.deleteExpense(req.params.id);
+    if (!result.affectedRows) return res.status(404).json({ success: false, message: 'Expense not found' });
+    res.json({ success: true, message: 'Expense deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to delete expense' });
+  }
+};
+
 // =========================================
 // CREATE EXPENSE
 // =========================================

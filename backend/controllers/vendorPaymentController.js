@@ -54,6 +54,10 @@ async (req, res) => {
 
     console.log("PAYMENT BODY:", req.body);
 
+    if (req.file) {
+      req.body.receipt_files = JSON.stringify([req.file.filename]);
+    }
+
     const result =
       await VendorPayment.create(
         req.body

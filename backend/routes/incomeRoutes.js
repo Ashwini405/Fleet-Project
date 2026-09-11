@@ -17,6 +17,16 @@ router.post(
 );
 
 // =====================================================
+// UPDATE INCOME
+// =====================================================
+
+router.put(
+  '/:id',
+  ...protect('Income & Expense', 'edit'),
+  incomeController.updateIncome
+);
+
+// =====================================================
 // GET ALL INCOME
 // =====================================================
 
@@ -24,16 +34,6 @@ router.get(
   '/',
   ...protect('Income & Expense', 'view'),
   incomeController.getAllIncome
-);
-
-// =====================================================
-// GET SINGLE INCOME
-// =====================================================
-
-router.get(
-  '/:id',
-  ...protect('Income & Expense', 'view'),
-  incomeController.getIncomeById
 );
 
 // =====================================================
@@ -54,6 +54,16 @@ router.get(
   '/vehicle-trips/:vehicleId',
   ...protect('Income & Expense', 'view'),
   incomeController.getCompletedTripsByVehicle
+);
+
+// =====================================================
+// GET SINGLE INCOME
+// =====================================================
+
+router.get(
+  '/:id',
+  ...protect('Income & Expense', 'view'),
+  incomeController.getIncomeById
 );
 
 module.exports = router;

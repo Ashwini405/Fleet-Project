@@ -1,6 +1,12 @@
 const IncomeModel = require('../models/incomeModel');
 const db = require('../config/db');
 
+const normalizeDate = (value) => {
+  if (!value) return null;
+  const text = String(value);
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : text.slice(0, 10);
+};
+
 // =====================================================
 // CREATE INCOME
 // =====================================================
@@ -85,8 +91,9 @@ const createIncome = async (req, res) => {
     const amount =
       Number(body.amount || 0);
 
-    const received =
-      Number(body.received_amount || amount);
+    const received = body.received_amount != null
+      ? Number(body.received_amount)
+      : body.payment_status === 'Received' ? amount : 0;
 
     const pending =
       amount - received;
@@ -220,6 +227,30 @@ const createIncome = async (req, res) => {
 
   }
 
+};
+
+const updateIncome = async (req, res) => {
+  try {
+    const amount = Number(req.body.amount || 0);
+    const received = Number(req.body.received_amount || 0);
+    await IncomeModel.updateIncome(req.params.id, {
+      income_category: req.body.income_category,
+      place_of_running: req.body.place_of_running,
+      freight_start_date: normalizeDate(req.body.freight_start_date),
+      freight_end_date: normalizeDate(req.body.freight_end_date),
+      amount,
+      received_amount: received,
+      pending_amount: Math.max(0, amount - received),
+      payment_status: received >= amount ? 'Received' : (received > 0 ? 'Partial' : 'Pending'),
+      payment_received_date: normalizeDate(req.body.payment_received_date),
+      bank_reference_number: req.body.bank_reference_number,
+      description: req.body.description,
+    });
+    res.json({ success: true, message: 'Income Entry Updated Successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Server Error' });
+  }
 };
 
 // =====================================================
@@ -377,6 +408,7 @@ const getCompletedTripsByVehicle = async (req, res) => {
 module.exports = {
 
   createIncome,
+  updateIncome,
   getAllIncome,
   getIncomeById,
   getIncomeByTrip,

@@ -12,6 +12,7 @@ export default function AddSupervisorModal({ isOpen, onClose, onSuccess }) {
     status: 'active',
     address: '',
     station_id: '',
+    wallet_balance: '',
     bank_name: '',
     account_number: '',
     ifsc_code: '',
@@ -208,6 +209,18 @@ export default function AddSupervisorModal({ isOpen, onClose, onSuccess }) {
                       onChange={handleChange}
                       className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all resize-none"
                     ></textarea>
+                  </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Opening Wallet Balance (₹)</label>
+                    <input
+                      type="number"
+                      name="wallet_balance"
+                      placeholder="e.g. 10000"
+                      value={formData.wallet_balance}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Initial cash balance handed to this supervisor</p>
                   </div>
                 </motion.div>
               )}

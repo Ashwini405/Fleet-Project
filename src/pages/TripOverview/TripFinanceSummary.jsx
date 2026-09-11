@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, CheckCircle2, Clock, AlertCircle,
   RefreshCw, ExternalLink, ChevronDown, ChevronUp,
-  CreditCard, Calendar, MapPin, Link2,
+  CreditCard, Calendar, MapPin, Link2, Pencil, Trash2,
 } from 'lucide-react';
 
 // ── Status badge config
@@ -83,10 +84,65 @@ function summarizeEntries(entries) {
   };
 }
 
-export default function TripFinanceSummary({ tripId }) {
+export default function TripFinanceSummary({ tripId, onAddIncome, onEditIncome, vehicleId, expenses = [], fuelEntries = [], refreshKey = 0 }) {
+  const navigate = useNavigate();
+  const financeIncomeViewUrl  = `/finance?tab=trucks${vehicleId ? `&vehicle_id=${vehicleId}` : ''}`;
+  const financeIncomeAddUrl   = `/finance?tab=income&trip_id=${tripId}${vehicleId ? `&vehicle_id=${vehicleId}` : ''}`;
+  const financeExpenseUrl     = `/finance?tab=expense&trip_id=${tripId}${vehicleId ? `&vehicle_id=${vehicleId}` : ''}`;
   const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [entries, setEntries] = useState([]);
+  const [expenseEntries, setExpenseEntries] = useState(expenses);
+  const [editingExpense, setEditingExpense] = useState(null);
+
+  const expenseLabel = (expense) => expense.expense_category || expense.type || expense.category || 'Miscellaneous';
+  const formatDateTime = (value) => {
+    if (!value) return '—';
+    const text = String(value);
+    const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00` : text);
+    if (Number.isNaN(date.getTime())) return text;
+    return date.toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  };
+  const expenseDate = (expense) => formatDateTime(expense.expense_date || expense.date || expense.created_at);
+  const fuelTotal = fuelEntries.reduce((sum, fuel) => sum + (Number(fuel.quantity || 0) * Number(fuel.rate || 0)), 0);
+
+  useEffect(() => {
+    setExpenseEntries(expenses || []);
+  }, [expenses]);
+
+  const updateExpense = async (event) => {
+    event.preventDefault();
+    const isTripExpense = editingExpense._source !== 'finance';
+    const response = await fetch(isTripExpense
+      ? `http://localhost:5001/api/trips/${tripId}/expense/${editingExpense.id}`
+      : `http://localhost:5001/api/expenses/${editingExpense.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(isTripExpense ? {
+        amount: editingExpense.amount,
+        type: editingExpense.expense_category,
+        notes: editingExpense.description || editingExpense.notes,
+      } : editingExpense),
+    });
+    const result = await response.json();
+    if (!result.success) return alert(result.message || 'Unable to update expense');
+    setExpenseEntries(current => current.map(expense => expense.id === editingExpense.id ? editingExpense : expense));
+    setEditingExpense(null);
+  };
+
+  const deleteExpense = async (expense) => {
+    if (!window.confirm(`Delete expense of ₹${Number(expense.amount || 0).toLocaleString('en-IN')}?`)) return;
+    const isTripExpense = expense._source !== 'finance';
+    const response = await fetch(isTripExpense
+      ? `http://localhost:5001/api/trips/${tripId}/expense/${expense.id}`
+      : `http://localhost:5001/api/expenses/${expense.id}`, { method: 'DELETE' });
+    const result = await response.json();
+    if (!result.success) return alert(result.message || 'Unable to delete expense');
+    setExpenseEntries(current => current.filter(item => item.id !== expense.id));
+  };
 
   useEffect(() => {
     if (!tripId) { setLoading(false); return; }
@@ -109,7 +165,7 @@ export default function TripFinanceSummary({ tripId }) {
       });
 
     return () => { cancelled = true; };
-  }, [tripId]);
+  }, [tripId, refreshKey]);
 
   if (loading) {
     return (
@@ -142,12 +198,28 @@ export default function TripFinanceSummary({ tripId }) {
             <p className="text-sm font-semibold text-slate-500">No income entry linked yet</p>
             <p className="text-xs text-slate-400 mt-0.5">Finance team has not recorded income for this trip.</p>
           </div>
-          <a
-            href="/finance"
-            className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors shrink-0"
-          >
-            <ExternalLink className="w-3 h-3" /> Open Finance
-          </a>
+          <div className="ml-auto flex items-center gap-2 shrink-0">
+            {onAddIncome && (
+              <button
+                onClick={onAddIncome}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 border border-emerald-700 rounded-lg hover:bg-emerald-700 transition-colors"
+              >
+                <TrendingUp className="w-3 h-3" /> Add Income
+              </button>
+            )}
+            <button
+              onClick={() => navigate(financeExpenseUrl)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" /> Add Expense
+            </button>
+            <button
+              onClick={() => navigate(financeIncomeViewUrl)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" /> Open Finance
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -222,6 +294,71 @@ export default function TripFinanceSummary({ tripId }) {
               {ref.entryCount > 1 && (
                 <RefRow icon={TrendingUp} label="Income Entries" value={`${ref.entryCount} entries`} />
               )}
+              <div className="space-y-2 border-b border-slate-50 py-2">
+                <p className="text-xs font-bold text-slate-400">Linked Income Entries</p>
+                {entries.map((entry, index) => (
+                  <div key={entry.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-slate-50/70 px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-bold text-slate-700">
+                        {index + 1}. {entry.income_number || `Income #${entry.id}`}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        ₹{Number(entry.amount || 0).toLocaleString('en-IN')} · {entry.payment_status || 'Pending'}
+                      </p>
+                    </div>
+                    {onEditIncome && (
+                      <button
+                        onClick={() => onEditIncome(entry)}
+                        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-[11px] font-bold text-blue-700 hover:bg-blue-100"
+                      >
+                        <Pencil className="h-3 w-3" /> Edit
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-2 border-b border-slate-50 py-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-bold text-slate-400">Trip Expenses</p>
+                  <span className="text-[11px] font-bold text-rose-600">
+                    ₹{(expenseEntries.reduce((sum, expense) => sum + Number(expense.amount || 0), 0) + fuelTotal).toLocaleString('en-IN')}
+                  </span>
+                </div>
+                {expenseEntries.length === 0 && fuelEntries.length === 0 ? (
+                  <p className="text-[11px] text-slate-400">No expenses recorded for this trip.</p>
+                ) : expenseEntries.map(expense => (
+                    <div key={expense.id} className="flex items-center justify-between gap-3 rounded-lg border border-rose-100 bg-rose-50/50 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-bold text-slate-700">{expenseLabel(expense)}</p>
+                        <p className="text-[11px] text-slate-500">
+                          ₹{Number(expense.amount || 0).toLocaleString('en-IN')} · {expenseDate(expense)}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button onClick={() => setEditingExpense({ ...expense, expense_category: expenseLabel(expense), expense_date: expense.expense_date || expense.date || '' })} className="rounded-lg border border-blue-200 bg-blue-50 p-1.5 text-blue-700 hover:bg-blue-100" title="Edit expense">
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                        <button onClick={() => deleteExpense(expense)} className="rounded-lg border border-red-200 bg-red-50 p-1.5 text-red-600 hover:bg-red-100" title="Delete expense">
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                {fuelEntries.map((fuel, index) => {
+                  const amount = Number(fuel.quantity || 0) * Number(fuel.rate || 0);
+                  return (
+                    <div key={`fuel-${fuel.id || index}`} className="flex items-center justify-between gap-3 rounded-lg border border-amber-100 bg-amber-50/60 px-3 py-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-bold text-slate-700">Fuel Expense</p>
+                        <p className="text-[11px] text-slate-500">
+                          {Number(fuel.quantity || 0).toFixed(1)} L × ₹{Number(fuel.rate || 0).toFixed(2)} · {formatDateTime(fuel.created_at || fuel.date)}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs font-bold text-amber-700">₹{amount.toLocaleString('en-IN')}</span>
+                    </div>
+                  );
+                })}
+              </div>
               <RefRow icon={MapPin}     label="Route"            value={ref.route} />
               <RefRow icon={CreditCard} label="Bank Reference"   value={ref.refNumber}     mono />
               <RefRow icon={Calendar}   label="Entry Date"       value={ref.entryDate}     mono />
@@ -229,22 +366,56 @@ export default function TripFinanceSummary({ tripId }) {
 
             {/* Action buttons */}
             <div className="flex items-center gap-2 px-5 pb-4 pt-1">
-              <a
-                href="/finance"
+              {!isReceived && onAddIncome && (
+                <button
+                  onClick={onAddIncome}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-600 border border-emerald-700 rounded-lg hover:bg-emerald-700 transition-colors"
+                >
+                  <TrendingUp className="w-3 h-3" /> Add Income
+                </button>
+              )}
+              <button
+                onClick={() => navigate(financeIncomeViewUrl)}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors"
               >
                 <ExternalLink className="w-3 h-3" /> View Income Entry
-              </a>
-              <a
-                href="/finance"
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 bg-slate-50 border border-slate-200 rounded-lg hover:bg-slate-100 transition-colors"
+              </button>
+              <button
+                onClick={() => navigate(financeExpenseUrl)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
               >
-                <TrendingUp className="w-3 h-3" /> Open Finance Record
-              </a>
+                <TrendingUp className="w-3 h-3" /> Add Expense
+              </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
+      {editingExpense && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
+          <form onSubmit={updateExpense} className="w-full max-w-md space-y-4 rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-800">Edit Expense</h3>
+              <button type="button" onClick={() => setEditingExpense(null)} className="text-slate-400 hover:text-slate-700">×</button>
+            </div>
+            <label className="block text-xs font-bold text-slate-500">Category
+              <input value={editingExpense.expense_category || ''} onChange={event => setEditingExpense({ ...editingExpense, expense_category: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" required />
+            </label>
+            <label className="block text-xs font-bold text-slate-500">Amount
+              <input type="number" min="0" value={editingExpense.amount || ''} onChange={event => setEditingExpense({ ...editingExpense, amount: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" required />
+            </label>
+            <label className="block text-xs font-bold text-slate-500">Date
+              <input type="date" value={String(editingExpense.expense_date || editingExpense.date || editingExpense.created_at || '').slice(0, 10)} onChange={event => setEditingExpense({ ...editingExpense, expense_date: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" required />
+            </label>
+            <label className="block text-xs font-bold text-slate-500">Description
+              <textarea value={editingExpense.description || ''} onChange={event => setEditingExpense({ ...editingExpense, description: event.target.value })} className="mt-1 w-full rounded-lg border border-slate-200 p-2 text-sm" rows="2" />
+            </label>
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setEditingExpense(null)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-bold text-slate-600">Cancel</button>
+              <button type="submit" className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-bold text-white">Save Changes</button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

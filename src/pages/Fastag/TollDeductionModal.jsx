@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiX, FiAlertCircle, FiLoader } from 'react-icons/fi';
 
-const emptyForm = { fastag_account_id: '', amount: '', date: new Date().toISOString().split('T')[0], toll_plaza_name: '', reference_no: '' };
+const emptyForm = { fastag_account_id: '', amount: '', month: new Date().toISOString().slice(0, 7), toll_plaza_name: '', reference_no: '' };
 
 export default function TollDeductionModal({ isOpen, accounts, onClose, onSuccess }) {
   const [form, setForm] = useState(emptyForm);
@@ -28,7 +28,7 @@ export default function TollDeductionModal({ isOpen, accounts, onClose, onSucces
       const res = await fetch('http://localhost:5001/api/fastag/toll-deduction', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, date: `${form.month}-01` }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Failed to record toll deduction');
@@ -77,24 +77,15 @@ export default function TollDeductionModal({ isOpen, accounts, onClose, onSucces
                 className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Date</label>
-              <input type="date" value={form.date} onChange={e => set('date', e.target.value)}
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Toll Month</label>
+              <input type="month" value={form.month} onChange={e => set('month', e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500" />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Toll Plaza</label>
-            <input type="text" value={form.toll_plaza_name} onChange={e => set('toll_plaza_name', e.target.value)}
-              placeholder="e.g. Shamshabad Toll Plaza"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500" />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Reference No.</label>
-            <input type="text" value={form.reference_no} onChange={e => set('reference_no', e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-rose-500" />
-          </div>
+          <p className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-2.5 text-xs font-medium text-cyan-800">
+            Monthly total entry: individual toll plazas and reference numbers are not required here.
+          </p>
 
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} disabled={loading}

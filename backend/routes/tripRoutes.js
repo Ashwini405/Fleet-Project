@@ -9,6 +9,8 @@ const {
   updateTrip,
   deleteTrip,
   addExpense,
+  updateExpense,
+  deleteExpense,
   addFuel,
   getExpenses,
   getFuel,
@@ -45,6 +47,8 @@ router.put('/:id/status', ...protect('Trip Master', 'edit'), updateTripStatus);
 
 // 🔥 EXPENSE ROUTES
 router.post('/:tripId/expense', ...protect('Trip Master', 'edit'), addExpense);
+router.put('/:tripId/expense/:expenseId', ...protect('Trip Master', 'edit'), updateExpense);
+router.delete('/:tripId/expense/:expenseId', ...protect('Trip Master', 'delete'), deleteExpense);
 router.get('/:tripId/expense', ...protect('Trip Master', 'view'), getExpenses);
 
 

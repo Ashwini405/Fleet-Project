@@ -31,7 +31,11 @@ exports.getSupervisors = async (req, res) => {
 // UPDATE
 exports.updateSupervisor = async (req, res) => {
   try {
-    await Supervisor.update(req.params.id, req.body);
+    const data = {
+      ...req.body,
+      profile_photo: req.files?.profile_photo?.[0]?.filename
+    };
+    await Supervisor.update(req.params.id, data);
     res.json({ success: true });
   } catch (err) {
     console.error(err);

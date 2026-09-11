@@ -28,6 +28,17 @@ const FuelVendor = {
   },
 
   create: async (data) => {
+    let fuelTypesJson = '[]';
+    if (Array.isArray(data.fuel_types)) {
+      fuelTypesJson = JSON.stringify(data.fuel_types);
+    } else if (typeof data.fuel_types === 'string') {
+      try {
+        const parsed = JSON.parse(data.fuel_types);
+        fuelTypesJson = Array.isArray(parsed) ? data.fuel_types : JSON.stringify([data.fuel_types]);
+      } catch {
+        fuelTypesJson = JSON.stringify([data.fuel_types]);
+      }
+    }
 
     const [result] = await db.query(
       `
@@ -59,9 +70,9 @@ const FuelVendor = {
         data.mobile_number,
         data.email || null,
         data.address_location,
-        JSON.stringify(data.fuel_types || []),
+        fuelTypesJson,
         data.gst_number || null,
-        data.opening_balance || 0,
+        data.opening_balance != null ? Number(data.opening_balance) || 0 : 0,
         data.status || "Active",
         data.payment_terms || "credit",
         data.bank_name || null,
@@ -77,6 +88,18 @@ const FuelVendor = {
   },
 
   update: async (id, data) => {
+    const rawFt = data.fuel_types !== undefined ? data.fuel_types : data.fuelTypes;
+    let fuelTypesJson = '[]';
+    if (Array.isArray(rawFt)) {
+      fuelTypesJson = JSON.stringify(rawFt);
+    } else if (typeof rawFt === 'string') {
+      try {
+        const parsed = JSON.parse(rawFt);
+        fuelTypesJson = Array.isArray(parsed) ? rawFt : JSON.stringify([rawFt]);
+      } catch {
+        fuelTypesJson = JSON.stringify([rawFt]);
+      }
+    }
 
     const [result] = await db.query(
       `
@@ -102,28 +125,27 @@ const FuelVendor = {
       `,
       [
         data.vendor_name,
-        data.contact_person,
+        data.contact_person || null,
         data.mobile_number,
-        data.email,
+        data.email || null,
         data.address_location,
-        JSON.stringify(data.fuel_types || []),
-        data.gst_number,
-        data.opening_balance,
-        data.status,
+        fuelTypesJson,
+        data.gst_number || null,
+        data.opening_balance != null ? Number(data.opening_balance) || 0 : 0,
+        data.status || "Active",
         data.payment_terms || "credit",
-        data.bank_name,
-        data.custom_bank_name,
-        data.account_number,
-        data.ifsc_code,
-        data.upi_id,
-        data.notes,
+        data.bank_name || null,
+        data.custom_bank_name || null,
+        data.account_number || null,
+        data.ifsc_code || null,
+        data.upi_id || null,
+        data.notes || null,
         id
       ]
     );
 
     return result;
   }
-
 };
 
 module.exports = FuelVendor;

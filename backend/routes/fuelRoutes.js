@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const upload = require('../config/multer');
 
 const {
   createFuel,
@@ -13,7 +14,7 @@ const {
 
 // ✅ CREATE + GET ALL
 router.route('/')
-  .post(createFuel)
+  .post(upload.array('receipt_files', 10), createFuel)
   .get(getFuelEntries);
 
 
@@ -23,7 +24,7 @@ router.get('/trip/:tripId', getFuelByTrip);
 
 
 // ✅ UPDATE + DELETE
-router.put('/:id', updateFuel);
+router.put('/:id', upload.array('receipt_files', 10), updateFuel);
 router.delete('/:id', deleteFuel);
 
 
