@@ -70,8 +70,9 @@ const CATEGORY_TONE = {
   Batteries: "purple",
   "Driver Salary": "blue",
   "Food Allowance": "yellow",
-  Toll: "gray",
-  Miscellaneous: "neutral",
+    Other: "neutral",
+    Toll: "gray",
+    Miscellaneous: "neutral",
 };
 
 const CATEGORY_ICON_MAP = {
@@ -81,8 +82,9 @@ const CATEGORY_ICON_MAP = {
   Batteries: BatteryCharging,
   "Driver Salary": UserRound,
   "Food Allowance": Utensils,
-  Toll: Route,
-  Miscellaneous: MoreHorizontal,
+    Other: MoreHorizontal,
+    Toll: Route,
+    Miscellaneous: MoreHorizontal,
 };
 
 function normalizeCategory(category) {
@@ -90,7 +92,7 @@ function normalizeCategory(category) {
     "Food/Allowance": "Food Allowance",
     Battery: "Batteries",
     Service: "Maintenance",
-    Other: "Miscellaneous",
+     Other: "Other",
   };
   return map[category] || category;
 }
@@ -120,6 +122,22 @@ function DetailRow({ label, value }) {
     </div>
   );
 }
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
+const normalizedTripKey = (value) => String(value || "").replace(/^TRIP-/i, "");
 
 const FILE_BASE = "http://localhost:5001/uploads/";
 const parseFiles = (value) => {
@@ -158,8 +176,9 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
   const [tripModalFuel, setTripModalFuel] = useState([]);
   const [tripModalLoading, setTripModalLoading] = useState(false);
   const [expenseList, setExpenseList] = useState([]);
+  const [fuelList, setFuelList] = useState([]);
   const [tripForm, setTripForm] = useState({
-    category: "", amount: "", date: "", vendor: "", description: "", paymentMethod: "",
+    category: "", amount: "", date: "", vendor: "", description: "", otherNote: "", paymentMethod: "",
   });
   const [tripFormLoading, setTripFormLoading] = useState(false);
   const [vehicles, setVehicles] = useState([]);
@@ -179,12 +198,38 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
     }
   };
 
+  const fetchFuel = async () => {
+    try {
+      const res = await fetch("http://localhost:5001/api/fuel");
+      const data = await res.json();
+      if (data.success) setFuelList(data.data || []);
+    } catch (error) {
+      console.error("Fuel fetch failed:", error);
+    }
+  };
+
   useEffect(() => {
     fetchExpenses();
+    fetchFuel();
     fetch("http://localhost:5001/api/vehicles")
       .then(r => r.json())
       .then(d => { if (d.success) setVehicles(d.data || []); })
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") {
+        fetchExpenses();
+        fetchFuel();
+      }
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    window.addEventListener("focus", refreshWhenVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.removeEventListener("focus", refreshWhenVisible);
+    };
   }, []);
 
   useEffect(() => {
@@ -220,13 +265,43 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
   const filtered = useMemo(() => {
     let list = [...expenseList];
     if (selectedTruck && selectedTruck !== "All")
-      list = list.filter(e => e.vehicle_number === selectedTruck);
+      list = list.filter(e =>
+        String(e.vehicle_id || "") === String(selectedTruck) ||
+        String(e.vehicle_number || "").trim().toLowerCase() === String(selectedTruck).trim().toLowerCase()
+      );
     if (dateFrom)
-      list = list.filter(e => e.expense_date >= dateFrom);
+      list = list.filter(e => String(e.expense_date || e.created_at || "").slice(0, 10) >= dateFrom);
     if (dateTo)
-      list = list.filter(e => e.expense_date <= dateTo);
+      list = list.filter(e => String(e.expense_date || e.created_at || "").slice(0, 10) <= dateTo);
     return list.sort((a, b) => new Date(b.expense_date) - new Date(a.expense_date));
   }, [expenseList, selectedTruck, dateFrom, dateTo]);
+
+  const filteredFuel = useMemo(() => {
+    return fuelList.filter(fuel => {
+      if (selectedTruck && selectedTruck !== "All" && String(fuel.vehicle_id) !== String(selectedTruck)) return false;
+      const fuelDate = String(fuel.date || fuel.created_at || "").slice(0, 10);
+      if (dateFrom && fuelDate < dateFrom) return false;
+      if (dateTo && fuelDate > dateTo) return false;
+      return true;
+    });
+  }, [fuelList, selectedTruck, dateFrom, dateTo]);
+
+  const invalidFuel = filteredFuel.filter(fuel => Number(fuel.tank_capacity || 0) > 0 && Number(fuel.quantity || 0) > Number(fuel.tank_capacity));
+  const validFuel = filteredFuel.filter(fuel => !invalidFuel.includes(fuel));
+
+  const unmatchedFuel = validFuel.filter(fuel => !filtered.some(expense =>
+    expense.expense_category === "Fuel" &&
+    String(expense.vehicle_id || "") === String(fuel.vehicle_id || "") &&
+    String(expense.expense_date || expense.created_at || "").slice(0, 10) === String(fuel.date || fuel.created_at || "").slice(0, 10) &&
+    Math.abs(Number(expense.amount || 0) - Number(fuel.total_cost || (Number(fuel.quantity || 0) * Number(fuel.rate || 0)))) < 0.01
+  ));
+  const totalFuelExpense = unmatchedFuel.reduce((sum, fuel) => sum + Number(fuel.total_cost || (Number(fuel.quantity || 0) * Number(fuel.rate || 0))), 0);
+  const totalExpenseAmount = filtered.reduce((sum, item) => sum + Number(item.amount || 0), 0) + totalFuelExpense;
+  const tripFuelTotals = useMemo(() => validFuel.reduce((totals, fuel) => {
+    const key = normalizedTripKey(fuel.trip_id);
+    if (key) totals[key] = (totals[key] || 0) + Number(fuel.total_cost || (Number(fuel.quantity || 0) * Number(fuel.rate || 0)));
+    return totals;
+  }, {}), [validFuel]);
 
   const groupedExpenses = useMemo(() => {
     const groups = new Map();
@@ -236,7 +311,7 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
         groups.set(`expense-${expense.id}`, expense);
         return;
       }
-      const key = `trip-${expense.trip_id}`;
+      const key = `trip-${normalizedTripKey(expense.trip_id)}`;
       const current = groups.get(key);
       if (current) {
         current.items.push(expense);
@@ -258,7 +333,7 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
       }
     });
     return [...groups.values()].sort((a, b) => new Date(b.date || b.expense_date) - new Date(a.date || a.expense_date));
-  }, [filtered]);
+  }, [filtered, unmatchedFuel]);
 
   const openExpenseDetails = async (expense) => {
     setViewTxn(expense);
@@ -275,9 +350,7 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
       setTripModalLoading(false);
     }
   };
-
-  const CATEGORIES = ["Fuel","Maintenance","Tyres","Batteries","Driver Salary","Food Allowance","Toll","Miscellaneous"];
-  const PAYMENT_METHODS = ["Cash","Bank Transfer","UPI","Cheque","Other"];
+  const CATEGORIES = ["Fuel","Maintenance","Tyres","Batteries","Driver Salary","Food Allowance","Toll","Miscellaneous","Other"];
   const selectedVehicle = vehicles.find(v => String(v.id) === String(initialVehicleId));
   const tripVehicle = selectedVehicle || (tripContext && {
     vehicle_no: tripContext.truck_no || tripContext.vehicle_no,
@@ -286,6 +359,10 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
 
   const handleTripExpenseSubmit = async (e) => {
     e.preventDefault();
+    if (tripForm.category === "Other" && !tripForm.otherNote.trim()) {
+      alert("Please describe what this other expense is for");
+      return;
+    }
     setTripFormLoading(true);
     try {
       const res = await fetch("http://localhost:5001/api/expenses", {
@@ -300,14 +377,14 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
           amount: tripForm.amount,
           payment_method: tripForm.paymentMethod,
           vendor_payee: tripForm.vendor,
-          description: tripForm.description,
+          description: tripForm.description || tripForm.otherNote,
           payment_status: "Paid",
         }),
       });
       const data = await res.json();
       if (data.success) {
         alert("Expense saved successfully");
-        setTripForm({ category: "", amount: "", date: "", vendor: "", description: "", paymentMethod: "" });
+        setTripForm({ category: "", amount: "", date: "", vendor: "", description: "", otherNote: "", paymentMethod: "" });
         fetchExpenses();
         if (initialTripId) navigate(-1);
         else setView("list");
@@ -370,7 +447,7 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-orange-100 text-orange-700 text-[10px] font-bold border border-orange-200">
                       <Fuel className="w-3 h-3" /> Fuel
                     </span>
-                    <span className="text-xs text-gray-500">{f.date || f.created_at || '—'} · {Number(f.quantity || 0).toFixed(1)} L @ ₹{Number(f.rate || 0).toFixed(2)}</span>
+                    <span className="text-xs text-gray-500">{formatDateTime(f.date || f.created_at)} · {Number(f.quantity || 0).toFixed(1)} L @ ₹{Number(f.rate || 0).toFixed(2)}</span>
                     </div>
                     <span className="text-sm font-bold text-orange-600">₹{cost.toLocaleString("en-IN")}</span>
                   </div>
@@ -387,7 +464,7 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
                   <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-red-100 text-red-700 text-[10px] font-bold border border-red-200">
                     <TrendingDown className="w-3 h-3" /> {e.type || e.expense_category || "Expense"}
                   </span>
-                  <span className="text-[10px] text-gray-400">· {e.expense_date || e.date || e.created_at || '—'}</span>
+                  <span className="text-[10px] text-gray-400">· {formatDateTime(e.expense_date || e.date || e.created_at)}</span>
                   </div>
                   <span className="text-sm font-bold text-red-500">₹{Number(e.amount || 0).toLocaleString("en-IN")}</span>
                 </div>
@@ -481,10 +558,18 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
           </div>
           <div className="space-y-1">
             <label className={lbl}>Description</label>
-            <input type="text" placeholder="Short note about this expense"
+            <input type="text" placeholder={tripForm.category === "Other" ? "Optional additional notes" : "Short note about this expense"}
               value={tripForm.description} onChange={e => setTripForm(f => ({ ...f, description: e.target.value }))}
               className={inp} />
           </div>
+          {tripForm.category === "Other" && (
+            <div className="space-y-1 md:col-span-2">
+              <label className={lbl}>Other Expense Details <span className="text-red-400">*</span></label>
+              <input type="text" placeholder="Describe what this expense is for" required
+                value={tripForm.otherNote} onChange={e => setTripForm(f => ({ ...f, otherNote: e.target.value }))}
+                className={inp} />
+            </div>
+          )}
         </div>
         <div className="flex gap-2.5 pt-1 border-t border-gray-100">
           <button type="button" onClick={() => setView("list")}
@@ -523,6 +608,10 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
         </div>
         <form onSubmit={async (e) => {
           e.preventDefault();
+          if (tripForm.category === "Other" && !tripForm.otherNote.trim()) {
+            alert("Please describe what this other expense is for");
+            return;
+          }
           setTripFormLoading(true);
           try {
             const v = vehicles.find(x => String(x.id) === String(tripForm.truck));
@@ -537,14 +626,14 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
                 amount: tripForm.amount,
                 payment_method: tripForm.paymentMethod,
                 vendor_payee: tripForm.vendor,
-                description: tripForm.description,
+                description: tripForm.description || tripForm.otherNote,
                 payment_status: "Paid",
               }),
             });
             const data = await res.json();
             if (data.success) {
               alert("Expense saved successfully");
-              setTripForm({ category: "", amount: "", date: "", vendor: "", description: "", paymentMethod: "", truck: "" });
+              setTripForm({ category: "", amount: "", date: "", vendor: "", description: "", otherNote: "", paymentMethod: "", truck: "" });
               fetchExpenses();
               setView("list");
             } else alert(data.message || "Failed to save");
@@ -599,10 +688,18 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
             </div>
             <div className="space-y-1 md:col-span-2">
               <label className={lbl}>Description</label>
-              <input type="text" placeholder="Short note about this expense"
+              <input type="text" placeholder={tripForm.category === "Other" ? "Optional additional notes" : "Short note about this expense"}
                 value={tripForm.description} onChange={e => setTripForm(f => ({ ...f, description: e.target.value }))}
                 className={inp} />
             </div>
+            {tripForm.category === "Other" && (
+              <div className="space-y-1 md:col-span-2">
+                <label className={lbl}>Other Expense Details <span className="text-red-400">*</span></label>
+                <input type="text" placeholder="Describe what this expense is for" required
+                  value={tripForm.otherNote} onChange={e => setTripForm(f => ({ ...f, otherNote: e.target.value }))}
+                  className={inp} />
+              </div>
+            )}
           </div>
           <div className="flex gap-2.5 pt-1 border-t border-gray-100">
             <button type="button" onClick={() => setView("list")}
@@ -639,7 +736,7 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Expenses</p>
-          <p className="mt-1 text-xl font-extrabold text-red-600">₹{filtered.reduce((sum, item) => sum + Number(item.amount || 0), 0).toLocaleString("en-IN")}</p>
+          <p className="mt-1 text-xl font-extrabold text-red-600">₹{totalExpenseAmount.toLocaleString("en-IN")}</p>
         </div>
         <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm">
           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Transactions</p>
@@ -650,6 +747,13 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
           <p className="mt-1 text-xl font-extrabold text-gray-800">{filtered.filter(item => item.trip_id !== null && item.trip_id !== undefined && item.trip_id !== '').length}</p>
         </div>
       </div>
+
+      {invalidFuel.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+          <strong>{invalidFuel.length} invalid fuel record{invalidFuel.length === 1 ? "" : "s"} excluded from Total Expenses.</strong>
+          {' '}Check Fuel Management: the quantity is greater than the vehicle tank capacity.
+        </div>
+      )}
 
       <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="hidden md:grid grid-cols-[2fr_1.3fr_1.5fr_1fr_auto] gap-4 px-5 py-3 bg-gray-50 border-b border-gray-100 text-xs font-bold text-gray-400 uppercase tracking-wide">
@@ -679,12 +783,12 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
                 </div>
 
                 <div className="min-w-0">
-                  <p className="text-sm text-gray-700 font-medium">{txn.date || txn.expense_date || "—"}</p>
+                  <p className="text-sm text-gray-700 font-medium">{formatDateTime(txn.date || txn.expense_date || txn.created_at)}</p>
                   <p className="text-xs text-gray-400 truncate">{txn._isTripGroup ? "Combined trip expenses" : (txn.description || txn.notes || txn.vendor_payee || "No description")}</p>
                 </div>
 
                 <p className="text-base font-extrabold text-red-500 md:text-right">
-                  -Rs. {Number(txn.amount || 0).toLocaleString("en-IN")}
+                  -Rs. {(Number(txn.amount || 0) + (txn._isTripGroup ? Number(tripFuelTotals[normalizedTripKey(txn.trip_id)] || 0) : 0)).toLocaleString("en-IN")}
                 </p>
 
                 <button
@@ -703,10 +807,18 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
       <Modal isOpen={!!viewTxn} onClose={() => setViewTxn(null)} title={viewTxn?._isTripGroup ? "Trip Expense Details" : "Expense Transaction Details"}>
         {viewTxn && (
           <div>
+            {(() => {
+              const tripFuelTotal = viewTxn._isTripGroup
+                ? tripModalFuel.reduce((sum, fuel) => sum + Number(fuel.total_cost || (Number(fuel.quantity || 0) * Number(fuel.rate || 0))), 0)
+                : 0;
+              const displayedTotal = Number(viewTxn.amount || 0) + tripFuelTotal;
+              return (
             <div className={`${viewTxn._isTripGroup ? "bg-orange-50 border-orange-100 text-orange-600" : "bg-red-50 border-red-100 text-red-500"} border rounded-xl px-4 py-3 mb-4`}>
-              <p className="text-xs font-semibold text-gray-500 mb-0.5">{viewTxn._isTripGroup ? "Total Trip Expense" : "Amount"}</p>
-              <p className="text-3xl font-extrabold">{viewTxn._isTripGroup ? "₹" : "-Rs. "}{Number(viewTxn.amount || 0).toLocaleString("en-IN")}</p>
+              <p className="text-xs font-semibold text-gray-500 mb-0.5">{viewTxn._isTripGroup ? "Total Trip Expense Including Fuel" : "Amount"}</p>
+              <p className="text-3xl font-extrabold">{viewTxn._isTripGroup ? "₹" : "-Rs. "}{displayedTotal.toLocaleString("en-IN")}</p>
             </div>
+              );
+            })()}
 
             {viewTxn._isTripGroup ? (
               <>
@@ -733,7 +845,7 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
                       <div key={`${fuel.id}-${index}`} className="px-3 py-3 border-t border-orange-50">
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="text-sm font-semibold text-gray-800">{fuel.date || fuel.created_at || "Fuel"}</p>
+                            <p className="text-sm font-semibold text-gray-800">{formatDateTime(fuel.date || fuel.created_at)}</p>
                             <p className="text-xs text-gray-500">{Number(fuel.quantity || 0).toFixed(2)} L × ₹{Number(fuel.rate || 0).toFixed(2)} · {fuel.vendor || fuel.station_name || "No vendor"}</p>
                           </div>
                           <span className="text-sm font-bold text-orange-600">₹{fuelCost.toLocaleString("en-IN")}</span>
@@ -751,7 +863,7 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
               </>
             ) : (
               <>
-                <DetailRow label="Date" value={viewTxn.expense_date || "—"} />
+                <DetailRow label="Date" value={formatDateTime(viewTxn.expense_date || viewTxn.created_at)} />
                 <DetailRow label="Category" value={viewTxn.expense_category || "—"} />
                 <DetailRow label="Vehicle" value={viewTxn.vehicle_number || "—"} />
                 <DetailRow label="Payment Method" value={viewTxn.payment_method || "—"} />

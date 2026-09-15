@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import TrucksPLList from './trucksPL/TrucksPLList';
 import { PERIOD_PRESETS, resolvePeriod, periodDisplay } from './trucksPL/periodService';
 import { FiSearch, FiFilter, FiDownload, FiChevronDown, FiTrendingUp, FiTrendingDown, FiTruck, FiX, FiCheckCircle, FiFileText, FiPieChart, FiBarChart2, FiCalendar, FiMapPin } from 'react-icons/fi';
@@ -64,8 +64,8 @@ export default function ProfitLossReports() {
       try {
         setSummaryLoading(true);
         setSummaryError(null);
-        const res = await axios.get(
-          "http://localhost:5001/api/reports/summary",
+        const res = await api.get(
+          "/reports/summary",
           { params: { startDate: isoStart, endDate: isoEnd } }
         );
         setSummary(res.data.data);

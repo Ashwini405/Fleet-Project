@@ -5,6 +5,7 @@ import { TruckPLHeader } from './TruckPLHeader';
 import { TruckKpiCards, ExpenseSummary, ProfitCalculationCard } from './PLWidgets';
 import {
   RevenueSection, FuelSection, MaintenanceSection,
+  FastagSection,
   TyreSection, BatterySection, DriverSettlementSection,
   RTASection, MiscExpenseSection, EmiSection,
 } from './PLSections';
@@ -100,10 +101,10 @@ export default function TruckPLDetail() {
             expenses: d.totals.totalExpenses,
             profit: d.totals.netProfit,
             margin: d.totals.profitMargin,
-            trips: d.revenue.trips.length,
-            distance: 0,
-            fuelCostPerKm: 0,
-            revenuePerKm: 0
+            trips: Number(d.revenue.totals.completedTrips || d.revenue.trips.length || 0),
+            distance: Number(d.revenue.totals.totalDistance || d.revenue.trips.reduce((sum, trip) => sum + Number(trip.distance || 0), 0)),
+            fuelCostPerKm: Number(d.revenue.totals.totalDistance || 0) > 0 ? d.totals.totalFuel / d.revenue.totals.totalDistance : 0,
+            revenuePerKm: Number(d.revenue.totals.totalDistance || 0) > 0 ? d.totals.totalRevenue / d.revenue.totals.totalDistance : 0
           }}
         />
       </div>
@@ -116,11 +117,19 @@ export default function TruckPLDetail() {
             data={d.revenue}
             totals={d.totals}
             prevTotal={0}
+            vehicleId={d.info.id}
           />
           <FuelSection
             data={d.fuel}
             total={d.totals.totalFuel}
             prevTotal={0}
+            vehicleId={d.info.id}
+          />
+          <FastagSection
+            data={d.fastag}
+            total={d.totals.totalFastag}
+            prevTotal={0}
+            vehicleId={d.info.id}
           />
           <MaintenanceSection
             data={d.maintenance}
@@ -131,6 +140,7 @@ export default function TruckPLDetail() {
             data={d.tyres}
             total={d.totals.totalTyres}
             prevTotal={0}
+            vehicleNumber={d.info.vehicle_no}
           />
           <BatterySection
             data={d.battery}

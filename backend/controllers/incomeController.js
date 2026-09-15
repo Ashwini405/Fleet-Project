@@ -154,11 +154,20 @@ const createIncome = async (req, res) => {
       place_of_running:
         body.place_of_running,
 
+      rental_description:
+        body.rental_description || null,
+
+      rental_start_date:
+        normalizeDate(body.rental_start_date),
+
+      rental_end_date:
+        normalizeDate(body.rental_end_date),
+
       freight_start_date:
-        body.freight_start_date,
+        normalizeDate(body.freight_start_date),
 
       freight_end_date:
-        body.freight_end_date,
+        normalizeDate(body.freight_end_date),
 
       amount,
 
@@ -172,7 +181,7 @@ const createIncome = async (req, res) => {
         body.payment_status,
 
       payment_received_date:
-        body.payment_received_date,
+        normalizeDate(body.payment_received_date),
 
       payment_method:
         body.payment_method,
@@ -236,6 +245,9 @@ const updateIncome = async (req, res) => {
     await IncomeModel.updateIncome(req.params.id, {
       income_category: req.body.income_category,
       place_of_running: req.body.place_of_running,
+      rental_description: req.body.rental_description || null,
+      rental_start_date: normalizeDate(req.body.rental_start_date),
+      rental_end_date: normalizeDate(req.body.rental_end_date),
       freight_start_date: normalizeDate(req.body.freight_start_date),
       freight_end_date: normalizeDate(req.body.freight_end_date),
       amount,

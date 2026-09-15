@@ -153,6 +153,7 @@ export default function TripMaster() {
   const [driverFilter, setDriverFilter] = useState('All');
   const [plantFilter, setPlantFilter] = useState('All');
   const [sortConfig, setSortConfig] = useState({ key: 'startDate', direction: 'desc' });
+  const vehicleIdFilter = new URLSearchParams(location.search).get('vehicle_id');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [activeTab, setActiveTab] = useState(() => {
@@ -224,6 +225,7 @@ export default function TripMaster() {
           // 🔥 IMPORTANT: map DB fields → UI fields
           const formatted = data.data.map(trip => ({
             id: trip.trip_id,
+            vehicleId: trip.vehicle_id,
             truckNumber: trip.truck_no,
             driverName: trip.driver_name,
             route: {
@@ -261,7 +263,9 @@ export default function TripMaster() {
       const isPastTrip = !isPresentTrip && trip.status !== 'Draft';
       const isDraft = trip.status === 'Draft';
 
-      const matchesTab = activeTab === 'present' ? isPresentTrip : activeTab === 'past' ? isPastTrip : isDraft;
+      const matchesTab = vehicleIdFilter
+        ? true
+        : activeTab === 'present' ? isPresentTrip : activeTab === 'past' ? isPastTrip : isDraft;
 
       const matchesSearch =
         (trip.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -276,8 +280,9 @@ export default function TripMaster() {
   (trip.plant || '') === currentView.filters.plantFilter;
       const matchesDate = (!dateRange.start || trip.startDate >= dateRange.start) &&
         (!dateRange.end || trip.startDate <= dateRange.end);
+      const matchesVehicle = !vehicleIdFilter || String(trip.vehicleId) === String(vehicleIdFilter);
 
-      return matchesTab && matchesSearch && matchesStatus && matchesDriver && matchesPlant && matchesDate;
+      return matchesTab && matchesSearch && matchesStatus && matchesDriver && matchesPlant && matchesDate && matchesVehicle;
     });
 
     // Sort
@@ -289,7 +294,7 @@ export default function TripMaster() {
 
     setFilteredTrips(filtered);
     setCurrentPage(1);
-  }, [trips, searchTerm, dateRange, sortConfig, currentView, activeTab]);
+  }, [trips, searchTerm, dateRange, sortConfig, currentView, activeTab, vehicleIdFilter]);
 
   // Save views to localStorage
   useEffect(() => {

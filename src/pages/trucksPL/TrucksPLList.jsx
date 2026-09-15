@@ -11,7 +11,7 @@ import { periodDisplay, resolvePeriod } from './periodService';
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 const EMPTY_FILTERS = {
-  plant: '', model: '', status: '', driver: '',
+  truckNo: '', plant: '', model: '', status: '', driver: '',
   minRevenue: '', maxRevenue: '', minProfit: '', maxProfit: '',
 };
 
@@ -124,6 +124,7 @@ export default function TrucksPLList({ periodKey = 'last30', startDate: startDat
         r.vehicleModel?.toLowerCase().includes(q)
       );
     }
+    if (filters.truckNo)    d = d.filter(r => r.truckNo === filters.truckNo);
     if (filters.plant)      d = d.filter(r => r.plant === filters.plant);
     if (filters.model)      d = d.filter(r => r.vehicleModel === filters.model);
     if (filters.status)     d = d.filter(r => r.status === filters.status);

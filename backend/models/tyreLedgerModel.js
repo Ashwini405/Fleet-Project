@@ -55,6 +55,7 @@ const getVendorLedger = async (vendorId) => {
         type: "Tyre Purchase",
         ref: row.invoice_number || "-",
         desc: `Tyre Purchase (${row.tyre_number})`,
+        tyreNumber: row.tyre_number,
         debit: Number(row.tyre_cost || 0),
         credit: 0,
         tyreProfile: {
@@ -134,6 +135,7 @@ const getVendorLedger = async (vendorId) => {
         date: row.sent_date,
         type: "Retreading Service",
         ref: row.tyre_no || "-",
+        tyreNumber: row.tyre_no,
         desc: `Retreading Cost${RETREAD_DESC_SUFFIX[row.status] || ""}`,
         debit: Number(row.actual_cost || 0),
         credit: 0,
@@ -226,6 +228,7 @@ const getVendorLedger = async (vendorId) => {
         debit: 0,
         credit: Number(row.sale_amount || 0),
         tyreNo: row.tyre_no,
+        tyreNumber: row.tyre_no,
         scrapProfile: {
           tyreNo: row.tyre_no,
           make: row.make,

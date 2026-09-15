@@ -15,6 +15,15 @@ const createFuel = async (req, res) => {
     } = req.body;
 
     const receipt_files = (req.files || []).map(file => file.filename);
+    const quantityValue = Number(quantity);
+    const rateValue = Number(rate);
+    const tankCapacityValue = Number(tank_capacity);
+    if (!Number.isFinite(quantityValue) || quantityValue <= 0 || !Number.isFinite(rateValue) || rateValue <= 0) {
+      return res.status(400).json({ success: false, message: 'Quantity and rate must be valid positive numbers.' });
+    }
+    if (tankCapacityValue > 0 && quantityValue > tankCapacityValue) {
+      return res.status(400).json({ success: false, message: `Fuel quantity cannot exceed tank capacity (${tankCapacityValue} L).` });
+    }
     const total_cost = Number(quantity) * Number(rate);
     let fastag_account_id = null;
 
@@ -60,8 +69,13 @@ const createFuel = async (req, res) => {
 
     const result = await Fuel.create(fuelData);
 
-    // FASTag Wallet fuel usage is included in the monthly FASTag report.
-    // It must not reduce the account balance once per trip.
+    // Post FASTag fuel once per account/month; later fills only deduct the difference.
+    if (payment_method === 'FASTag Wallet') {
+      await Fastag.postMonthlyFuel({
+        fastagAccountId: fastag_account_id,
+        fuelDate: fuelData.date,
+      });
+    }
 
     // ── Driver Advance: deduct from supervisor wallet ─────────────────────────
     if (payment_method === 'Driver Advance' && trip_id) {
@@ -155,6 +169,10 @@ const updateFuel = async (req, res) => {
   try {
     const { id } = req.params;
     let { quantity, rate } = req.body;
+
+    if (quantity !== undefined && rate !== undefined && (Number(quantity) <= 0 || Number(rate) <= 0)) {
+      return res.status(400).json({ success: false, message: 'Quantity and rate must be valid positive numbers.' });
+    }
 
     // 🔥 Recalculate total cost if quantity or rate is updated
     if (quantity && rate) {

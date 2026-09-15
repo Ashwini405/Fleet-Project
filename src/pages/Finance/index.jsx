@@ -20,6 +20,7 @@ export default function Finance() {
   const urlTab       = searchParams.get("tab");
   const urlTripId    = searchParams.get("trip_id");    // auto-open add form
   const urlViewTrip  = searchParams.get("view_trip");  // open list, highlight trip
+  const urlProfitTripId = searchParams.get("profit_trip_id");
   const urlVehicleId = searchParams.get("vehicle_id");
 
   const [activeTab,     setActiveTab]     = useState(urlTab || "overview");
@@ -58,7 +59,7 @@ export default function Finance() {
       case "overview": return <OverviewTab  {...sharedProps} />;
       case "income":   return <IncomeTab    {...sharedProps} {...tripProps} />;
       case "expense":  return <ExpenseTab   {...sharedProps} {...tripProps} />;
-      case "trucks":   return <TrucksTab    {...sharedProps} />;
+      case "trucks":   return <TrucksTab    {...sharedProps} tripId={urlProfitTripId} />;
       default:         return null;
     }
   };

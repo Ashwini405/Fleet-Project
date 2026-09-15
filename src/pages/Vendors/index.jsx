@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { vendorCategories } from './data/dummyData';
 import DashboardPage    from './pages/DashboardPage';
 import VendorDetailPage from './pages/VendorDetailPage';
@@ -26,7 +27,12 @@ function resolveIcon(iconName) {
 }
 
 export default function Vendors() {
-  const [activePage, setActivePage] = useState('dashboard'); // 'dashboard' | category.id
+  const [searchParams] = useSearchParams();
+  const requestedCategory = searchParams.get('category');
+  const requestedVendorId = searchParams.get('vendor_id');
+  const requestedTyreNumber = searchParams.get('tyre_number');
+  const requestedTxnType = searchParams.get('txn_type');
+  const [activePage, setActivePage] = useState(requestedCategory || 'dashboard'); // 'dashboard' | category.id
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
 
@@ -92,7 +98,12 @@ export default function Vendors() {
         ) : activePage === 'parts' ? (
           <PartsPage />
         ) : activePage === 'tyres' ? (
-          <TyresVendorPage onVendorClick={handleVendorClick} />
+          <TyresVendorPage
+            onVendorClick={handleVendorClick}
+            initialVendorId={requestedVendorId}
+            initialTyreNumber={requestedTyreNumber}
+            initialTxnType={requestedTxnType}
+          />
         ) : activePage === 'oils' ? (
           <OilsPage />
         ) : activePage === 'fuel' ? (

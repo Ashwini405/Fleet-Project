@@ -49,11 +49,17 @@ const getRevenue = async (vehicleId, startDate = null, endDate = null) => {
     `
     SELECT
       id,
+      trip_id,
       trip_date,
       source,
       destination,
       customer_name,
-      freight_amount
+      freight_amount,
+      est_distance,
+      EXISTS (
+        SELECT 1 FROM income_entries ie
+        WHERE ie.trip_id = trips.id OR ie.trip_id = trips.trip_id
+      ) AS has_income_record
     FROM trips
     WHERE vehicle_id = ?
     ${tripDateFilter}
@@ -72,39 +78,65 @@ const getRevenue = async (vehicleId, startDate = null, endDate = null) => {
       customer_name,
       freight_start_date,
       freight_end_date,
-      rental_description
+      rental_description,
+      rental_start_date,
+      rental_end_date,
+      description,
+      place_of_running,
+      payment_received_date,
+      trip_id
     FROM income_entries
     WHERE vehicle_id = ?
-      AND income_category <> 'Freight'
       ${incomeDateFilter}
     ORDER BY created_at DESC
     `,
     incomeDateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
   );
 
-  const trips = tripRows.map(row => ({
-    date: row.trip_date,
-    route: `${row.source} → ${row.destination}`,
-    type: "Freight",
-    amount: Number(row.freight_amount)
-  }));
+  const incomeByTrip = new Map();
+  incomeRows
+    .filter(row => !["Rental", "Rental Income"].includes(row.income_category) && row.trip_id !== null && row.trip_id !== undefined && row.trip_id !== "")
+    .forEach(row => {
+      const key = String(row.trip_id);
+      incomeByTrip.set(key, (incomeByTrip.get(key) || 0) + Number(row.amount || 0));
+    });
+
+  const trips = tripRows.map(row => {
+    const linkedIncome = incomeByTrip.get(String(row.id)) || incomeByTrip.get(String(row.trip_id));
+    return {
+      date: row.trip_date,
+      route: `${row.source} → ${row.destination}`,
+      type: "Freight",
+      amount: Number(row.has_income_record ? linkedIncome || 0 : row.freight_amount || 0),
+      distance: Number(row.est_distance || 0)
+    };
+  });
 
   const rental = incomeRows
-    .filter(x => x.income_category === "Rental")
-    .map(x => ({
-      date: x.freight_start_date,
-      client: x.customer_name,
-      days: "-",
-      amount: Number(x.amount)
-    }));
+    .filter(x => ["Rental", "Rental Income"].includes(x.income_category))
+    .map(x => {
+      const start = x.rental_start_date || x.freight_start_date || x.payment_received_date;
+      const end = x.rental_end_date || start;
+      const startDate = start ? new Date(start) : null;
+      const endDate = end ? new Date(end) : null;
+      const duration = startDate && endDate && !Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime())
+        ? Math.max(1, Math.floor((endDate - startDate) / 86400000) + 1)
+        : null;
+
+      return {
+        date: start,
+        client: x.customer_name || x.rental_description || x.description || "—",
+        days: duration ? `${duration} day${duration === 1 ? "" : "s"}` : "—",
+        amount: Number(x.amount)
+      };
+    });
 
   const other = incomeRows
-    .filter(x => x.income_category !== "Rental")
+    .filter(x => !["Rental", "Rental Income"].includes(x.income_category) && (x.trip_id === null || x.trip_id === undefined || x.trip_id === ""))
     .map(x => ({
       date: x.freight_start_date,
-      description:
-        x.rental_description ||
-        x.income_category,
+      category: x.income_category,
+      description: x.description || x.rental_description || x.place_of_running || "No description provided",
       amount: Number(x.amount)
     }));
 
@@ -136,7 +168,9 @@ const getRevenue = async (vehicleId, startDate = null, endDate = null) => {
       totalRevenue:
         totalTripRevenue +
         totalRentalRevenue +
-        totalOtherRevenue
+        totalOtherRevenue,
+      completedTrips: tripRows.length,
+      totalDistance: trips.reduce((sum, trip) => sum + trip.distance, 0)
 
     }
 
@@ -156,6 +190,7 @@ const getFuel = async (vehicleId, startDate = null, endDate = null) => {
     SELECT
       date,
       station_name,
+      vendor,
       quantity,
       rate,
       total_cost,
@@ -170,7 +205,7 @@ const getFuel = async (vehicleId, startDate = null, endDate = null) => {
 
   const entries = rows.map(row => ({
     date: row.date,
-    station: row.station_name,
+    station: row.station_name || row.vendor || "—",
     litres: Number(row.quantity),
     rate: Number(row.rate),
     amount: Number(row.total_cost),
@@ -208,6 +243,61 @@ const getFuel = async (vehicleId, startDate = null, endDate = null) => {
     totalAdBlue,
     totalAdBlueLitres,
     adBlueFillups: adBlueEntries.length
+  };
+};
+
+// ============================================
+// Get Fastag Toll Expenses
+// ============================================
+const getFastagExpenses = async (vehicleId, startDate = null, endDate = null) => {
+  const dateFilter = (startDate && endDate) ? " AND t.date BETWEEN ? AND ?" : "";
+  const [rows] = await db.query(
+    `
+    SELECT t.date, t.toll_plaza_name, t.type, t.amount, t.reference_no
+    FROM fastag_transactions t
+    INNER JOIN fastag_accounts fa ON fa.id = t.fastag_account_id
+    WHERE fa.vehicle_id = ?
+      AND t.type = 'toll_deduction'
+      ${dateFilter}
+    ORDER BY t.date DESC, t.id DESC
+    `,
+    dateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
+  );
+
+  const entries = rows.map(row => ({
+    date: row.date,
+    plaza: row.toll_plaza_name || 'Toll deduction',
+    type: 'Toll Deduction',
+    reference: row.reference_no || '—',
+    amount: Number(row.amount || 0),
+  }));
+
+  const fuelDateFilter = (startDate && endDate) ? " AND f.date BETWEEN ? AND ?" : "";
+  const [fuelRows] = await db.query(
+    `
+    SELECT f.date, f.quantity, f.rate, f.total_cost
+    FROM fuel_entries f
+    WHERE f.vehicle_id = ?
+      AND f.payment_method = 'FASTag Wallet'
+      ${fuelDateFilter}
+    ORDER BY f.date DESC
+    `,
+    fuelDateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
+  );
+
+  const walletFuelEntries = fuelRows.map(row => ({
+    date: row.date,
+    litres: Number(row.quantity || 0),
+    rate: Number(row.rate || 0),
+    amount: Number(row.total_cost || 0),
+  }));
+
+  return {
+    entries,
+    total: entries.reduce((sum, entry) => sum + entry.amount, 0),
+    count: entries.length,
+    walletFuelEntries,
+    walletFuelTotal: walletFuelEntries.reduce((sum, entry) => sum + entry.amount, 0),
   };
 };
 
@@ -309,7 +399,7 @@ const getMaintenance = async (vehicleId, startDate = null, endDate = null) => {
 // ============================================
 // Get Tyre Expenses
 // ============================================
-const getTyres = async (vehicleId, startDate = null, endDate = null) => {
+const getTyres = async (vehicleId, vehicleNumber, startDate = null, endDate = null) => {
 
   const purchaseDateFilter = (startDate && endDate) ? " AND purchase_date BETWEEN ? AND ?" : "";
   const serviceDateFilter = (startDate && endDate) ? " AND service_date BETWEEN ? AND ?" : "";
@@ -318,15 +408,31 @@ const getTyres = async (vehicleId, startDate = null, endDate = null) => {
   const [purchaseRows] = await db.query(
     `
     SELECT
-      purchase_date,
-      brand,
-      model,
-      tyre_cost
+      tyres.purchase_date,
+      tyres.vendor_name,
+      tv.id AS vendor_id,
+      tyres.tyre_number,
+      tyres.brand,
+      tyres.model,
+      tyres.tyre_cost
     FROM tyres
-    WHERE vehicle_id = ?
+    LEFT JOIN tyre_vendors tv ON tv.vendor_name = tyres.vendor_name
+    WHERE (
+      vehicle_id = ?
+      OR vehicle_number = ?
+      OR EXISTS (
+        SELECT 1
+        FROM tyre_activity_history tah
+        WHERE tah.tyre_number = tyres.tyre_number
+          AND TRIM(tah.vehicle_number) = TRIM(?)
+          AND tah.activity_type = 'mounted'
+      )
+    )
     ${purchaseDateFilter}
     `,
-    purchaseDateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
+    purchaseDateFilter
+      ? [vehicleId, vehicleNumber, vehicleNumber, startDate, endDate]
+      : [vehicleId, vehicleNumber, vehicleNumber]
   );
 
   // Tyre Service History
@@ -334,16 +440,32 @@ const getTyres = async (vehicleId, startDate = null, endDate = null) => {
     `
     SELECT
       service_date,
+      t.vendor_name,
+      tv.id AS vendor_id,
+      tsh.tyre_number,
       issue_type,
       action_taken,
       tyre_repair_cost,
       tyre_replacement_cost,
       retreading_cost
-    FROM tyre_service_history
-    WHERE vehicle_id = ?
+    FROM tyre_service_history tsh
+    LEFT JOIN tyres t ON t.tyre_number = tsh.tyre_number
+    LEFT JOIN tyre_vendors tv ON tv.vendor_name = t.vendor_name
+    WHERE (
+      tsh.vehicle_id = ?
+      OR tsh.vehicle_no = ?
+      OR EXISTS (
+        SELECT 1
+        FROM tyres t
+        WHERE t.tyre_number = tsh.tyre_number
+          AND (t.vehicle_id = ? OR t.vehicle_number = ?)
+      )
+    )
     ${serviceDateFilter}
     `,
-    serviceDateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
+    serviceDateFilter
+      ? [vehicleId, vehicleNumber, vehicleId, vehicleNumber, startDate, endDate]
+      : [vehicleId, vehicleNumber, vehicleId, vehicleNumber]
   );
 
   const records = [];
@@ -358,6 +480,9 @@ const getTyres = async (vehicleId, startDate = null, endDate = null) => {
       type: "Purchase",
 
       description: `${row.brand} ${row.model}`,
+      vendorId: row.vendor_id,
+      vendorName: row.vendor_name,
+      tyreNumber: row.tyre_number,
 
       amount: Number(row.tyre_cost)
 
@@ -377,6 +502,9 @@ const getTyres = async (vehicleId, startDate = null, endDate = null) => {
         type: "Repair",
 
         description: row.issue_type,
+        vendorId: row.vendor_id,
+        vendorName: row.vendor_name,
+        tyreNumber: row.tyre_number,
 
         amount: Number(row.tyre_repair_cost)
 
@@ -393,6 +521,9 @@ const getTyres = async (vehicleId, startDate = null, endDate = null) => {
         type: "Replacement",
 
         description: row.action_taken,
+        vendorId: row.vendor_id,
+        vendorName: row.vendor_name,
+        tyreNumber: row.tyre_number,
 
         amount: Number(row.tyre_replacement_cost)
 
@@ -409,6 +540,9 @@ const getTyres = async (vehicleId, startDate = null, endDate = null) => {
         type: "Retreading",
 
         description: row.action_taken,
+        vendorId: row.vendor_id,
+        vendorName: row.vendor_name,
+        tyreNumber: row.tyre_number,
 
         amount: Number(row.retreading_cost)
 
@@ -806,13 +940,21 @@ const getTruckPLList = async (startDate = null, endDate = null, options = {}) =>
         [rtaRows], [miscRows], [emiRows],
     ] = await Promise.all([
         db.query(
-            `SELECT vehicle_id, COUNT(*) AS trip_count, COALESCE(SUM(freight_amount),0) AS trip_revenue
-             FROM trips WHERE vehicle_id IN (?) ${tripDateFilter} GROUP BY vehicle_id`,
+            `SELECT vehicle_id,
+                    COUNT(*) AS trip_count,
+                    COALESCE(SUM(CASE WHEN NOT EXISTS (
+                        SELECT 1 FROM income_entries ie
+                        WHERE ie.trip_id = trips.id OR ie.trip_id = trips.trip_id
+                    ) THEN freight_amount ELSE 0 END), 0) AS trip_revenue
+           FROM trips
+           WHERE vehicle_id IN (?)
+             ${tripDateFilter}
+           GROUP BY vehicle_id`,
             [vehicleIds, ...dateParams]
         ),
         db.query(
             `SELECT vehicle_id, COALESCE(SUM(amount),0) AS income_total
-             FROM income_entries WHERE vehicle_id IN (?) AND income_category <> 'Freight' ${incomeDateFilter} GROUP BY vehicle_id`,
+           FROM income_entries WHERE vehicle_id IN (?) ${incomeDateFilter} GROUP BY vehicle_id`,
             [vehicleIds, ...dateParams]
         ),
         db.query(
@@ -1019,6 +1161,7 @@ module.exports = {
   getTruckInfo,
   getRevenue,
   getFuel,
+  getFastagExpenses,
   getMaintenance,
   getTyres,
   getBattery,

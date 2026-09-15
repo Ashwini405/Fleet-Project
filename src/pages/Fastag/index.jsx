@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   FiCreditCard, FiPlus, FiTrendingDown, FiAlertTriangle, FiTruck,
   FiSearch, FiFilter, FiRefreshCw,
@@ -13,6 +14,11 @@ const API = 'http://localhost:5001/api';
 const TABS = ['Dashboard', 'Accounts', 'Transactions'];
 
 const INR = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+const monthKey = (date) => {
+  const value = new Date(date);
+  if (Number.isNaN(value.getTime())) return 'Unknown';
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}`;
+};
 
 function Card({ icon, label, value, sub, accent, valueClass = '' }) {
   return (
@@ -28,7 +34,8 @@ function Card({ icon, label, value, sub, accent, valueClass = '' }) {
 }
 
 export default function FastagModule() {
-  const [activeTab, setActiveTab] = useState('Dashboard');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(() => new URLSearchParams(window.location.search).get('tab') || 'Dashboard');
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -39,6 +46,7 @@ export default function FastagModule() {
 
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
+  const [vehicleFilter, setVehicleFilter] = useState('all');
 
   const fetchAccounts = useCallback(async () => {
     try {
@@ -68,16 +76,30 @@ export default function FastagModule() {
 
   useEffect(() => { refreshAll(); }, [refreshAll]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const vehicleId = params.get('vehicle_id');
+    const tab = params.get('tab');
+    if (tab && TABS.includes(tab)) setActiveTab(tab);
+    if (!vehicleId || accounts.length === 0) return;
+    const account = accounts.find(item => String(item.vehicle_id) === String(vehicleId));
+    if (account?.vehicle_no) {
+      setVehicleFilter(account.vehicle_no);
+      setActiveTab('Transactions');
+    }
+  }, [location.search, accounts]);
+
   const totals = useMemo(() => {
     const totalBalance = accounts.reduce((s, a) => s + Number(a.balance || 0), 0);
     const lowBalance = accounts.filter(a => Number(a.balance) < Number(a.low_balance_threshold || 200));
+    const accountBalanceByVehicle = new Map(accounts.map(account => [account.vehicle_no, Number(account.balance || 0)]));
     const totalRecharged = transactions.filter(t => t.type === 'recharge').reduce((s, t) => s + Number(t.amount), 0);
     const totalTollSpend = transactions.filter(t => t.type === 'toll_deduction').reduce((s, t) => s + Number(t.amount), 0);
     const monthlyFuelSpend = transactions.filter(t => t.type === 'fuel_monthly').reduce((s, t) => s + Number(t.amount), 0);
     const monthlyTollSpend = transactions
       .filter(t => t.type === 'toll_deduction')
       .reduce((groups, transaction) => {
-        const month = String(transaction.date).slice(0, 7);
+        const month = monthKey(transaction.date);
         const key = `${month}-${transaction.vehicle_no || 'unknown'}`;
         const current = groups.get(key) || { month, vehicle: transaction.vehicle_no || '—', amount: 0 };
         current.amount += Number(transaction.amount || 0);
@@ -87,7 +109,7 @@ export default function FastagModule() {
     const monthlyRecharge = transactions
       .filter(t => t.type === 'recharge')
       .reduce((groups, transaction) => {
-        const month = String(transaction.date).slice(0, 7);
+        const month = monthKey(transaction.date);
         const key = `${month}-${transaction.vehicle_no || 'unknown'}`;
         const current = groups.get(key) || { month, vehicle: transaction.vehicle_no || '—', amount: 0 };
         current.amount += Number(transaction.amount || 0);
@@ -97,10 +119,17 @@ export default function FastagModule() {
     const monthlyVehicleSummary = transactions
       .filter(t => ['recharge', 'toll_deduction', 'fuel_monthly'].includes(t.type))
       .reduce((groups, transaction) => {
-        const month = String(transaction.date).slice(0, 7);
+        const month = monthKey(transaction.date);
         const vehicle = transaction.vehicle_no || '—';
         const key = `${month}-${vehicle}`;
-        const current = groups.get(key) || { month, vehicle, recharge: 0, toll: 0, fuel: 0 };
+        const current = groups.get(key) || {
+          month,
+          vehicle,
+          recharge: 0,
+          toll: 0,
+          fuel: 0,
+          currentBalance: accountBalanceByVehicle.get(vehicle) || 0,
+        };
         if (transaction.type === 'recharge') current.recharge += Number(transaction.amount || 0);
         if (transaction.type === 'toll_deduction') current.toll += Number(transaction.amount || 0);
         if (transaction.type === 'fuel_monthly') current.fuel += Number(transaction.amount || 0);
@@ -123,12 +152,18 @@ export default function FastagModule() {
     const q = search.trim().toLowerCase();
     return transactions.filter(t => {
       if (typeFilter !== 'all' && t.type !== typeFilter) return false;
+      if (vehicleFilter !== 'all' && t.vehicle_no !== vehicleFilter) return false;
       if (!q) return true;
       return (t.vehicle_no || '').toLowerCase().includes(q) ||
         (t.toll_plaza_name || '').toLowerCase().includes(q) ||
         (t.reference_no || '').toLowerCase().includes(q);
     });
-  }, [transactions, search, typeFilter]);
+  }, [transactions, search, typeFilter, vehicleFilter]);
+
+  const filteredMonthlySummary = useMemo(
+    () => totals.monthlyVehicleSummary.filter(row => vehicleFilter === 'all' || row.vehicle === vehicleFilter),
+    [totals.monthlyVehicleSummary, vehicleFilter]
+  );
 
   const renderDashboard = () => (
     <div className="space-y-6">
@@ -305,7 +340,48 @@ export default function FastagModule() {
             <option value="fuel_monthly">Monthly Fuel Usage</option>
           </select>
         </div>
+        <select value={vehicleFilter} onChange={e => setVehicleFilter(e.target.value)}
+          className="text-sm font-medium text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none cursor-pointer">
+          <option value="all">All Vehicles</option>
+          {[...new Set(accounts.map(account => account.vehicle_no).filter(Boolean))]
+            .sort()
+            .map(vehicle => <option key={vehicle} value={vehicle}>{vehicle}</option>)}
+        </select>
         <span className="text-xs text-slate-400 ml-auto">{filteredTransactions.length} transactions</span>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100">
+          <h3 className="text-sm font-bold text-slate-800">Vehicle-wise Monthly Summary</h3>
+          <p className="text-xs text-slate-400 mt-0.5">Monthly amounts by vehicle; current balance includes all past transactions</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                {['Month', 'Vehicle', 'Recharge', 'Toll Deducted', 'Fuel Deducted', 'Total Deducted (Month)', 'Current Balance (All Time)'].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {filteredMonthlySummary.map(row => (
+                <tr key={`${row.month}-${row.vehicle}`} className="hover:bg-slate-50/60">
+                  <td className="px-4 py-3 text-xs font-semibold text-slate-600 whitespace-nowrap">{row.month}</td>
+                  <td className="px-4 py-3 font-bold text-slate-800 whitespace-nowrap">{row.vehicle}</td>
+                  <td className="px-4 py-3 font-bold text-emerald-600 whitespace-nowrap">{INR(row.recharge)}</td>
+                  <td className="px-4 py-3 font-bold text-rose-600 whitespace-nowrap">{INR(row.toll)}</td>
+                  <td className="px-4 py-3 font-bold text-cyan-600 whitespace-nowrap">{INR(row.fuel)}</td>
+                  <td className="px-4 py-3 font-bold text-slate-800 whitespace-nowrap">{INR(Number(row.toll) + Number(row.fuel))}</td>
+                  <td className={`px-4 py-3 font-bold whitespace-nowrap ${Number(row.currentBalance) < 0 ? 'text-red-600' : 'text-slate-800'}`}>{INR(row.currentBalance)}</td>
+                </tr>
+              ))}
+              {filteredMonthlySummary.length === 0 && (
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-xs text-slate-400">No vehicle-wise monthly activity recorded yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">

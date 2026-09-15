@@ -12,7 +12,26 @@ function DetailRow({ label, value }) {
   );
 }
 
-export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
+const INR = (value) => `₹${Number(value || 0).toLocaleString("en-IN")}`;
+const dateKey = (value) => String(value || "").slice(0, 10);
+const normalizedTripKey = (value) => String(value || "").replace(/^TRIP-/i, "");
+const formatDateTime = (value) => {
+  if (!value) return "—";
+  const text = String(value);
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00` : text);
+  if (Number.isNaN(date.getTime())) return text;
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
+const tripLabel = (transaction) => transaction.trip_number || transaction.trip_id || "No trip assigned";
+
+export default function TrucksTab({ selectedTruck, dateFrom, dateTo, tripId = null }) {
   const [modalTruck, setModalTruck] = useState(null);
   const [detailTxn, setDetailTxn] = useState(null);
   const [vehicles, setVehicles] = useState([]);
@@ -87,6 +106,13 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
       let exp = expenseList.filter(e => String(e.vehicle_id) === String(vehicle.id));
       let fuel = fuelList.filter(f => String(f.vehicle_id) === String(vehicle.id));
 
+      if (tripId) {
+        const matchesTrip = item => String(item.trip_id || "") === String(tripId);
+        inc = inc.filter(matchesTrip);
+        exp = exp.filter(matchesTrip);
+        fuel = fuel.filter(matchesTrip);
+      }
+
       // Apply date filters
       if (dateFrom) {
         inc = inc.filter(i => i.payment_received_date >= dateFrom);
@@ -100,10 +126,48 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
       }
 
       const totalIncome = inc.reduce((s, i) => s + Number(i.amount || 0), 0);
-      const otherExpense = exp.reduce((s, e) => s + Number(e.amount || 0), 0);
       const fuelExpense = fuel.reduce((s, f) => s + Number(f.total_cost || (Number(f.quantity || 0) * Number(f.rate || 0))), 0);
-      const totalExpense = otherExpense + fuelExpense;
+      const financeFuel = exp.filter(e => e.expense_category === "Fuel");
+      const unmatchedFinanceFuel = financeFuel.filter(expense => !fuel.some(entry =>
+        dateKey(entry.date || entry.created_at) === dateKey(expense.expense_date) &&
+        Math.abs(Number(entry.total_cost || (Number(entry.quantity || 0) * Number(entry.rate || 0))) - Number(expense.amount || 0)) < 0.01
+      ));
+      const nonFuelExpenses = exp.filter(e => e.expense_category !== "Fuel");
+      const unmatchedFuelTotal = unmatchedFinanceFuel.reduce((s, e) => s + Number(e.amount || 0), 0);
+      const totalExpense = nonFuelExpenses.reduce((s, e) => s + Number(e.amount || 0), 0) + fuelExpense + unmatchedFuelTotal;
       const netProfit = totalIncome - totalExpense;
+
+      const incomeBreakdown = inc.reduce((groups, item) => {
+        const label = item.income_category || "Other Income";
+        groups[label] = (groups[label] || 0) + Number(item.amount || 0);
+        return groups;
+      }, {});
+      const expenseBreakdown = nonFuelExpenses.reduce((groups, item) => {
+        const label = item.expense_category || "Miscellaneous";
+        groups[label] = (groups[label] || 0) + Number(item.amount || 0);
+        return groups;
+      }, {});
+      if (fuelExpense + unmatchedFuelTotal > 0) expenseBreakdown.Fuel = fuelExpense + unmatchedFuelTotal;
+
+      const tripBreakdown = new Map();
+      const ensureTrip = (tripId, tripNumber) => {
+        const key = normalizedTripKey(tripId || tripNumber);
+        if (!key) return null;
+        if (!tripBreakdown.has(key)) tripBreakdown.set(key, { trip: tripNumber || `TRIP-${key}`, income: 0, expense: 0 });
+        return tripBreakdown.get(key);
+      };
+      inc.forEach(item => {
+        const trip = ensureTrip(item.trip_id, item.trip_number);
+        if (trip) trip.income += Number(item.amount || 0);
+      });
+      [...nonFuelExpenses, ...unmatchedFinanceFuel].forEach(item => {
+        const trip = ensureTrip(item.trip_id, item.trip_number);
+        if (trip) trip.expense += Number(item.amount || 0);
+      });
+      fuel.forEach(item => {
+        const trip = ensureTrip(item.trip_id, item.trip_number);
+        if (trip) trip.expense += Number(item.total_cost || (Number(item.quantity || 0) * Number(item.rate || 0)));
+      });
 
       // Combine income and expense for transaction history
       const history = [
@@ -114,7 +178,7 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
           title: i.income_category,
           date: i.payment_received_date,
         })),
-        ...exp.map(e => ({
+        ...[...nonFuelExpenses, ...unmatchedFinanceFuel].map(e => ({
           ...e,
           _type: "expense",
           amount: Number(e.amount || 0),
@@ -136,6 +200,9 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
         totalIncome,
         totalExpense,
         netProfit,
+        incomeBreakdown,
+        expenseBreakdown,
+        tripBreakdown: [...tripBreakdown.values()],
         history,
       };
     }).filter(
@@ -245,6 +312,45 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 gap-3 text-xs">
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+                    <p className="font-bold uppercase tracking-widest text-emerald-700/70 mb-2">Income Sources</p>
+                    {Object.entries(truck.incomeBreakdown).length === 0 ? (
+                      <p className="text-gray-400">No income records</p>
+                    ) : Object.entries(truck.incomeBreakdown).map(([label, value]) => (
+                      <div key={label} className="flex justify-between gap-3 py-1">
+                        <span className="text-gray-600">{label}</span><strong className="text-emerald-700">{INR(value)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="rounded-xl border border-red-100 bg-red-50/40 p-3">
+                    <p className="font-bold uppercase tracking-widest text-red-600/70 mb-2">All Expense Categories</p>
+                    {Object.entries(truck.expenseBreakdown).length === 0 ? (
+                      <p className="text-gray-400">No expense records</p>
+                    ) : Object.entries(truck.expenseBreakdown).map(([label, value]) => (
+                      <div key={label} className="flex justify-between gap-3 py-1">
+                        <span className="text-gray-600">{label}</span><strong className="text-red-600">{INR(value)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {truck.tripBreakdown.length > 0 && (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 text-xs">
+                    <p className="font-bold uppercase tracking-widest text-slate-500 mb-2">Trip-wise Income & Expense</p>
+                    <div className="space-y-1.5">
+                      {truck.tripBreakdown.map(trip => (
+                        <div key={trip.trip} className="flex items-center justify-between gap-3 rounded-lg bg-white border border-slate-100 px-2.5 py-2">
+                          <span className="font-bold text-slate-700">{trip.trip}</span>
+                          <span className="text-emerald-700">Income {INR(trip.income)}</span>
+                          <span className="text-red-600">Expense {INR(trip.expense)}</span>
+                          <span className={`font-bold ${trip.income - trip.expense >= 0 ? 'text-emerald-700' : 'text-red-600'}`}>Net {INR(trip.income - trip.expense)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Expense-share bar */}
                 <div>
                   <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden">
@@ -288,8 +394,20 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
             </div>
 
             <DetailRow label="Assigned Station" value={modalTruck.station_name || "Not Assigned"} />
-            <DetailRow label="Fuel Expense" value={`₹${Number(modalTruck.fuelExpense || 0).toLocaleString("en-IN")}`} />
-            <DetailRow label="Other Expenses" value={`₹${Number(modalTruck.otherExpense || 0).toLocaleString("en-IN")}`} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+                <p className="text-xs font-bold uppercase tracking-widest text-emerald-700/70 mb-2">Income Sources</p>
+                {Object.entries(modalTruck.incomeBreakdown || {}).map(([label, value]) => (
+                  <div key={label} className="flex justify-between gap-2 py-1 text-xs"><span>{label}</span><strong className="text-emerald-700">{INR(value)}</strong></div>
+                ))}
+              </div>
+              <div className="rounded-xl border border-red-100 bg-red-50/40 p-3">
+                <p className="text-xs font-bold uppercase tracking-widest text-red-600/70 mb-2">All Expense Categories</p>
+                {Object.entries(modalTruck.expenseBreakdown || {}).map(([label, value]) => (
+                  <div key={label} className="flex justify-between gap-2 py-1 text-xs"><span>{label}</span><strong className="text-red-600">{INR(value)}</strong></div>
+                ))}
+              </div>
+            </div>
 
             {/* P&L summary */}
             <div className="grid grid-cols-3 gap-3">
@@ -332,7 +450,8 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
                           </div>
                           <div>
                             <p className="text-sm font-semibold text-gray-800">{txn.title || "—"}</p>
-                            <p className="text-xs text-gray-400">{txn.date || "—"}</p>
+                            <p className="text-xs font-semibold text-blue-600">Trip {tripLabel(txn)}</p>
+                            <p className="text-xs text-gray-400">{formatDateTime(txn.date)}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -380,7 +499,8 @@ export default function TrucksTab({ selectedTruck, dateFrom, dateTo }) {
               </p>
             </div>
 
-            <DetailRow label="Date" value={detailTxn.expense_date || detailTxn.date || "—"} />
+            <DetailRow label="Date" value={formatDateTime(detailTxn.expense_date || detailTxn.date || detailTxn.created_at)} />
+            <DetailRow label="Trip" value={tripLabel(detailTxn)} />
             <DetailRow label="Category" value={detailTxn.expense_category || "—"} />
             <DetailRow label="Vehicle" value={detailTxn.vehicle_number || "—"} />
             <DetailRow label="Payment Method" value={detailTxn.payment_method || "—"} />

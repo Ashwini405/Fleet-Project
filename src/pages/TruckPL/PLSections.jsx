@@ -4,6 +4,17 @@ import { FiChevronDown, FiChevronUp, FiExternalLink, FiDatabase } from 'react-ic
 
 const INR = (n) => '₹' + Number(n).toLocaleString('en-IN');
 
+function formatReportDate(value) {
+  if (!value) return '—';
+  const text = String(value);
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00` : text);
+  if (Number.isNaN(date.getTime())) return text;
+  return date.toLocaleString('en-IN', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  });
+}
+
 // ── Variance pill ─────────────────────────────────────────────────────────────
 function VariancePill({ current, previous }) {
   if (!previous || previous === 0) return null;
@@ -136,7 +147,7 @@ export function PLSection({
 }
 
 // ── Shared table ──────────────────────────────────────────────────────────────
-export function PLTable({ cols, rows, amountKey = 'amount' }) {
+export function PLTable({ cols, rows, amountKey = 'amount', onRowClick }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-100">
       <table className="w-full text-xs">
@@ -151,14 +162,21 @@ export function PLTable({ cols, rows, amountKey = 'amount' }) {
         </thead>
         <tbody className="divide-y divide-slate-50">
           {rows.map((row, i) => (
-            <tr key={i} className="hover:bg-slate-50/60 transition-colors">
+            <tr
+              key={i}
+              onClick={() => onRowClick?.(row)}
+              title={onRowClick ? 'View transaction in vendor ledger' : undefined}
+              className={`hover:bg-slate-50/60 transition-colors ${onRowClick ? 'cursor-pointer' : ''}`}
+            >
               {cols.map(c => (
                 <td key={c.key} className={`px-4 py-3 ${c.right ? 'text-right font-bold text-slate-800' : 'text-slate-600 font-medium'} ${c.key === amountKey ? 'text-slate-800 font-black' : ''}`}>
                   {c.key === amountKey
                     ? INR(row[c.key])
                     : c.badge
                       ? <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${c.badge(row[c.key])}`}>{row[c.key]}</span>
-                      : row[c.key]
+                      : c.key === 'date'
+                        ? formatReportDate(row[c.key])
+                        : row[c.key]
                   }
                 </td>
               ))}
@@ -171,7 +189,7 @@ export function PLTable({ cols, rows, amountKey = 'amount' }) {
 }
 
 // ── 1. Revenue Section ────────────────────────────────────────────────────────
-export function RevenueSection({ data, totals, prevTotal }) {
+export function RevenueSection({ data, totals, prevTotal, vehicleId }) {
   const typeBadge = (t) => {
     if (t === 'Freight')     return 'bg-indigo-50 text-indigo-700 border-indigo-200';
     if (t === 'Return Load') return 'bg-blue-50 text-blue-700 border-blue-200';
@@ -184,7 +202,7 @@ export function RevenueSection({ data, totals, prevTotal }) {
       total={totals.totalRevenue} totalLabel="Total Revenue" accent="green"
       defaultOpen={true} prevTotal={prevTotal}
       source="Trip Master" records={`${totalRecords} Records (${data.trips.length} Trips)`}
-      viewLabel="View Trips →" viewPath="/trips"
+      viewLabel="View Trips →" viewPath={`/trips?vehicle_id=${vehicleId}`}
     >
       <div className="space-y-5">
         <div>
@@ -220,7 +238,8 @@ export function RevenueSection({ data, totals, prevTotal }) {
           <PLTable
             cols={[
               { key: 'date',   label: 'Date'        },
-              { key: 'desc',   label: 'Description' },
+              { key: 'category', label: 'Category'  },
+              { key: 'description', label: 'Description' },
               { key: 'amount', label: 'Amount', right: true },
             ]}
             rows={data.other}
@@ -232,14 +251,14 @@ export function RevenueSection({ data, totals, prevTotal }) {
 }
 
 // ── 2. Fuel Section ───────────────────────────────────────────────────────────
-export function FuelSection({ data, total, prevTotal }) {
+export function FuelSection({ data, total, prevTotal, vehicleId }) {
   const totalLitres = data.totalLitres || 0;
   return (
     <PLSection
       title="Fuel Expenses" subtitle={`${totalLitres.toLocaleString()} L total · ${data.fillups || 0} fill-ups`}
       total={total} totalLabel="Total Fuel Expense" accent="red" prevTotal={prevTotal}
       source="Fuel Management" records={`${data.fillups || 0} Fuel Entries`}
-      viewLabel="View Fuel Entries →" viewPath="/fuel"
+      viewLabel="View Fuel Entries →" viewPath={`/fuel?vehicle_id=${vehicleId}`}
     >
       <PLTable
         cols={[
@@ -251,6 +270,57 @@ export function FuelSection({ data, total, prevTotal }) {
         ]}
         rows={data.entries || []}
       />
+    </PLSection>
+  );
+}
+
+// ── 3. Fastag Expenses ───────────────────────────────────────────────────────
+export function FastagSection({ data, total, prevTotal, vehicleId }) {
+  return (
+    <PLSection
+      title="Fastag Expenses"
+      subtitle={`${data.count || 0} toll deductions · wallet fuel shown separately`}
+      total={total}
+      totalLabel="Total Fastag Expense"
+      accent="purple"
+      prevTotal={prevTotal}
+      source="Fastag Management"
+      records={`${data.count || 0} Fastag Entries`}
+      viewLabel="View Fastag Entries →"
+      viewPath={`/fastag?tab=Transactions&vehicle_id=${vehicleId}`}
+    >
+      <PLTable
+        cols={[
+          { key: 'date', label: 'Date' },
+          { key: 'plaza', label: 'Toll Plaza' },
+          { key: 'type', label: 'Type' },
+          { key: 'reference', label: 'Reference' },
+          { key: 'amount', label: 'Amount', right: true },
+        ]}
+        rows={data.entries || []}
+      />
+      <div className="mt-5 rounded-xl border border-cyan-100 bg-cyan-50/50 p-4">
+        <div className="flex items-center justify-between gap-3 mb-2">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-cyan-700">Fuel via Fastag Wallet</p>
+            <p className="text-[11px] text-cyan-700/70">Informational only · already included in Fuel Expenses</p>
+          </div>
+          <span className="text-sm font-black text-cyan-700">{INR(data.walletFuelTotal || 0)}</span>
+        </div>
+        {(data.walletFuelEntries || []).length > 0 ? (
+          <PLTable
+            cols={[
+              { key: 'date', label: 'Date' },
+              { key: 'litres', label: 'Litres' },
+              { key: 'rate', label: '₹/L' },
+              { key: 'amount', label: 'Already in Fuel', right: true },
+            ]}
+            rows={data.walletFuelEntries}
+          />
+        ) : (
+          <p className="text-xs text-cyan-700/70">No fuel entries paid through Fastag Wallet.</p>
+        )}
+      </div>
     </PLSection>
   );
 }
@@ -278,7 +348,8 @@ export function MaintenanceSection({ data, total, prevTotal }) {
 }
 
 // ── 4. Tyre Section ───────────────────────────────────────────────────────────
-export function TyreSection({ data, total, prevTotal }) {
+export function TyreSection({ data, total, prevTotal, vehicleNumber }) {
+  const navigate = useNavigate();
   const typeBadge = (t) => {
     if (t === 'Purchase')    return 'bg-indigo-50 text-indigo-700 border-indigo-200';
     if (t === 'Retreading')  return 'bg-blue-50 text-blue-700 border-blue-200';
@@ -289,18 +360,36 @@ export function TyreSection({ data, total, prevTotal }) {
     <PLSection
       title="Tyre Expenses" subtitle="Purchase · Retreading · Puncture · Replacement"
       total={total} totalLabel="Total Tyre Cost" accent="purple" prevTotal={prevTotal}
-      source="Tyre Management" records={`${data.transactions || 0} Transactions`}
-      viewLabel="View Tyre Transactions →" viewPath="/tyres"
+      source="Tyre Vendor Ledger" records={`${data.transactions || 0} Transactions`}
+      viewLabel="View Tyre Vendors →"
+      viewPath="/vendors?category=tyres"
     >
       <PLTable
         cols={[
           { key: 'date',   label: 'Date'        },
           { key: 'type',   label: 'Type', badge: typeBadge },
+          { key: 'tyreNumber', label: 'Tyre Number' },
           { key: 'description', label: 'Description' },
+          { key: 'vendorName', label: 'Vendor' },
           { key: 'amount', label: 'Amount', right: true },
         ]}
         rows={data.records || []}
+        onRowClick={row => {
+          if (!row.vendorId) return;
+          const params = new URLSearchParams({
+            category: 'tyres',
+            vendor_id: String(row.vendorId),
+            tyre_number: row.tyreNumber || '',
+            txn_type: row.type || '',
+          });
+          navigate(`/vendors?${params.toString()}`);
+        }}
       />
+      {(data.records || []).length === 0 && (
+        <div className="mt-3 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          No tyre transactions are linked to this vehicle yet. Mount the tyre from Tyre Management to connect its vendor purchase and lifecycle costs to this P&L report.
+        </div>
+      )}
     </PLSection>
   );
 }

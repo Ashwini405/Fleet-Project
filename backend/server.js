@@ -126,6 +126,24 @@ db.query(`
 `).then(() => console.log('tyre_notifications table ready'))
   .catch(e => console.error('tyre_notifications table error:', e.message));
 
+// Keep monthly FASTag fuel postings available for installations that predate the migration.
+db.query(`
+  CREATE TABLE IF NOT EXISTS fastag_monthly_postings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    fastag_account_id INT NOT NULL,
+    month DATE NOT NULL,
+    amount DECIMAL(10,2) NOT NULL,
+    transaction_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_fastag_month (fastag_account_id, month),
+    CONSTRAINT fk_monthly_posting_account FOREIGN KEY (fastag_account_id)
+      REFERENCES fastag_accounts(id) ON DELETE CASCADE,
+    CONSTRAINT fk_monthly_posting_transaction FOREIGN KEY (transaction_id)
+      REFERENCES fastag_transactions(id) ON DELETE CASCADE
+  )
+`).then(() => console.log('fastag_monthly_postings table ready'))
+  .catch(e => console.error('fastag_monthly_postings table error:', e.message));
+
 // Auto-create warranty_notifications table
 db.query(`
   CREATE TABLE IF NOT EXISTS warranty_notifications (

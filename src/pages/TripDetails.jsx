@@ -449,6 +449,7 @@ export default function TripDetails() {
   const [expForm, setExpForm] = useState({ type: 'Food', amount: '', note: '' });
   const [supervisorWallet, setSupervisorWallet] = useState(null);
   const [incomeRefreshKey, setIncomeRefreshKey] = useState(0);
+  const [linkedIncomeTotal, setLinkedIncomeTotal] = useState(0);
   const [editingIncome, setEditingIncome] = useState(null);
 
   // Fetch supervisor wallet balance
@@ -689,6 +690,7 @@ export default function TripDetails() {
         expenses={expenses}
         fuelEntries={fuelEntries}
         refreshKey={incomeRefreshKey}
+        onIncomeTotal={setLinkedIncomeTotal}
         onAddIncome={() => { setEditingIncome(null); setModal('addIncome'); }}
         onEditIncome={(income) => { setEditingIncome(income); setModal('addIncome'); }}
       />
@@ -916,8 +918,8 @@ export default function TripDetails() {
               {/* Revenue & Advance */}
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-indigo-200">Revenue (Freight)</span>
-                  <span className="font-bold">{Number(trip.freight_amount) > 0 ? INR(trip.freight_amount) : <span className="text-indigo-300 font-normal text-xs">Not set</span>}</span>
+                  <span className="text-indigo-200">Trip Income</span>
+                  <span className="font-bold">{linkedIncomeTotal > 0 ? INR(linkedIncomeTotal) : Number(trip.freight_amount) > 0 ? INR(trip.freight_amount) : <span className="text-indigo-300 font-normal text-xs">Not recorded</span>}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-indigo-200">Total Advance</span>
@@ -959,7 +961,7 @@ export default function TripDetails() {
 
               {/* Profit / Loss */}
               {(() => {
-                const freight = Number(trip.freight_amount) || 0;
+                const freight = linkedIncomeTotal || Number(trip.freight_amount) || 0;
                 const profit = freight - grandTotal;
                 if (freight === 0) return null;
                 return (

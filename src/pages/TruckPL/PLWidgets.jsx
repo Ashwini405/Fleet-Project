@@ -129,26 +129,6 @@ export function TruckKpiCards({ kpis }) {
           valueColor="text-cyan-700"
           accent="border-cyan-400"
         />
-        <KpiCard
-          label="Fuel Cost per km"
-          value={`₹ ${Number(kpis.fuelCostPerKm ?? 0).toFixed(2)}`}
-          trendLabel="Cost per kilometre"
-          icon={FiDroplet}
-          iconBg="bg-orange-100"
-          iconColor="text-orange-600"
-          valueColor="text-orange-700"
-          accent="border-orange-400"
-        />
-        <KpiCard
-          label="Revenue per km"
-          value={`₹ ${Number(kpis.revenuePerKm ?? 0).toFixed(2)}`}
-          trendLabel="Earnings per kilometre"
-          icon={FiBarChart2}
-          iconBg="bg-indigo-100"
-          iconColor="text-indigo-600"
-          valueColor="text-indigo-700"
-          accent="border-indigo-400"
-        />
       </div>
 
     </div>
@@ -159,6 +139,7 @@ export function TruckKpiCards({ kpis }) {
 export function ExpenseSummary({ totals }) {
   const items = [
     { label: 'Fuel',          value: totals.totalFuel,       color: '#ef4444', bar: 'bg-red-500'    },
+    { label: 'Fastag',        value: totals.totalFastag,     color: '#7c3aed', bar: 'bg-violet-500' },
     { label: 'Maintenance',   value: totals.totalMaintenance, color: '#f59e0b', bar: 'bg-amber-500'  },
     { label: 'Tyres',         value: totals.totalTyres,      color: '#8b5cf6', bar: 'bg-purple-500' },
     { label: 'Battery',       value: totals.totalBattery,    color: '#3b82f6', bar: 'bg-blue-500'   },
@@ -236,6 +217,7 @@ export function ProfitCalculationCard({ totals }) {
   
   const expenseLines = [
     { label: 'Fuel',             value: totals.totalFuel || 0 },
+    { label: 'Fastag',           value: totals.totalFastag || 0 },
     { label: 'Maintenance',      value: totals.totalMaintenance || 0 },
     { label: 'Tyres',            value: totals.totalTyres || 0 },
     { label: 'Battery',          value: totals.totalBattery || 0 },

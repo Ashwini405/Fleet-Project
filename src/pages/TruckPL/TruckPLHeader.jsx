@@ -25,7 +25,7 @@ export function TruckPLHeader({ info, period, reportRef }) {
   const displayPeriod =
     typeof period === "object" && period !== null
       ? `${period.from || "-"} to ${period.to || "-"}`
-      : period || "Current Period";
+      : period || "All recorded data";
 
   const exportPDF = async () => {
     const report = reportRef?.current || document.getElementById('truck-pl-report');

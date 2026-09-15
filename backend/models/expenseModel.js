@@ -141,6 +141,7 @@ const Expense = {
         toll_receipt_number,
 
         expense_title,
+        other_expense_note,
 
         created_by,
 
@@ -192,7 +193,7 @@ const Expense = {
           vendor_payee || null,
 
         description:
-          description || null,
+          description || other_expense_note || null,
 
         attachment:
           JSON.stringify(
