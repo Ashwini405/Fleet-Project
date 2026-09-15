@@ -8,6 +8,10 @@
     "dev": "nodemon server.js",
     "migrate:inspection-defects": "node migrateInspectionDefects.js",
     "migrate:repair-inspection-links": "node migrateRepairInspectionLinks.js",
+    "migrate:inventory-lifecycle": "node migrateInventoryLifecycle.js",
+    "test:inventory-workflow": "node test-inventory-workflow.js",
+    "repair:damaged-returns": "node repairDamagedVehicleReturns.js",
+    "repair:received-batteries": "node repairReceivedBatteries.js",
     "migrate:auth-rbac": "node migrateAuthRbac.js",
     "seed:test-users": "node seedTestUsers.js"
   },

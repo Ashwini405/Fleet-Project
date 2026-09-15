@@ -108,40 +108,46 @@ const roleRoutes = require("./routes/roleRoutes");
 const backupRestoreRoutes = require("./routes/backupRestoreRoutes");
 const authRoutes = require("./routes/authRoutes");
 const pendingPurchaseOrderRoutes = require("./routes/pendingPurchaseOrderRoutes");
+const inventoryWorkflowRoutes = require('./routes/inventoryWorkflowRoutes');
 
 
-// Auto-create pending_purchase_orders table
-db.query(`
-  CREATE TABLE IF NOT EXISTS pending_purchase_orders (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    po_number VARCHAR(50) UNIQUE,
-    category VARCHAR(100),
-    item_name VARCHAR(255) NOT NULL,
-    brand_name VARCHAR(255),
-    serial_number VARCHAR(255),
-    ordered_quantity INT NOT NULL,
-    received_quantity INT DEFAULT 0,
-    pending_quantity INT NOT NULL,
-    status ENUM('Pending','Partially Received','Completed') DEFAULT 'Pending',
-    receive_date DATE NULL,
-    notes TEXT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-  )
-`).then(() => {
-  console.log('pending_purchase_orders table ready');
-  // Fix any inventory_parts that landed in Others due to missing category mapping
-  return db.query(`
-    UPDATE inventory_parts ip
-    JOIN pending_purchase_orders ppo
-      ON LOWER(ip.part_name) = LOWER(ppo.item_name)
-    SET ip.category = ppo.category
-    WHERE (ip.category = 'Others' OR ip.category IS NULL OR ip.category = '')
-      AND ppo.category IS NOT NULL
-      AND ppo.category != ''
-  `);
-}).then(() => console.log('inventory_parts category sync done'))
-  .catch(e => console.error('pending_purchase_orders table error:', e.message));
+// Auto-create pending_purchase_orders table + patch missing columns
+async function initPPOTable() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS pending_purchase_orders (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        po_number VARCHAR(50) UNIQUE,
+        category VARCHAR(100),
+        item_name VARCHAR(255) NOT NULL,
+        brand_name VARCHAR(255),
+        serial_number VARCHAR(255),
+        ordered_quantity INT NOT NULL,
+        received_quantity INT DEFAULT 0,
+        pending_quantity INT NOT NULL,
+        status ENUM('Pending','Partially Received','Completed') DEFAULT 'Pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+    const [cols] = await db.query(`SHOW COLUMNS FROM pending_purchase_orders`);
+    const colNames = cols.map(c => c.Field);
+    if (!colNames.includes('notes'))        await db.query(`ALTER TABLE pending_purchase_orders ADD COLUMN notes TEXT NULL`);
+    if (!colNames.includes('receive_date')) await db.query(`ALTER TABLE pending_purchase_orders ADD COLUMN receive_date DATE NULL`);
+    console.log('pending_purchase_orders table ready');
+    await db.query(`
+      UPDATE inventory_parts ip
+      JOIN pending_purchase_orders ppo ON LOWER(ip.part_name) = LOWER(ppo.item_name)
+      SET ip.category = ppo.category
+      WHERE (ip.category = 'Others' OR ip.category IS NULL OR ip.category = '')
+        AND ppo.category IS NOT NULL AND ppo.category != ''
+    `);
+    console.log('inventory_parts category sync done');
+  } catch (e) {
+    console.error('pending_purchase_orders table error:', e.message);
+  }
+}
+initPPOTable();
 
 // Auto-create tyre_notifications table
 db.query(`
@@ -217,6 +223,7 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/repair', repairRoutes);
 app.use('/api/garages', garageRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/inventory/workflow', inventoryWorkflowRoutes);
 app.use('/api/incidents', incidentsRoutes);
 app.use('/api/warranties', warrantyRoutes);
 app.use(

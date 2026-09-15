@@ -24,14 +24,21 @@ exports.getById = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const { category, item_name, brand_name, serial_number, quantity } = req.body;
+    const { category, item_name, brand_name, serial_number, quantity, notes } = req.body;
     if (!item_name || !item_name.trim()) {
       return res.status(400).json({ success: false, message: 'Item name is required.' });
     }
     if (!quantity || Number(quantity) <= 0) {
       return res.status(400).json({ success: false, message: 'Valid quantity is required.' });
     }
-    const result = await PPO.create({ category, item_name: item_name.trim(), brand_name, serial_number, quantity: Number(quantity) });
+    const result = await PPO.create({
+      category,
+      item_name: item_name.trim(),
+      brand_name,
+      serial_number,
+      quantity: Number(quantity),
+      notes: notes || null,
+    });
     res.status(201).json({ success: true, message: 'Pending purchase order created.', id: result.insertId, po_number: result.po_number });
   } catch (err) {
     console.error('PPO CREATE ERROR:', err);
@@ -86,37 +93,84 @@ exports.receiveStock = async (req, res) => {
 
     const updated = await PPO.receiveStock(id, qty, receive_date, notes);
 
-    // Update inventory: insert or increment
-    const [existing] = await db.query(
-      `SELECT id, current_stock, brand FROM inventory_parts WHERE LOWER(part_name) = LOWER(?) LIMIT 1`,
-      [po.item_name]
-    );
+    // ── Batteries: insert into batteries table ──
+    if (po.category === 'Batteries') {
+      let bat = {};
+      try { bat = JSON.parse(po.notes || '{}'); } catch (_) {}
 
-    if (existing.length) {
-      await db.query(
-        `UPDATE inventory_parts
-         SET current_stock = current_stock + ?,
-             brand = CASE WHEN brand IS NULL OR TRIM(brand) = '' OR brand = '—' THEN ? ELSE brand END,
-             updated_at = NOW()
-         WHERE id = ?`,
-        [qty, po.brand_name || null, existing[0].id]
+      const serial = bat.serial_number || po.serial_number || `BAT-${Date.now()}`;
+
+      const [existing] = await db.query(
+        `SELECT id FROM batteries WHERE serial_number = ? LIMIT 1`, [serial]
       );
-      await db.query(
-        `INSERT INTO inventory_stock_movements (part_id, movement_type, quantity, movement_date)
-         VALUES (?, 'Stock In', ?, ?)`,
-        [existing[0].id, qty, receive_date || new Date().toISOString().slice(0, 10)]
-      );
+
+      if (!existing.length) {
+        const warrantyMonths = Number(bat.warranty_period_months || 0);
+        const purchaseDate   = bat.purchase_date || receive_date || new Date().toISOString().slice(0, 10);
+        let warrantyExpiry   = null;
+        if (warrantyMonths > 0) {
+          const d = new Date(purchaseDate);
+          d.setMonth(d.getMonth() + warrantyMonths);
+          warrantyExpiry = d.toISOString().slice(0, 10);
+        }
+        await db.query(
+          `INSERT INTO batteries
+            (serial_number, barcode, brand, model, capacity_ah, voltage, battery_type,
+             purchase_date, warranty_period_months, warranty_expiry, vendor,
+             purchase_cost, location, compatible_vehicle_types, notes, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'In Stock')`,
+          [
+            serial,
+            bat.barcode                    || null,
+            bat.brand                      || po.brand_name || '',
+            bat.model                      || po.item_name  || '',
+            bat.capacity_ah                || null,
+            bat.voltage                    || null,
+            bat.battery_type               || 'Dry',
+            purchaseDate,
+            warrantyMonths                 || null,
+            warrantyExpiry,
+            bat.vendor                     || null,
+            Number(bat.purchase_cost       || 0),
+            bat.location                   || null,
+            bat.compatible_vehicle_types   || null,
+            bat.notes                      || null,
+          ]
+        );
+      }
     } else {
-      const [inserted] = await db.query(
-        `INSERT INTO inventory_parts (part_name, category, brand, sku, current_stock, opening_stock, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, 'PPO Auto')`,
-        [po.item_name, po.category || 'Others', po.brand_name || null, po.serial_number || null, qty, qty]
+      // ── Other categories: update inventory_parts ──
+      const [existing] = await db.query(
+        `SELECT id FROM inventory_parts WHERE LOWER(part_name) = LOWER(?) LIMIT 1`,
+        [po.item_name]
       );
-      await db.query(
-        `INSERT INTO inventory_stock_movements (part_id, movement_type, quantity, movement_date)
-         VALUES (?, 'Stock In', ?, ?)`,
-        [inserted.insertId, qty, receive_date || new Date().toISOString().slice(0, 10)]
-      );
+
+      if (existing.length) {
+        await db.query(
+          `UPDATE inventory_parts
+           SET current_stock = current_stock + ?,
+               brand = CASE WHEN brand IS NULL OR TRIM(brand) = '' OR brand = '—' THEN ? ELSE brand END,
+               updated_at = NOW()
+           WHERE id = ?`,
+          [qty, po.brand_name || null, existing[0].id]
+        );
+        await db.query(
+          `INSERT INTO inventory_stock_movements (part_id, movement_type, quantity, movement_date)
+           VALUES (?, 'Stock In', ?, ?)`,
+          [existing[0].id, qty, receive_date || new Date().toISOString().slice(0, 10)]
+        );
+      } else {
+        const [inserted] = await db.query(
+          `INSERT INTO inventory_parts (part_name, category, brand, sku, current_stock, opening_stock, created_by)
+           VALUES (?, ?, ?, ?, ?, ?, 'PPO Auto')`,
+          [po.item_name, po.category || 'Others', po.brand_name || null, po.serial_number || null, qty, qty]
+        );
+        await db.query(
+          `INSERT INTO inventory_stock_movements (part_id, movement_type, quantity, movement_date)
+           VALUES (?, 'Stock In', ?, ?)`,
+          [inserted.insertId, qty, receive_date || new Date().toISOString().slice(0, 10)]
+        );
+      }
     }
 
     res.json({ success: true, message: 'Stock received and inventory updated.', data: updated });

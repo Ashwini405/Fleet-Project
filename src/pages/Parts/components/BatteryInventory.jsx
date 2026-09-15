@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, X, RefreshCw, Search, AlertTriangle, Battery, CheckCircle, Package, Zap } from 'lucide-react';
 
 const API = 'http://localhost:5001/api/batteries';
+const WORKFLOW_API = 'http://localhost:5001/api/inventory/workflow';
 
 const STATUS_STYLES = {
   'In Stock':       'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -52,7 +53,7 @@ function StatCard({ label, value, icon: Icon, color }) {
   );
 }
 
-export default function BatteryInventory({ showToast }) {
+export default function BatteryInventory({ showToast, onRequestCreated, refreshTrigger }) {
   const [batteries, setBatteries] = useState([]);
   const [stats, setStats] = useState({});
   const [available, setAvailable] = useState([]);
@@ -87,7 +88,7 @@ export default function BatteryInventory({ showToast }) {
     if (v.success) setVehicles(v.data);
   };
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, refreshTrigger]);
 
   const filtered = batteries.filter(b => {
     const q = search.toLowerCase();
@@ -104,12 +105,38 @@ export default function BatteryInventory({ showToast }) {
     if (!form.serial_number || !form.brand || !form.model) { setError('Serial number, brand and model are required'); return; }
     setSaving(true); setError('');
     try {
-      const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      const res = await fetch('http://localhost:5001/api/purchase-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          category:      'Batteries',
+          item_name:     `${form.brand} ${form.model}`.trim(),
+          brand_name:    form.brand,
+          serial_number: form.serial_number,
+          quantity:      1,
+          notes: JSON.stringify({
+            serial_number:          form.serial_number,
+            barcode:                form.barcode,
+            brand:                  form.brand,
+            model:                  form.model,
+            capacity_ah:            form.capacity_ah,
+            voltage:                form.voltage,
+            battery_type:           form.battery_type,
+            purchase_date:          form.purchase_date,
+            warranty_period_months: form.warranty_period_months,
+            vendor:                 form.vendor,
+            purchase_cost:          form.purchase_cost,
+            location:               form.location,
+            compatible_vehicle_types: form.compatible_vehicle_types,
+            notes:                  form.notes,
+          }),
+        }),
+      });
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
       setShowAdd(false); setForm(EMPTY_FORM);
-      showToast?.('Battery added to inventory.');
-      load();
+      showToast?.('Battery added to Pending Purchase Orders.');
+      onRequestCreated?.();
     } catch { setError('Server error'); }
     finally { setSaving(false); }
   };
@@ -195,7 +222,7 @@ export default function BatteryInventory({ showToast }) {
           </button>
           <button onClick={() => { setShowAdd(true); setError(''); setForm(EMPTY_FORM); }}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
-            <Plus className="w-3.5 h-3.5" /> Add Battery
+            <Plus className="w-3.5 h-3.5" /> Request Battery
           </button>
         </div>
       </div>
@@ -258,7 +285,7 @@ export default function BatteryInventory({ showToast }) {
 
       {/* Add Modal */}
       {showAdd && (
-        <Modal title="Add Battery to Inventory" onClose={() => setShowAdd(false)}>
+        <Modal title="Request Battery Purchase" onClose={() => setShowAdd(false)}>
           {error && <ErrBox msg={error} />}
           <div className="grid grid-cols-2 gap-3">
             <F label="Serial Number *" value={form.serial_number} onChange={v => setForm({ ...form, serial_number: v })} placeholder="BAT-2024-001" span2 />
@@ -267,15 +294,15 @@ export default function BatteryInventory({ showToast }) {
             <F label="Capacity (AH)" type="number" value={form.capacity_ah} onChange={v => setForm({ ...form, capacity_ah: v })} placeholder="150" />
             <F label="Voltage (V)" type="number" value={form.voltage} onChange={v => setForm({ ...form, voltage: v })} placeholder="12" />
             <Sel label="Battery Type" value={form.battery_type} onChange={v => setForm({ ...form, battery_type: v })} options={['Dry', 'Wet', 'Lithium', 'AGM', 'Gel']} />
-            <F label="Location" value={form.location} onChange={v => setForm({ ...form, location: v })} placeholder="e.g. Warehouse or Workshop" />
             <F label="Purchase Date" type="date" value={form.purchase_date} onChange={v => setForm({ ...form, purchase_date: v })} />
             <F label="Warranty (Months)" type="number" value={form.warranty_period_months} onChange={v => setForm({ ...form, warranty_period_months: v })} placeholder="24" />
             <F label="Vendor" value={form.vendor} onChange={v => setForm({ ...form, vendor: v })} placeholder="Auto Parts Hub" />
             <F label="Purchase Cost (₹)" type="number" value={form.purchase_cost} onChange={v => setForm({ ...form, purchase_cost: v })} placeholder="8500" />
             <F label="Barcode / QR" value={form.barcode} onChange={v => setForm({ ...form, barcode: v })} placeholder="Optional" />
+            <F label="Location" value={form.location} onChange={v => setForm({ ...form, location: v })} placeholder="e.g. Warehouse or Workshop" />
           </div>
           <F label="Compatible Vehicle Types" value={form.compatible_vehicle_types} onChange={v => setForm({ ...form, compatible_vehicle_types: v })} placeholder="Truck, Bus, Tipper" />
-          <MFoot onCancel={() => setShowAdd(false)} onSave={handleAdd} saving={saving} label="Add to Inventory" />
+          <MFoot onCancel={() => setShowAdd(false)} onSave={handleAdd} saving={saving} label="Create Purchase Request" />
         </Modal>
       )}
 

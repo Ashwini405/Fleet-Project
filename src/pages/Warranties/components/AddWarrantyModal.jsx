@@ -97,30 +97,30 @@ const DEFAULT_VENDOR_SOURCE = { endpoint: 'parts-vendors', nameField: 'vendor_na
 export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
    const [vehicles, setVehicles] = useState([]);
    const [tyres, setTyres] = useState([]);
+   const [batteries, setBatteries] = useState([]);
    const [categoryVendors, setCategoryVendors] = useState([]);
    const [purchaseShowroom, setPurchaseShowroom] = useState('');
    const [files, setFiles] = useState({ warrantyCard: null, invoiceFile: null });
    const [successNumber, setSuccessNumber] = useState('');
    const [fd, setFd] = useState({
       category: '', brand: '', model: '', serialNo: '',
-      vehicle_id: '', vehicle_no: '', odometer: '', tyreId: '',
+      vehicle_id: '', vehicle_no: '', odometer: '', tyreId: '', batteryId: '',
       startDate: '', endDate: '', warrantyPeriod: '',
       description: '', dealerShowroom: '',
    });
 
    const set = (f, v) => setFd(p => ({ ...p, [f]: v }));
 
-   const isTyreCategory = fd.category === 'Tyres';
+   const isTyreCategory    = fd.category === 'Tyres';
+   const isBatteryCategory = fd.category === 'Battery';
    const isVehicleCategory = fd.category === 'Vehicle';
 
    const handleCategoryChange = (e) => {
       const cat = e.target.value;
       setPurchaseShowroom('');
-      // Previous vendor/item selection belonged to the old category, so it
-      // no longer applies once the category changes.
       setFd(p => ({
          ...p, category: cat, brand: '', model: '', dealerShowroom: '',
-         vehicle_id: '', vehicle_no: '', odometer: '', tyreId: '',
+         vehicle_id: '', vehicle_no: '', odometer: '', tyreId: '', batteryId: '', serialNo: '',
       }));
    };
 
@@ -134,6 +134,10 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
          .then(r => r.json())
          .then(data => { if (data.success) setTyres(data.data || []); })
          .catch(err => console.error('FETCH TYRES ERROR:', err));
+      fetch('http://localhost:5001/api/batteries/available')
+         .then(r => r.json())
+         .then(data => { if (data.success) setBatteries(data.data || []); })
+         .catch(err => console.error('FETCH BATTERIES ERROR:', err));
    }, [isOpen]);
 
    // Vendor list depends on the selected category — Vehicle -> Showrooms,
@@ -169,9 +173,6 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
       }));
    };
 
-   // Tyres come from the tyre master, not the vehicle list — a tyre may
-   // still be sitting "In Stock" with no vehicle attached yet, and its
-   // vendor is already known from its own record.
    const handleTyreChange = (e) => {
       const selected = tyres.find(t => t.id === Number(e.target.value));
       setFd(p => ({
@@ -187,7 +188,22 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
       }));
    };
 
-   const isValid = fd.category && (isTyreCategory ? fd.tyreId : fd.vehicle_id) && fd.brand && fd.model && fd.startDate && fd.endDate && files.warrantyCard && files.invoiceFile;
+   const handleBatteryChange = (e) => {
+      const selected = batteries.find(b => b.id === Number(e.target.value));
+      setFd(p => ({
+         ...p,
+         batteryId: selected?.id || '',
+         serialNo: selected?.serial_number || '',
+         brand: selected?.brand || '',
+         model: selected?.model || '',
+         dealerShowroom: selected?.vendor || '',
+         warrantyPeriod: selected?.warranty_period_months ? `${selected.warranty_period_months} Months` : '',
+      }));
+   };
+
+   const isValid = fd.category &&
+      (isTyreCategory ? fd.tyreId : isBatteryCategory ? fd.batteryId : fd.vehicle_id) &&
+      fd.brand && fd.model && fd.startDate && fd.endDate && files.warrantyCard && files.invoiceFile;
 
    const handleSubmit = async () => {
       try {
@@ -277,25 +293,37 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
                                  </option>
                               ))}
                            </Sel>
+                        ) : isBatteryCategory ? (
+                           <Sel label="Select Battery (In Stock)" required value={fd.batteryId} onChange={handleBatteryChange}>
+                              <option value="">Select Battery</option>
+                              {batteries.map(b => (
+                                 <option key={b.id} value={b.id}>
+                                    {b.serial_number} · {b.brand} {b.model}{b.capacity_ah ? ` — ${b.capacity_ah}AH` : ''}
+                                 </option>
+                              ))}
+                           </Sel>
                         ) : (
                            <Sel label="Truck / Vehicle" required value={fd.vehicle_id} onChange={handleVehicleChange}>
                               <option value="">Select Vehicle</option>
                               {vehicles.map(v => <option key={v.id} value={v.id}>{v.vehicle_no}</option>)}
                            </Sel>
                         )}
-                        {isTyreCategory
-                           ? fd.tyreId && <ReadField label="Fitted On Vehicle" value={fd.vehicle_no || 'In Stock (not fitted)'} />
-                           : fd.vehicle_id && <ReadField label="Purchased From (Showroom)" value={purchaseShowroom} />
-                        }
-                        {!isVehicleCategory && (isTyreCategory ? fd.tyreId : fd.vehicle_id) && (
-                           <Sel label={vendorSource.label} value={fd.dealerShowroom} onChange={e => set('dealerShowroom', e.target.value)} disabled={!fd.category}>
-                              <option value="">{fd.category ? `Select ${vendorSource.label.toLowerCase()}` : 'Select category first'}</option>
-                              {categoryVendors.map(v => (
-                                 <option key={v.id} value={v[vendorSource.nameField]}>{v[vendorSource.nameField]}</option>
-                              ))}
-                           </Sel>
+                        {isTyreCategory && fd.tyreId && <ReadField label="Fitted On Vehicle" value={fd.vehicle_no || 'In Stock (not fitted)'} />}
+                        {isBatteryCategory && fd.batteryId && <ReadField label="Serial Number" value={fd.serialNo} />}
+                        {!isTyreCategory && !isBatteryCategory && fd.vehicle_id && <ReadField label="Purchased From (Showroom)" value={purchaseShowroom} />}
+                        {!isVehicleCategory && (isTyreCategory ? fd.tyreId : isBatteryCategory ? fd.batteryId : fd.vehicle_id) && (
+                           isBatteryCategory && fd.dealerShowroom
+                              ? <ReadField label="Battery Vendor" value={fd.dealerShowroom} />
+                              : <Sel label={vendorSource.label} value={fd.dealerShowroom} onChange={e => set('dealerShowroom', e.target.value)} disabled={!fd.category}>
+                                   <option value="">{fd.category ? `Select ${vendorSource.label.toLowerCase()}` : 'Select category first'}</option>
+                                   {categoryVendors.map(v => (
+                                      <option key={v.id} value={v[vendorSource.nameField]}>{v[vendorSource.nameField]}</option>
+                                   ))}
+                                </Sel>
                         )}
                         {isVehicleCategory ? (
+                           <ReadField label="Brand" value={fd.brand} />
+                        ) : (isTyreCategory || isBatteryCategory) && fd.brand ? (
                            <ReadField label="Brand" value={fd.brand} />
                         ) : (
                            <Sel label="Brand" required value={fd.brand} onChange={e => set('brand', e.target.value)} disabled={!fd.category}>
@@ -305,13 +333,15 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
                         )}
                         {isVehicleCategory ? (
                            <ReadField label="Model" value={fd.model} />
+                        ) : (isTyreCategory || isBatteryCategory) && fd.model ? (
+                           <ReadField label="Model" value={fd.model} />
                         ) : (
                            <Sel label="Model" required value={fd.model} onChange={e => set('model', e.target.value)} disabled={!fd.category}>
                               <option value="">{fd.category ? 'Select Model' : 'Select category first'}</option>
                               {(MODELS_BY_CATEGORY[fd.category] || []).map(m => <option key={m}>{m}</option>)}
                            </Sel>
                         )}
-                        <Inp label="Serial Number" value={fd.serialNo} onChange={e => set('serialNo', e.target.value)} placeholder="e.g. SN1234567890" />
+                        {!isBatteryCategory && <Inp label="Serial Number" value={fd.serialNo} onChange={e => set('serialNo', e.target.value)} placeholder="e.g. SN1234567890" />}
                      </div>
                   </div>
 

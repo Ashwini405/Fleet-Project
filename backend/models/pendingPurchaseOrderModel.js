@@ -22,8 +22,8 @@ const PendingPurchaseOrder = {
     const [result] = await db.query(
       `INSERT INTO pending_purchase_orders
         (po_number, category, item_name, brand_name, serial_number,
-         ordered_quantity, received_quantity, pending_quantity, status)
-       VALUES (?, ?, ?, ?, ?, ?, 0, ?, 'Pending')`,
+         ordered_quantity, received_quantity, pending_quantity, status, notes)
+       VALUES (?, ?, ?, ?, ?, ?, 0, ?, 'Pending', ?)`,
       [
         po_number,
         data.category || null,
@@ -32,6 +32,7 @@ const PendingPurchaseOrder = {
         data.serial_number || null,
         data.quantity,
         data.quantity,
+        data.notes || null,
       ]
     );
     return { insertId: result.insertId, po_number };
@@ -51,9 +52,9 @@ const PendingPurchaseOrder = {
     await db.query(
       `UPDATE pending_purchase_orders
        SET received_quantity = ?, pending_quantity = ?, status = ?,
-           receive_date = ?, notes = ?, updated_at = NOW()
+           receive_date = ?, updated_at = NOW()
        WHERE id = ?`,
-      [newReceived, Math.max(0, newPending), newStatus, receiveDate || null, notes || null, id]
+      [newReceived, Math.max(0, newPending), newStatus, receiveDate || null, id]
     );
 
     return { ...po, received_quantity: newReceived, pending_quantity: Math.max(0, newPending), status: newStatus };

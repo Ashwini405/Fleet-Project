@@ -45,10 +45,11 @@ const PartsVendor = {
         custom_bank_name,
         account_number,
         ifsc_code,
-        upi_id
+        upi_id,
+        category
       )
       VALUES
-      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         data.vendor_name,
@@ -63,7 +64,8 @@ const PartsVendor = {
         data.custom_bank_name,
         data.account_number,
         data.ifsc_code,
-        data.upi_id
+        data.upi_id,
+        data.category || 'All'
       ]
     );
 
@@ -88,7 +90,8 @@ const PartsVendor = {
         custom_bank_name = ?,
         account_number = ?,
         ifsc_code = ?,
-        upi_id = ?
+        upi_id = ?,
+        category = ?
       WHERE id = ?
       `,
       [
@@ -105,6 +108,7 @@ const PartsVendor = {
         data.account_number,
         data.ifsc_code,
         data.upi_id,
+        data.category || 'All',
         id
       ]
     );

@@ -866,6 +866,7 @@ exports.createPartReturn = async (req, res) => {
       restocked,
       notes,
       created_by,
+      vendor_return,
     } = req.body;
 
     if (!part_id || !quantity_returned || !return_date) {
@@ -890,7 +891,25 @@ exports.createPartReturn = async (req, res) => {
     const part = parts[0];
     const shouldRestock = !!restocked;
 
-    if (shouldRestock) {
+    if (vendor_return) {
+      const currentStock = Number(part.current_stock || 0);
+      const returnQty = Number(quantity_returned);
+      if (returnQty > currentStock) {
+        return res.status(400).json({ success: false, message: `Return quantity cannot exceed available stock (${currentStock}).` });
+      }
+      const newStock = currentStock - returnQty;
+      await db.query(
+        `UPDATE inventory_parts SET current_stock = ?, inventory_value = ? * COALESCE(cost_price, 0), updated_at = NOW() WHERE id = ?`,
+        [newStock, newStock, part_id]
+      );
+      await db.query(
+        `INSERT INTO inventory_stock_movements (part_id, movement_type, event_type, quantity, cost_per_unit, vendor, movement_date)
+         VALUES (?, 'Stock Out', 'Vendor Return', ?, ?, ?, ?)`,
+        [part_id, returnQty, Number(part.cost_price || 0), part.preferred_vendor || null, return_date]
+      );
+    }
+
+    if (shouldRestock && !vendor_return) {
       const newStock = Number(part.current_stock || 0) + Number(quantity_returned);
       const inventoryValue = newStock * Number(part.cost_price || 0);
 
@@ -1194,7 +1213,7 @@ exports.orderPurchaseOrder = async (req, res) => {
 
 exports.createPurchaseOrder = async (req, res) => {
   try {
-    const { vendor, part_id, item_name, brand_name, category, quantity, expected_delivery, notes, requested_by, requested_date } = req.body;
+    const { vendor, vendor_id, part_id, item_name, brand_name, category, quantity, unit_price, expected_delivery, notes, requested_by, requested_date } = req.body;
 
     if (!vendor || !item_name || !quantity) {
       return res.status(400).json({ success: false, message: 'Vendor, item and quantity are required.' });
@@ -1203,6 +1222,8 @@ exports.createPurchaseOrder = async (req, res) => {
     const requestDate = requested_date || new Date().toISOString().slice(0, 10);
     const datePart    = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const po_number   = `PO-${datePart}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const unitPrice   = Number(unit_price || 0);
+    const totalAmount = unitPrice * Number(quantity);
 
     const items = [{
       part_id: part_id || null,
@@ -1210,17 +1231,18 @@ exports.createPurchaseOrder = async (req, res) => {
       brand_name: brand_name || '',
       category: category || 'Others',
       qty: Number(quantity),
+      unitPrice,
       notes: notes || '',
     }];
 
-    await db.query(
+    const [poResult] = await db.query(
       `INSERT INTO inventory_purchase_orders
-         (po_number, vendor, total_amount, expected_delivery, status, status_id, items, requested_by, requested_date)
-       VALUES (?, ?, 0.00, ?, 'Pending Approval', 0, ?, ?, ?)`,
-      [po_number, vendor, expected_delivery || null, JSON.stringify(items), requested_by || 'Supervisor', requestDate]
+         (po_number, vendor, vendor_id, total_amount, expected_delivery, status, status_id, items, requested_by, requested_date)
+       VALUES (?, ?, ?, ?, ?, 'Pending Approval', 0, ?, ?, ?)`,
+      [po_number, vendor, vendor_id || null, totalAmount, expected_delivery || null, JSON.stringify(items), requested_by || 'Supervisor', requestDate]
     );
 
-    res.status(201).json({ success: true, message: 'Purchase order created.', po_number });
+    res.status(201).json({ success: true, message: 'Purchase order created.', po_number, id: poResult.insertId });
   } catch (error) {
     console.error('CREATE PO ERROR:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
@@ -1242,7 +1264,6 @@ exports.receivePurchaseOrder = async (req, res) => {
     if (!rows.length) return res.status(404).json({ success: false, message: 'PO not found.' });
 
     const po = rows[0];
-
     await db.query(
       `UPDATE inventory_purchase_orders SET status = 'Received', status_id = 4 WHERE id = ?`, [id]
     );
@@ -1254,96 +1275,132 @@ exports.receivePurchaseOrder = async (req, res) => {
     const itemName = item.partName || item.name || item.item_name || '';
 
     if (qty > 0 && itemName) {
-      // Resolve or create inventory_parts record
-      if (!partId) {
-        const [existing] = await db.query(
-          `SELECT id FROM inventory_parts WHERE LOWER(part_name) = LOWER(?) LIMIT 1`,
-          [itemName]
-        );
-        if (existing.length) {
-          partId = existing[0].id;
-        } else {
-          // Look up category from pending_purchase_orders first
-          let resolvedCategory = item.category || po.category || 'Others';
-          let resolvedBrand = item.brand_name || item.brand || null;
-          try {
-            const [pendingOrder] = await db.query(
-              `SELECT category, brand_name
-               FROM pending_purchase_orders
-               WHERE LOWER(item_name) = LOWER(?)
-               ORDER BY id DESC
-               LIMIT 1`,
-              [itemName]
-            );
-            if (pendingOrder.length) {
-              if (!item.category && pendingOrder[0].category) resolvedCategory = pendingOrder[0].category;
-              if (!resolvedBrand) resolvedBrand = pendingOrder[0].brand_name || null;
-            }
-          } catch (_) {}
-          const [inserted] = await db.query(
-            `INSERT INTO inventory_parts
-              (part_name, category, brand, current_stock, opening_stock, preferred_vendor, created_by)
-             VALUES (?, ?, ?, 0, 0, ?, 'PO Auto')`,
-            [itemName, resolvedCategory, resolvedBrand, po.vendor || '']
-          );
-          partId = inserted.insertId;
-        }
-      }
-
-      if (partId) {
-        const [pendingBrand] = await db.query(
-          `SELECT category, brand_name
-           FROM pending_purchase_orders
-           WHERE LOWER(item_name) = LOWER(?)
-             AND NULLIF(TRIM(brand_name), '') IS NOT NULL
-           ORDER BY id DESC
-           LIMIT 1`,
-          [itemName]
-        );
-        await db.query(
-          `UPDATE inventory_parts
-           SET current_stock = current_stock + ?,
-               category = CASE WHEN category IS NULL OR TRIM(category) = '' OR category = 'Others' THEN COALESCE(?, category) ELSE category END,
-               brand = CASE WHEN brand IS NULL OR TRIM(brand) = '' OR brand = '—' THEN COALESCE(?, brand) ELSE brand END,
-               updated_at = NOW()
-           WHERE id = ?`,
-          [
-            qty,
-            item.category || pendingBrand[0]?.category || null,
-            item.brand_name || item.brand || pendingBrand[0]?.brand_name || null,
-            partId,
-          ]
-        );
-        await db.query(
-          `INSERT INTO inventory_stock_movements (part_id, movement_type, quantity, vendor, movement_date)
-           VALUES (?, 'Stock In', ?, ?, NOW())`,
-          [partId, qty, po.vendor || '']
-        );
-      }
-
-      // ── Mark matching pending_purchase_order as Completed ──
+      // Look up matching pending_purchase_order for category + battery details
+      let ppoRow = null;
       try {
         const [ppoRows] = await db.query(
-          `SELECT id, ordered_quantity FROM pending_purchase_orders
+          `SELECT * FROM pending_purchase_orders
            WHERE LOWER(item_name) = LOWER(?) AND status != 'Completed'
            ORDER BY created_at ASC LIMIT 1`,
           [itemName]
         );
-        if (ppoRows.length) {
-          const ppo = ppoRows[0];
-          const newReceived = Number(ppo.ordered_quantity);
+        if (ppoRows.length) ppoRow = ppoRows[0];
+      } catch (_) {}
+
+      const resolvedCategory = ppoRow?.category || item.category || po.category || 'Others';
+
+      if (resolvedCategory === 'Batteries') {
+        // Insert into batteries table
+        let bat = {};
+        try { bat = JSON.parse(ppoRow?.notes || '{}'); } catch (_) {}
+        const serial = bat.serial_number || ppoRow?.serial_number || `BAT-${Date.now()}`;
+        const [existingBat] = await db.query(`SELECT id FROM batteries WHERE serial_number = ? LIMIT 1`, [serial]);
+        if (!existingBat.length) {
+          const warrantyMonths = Number(bat.warranty_period_months || 0);
+          const purchaseDate   = bat.purchase_date || new Date().toISOString().slice(0, 10);
+          let warrantyExpiry   = null;
+          if (warrantyMonths > 0) {
+            const d = new Date(purchaseDate);
+            d.setMonth(d.getMonth() + warrantyMonths);
+            warrantyExpiry = d.toISOString().slice(0, 10);
+          }
           await db.query(
-            `UPDATE pending_purchase_orders
-             SET received_quantity = ?, pending_quantity = 0,
-                 status = 'Completed', receive_date = CURDATE(), updated_at = NOW()
-             WHERE id = ?`,
-            [newReceived, ppo.id]
+            `INSERT INTO batteries
+              (serial_number, barcode, brand, model, capacity_ah, voltage, battery_type,
+               purchase_date, warranty_period_months, warranty_expiry, vendor,
+               purchase_cost, location, compatible_vehicle_types, notes, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'In Stock')`,
+            [
+              serial,
+              bat.barcode || null,
+              bat.brand || ppoRow?.brand_name || '',
+              bat.model || itemName,
+              bat.capacity_ah || null,
+              bat.voltage || null,
+              bat.battery_type || 'Dry',
+              purchaseDate,
+              warrantyMonths || null,
+              warrantyExpiry,
+              bat.vendor || po.vendor || null,
+              Number(bat.purchase_cost || 0),
+              bat.location || null,
+              bat.compatible_vehicle_types || null,
+              bat.notes || null,
+            ]
           );
         }
-      } catch (_) { /* pending_purchase_orders table may not exist yet — ignore */ }
+      } else {
+        // Insert/update inventory_parts for non-battery items
+        if (!partId) {
+          const [existing] = await db.query(
+            `SELECT id FROM inventory_parts WHERE LOWER(part_name) = LOWER(?) LIMIT 1`, [itemName]
+          );
+          if (existing.length) {
+            partId = existing[0].id;
+          } else {
+            const [inserted] = await db.query(
+              `INSERT INTO inventory_parts (part_name, category, brand, current_stock, opening_stock, preferred_vendor, created_by)
+               VALUES (?, ?, ?, 0, 0, ?, 'PO Auto')`,
+              [itemName, resolvedCategory, item.brand_name || item.brand || ppoRow?.brand_name || null, po.vendor || '']
+            );
+            partId = inserted.insertId;
+          }
+        }
+        if (partId) {
+          await db.query(
+            `UPDATE inventory_parts
+             SET current_stock = current_stock + ?,
+                 category = CASE WHEN category IS NULL OR TRIM(category) = '' OR category = 'Others' THEN COALESCE(?, category) ELSE category END,
+                 brand = CASE WHEN brand IS NULL OR TRIM(brand) = '' OR brand = '—' THEN COALESCE(?, brand) ELSE brand END,
+                 updated_at = NOW()
+             WHERE id = ?`,
+            [qty, item.category || ppoRow?.category || null, item.brand_name || item.brand || ppoRow?.brand_name || null, partId]
+          );
+          await db.query(
+            `INSERT INTO inventory_stock_movements (part_id, movement_type, quantity, vendor, movement_date)
+             VALUES (?, 'Stock In', ?, ?, NOW())`,
+            [partId, qty, po.vendor || '']
+          );
+        }
+      }
+
+      // Mark matching pending_purchase_order as Completed
+      if (ppoRow) {
+        try {
+          await db.query(
+            `UPDATE pending_purchase_orders
+             SET received_quantity = ordered_quantity, pending_quantity = 0,
+                 status = 'Completed', receive_date = CURDATE(), updated_at = NOW()
+             WHERE id = ?`,
+            [ppoRow.id]
+          );
+        } catch (_) {}
+      }
     }
 
-    res.json({ success: true, message: 'Purchase order received and stock updated.' });
+    // Auto-debit parts vendor ledger
+    try {
+      const poAmount = Number(po.total_amount || 0);
+      let resolvedVendorId = po.vendor_id || null;
+      if (!resolvedVendorId && po.vendor) {
+        const [vRows] = await db.query(
+          `SELECT id FROM parts_vendors WHERE LOWER(vendor_name) = LOWER(?) LIMIT 1`, [po.vendor]
+        );
+        if (vRows.length) resolvedVendorId = vRows[0].id;
+      }
+      if (resolvedVendorId && poAmount > 0) {
+        await db.query(
+          `INSERT INTO parts_vendor_ledger (vendor_id, transaction_type, amount, reference_no, description, transaction_date)
+           VALUES (?, 'Debit', ?, ?, ?, CURDATE())
+           ON DUPLICATE KEY UPDATE amount = VALUES(amount)`,
+          [resolvedVendorId, poAmount, po.po_number || `PO-${id}`, `Purchase - PO ${po.po_number || id} received`]
+        );
+      }
+    } catch (ledgerErr) {
+      console.warn('[PO Receive] Vendor ledger update skipped:', ledgerErr.message);
+    }
+
+    res.json({ success: true, message: 'Purchase order received and inventory updated.' });
   } catch (error) {
     console.error('RECEIVE PO ERROR:', error);
     res.status(500).json({ success: false, message: 'Server Error' });

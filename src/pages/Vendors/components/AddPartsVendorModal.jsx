@@ -11,6 +11,7 @@ const labelOptCls = "block text-xs font-bold text-gray-400 uppercase tracking-wi
 
 const EMPTY = {
   name: '', mobile: '', email: '', address: '', gst: '',
+  category: 'All',
   openingBalance: '0', status: 'Active', paymentTerms: 'credit',
   bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '',
 };
@@ -52,6 +53,7 @@ export default function AddPartsVendorModal({ isOpen, onClose }) {
         opening_balance: form.openingBalance,
         status: form.status,
         payment_terms: form.paymentTerms,
+        category: form.category,
         bank_name: form.bankName === 'Others' ? form.customBank : form.bankName,
         custom_bank_name: form.customBank,
         account_number: form.accountNo,
@@ -151,6 +153,12 @@ export default function AddPartsVendorModal({ isOpen, onClose }) {
                       </button>
                     ))}
                   </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Supported Inventory Category</label>
+                  <select value={form.category} onChange={e => set('category', e.target.value)} className={inputCls + ' text-gray-700'}>
+                    {['All', 'Spares', 'Tubes', 'Lubricants', 'Electrical', 'Batteries', 'Others'].map(category => <option key={category}>{category}</option>)}
+                  </select>
                 </div>
               </div>
             </div>

@@ -113,6 +113,8 @@ import ReturnsHistory    from './components/ReturnsHistory';
 import {
   Plus, Package, ClipboardList, Loader2,
   Search, Pencil, Trash2, ShoppingCart, CheckCircle2, X,
+  Shield, Users, AlertTriangle, RefreshCw,
+  BarChart3,
 } from 'lucide-react';
 
 const CATEGORIES  = ['Spares', 'Batteries', 'Tubes', 'Lubricants', 'Electrical', 'Others'];
@@ -276,6 +278,25 @@ export default function PartsModule() {
   const [returnErrors, setReturnErrors] = useState({});
   const [returnActionLoading, setReturnActionLoading] = useState(false);
 
+  /* ── warranties state ── */
+  const [warranties, setWarranties]             = useState([]);
+  const [warrantiesLoading, setWarrantiesLoading] = useState(false);
+  const [isAddWarrantyOpen, setIsAddWarrantyOpen] = useState(false);
+  const [warrantyForm, setWarrantyForm] = useState({
+    inventory_item_id: '', item_title: '', category: '', brand: '', model: '', serial_no: '',
+    vehicle_id: '', vehicle_no: '', purchase_date: '', start_date: '', end_date: '',
+    warranty_period: '', warranty_type: 'Full', warranty_status: 'Active',
+    vendor_name: '', contact_number: '', purchase_cost: '', claim_amount: '',
+    reminder_before: 30, item_description: '', terms_conditions: '',
+  });
+  const [warrantyErrors, setWarrantyErrors] = useState({});
+  const [warrantySubmitting, setWarrantySubmitting] = useState(false);
+
+  /* ── vendors state ── */
+  const [partsVendorsList, setPartsVendorsList] = useState([]);
+  const [vendorsLoading, setVendorsLoading]     = useState(false);
+  const [vendorSearch, setVendorSearch]         = useState('');
+
   const { addVendorTransaction, hasPOTransaction } = useVendorLedger();
 
   /* ── toast ── */
@@ -321,17 +342,44 @@ export default function PartsModule() {
     try {
       const res  = await fetch(`${API}/inventory/returns`);
       const data = await res.json();
-      setPartReturns(data.data || []);
+      const rows = data.data || [];
+      setPartReturns(rows);
+      setReturns(rows.filter(row => !row.original_issue_id && !row.vehicle_number).map(row => ({
+        id: row.id,
+        number: row.return_number || `RTN-${String(row.id).padStart(6, '0')}`,
+        vendor: row.vendor || row.preferred_vendor || '—',
+        itemName: row.part_name || '—',
+        quantity: Number(row.quantity_returned || 0),
+        date: row.return_date,
+        reason: row.condition_on_return || '—',
+        remarks: row.notes || '',
+        status: 'pending',
+        poRef: row.po_number || '—',
+        costPerUnit: Number(row.cost_per_unit || 0),
+        creditAmount: 0,
+        createdBy: row.created_by || '—',
+        createdAt: row.created_at,
+      })));
     } catch { showToast('Failed to load part returns.', 'error'); }
     finally  { setPartReturnsLoading(false); }
   }, []);
 
   const fetchPendingPOCount = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/purchase-orders`);
+      const res = await fetch(`${API}/inventory/workflow/requests`);
       const data = await res.json();
-      setPendingPOCount((data.data || []).filter(order => order.status !== 'Completed').length);
+      const pendingStatuses = new Set([
+        'Pending Purchase Order',
+        'Purchase Order Created',
+        'Awaiting Approval',
+        'Approved',
+        'Ordered',
+      ]);
+      const filtered = (data.data || []).filter(item => pendingStatuses.has(item.status));
+      setPendingItems(filtered);
+      setPendingPOCount(filtered.length);
     } catch {
+      setPendingItems([]);
       setPendingPOCount(0);
     }
   }, []);
@@ -343,6 +391,26 @@ export default function PartsModule() {
     fetchPartReturns();
     fetchPendingPOCount();
   }, [fetchInventory, fetchHistory, fetchPOs, fetchPartReturns, fetchPendingPOCount]);
+
+  const fetchWarranties = useCallback(async () => {
+    setWarrantiesLoading(true);
+    try {
+      const res  = await fetch(`${API}/warranties`);
+      const data = await res.json();
+      setWarranties(data.data || data || []);
+    } catch { /* non-fatal */ }
+    finally { setWarrantiesLoading(false); }
+  }, []);
+
+  const fetchPartsVendors = useCallback(async () => {
+    setVendorsLoading(true);
+    try {
+      const res  = await fetch(`${API}/parts-vendors`);
+      const data = await res.json();
+      setPartsVendorsList(data.data || []);
+    } catch { /* non-fatal */ }
+    finally { setVendorsLoading(false); }
+  }, []);
 
   const handleReturnPartSuccess = () => {
     setReturnPartRecord(null);
@@ -444,7 +512,7 @@ export default function PartsModule() {
     setIsAddOpen(false);
     setPpoPendingRefresh(n => n + 1);
     fetchPendingPOCount();
-    showToast(`Purchase order ${result?.po_number || ''} created. Receive stock to update inventory.`);
+    showToast(`Inventory request ${result?.id ? `#${result.id}` : ''} created and is pending a purchase order.`);
   };
   const handleEditSuccess = () => {
     setEditItem(null);
@@ -506,7 +574,7 @@ export default function PartsModule() {
     );
   };
 
-  const handleConfirmReturn = () => {
+  const handleConfirmReturn = async () => {
     if (!returnModalItem) return;
     const qty = Number(returnForm.quantity || 0);
     const currentStock = Number(returnModalItem.current_stock || 0);
@@ -534,78 +602,33 @@ export default function PartsModule() {
     const unitCost = Number(returnModalItem.costPrice || returnModalItem.cost_price || 0);
     const creditAmount = qty * unitCost;
 
-    const now = new Date().toISOString();
-    const newReturn = {
-      id: returnNumber,
-      number: returnNumber,
-      vendor: vendorName,
-      itemName,
-      quantity: qty,
-      date: returnForm.date,
-      reason: returnForm.reason,
-      remarks: returnForm.remarks,
-      status: 'pending',
-      poRef: po?.po_number || po?.poNumber || '—',
-      costPerUnit: unitCost,
-      creditAmount,
-      createdBy: currentUser.name,
-      createdAt: now,
-      updatedBy: currentUser.name,
-      updatedAt: now,
-    };
-
-    setInventory(prev => prev.map(i =>
-      i.id === returnModalItem.id
-        ? { ...i, current_stock: Math.max(0, currentStock - qty) }
-        : i
-    ));
-
-    setReturns(prev => [newReturn, ...prev]);
-
-    if (po) {
-      setPoList(prev => prev.map(matchedPO => {
-        if (matchedPO.id !== po.id) return matchedPO;
-        const returnEntry = {
-          returnNumber,
-          quantity: qty,
-          reason: returnForm.reason,
-          date: returnForm.date,
-          status: 'Pending Pickup',
-        };
-        return {
-          ...matchedPO,
-          returnHistory: [returnEntry, ...(matchedPO.returnHistory || [])],
-          returnedQty: (matchedPO.returnedQty || 0) + qty,
-        };
-      }));
-    }
-
-    const vendorId = findVendorIdByName(vendorName);
-    if (vendorId) {
-      addVendorTransaction({
-        vendorId,
-        id: `TXN-${Date.now()}`,
-        date: returnForm.date,
-        truckId: '',
-        type: 'Return Adjustment',
-        ref: returnNumber,
-        desc: `Vendor Return - ${itemName}`,
-        debit: 0,
-        credit: creditAmount,
-        vendor: vendorName,
-        itemName,
-        quantity: qty,
-        reason: returnForm.reason,
-        poRef: newReturn.poRef,
-        category: po?.category || '',
+    try {
+      const res = await fetch(`${API}/inventory/returns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          part_id: returnModalItem.id,
+          quantity_returned: qty,
+          return_date: returnForm.date,
+          condition_on_return: returnForm.reason,
+          restocked: false,
+          vendor_return: true,
+          notes: `${vendorName} | ${returnForm.remarks}`,
+          created_by: currentUser.name,
+        }),
       });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to record return.');
+      setReturnModalItem(null);
+      setReturnErrors({});
+      await fetchPartReturns();
+      await fetchInventory();
+      showToast('Return saved successfully.');
+    } catch (error) {
+      showToast(error.message || 'Failed to save return.', 'error');
+    } finally {
+      setReturnActionLoading(false);
     }
-
-    setProcessedReturnRefs(prev => new Set([...prev, returnNumber]));
-    setReturnModalItem(null);
-    setReturnErrors({});
-    setReturnActionLoading(false);
-    showToast('Return recorded and inventory adjusted.');
   };
 
   const handleAdvanceReturnStatus = (recordId) => {
@@ -623,34 +646,9 @@ export default function PartsModule() {
   /* ── PO handlers ── */
   const handleCreatePOSuccess = (localPO) => {
     setIsCreatePOOpen(false);
-
-    if (localPO) {
-      const itemName = localPO.item_name || localPO.items?.[0]?.partName || localPO.items?.[0]?.name || 'Item';
-      const addedQty = Number(localPO.quantity || localPO.items?.[0]?.qty || 0);
-
-      setInventory(prev => [{
-        id: `po-${Date.now()}`,
-        part_name: itemName,
-        brand: localPO.brand_name || localPO.brand || '',
-        category: localPO.category,
-        current_stock: addedQty,
-        min_stock: 0,
-      }, ...prev]);
-
-      setPendingItems(prev => prev.filter(item => item.part_name !== itemName || item.category !== localPO.category));
-
-      setPoList(prev => [{
-        ...localPO,
-        po_number:       localPO.poNumber,
-        status_id:       0,
-        requested_date:  localPO.requested_date,
-        requested_by:    localPO.requested_by,
-      }, ...prev]);
-    } else {
-      fetchPOs();
-    }
+    fetchPOs();
     fetchPendingPOCount();
-    showToast('Purchase order created and item moved to inventory.');
+    showToast(`Purchase order ${localPO?.po_number || ''} created and is awaiting approval.`);
   };
 
   const openCommentModal = (po, action) => {
@@ -729,7 +727,10 @@ export default function PartsModule() {
     try {
       let succeeded = false;
       try {
-        const res  = await fetch(`${API}/inventory/purchase-orders/${id}/${action}`, { method: 'PUT' });
+        const endpoint = action === 'receive'
+          ? `${API}/inventory/purchase-orders/${id}/receive`
+          : `${API}/inventory/purchase-orders/${id}/${action}`;
+        const res  = await fetch(endpoint, { method: 'PUT' });
         const data = await res.json();
         if (!data.success) throw new Error(data.message || 'Failed to update status.');
         succeeded = true;
@@ -850,26 +851,26 @@ export default function PartsModule() {
                   <span className="hidden sm:inline">Add Item</span>
                   <span className="sm:hidden">Add</span>
                 </button>
-              ) : (
+              ) : pageTab === 'Purchase Orders' ? (
                 <button onClick={() => setIsCreatePOOpen(true)}
                   className="shrink-0 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-violet-700 active:scale-95 transition shadow-sm">
                   <Plus className="h-4 w-4" />
                   <span className="hidden sm:inline">Create PO</span>
                   <span className="sm:hidden">Create</span>
                 </button>
-              )}
+              ) : null}
             </div>
         </div>
 
         {/* Page-level tabs */}
-        <div className="mt-3 flex gap-1">
+        <div className="mt-3 flex gap-1 overflow-x-auto pb-0.5">
           {PAGE_TABS.map(tab => (
             <button key={tab} onClick={() => setPageTab(tab)}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition
+              className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition
                 ${pageTab === tab ? 'bg-violet-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}>
-              {tab === 'Inventory'
-                ? <Package className="h-3.5 w-3.5" />
-                : <ShoppingCart className="h-3.5 w-3.5" />}
+              {tab === 'Inventory'       && <Package     className="h-3.5 w-3.5" />}
+              {tab === 'Purchase Orders' && <ShoppingCart className="h-3.5 w-3.5" />}
+              {tab === 'Returns'         && <RefreshCw    className="h-3.5 w-3.5" />}
               {tab}
             </button>
           ))}
@@ -897,50 +898,10 @@ export default function PartsModule() {
             ))}
           </div>
 
-          {pendingItems.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <Package className="h-4 w-4 text-violet-600" />
-                  <h2 className="text-sm font-bold text-slate-800">Pending Inventory</h2>
-                </div>
-                <span className="text-xs text-slate-400">{pendingItems.length} item{pendingItems.length !== 1 ? 's' : ''}</span>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[700px]">
-                  <thead>
-                    <tr className="border-b border-slate-100">
-                      <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Item Name</th>
-                      <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Category</th>
-                      <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Brand</th>
-                      <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Quantity</th>
-                      <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Date Added</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pendingItems.map(item => (
-                      <tr key={item.id} className="border-b border-slate-50 hover:bg-slate-50/70 transition">
-                        <td className="px-5 py-3.5 font-medium text-slate-800">{item.part_name}</td>
-                        <td className="px-5 py-3.5 text-slate-500">{item.category}</td>
-                        <td className="px-5 py-3.5 text-slate-500">{item.brand || '—'}</td>
-                        <td className="px-5 py-3.5">
-                          <span className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                            {item.current_stock}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3.5 text-slate-500">{item.date_of_entry}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Pending Purchase Orders — above Inventory Management */}
+          {/* Pending Purchase Orders — above Inventory Management, always visible */}
           <PendingPurchaseOrders
             refreshTrigger={ppoPendingRefresh}
+            onStockReceived={() => setPpoPendingRefresh(n => n + 1)}
           />
 
           {/* Inventory Management card */}
@@ -983,7 +944,14 @@ export default function PartsModule() {
             {/* Batteries sub-module */}
             {activeCategory === 'Batteries' && (
               <div className="px-5 pb-5">
-                <BatteryInventory showToast={showToast} />
+                <BatteryInventory
+                  showToast={showToast}
+                  refreshTrigger={ppoPendingRefresh}
+                  onRequestCreated={() => {
+                    setPpoPendingRefresh(value => value + 1);
+                    fetchPendingPOCount();
+                  }}
+                />
               </div>
             )}
 
@@ -1241,6 +1209,329 @@ export default function PartsModule() {
           <ReturnsHistory returns={partReturns} loading={partReturnsLoading} />
         </div>
       )}
+
+      {/* ════════════════════════════════════════
+          WARRANTIES TAB
+      ════════════════════════════════════════ */}
+      {pageTab === 'Warranties' && (() => {
+        const handleWarrantySubmit = async (e) => {
+          e.preventDefault();
+          const errs = {};
+          if (!warrantyForm.inventory_item_id) errs.inventory_item_id = 'Select a part from inventory';
+          if (!warrantyForm.vendor_name.trim()) errs.vendor_name = 'Vendor name is required';
+          if (!warrantyForm.start_date)         errs.start_date = 'Start date is required';
+          if (!warrantyForm.end_date)           errs.end_date   = 'End date is required';
+          if (Object.keys(errs).length) { setWarrantyErrors(errs); return; }
+          setWarrantySubmitting(true);
+          try {
+            const selectedPart = inventory.find(i => String(i.id) === String(warrantyForm.inventory_item_id));
+            const wNum = `WRT-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(1000+Math.random()*9000)}`;
+            const payload = {
+              ...warrantyForm,
+              warranty_number: wNum,
+              item_title: selectedPart?.part_name || warrantyForm.item_title,
+              category: selectedPart?.category || warrantyForm.category,
+              brand: selectedPart?.brand || warrantyForm.brand,
+              claim_available: 1, tax_included: 0,
+              notify_to: '', notification_method: 'Email',
+              created_by: currentUser.name,
+            };
+            const res = await fetch(`${API}/warranties`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Failed');
+            showToast('Warranty created successfully.');
+            setIsAddWarrantyOpen(false);
+            setWarrantyForm(f => ({ ...f, inventory_item_id: '', vendor_name: '', start_date: '', end_date: '', purchase_date: '' }));
+            setWarrantyErrors({});
+            fetchWarranties();
+          } catch (err) {
+            showToast(err.message || 'Failed to create warranty.', 'error');
+          } finally {
+            setWarrantySubmitting(false);
+          }
+        };
+        const wCls = (err) => `w-full rounded-xl border px-3 py-2.5 text-sm text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 transition ${err ? 'border-red-300' : 'border-slate-200'}`;
+        const expiredCount   = warranties.filter(w => w.warranty_status === 'Expired').length;
+        const activeCount    = warranties.filter(w => w.warranty_status === 'Active').length;
+        const claimableCount = warranties.filter(w => w.claim_available).length;
+        return (
+          <div className="p-4 md:p-6 space-y-6">
+            {/* Summary cards */}
+            <div className="grid gap-4 sm:grid-cols-3">
+              {[
+                { label: 'Active',    value: activeCount,    color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                { label: 'Expired',   value: expiredCount,   color: 'text-red-600',     bg: 'bg-red-50'     },
+                { label: 'Claimable', value: claimableCount, color: 'text-violet-600',  bg: 'bg-violet-50'  },
+              ].map(c => (
+                <div key={c.label} className={`rounded-2xl border border-slate-100 p-5 ${c.bg}`}>
+                  <p className={`text-[10px] uppercase tracking-widest font-bold mb-1 ${c.color}`}>{c.label}</p>
+                  <p className={`text-2xl font-black ${c.color}`}>{c.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Warranties list */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
+              <div className="flex items-center gap-2 px-5 py-4 border-b border-slate-100">
+                <Shield className="h-4 w-4 text-violet-600" />
+                <h2 className="text-sm font-bold text-slate-800">Warranties</h2>
+                <span className="ml-auto text-xs text-slate-400">{warranties.length} records</span>
+              </div>
+              {warrantiesLoading ? (
+                <div className="py-14 text-center"><Loader2 className="h-5 w-5 text-violet-400 animate-spin mx-auto" /></div>
+              ) : warranties.length === 0 ? (
+                <div className="py-16 text-center">
+                  <Shield className="h-9 w-9 text-slate-200 mx-auto mb-3" />
+                  <p className="text-sm font-medium text-slate-400">No warranties found</p>
+                  <p className="text-xs text-slate-400 mt-1">Click "Add Warranty" to create one.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        {['Warranty No.','Part / Item','Category','Brand','Vehicle','Start','End','Status','Vendor'].map(h => (
+                          <th key={h} className="text-left text-xs font-semibold text-slate-400 px-5 py-3 whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {warranties.map(w => {
+                        const isExpired  = w.warranty_status === 'Expired';
+                        const isActive   = w.warranty_status === 'Active';
+                        return (
+                          <tr key={w.id} className="border-b border-slate-50 hover:bg-slate-50/70 transition">
+                            <td className="px-5 py-3.5 font-mono text-xs text-slate-700">{w.warranty_number || `WRT-${w.id}`}</td>
+                            <td className="px-5 py-3.5 font-medium text-slate-800">{w.item_title || '—'}</td>
+                            <td className="px-5 py-3.5 text-slate-500">{w.category || '—'}</td>
+                            <td className="px-5 py-3.5 text-slate-500">{w.brand || '—'}</td>
+                            <td className="px-5 py-3.5 text-slate-600">{w.vehicle_no || '—'}</td>
+                            <td className="px-5 py-3.5 text-slate-500 whitespace-nowrap">{fmt(w.start_date)}</td>
+                            <td className="px-5 py-3.5 text-slate-500 whitespace-nowrap">{fmt(w.end_date)}</td>
+                            <td className="px-5 py-3.5">
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold border ${
+                                isExpired ? 'bg-red-50 text-red-700 border-red-200'
+                                : isActive ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}>{w.warranty_status || 'Active'}</span>
+                            </td>
+                            <td className="px-5 py-3.5 text-slate-500">{w.vendor_name || w.dealer_showroom || '—'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Add Warranty Modal */}
+            {isAddWarrantyOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+                <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+                  <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-violet-600">Parts & Inventory</p>
+                      <h2 className="text-base font-bold text-slate-800 mt-0.5">Add Warranty</h2>
+                    </div>
+                    <button onClick={() => setIsAddWarrantyOpen(false)} className="text-slate-400 hover:text-slate-600 transition p-1">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <form onSubmit={handleWarrantySubmit} className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+                    {/* Part from inventory dropdown */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Part from Inventory <span className="text-red-500">*</span></label>
+                      <select value={warrantyForm.inventory_item_id}
+                        onChange={e => setWarrantyForm(f => ({ ...f, inventory_item_id: e.target.value }))}
+                        className={wCls(warrantyErrors.inventory_item_id)}>
+                        <option value="">— Select Inventory Part —</option>
+                        {inventory.map(p => (
+                          <option key={p.id} value={p.id}>{p.part_name}{p.brand ? ` (${p.brand})` : ''} — {p.category}</option>
+                        ))}
+                      </select>
+                      {warrantyErrors.inventory_item_id && <p className="mt-1 text-[11px] text-red-500">{warrantyErrors.inventory_item_id}</p>}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Vehicle No.</label>
+                        <input value={warrantyForm.vehicle_no} onChange={e => setWarrantyForm(f => ({ ...f, vehicle_no: e.target.value }))}
+                          placeholder="e.g. TS09AB1234" className={wCls(false)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Serial No.</label>
+                        <input value={warrantyForm.serial_no} onChange={e => setWarrantyForm(f => ({ ...f, serial_no: e.target.value }))}
+                          placeholder="Optional" className={wCls(false)} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Purchase Date</label>
+                        <input type="date" value={warrantyForm.purchase_date} onChange={e => setWarrantyForm(f => ({ ...f, purchase_date: e.target.value }))} className={wCls(false)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Warranty Type</label>
+                        <select value={warrantyForm.warranty_type} onChange={e => setWarrantyForm(f => ({ ...f, warranty_type: e.target.value }))} className={wCls(false)}>
+                          {['Full','Limited','Extended','On-Site'].map(t => <option key={t}>{t}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Start Date <span className="text-red-500">*</span></label>
+                        <input type="date" value={warrantyForm.start_date} onChange={e => setWarrantyForm(f => ({ ...f, start_date: e.target.value }))} className={wCls(warrantyErrors.start_date)} />
+                        {warrantyErrors.start_date && <p className="mt-1 text-[11px] text-red-500">{warrantyErrors.start_date}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">End Date <span className="text-red-500">*</span></label>
+                        <input type="date" value={warrantyForm.end_date} onChange={e => setWarrantyForm(f => ({ ...f, end_date: e.target.value }))} className={wCls(warrantyErrors.end_date)} />
+                        {warrantyErrors.end_date && <p className="mt-1 text-[11px] text-red-500">{warrantyErrors.end_date}</p>}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Vendor Name <span className="text-red-500">*</span></label>
+                        <input value={warrantyForm.vendor_name} onChange={e => setWarrantyForm(f => ({ ...f, vendor_name: e.target.value }))}
+                          placeholder="Vendor / dealer name" className={wCls(warrantyErrors.vendor_name)} />
+                        {warrantyErrors.vendor_name && <p className="mt-1 text-[11px] text-red-500">{warrantyErrors.vendor_name}</p>}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Contact</label>
+                        <input value={warrantyForm.contact_number} onChange={e => setWarrantyForm(f => ({ ...f, contact_number: e.target.value }))}
+                          placeholder="Phone number" className={wCls(false)} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Purchase Cost (₹)</label>
+                        <input type="number" min="0" value={warrantyForm.purchase_cost} onChange={e => setWarrantyForm(f => ({ ...f, purchase_cost: e.target.value }))}
+                          placeholder="0" className={wCls(false)} />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-600 mb-1">Claim Amount (₹)</label>
+                        <input type="number" min="0" value={warrantyForm.claim_amount} onChange={e => setWarrantyForm(f => ({ ...f, claim_amount: e.target.value }))}
+                          placeholder="0" className={wCls(false)} />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Description</label>
+                      <textarea rows={2} value={warrantyForm.item_description}
+                        onChange={e => setWarrantyForm(f => ({ ...f, item_description: e.target.value }))}
+                        placeholder="Optional warranty notes…" className={wCls(false) + ' resize-none'} />
+                    </div>
+                    <div className="flex gap-3 pt-1 pb-1">
+                      <button type="button" onClick={() => setIsAddWarrantyOpen(false)} disabled={warrantySubmitting}
+                        className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50">Cancel</button>
+                      <button type="submit" disabled={warrantySubmitting}
+                        className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 py-2.5 text-sm font-bold text-white hover:bg-violet-700 transition disabled:opacity-60">
+                        {warrantySubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                        {warrantySubmitting ? 'Saving…' : 'Save Warranty'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ════════════════════════════════════════
+          VENDORS TAB
+      ════════════════════════════════════════ */}
+      {pageTab === 'Vendors' && (() => {
+        const filteredVendors = partsVendorsList.filter(v => {
+          const q = vendorSearch.trim().toLowerCase();
+          if (!q) return true;
+          return (
+            (v.vendor_name || '').toLowerCase().includes(q) ||
+            (v.mobile_number || '').toLowerCase().includes(q) ||
+            (v.gst_number || '').toLowerCase().includes(q) ||
+            (v.address_location || '').toLowerCase().includes(q)
+          );
+        });
+        return (
+          <div className="p-4 md:p-6 space-y-6">
+            <div className="grid gap-4 sm:grid-cols-3">
+              {[
+                { label: 'Total Vendors', value: partsVendorsList.length,                                             color: 'text-violet-600', bg: 'bg-violet-50' },
+                { label: 'Active',        value: partsVendorsList.filter(v => v.status === 'Active').length,          color: 'text-emerald-600', bg: 'bg-emerald-50' },
+                { label: 'Credit Terms',  value: partsVendorsList.filter(v => v.payment_terms === 'credit').length,   color: 'text-amber-600',  bg: 'bg-amber-50'  },
+              ].map(c => (
+                <div key={c.label} className={`rounded-2xl border border-slate-100 p-5 ${c.bg}`}>
+                  <p className={`text-[10px] uppercase tracking-widest font-bold mb-1 ${c.color}`}>{c.label}</p>
+                  <p className={`text-2xl font-black ${c.color}`}>{c.value}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100">
+              <div className="flex flex-wrap items-center gap-3 px-5 py-4 border-b border-slate-100">
+                <Users className="h-4 w-4 text-violet-600" />
+                <h2 className="text-sm font-bold text-slate-800">Parts Vendors</h2>
+                <div className="ml-auto relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
+                  <input value={vendorSearch} onChange={e => setVendorSearch(e.target.value)}
+                    placeholder="Search vendor, GST…"
+                    className="pl-7 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-400 w-44 bg-slate-50" />
+                </div>
+              </div>
+              {vendorsLoading ? (
+                <div className="py-14 text-center"><Loader2 className="h-5 w-5 text-violet-400 animate-spin mx-auto" /></div>
+              ) : filteredVendors.length === 0 ? (
+                <div className="py-16 text-center">
+                  <Users className="h-9 w-9 text-slate-200 mx-auto mb-3" />
+                  <p className="text-sm font-medium text-slate-400">{vendorSearch ? 'No vendors match your search.' : 'No parts vendors found.'}</p>
+                  <p className="text-xs text-slate-400 mt-1">Add vendors in the Vendors module to link them with purchase orders.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        {['Vendor Name','Mobile','Email','GST No.','Location','Status','Payment Terms','Balance'].map(h => (
+                          <th key={h} className="text-left text-xs font-semibold text-slate-400 px-5 py-3 whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredVendors.map(v => {
+                        const poCount = poList.filter(po => (po.vendor || '').toLowerCase() === (v.vendor_name || '').toLowerCase()).length;
+                        return (
+                          <tr key={v.id} className="border-b border-slate-50 hover:bg-slate-50/70 transition">
+                            <td className="px-5 py-3.5">
+                              <p className="font-semibold text-slate-800">{v.vendor_name}</p>
+                              {poCount > 0 && (
+                                <span className="text-[10px] text-violet-600 font-bold">{poCount} PO{poCount !== 1 ? 's' : ''}</span>
+                              )}
+                            </td>
+                            <td className="px-5 py-3.5 text-slate-500">{v.mobile_number || '—'}</td>
+                            <td className="px-5 py-3.5 text-slate-500">{v.email || '—'}</td>
+                            <td className="px-5 py-3.5 font-mono text-xs text-slate-600">{v.gst_number || '—'}</td>
+                            <td className="px-5 py-3.5 text-slate-500">{v.address_location || '—'}</td>
+                            <td className="px-5 py-3.5">
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold border ${
+                                v.status === 'Active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}>{v.status || 'Active'}</span>
+                            </td>
+                            <td className="px-5 py-3.5 text-slate-500 capitalize">{v.payment_terms || '—'}</td>
+                            <td className="px-5 py-3.5">
+                              <span className="text-sm font-bold text-slate-700">₹{Number(v.opening_balance || 0).toLocaleString('en-IN')}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ════════════════════════════════════════
           PURCHASE ORDERS TAB

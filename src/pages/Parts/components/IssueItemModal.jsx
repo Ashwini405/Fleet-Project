@@ -6,6 +6,7 @@ const emptyForm = {
   quantity: '',
   price_per_unit: '',
   odometer: '',
+  technician: '',
 };
 
 export default function IssueItemModal({ isOpen, item, onClose, onSuccess }) {
@@ -73,16 +74,19 @@ export default function IssueItemModal({ isOpen, item, onClose, onSuccess }) {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:5001/api/inventory/stock-out', {
+      const res = await fetch('http://localhost:5001/api/inventory/workflow/issues', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          partId: item.id,
-          qty,
-          vehicleNumber: selectedVehicle.vehicle_no,
+          part_id: item.id,
+          quantity: qty,
+          vehicle_id: selectedVehicle.id,
+          vehicle_number: selectedVehicle.vehicle_no,
           odometer: Number(form.odometer) || 0,
-          costPerUnit: Number(form.price_per_unit) || 0,
-          date: form.issue_date,
+          cost_per_unit: Number(form.price_per_unit) || 0,
+          issue_date: form.issue_date,
+          technician: form.technician.trim(),
+          performed_by: 'Supervisor',
         }),
       });
       const data = await res.json();
@@ -194,6 +198,11 @@ export default function IssueItemModal({ isOpen, item, onClose, onSuccess }) {
                 <p className="text-[10px] text-red-500 mt-1">Exceeds available stock ({available})</p>
               )}
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Technician</label>
+            <input value={form.technician} onChange={e => set('technician', e.target.value)} placeholder="Technician name" className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
           </div>
 
           {/* Price + Odometer */}

@@ -227,10 +227,10 @@ function ReplaceModal({ item, onClose, onSuccess, showToast }) {
     if (Object.keys(e).length) { setErrors(e); return; }
     setSaving(true);
     try {
-      const res = await fetch(`${API}/vehicle-inventory/${item.id}/replace`, {
+      const res = await fetch(`${API}/inventory/workflow/vehicle-inventory/${item.id}/replace`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, quantity: Number(form.quantity) }),
+        body: JSON.stringify({ ...form, new_part_id: form.new_inventory_item_id, quantity: Number(form.quantity), performed_by: 'Supervisor' }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
@@ -364,12 +364,18 @@ function ConditionModal({ item, onClose, onSuccess, showToast }) {
 
 // ── Remove Assignment Confirm Modal ───────────────────────────────────────────
 function RemoveModal({ item, onClose, onSuccess, showToast }) {
+  const [disposition, setDisposition] = useState('Good Condition');
+  const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
 
   const handleConfirm = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`${API}/vehicle-inventory/${item.id}/remove`, { method: 'DELETE' });
+      const res = await fetch(`${API}/inventory/workflow/vehicle-inventory/${item.id}/remove`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disposition_type: disposition, reason, performed_by: 'Supervisor' }),
+      });
       const data = await res.json();
       if (!data.success) throw new Error(data.message);
       showToast('Assignment removed');
@@ -382,7 +388,7 @@ function RemoveModal({ item, onClose, onSuccess, showToast }) {
   };
 
   return (
-    <Modal title="Remove Assignment" onClose={onClose}
+    <Modal title="Remove Installed Part" subtitle={item.item_name} onClose={onClose}
       footer={
         <>
           <button onClick={onClose} className="flex-1 px-4 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-xl text-sm font-medium hover:bg-slate-50 transition">Cancel</button>
@@ -396,11 +402,20 @@ function RemoveModal({ item, onClose, onSuccess, showToast }) {
         <FiAlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
         <div>
           <p className="text-sm font-bold text-red-700">Remove inventory assignment?</p>
-          <p className="text-xs text-red-600 mt-1">
-            <strong>{item.item_name}</strong> (qty {item.quantity}) will be unassigned from this truck and stock will be restored to central inventory.
-          </p>
+          <p className="text-xs text-red-600 mt-1"><strong>{item.item_name}</strong> (qty {item.quantity}) will be removed and routed to the selected destination.</p>
         </div>
       </div>
+      <Field label="Removal Destination" required>
+        <Select value={disposition} onChange={e => setDisposition(e.target.value)}>
+          <option>Good Condition</option>
+          <option>Damaged</option>
+          <option>Warranty Claim</option>
+          <option>Scrap</option>
+        </Select>
+      </Field>
+      <Field label="Reason">
+        <Textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="Optional removal reason..." />
+      </Field>
     </Modal>
   );
 }

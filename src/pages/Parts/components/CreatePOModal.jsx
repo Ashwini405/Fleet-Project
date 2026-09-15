@@ -6,6 +6,7 @@ const today = () => new Date().toISOString().split('T')[0];
 
 const CATEGORIES = [
   { id: 'Parts & Spares', vendorCat: 'parts', color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
+  { id: 'Batteries',      vendorCat: 'parts', color: 'bg-red-50 text-red-700 border-red-200' },
   { id: 'Oils & Lubes',   vendorCat: 'oils',  color: 'bg-amber-50  text-amber-700  border-amber-200'  },
 ];
 
@@ -50,11 +51,18 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
 
   useEffect(() => {
     if (!isOpen) return;
-    fetch(`${API}/parts-vendors`).then(r => r.json()).then(d => setPartsVendors(d.data || [])).catch(() => {});
-    fetch(`${API}/oil-vendors`).then(r => r.json()).then(d => setOilVendors(d.data || [])).catch(() => {});
-    fetch(`${API}/purchase-orders`).then(r => r.json()).then(d => {
-      setPendingOrders((d.data || []).filter(o => o.status !== 'Completed'));
-    }).catch(() => {});
+
+    fetch(`${API}/purchase-orders`)
+      .then(r => r.json())
+      .then(d => setPendingOrders((d.data || []).filter(o => o.status !== 'Completed')))
+      .catch(() => setPendingOrders([]));
+
+    Promise.all([
+      fetch(`${API}/parts-vendors`).then(r => r.json()).then(d => d.data || []).catch(() => []),
+      fetch(`${API}/oil-vendors`).then(r => r.json()).then(d => d.data || []).catch(() => []),
+    ])
+      .then(([parts, oils]) => { setPartsVendors(parts); setOilVendors(oils); })
+      .catch(() => { setPartsVendors([]); setOilVendors([]); });
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -63,7 +71,7 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
 
   const catMeta = CATEGORIES.find(c => c.id === form.category);
 
-  const vendorsForCategory = form.category === 'Parts & Spares'
+  const vendorsForCategory = form.category === 'Parts & Spares' || form.category === 'Batteries'
     ? partsVendors
     : form.category === 'Oils & Lubes'
     ? oilVendors
@@ -82,7 +90,14 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
 
   const handleVendorChange = (vendorId) => {
     const v = vendorsForCategory.find(x => String(x.id) === String(vendorId));
-    setForm(f => ({ ...f, vendorId, vendor: v?.vendor_name || '', itemCategory: '', pendingOrderId: '', item_name: '', brand_name: '', quantity: '', unit_price: '' }));
+    setForm(f => ({
+      ...f,
+      vendorId,
+      vendor: v?.vendor_name || '',
+      vendorContact: v?.mobile_number || '',
+      vendorGST: v?.gst_number || '',
+      itemCategory: '', pendingOrderId: '', item_name: '', brand_name: '', quantity: '', unit_price: ''
+    }));
     setErrors(e => ({ ...e, vendorId: null }));
   };
 
@@ -96,9 +111,9 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
     setForm(f => ({
       ...f,
       pendingOrderId,
-      item_name: po?.item_name || '',
+      item_name:  po?.item_name  || '',
       brand_name: po?.brand_name || '',
-      quantity:  po ? String(po.pending_quantity) : '',
+      quantity:   po ? String(po.pending_quantity || po.ordered_quantity || '') : '',
     }));
     setErrors(e => ({ ...e, pendingOrderId: null }));
   };
@@ -121,50 +136,32 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     setLoading(true);
-    const localPO = {
-      id:               `PO-LOCAL-${Date.now()}`,
-      poNumber:         `PO-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
-      vendor:           form.vendor,
-      category:         form.itemCategory,
-      item_name:        form.item_name,
-      brand_name:       form.brand_name,
-      brand:            form.brand_name,
-      quantity:         Number(form.quantity),
-      items:            [{ partName: form.item_name, qty: Number(form.quantity), unitPrice: Number(form.unit_price) || 0 }],
-      totalAmount:      total,
-      status_id:        0,
-      requested_date:   today(),
-      expected_delivery: form.expected_delivery || null,
-      notes:            form.notes,
-      requested_by:     requestedBy || 'Supervisor',
-    };
-
     try {
       const res = await fetch(`${API}/inventory/purchase-orders`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          vendor: form.vendor, item_name: form.item_name,
-          brand_name: form.brand_name,
-          quantity: Number(form.quantity), unit_price: Number(form.unit_price) || 0,
-          total_amount: total, category: form.itemCategory,
+          vendor:            form.vendor,
+          item_name:         form.item_name,
+          quantity:          Number(form.quantity),
+          unit_price:        Number(form.unit_price) || 0,
+          total_amount:      total,
+          category:          form.itemCategory,
           expected_delivery: form.expected_delivery || null,
-          notes: form.notes, requested_by: requestedBy || 'Supervisor',
-          requested_date: today(),
+          notes:             form.notes,
+          requested_by:      requestedBy || 'Supervisor',
+          requested_date:    today(),
         }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.message || 'Server error');
-      if (form.pendingOrderId) {
-        await fetch(`${API}/purchase-orders/${form.pendingOrderId}`, { method: 'DELETE' });
-      }
-      onSuccess?.();
-    } catch {
-      onSuccess?.(localPO);
-    } finally {
-      setLoading(false);
+      onSuccess?.(data);
       setForm(EMPTY);
       setErrors({});
+    } catch (err) {
+      setErrors({ submit: err.message || 'Unable to create purchase order.' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -187,6 +184,8 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
         </div>
 
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+
+          <Err msg={errors.submit} />
 
           {/* 1. Category (Parts & Spares / Oils & Lubes) */}
           <div>
@@ -223,10 +222,23 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
                 className={sCls(errors.vendorId)}>
                 <option value="">— Select Vendor —</option>
                 {vendorsForCategory.map(v => (
-                  <option key={v.id} value={v.id}>{v.vendor_name}</option>
+                  <option key={v.id} value={v.id}>{v.vendor_name}{v.mobile_number ? ` — ${v.mobile_number}` : ''}</option>
                 ))}
               </select>
               <Err msg={errors.vendorId} />
+              {/* Vendor info panel */}
+              {form.vendorId && (() => {
+                const v = vendorsForCategory.find(x => String(x.id) === String(form.vendorId));
+                if (!v) return null;
+                return (
+                  <div className="mt-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 grid grid-cols-2 gap-x-4 gap-y-1">
+                    {v.mobile_number && <p className="text-[11px] text-slate-600"><span className="font-bold">Mobile:</span> {v.mobile_number}</p>}
+                    {v.gst_number    && <p className="text-[11px] text-slate-600"><span className="font-bold">GST:</span> {v.gst_number}</p>}
+                    {v.email         && <p className="text-[11px] text-slate-600"><span className="font-bold">Email:</span> {v.email}</p>}
+                    {v.payment_terms && <p className="text-[11px] text-slate-600"><span className="font-bold">Terms:</span> {v.payment_terms}</p>}
+                  </div>
+                );
+              })()}
             </div>
           )}
 

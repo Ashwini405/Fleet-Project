@@ -128,6 +128,8 @@ const VehicleInventory = {
       if (returnQty > item.quantity) throw new Error('Return quantity exceeds assigned quantity');
 
       const newQty = item.quantity - returnQty;
+      const normalizedCondition = String(conditionOnReturn || item.condition_status || 'Good').trim().toLowerCase();
+      const shouldRestock = normalizedCondition === 'good';
 
       // Update or remove vehicle_inventory row
       if (newQty === 0) {
@@ -139,8 +141,8 @@ const VehicleInventory = {
         );
       }
 
-      // Increase central inventory stock
-      if (item.inventory_item_id) {
+      // Only good-condition vehicle returns become available stock.
+      if (item.inventory_item_id && shouldRestock) {
         await conn.query(
           `UPDATE inventory_parts
            SET current_stock = current_stock + ?,
@@ -152,8 +154,8 @@ const VehicleInventory = {
 
         // Stock movement record
         await conn.query(
-          `INSERT INTO inventory_stock_movements (part_id, movement_type, quantity, movement_date)
-           VALUES (?, 'Stock In', ?, ?)`,
+          `INSERT INTO inventory_stock_movements (part_id, movement_type, event_type, quantity, movement_date)
+           VALUES (?, 'Stock In', 'Returned Stock', ?, ?)`,
           [item.inventory_item_id, returnQty, returnDate || new Date()]
         );
       }
@@ -179,7 +181,7 @@ const VehicleInventory = {
       await conn.query(
         `INSERT INTO part_returns
            (original_issue_id, part_id, vehicle_number, quantity_returned, return_date, condition_on_return, restocked, notes, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           item.issue_history_id || null,
           item.inventory_item_id,
@@ -187,7 +189,27 @@ const VehicleInventory = {
           returnQty,
           returnDate,
           conditionOnReturn || item.condition_status || 'Good',
+          shouldRestock ? 1 : 0,
           remarks || reason || null,
+          'Admin',
+        ]
+      );
+
+      await conn.query(
+        `INSERT INTO inventory_dispositions
+           (vehicle_inventory_id, part_id, vehicle_id, vehicle_number, disposition_type, quantity,
+            condition_status, reason, remarks, created_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          id,
+          item.inventory_item_id,
+          item.vehicle_id || null,
+          item.vehicle_number,
+          shouldRestock ? 'Good Condition' : 'Damaged',
+          returnQty,
+          conditionOnReturn || item.condition_status || 'Good',
+          reason || (shouldRestock ? 'Returned in good condition' : 'Returned damaged'),
+          remarks || null,
           'Admin',
         ]
       );
@@ -384,6 +406,23 @@ const VehicleInventory = {
 
       await conn.query(`DELETE FROM vehicle_inventory WHERE id = ?`, [id]);
 
+      // ✅ Log to part_returns so it appears in Parts > Returns tab
+      try {
+        await conn.query(
+          `INSERT INTO part_returns
+             (original_issue_id, part_id, vehicle_number, quantity_returned,
+              return_date, condition_on_return, restocked, notes, created_by)
+           VALUES (?, ?, ?, ?, CURDATE(), ?, 1, 'Removed from vehicle assignment', 'Admin')`,
+          [
+            item.issue_history_id || null,
+            item.inventory_item_id || null,
+            item.vehicle_number,
+            item.quantity,
+            item.condition_status || 'Good',
+          ]
+        );
+      } catch (_) { /* part_returns insert is best-effort */ }
+
       await conn.commit();
       return item;
     } catch (err) {
@@ -393,6 +432,7 @@ const VehicleInventory = {
       conn.release();
     }
   },
+
 
   // ── SYNC: called after Issue Part to create vehicle_inventory row ────────────
   syncFromIssue: async ({ issueHistoryId, vehicleNumber, inventoryItemId, itemName, category, quantity, issueDate }) => {
