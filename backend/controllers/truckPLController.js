@@ -33,10 +33,8 @@ const getTruckPL = async (req, res) => {
     // ── STEP 3: Calculate totals ──
     const totalRevenue = revenue.totals.totalRevenue;
 
-    // misc.totalMisc already folds in any manually-logged 'EMI' expense rows
-    // (misc.totalEMI is that subset, split out for display only). emi.totalEMI
-    // is a separate, genuinely new source — actual EMI-paid records × the
-    // vehicle's fixed installment — so it's added on top, not double-counted.
+    // EMI and Driver Salary entries are already assigned to their dedicated
+    // sections, so they must not be added through Miscellaneous as well.
     const totalExpenses =
       fuel.totalFuel +
       fuel.totalAdBlue +
@@ -65,8 +63,8 @@ const getTruckPL = async (req, res) => {
       totalBattery: battery.totalBattery,
       totalDriver: driverSettlement.netDriverCost,
       totalRTA: rta.totalRTA,
-      totalMisc: misc.totalMisc - misc.totalEMI,
-      totalEMI: misc.totalEMI + emi.totalEMI,
+      totalMisc: misc.totalMisc,
+      totalEMI: emi.totalEMI,
       totalExpenses,
       netProfit,
       profitMargin

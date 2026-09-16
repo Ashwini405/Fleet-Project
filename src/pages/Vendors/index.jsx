@@ -30,6 +30,9 @@ export default function Vendors() {
   const [searchParams] = useSearchParams();
   const requestedCategory = searchParams.get('category');
   const requestedVendorId = searchParams.get('vendor_id');
+  const requestedVendorName = searchParams.get('vendor_name');
+  const requestedVendorIds = searchParams.get('vendor_ids');
+  const requestedVendorNames = searchParams.get('vendor_names');
   const requestedTyreNumber = searchParams.get('tyre_number');
   const requestedTxnType = searchParams.get('txn_type');
   const [activePage, setActivePage] = useState(requestedCategory || 'dashboard'); // 'dashboard' | category.id
@@ -101,6 +104,9 @@ export default function Vendors() {
           <TyresVendorPage
             onVendorClick={handleVendorClick}
             initialVendorId={requestedVendorId}
+            initialVendorName={requestedVendorName}
+            initialVendorIds={requestedVendorIds}
+            initialVendorNames={requestedVendorNames}
             initialTyreNumber={requestedTyreNumber}
             initialTxnType={requestedTxnType}
           />

@@ -156,6 +156,7 @@ export default function TruckPLDetail() {
             data={d.emi}
             total={d.totals.totalEMI}
             prevTotal={0}
+            vehicleId={d.info.id}
           />
           <RTASection
             data={d.rta}

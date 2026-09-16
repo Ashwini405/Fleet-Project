@@ -5,7 +5,7 @@ import AddTyreVendorModal from '../components/AddTyreVendorModal';
 import EditTyreVendorModal from '../components/EditTyreVendorModal';
 import TyresLedger from '../components/TyresLedger';
 
-export default function TyresVendorPage({ initialVendorId, initialTyreNumber, initialTxnType }) {
+export default function TyresVendorPage({ initialVendorId, initialVendorName, initialVendorIds, initialVendorNames, initialTyreNumber, initialTxnType }) {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [balances, setBalances] = useState({}); // vendorId -> { totalDebit, totalCredit }, null on fetch error
@@ -14,6 +14,8 @@ export default function TyresVendorPage({ initialVendorId, initialTyreNumber, in
   const [addOpen, setAddOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [editVendor, setEditVendor] = useState(null);
+  const allowedVendorIds = (initialVendorIds || '').split(',').map(value => value.trim()).filter(Boolean);
+  const allowedVendorNames = (initialVendorNames || '').split('|').map(value => value.trim().toLowerCase()).filter(Boolean);
 
   // Fetch tyre vendors from database
   const fetchTyreVendors = async () => {
@@ -55,13 +57,21 @@ export default function TyresVendorPage({ initialVendorId, initialTyreNumber, in
   }, []);
 
   useEffect(() => {
-    if (!initialVendorId || vendors.length === 0) return;
-    const vendor = vendors.find(item => String(item.id) === String(initialVendorId));
+    if ((!initialVendorId && !initialVendorName) || vendors.length === 0) return;
+    const vendor = vendors.find(item => (
+      initialVendorId && String(item.id) === String(initialVendorId)
+    ) || (
+      !initialVendorId && initialVendorName &&
+      String(item.vendor_name || '').trim().toLowerCase() === String(initialVendorName).trim().toLowerCase()
+    ));
     if (vendor) setSelectedVendor(vendor);
-  }, [initialVendorId, vendors]);
+  }, [initialVendorId, initialVendorName, vendors]);
 
   // Filter vendors based on search term and payment terms
   const filtered = vendors
+    .filter(v => !allowedVendorIds.length && !allowedVendorNames.length
+      || allowedVendorIds.includes(String(v.id))
+      || allowedVendorNames.includes(String(v.vendor_name || '').trim().toLowerCase()))
     .filter(v => !search || v.vendor_name?.toLowerCase().includes(search.toLowerCase()))
     .filter(v => paymentFilter === 'all' || (v.payment_terms || 'credit') === paymentFilter);
 

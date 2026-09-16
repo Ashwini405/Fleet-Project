@@ -44,7 +44,13 @@ v.default_tyre_size,
 v.axle_positions,
 
         v.gps_device_id,
-        v.fastag_id,
+        COALESCE(fa.fastag_id, v.fastag_id) AS fastag_id,
+        fa.id AS fastag_account_id,
+        fa.bank_issuer AS fastag_bank_issuer,
+        fa.linked_account_no AS fastag_linked_account_no,
+        fa.balance AS fastag_balance,
+        fa.low_balance_threshold AS fastag_low_balance_threshold,
+        fa.status AS fastag_status,
 
         v.vehicle_status,
 
@@ -69,6 +75,9 @@ v.axle_positions,
 
       LEFT JOIN supervisors sp
       ON v.supervisor_id = sp.id
+
+      LEFT JOIN fastag_accounts fa
+      ON fa.vehicle_id = v.id
 
       ORDER BY v.vehicle_no ASC
 

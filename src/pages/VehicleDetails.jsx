@@ -950,6 +950,13 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                 </div>
 
                 {fastagAccount && (
+                  <div className="mt-2 grid grid-cols-2 gap-4">
+                    <InfoItem label="Bank / Issuer" value={fastagAccount.bank_issuer} />
+                    <InfoItem label="Linked Account No." value={fastagAccount.linked_account_no} />
+                  </div>
+                )}
+
+                {fastagAccount && (
                   <div className="mt-2">
                     <p className="text-xs uppercase tracking-wider font-semibold text-slate-500">Fastag Balance</p>
                     <button

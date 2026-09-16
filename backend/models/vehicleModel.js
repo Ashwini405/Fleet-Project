@@ -31,11 +31,19 @@ const Vehicle = {
            s.full_name AS supervisor_name,
            d.full_name AS driver_name,
            d.mobile AS driver_contact,
-           st.station_name AS source_plant
+          st.station_name AS source_plant,
+          COALESCE(fa.fastag_id, v.fastag_id) AS fastag_id,
+          fa.id AS fastag_account_id,
+          fa.bank_issuer AS fastag_bank_issuer,
+          fa.linked_account_no AS fastag_linked_account_no,
+          fa.balance AS fastag_balance,
+          fa.low_balance_threshold AS fastag_low_balance_threshold,
+          fa.status AS fastag_status
     FROM vehicles v
     LEFT JOIN supervisors s ON v.supervisor_id = s.id
     LEFT JOIN drivers d ON v.assigned_driver = d.id
     LEFT JOIN stations st ON v.station_id = st.id
+    LEFT JOIN fastag_accounts fa ON fa.vehicle_id = v.id
     WHERE v.id = ?
   `, [id]);
 

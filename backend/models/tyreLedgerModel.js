@@ -76,6 +76,47 @@ const getVendorLedger = async (vendorId) => {
     });
 
     // ==========================
+    // TYRE SERVICE HISTORY
+    // ==========================
+    const [serviceRows] = await db.query(
+      `
+      SELECT
+        tsh.id,
+        tsh.service_date,
+        tsh.tyre_number,
+        tsh.issue_type,
+        tsh.action_taken,
+        tsh.tyre_repair_cost,
+        tsh.tyre_replacement_cost,
+        tsh.retreading_cost
+      FROM tyre_service_history tsh
+      JOIN tyres t ON t.tyre_number = tsh.tyre_number
+      WHERE LOWER(TRIM(t.vendor_name)) = LOWER(TRIM(?))
+      `,
+      [vendor.vendor_name]
+    );
+
+    serviceRows.forEach((row) => {
+      [
+        ['Repair', row.tyre_repair_cost, row.issue_type],
+        ['Replacement', row.tyre_replacement_cost, row.action_taken],
+        ['Retreading', row.retreading_cost, row.action_taken],
+      ].forEach(([type, amount, description]) => {
+        if (Number(amount) <= 0) return;
+        transactions.push({
+          id: `SRV-${row.id}-${type}`,
+          date: row.service_date,
+          type,
+          ref: row.tyre_number || '-',
+          tyreNumber: row.tyre_number,
+          desc: description || `${type} service`,
+          debit: Number(amount),
+          credit: 0,
+        });
+      });
+    });
+
+    // ==========================
     // PAYMENTS RECORDED AGAINST THIS VENDOR
     // ==========================
     const [paymentRows] = await db.query(
