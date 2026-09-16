@@ -5,17 +5,16 @@ import {
   FiFileText, FiPhone, FiMapPin,
 } from 'react-icons/fi';
 import axios from 'axios';
-import { TypeBadge, SummaryCards } from './shared';
+import { TypeBadge } from './shared';
 import AddExpenseModal from './AddExpenseModal';
 import AddPaymentModal from './AddPaymentModal';
 import { PAGE_SIZE, MODAL_ANIM, PAYMENT_METHODS } from './shared/constants';
 
 /* ─── constants ─────────────────────────────────────────────────────────── */
-const LEDGER_FILTERS = ['All', 'Expenses', 'Payments', 'Adjustments'];
+const LEDGER_FILTERS = ['Expenses', 'Payments'];
 const ledgerFilterMatch = {
   Expenses:    ['Expense'],
   Payments:    ['Payment'],
-  Adjustments: ['Adjustment', 'Opening Balance', 'Manual Adjustment'],
 };
 
 /* ─── helpers ───────────────────────────────────────────────────────────── */
@@ -67,19 +66,25 @@ function TxnDetailModal({ txn, agentName, onClose }) {
           <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
             <span className="text-xs font-semibold text-gray-400">Amount</span>
             {txn.debit > 0
-              ? <span className="text-sm font-extrabold text-red-500">₹{txn.debit.toLocaleString('en-IN')} <span className="text-xs font-normal text-gray-400">Debit</span></span>
-              : <span className="text-sm font-extrabold text-green-600">₹{txn.credit.toLocaleString('en-IN')} <span className="text-xs font-normal text-gray-400">Credit</span></span>
+              ? <span className="text-sm font-extrabold text-red-500">₹{txn.debit.toLocaleString('en-IN')} <span className="text-xs font-normal text-gray-400">Expense</span></span>
+              : <span className="text-sm font-extrabold text-green-600">₹{txn.credit.toLocaleString('en-IN')} <span className="text-xs font-normal text-gray-400">Paid</span></span>
             }
           </div>
           <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
-            <span className="text-xs font-semibold text-gray-400">Running Balance</span>
+            <span className="text-xs font-semibold text-gray-400">Balance Due</span>
             <div className="text-right">
-              <span className={`text-sm font-black ${balColor(txn.runningBalance)}`}>
-                ₹{Math.abs(txn.runningBalance).toLocaleString('en-IN')}
-              </span>
-              <span className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${balBg(txn.runningBalance)}`}>
-                {balLabel(txn.runningBalance)}
-              </span>
+              {txn.type === 'Payment' ? (
+                <span className="text-xs font-semibold text-indigo-600">Applied to expenses</span>
+              ) : (
+                <>
+                  <span className={`text-sm font-black ${txn.remainingDue > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                    ₹{Number(txn.remainingDue || 0).toLocaleString('en-IN')}
+                  </span>
+                  <span className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${txn.remainingDue > 0 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
+                    {txn.remainingDue > 0 ? 'Payable' : 'Paid'}
+                  </span>
+                </>
+              )}
             </div>
           </div>
           <div className="flex justify-between items-start py-2.5">
@@ -102,7 +107,7 @@ export default function RTALedger({ vendor, onBack }) {
   const [rawTxns, setRawTxns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('Ledger');
-  const [ledgerFilter, setLedgerFilter] = useState('All');
+  const [ledgerFilter, setLedgerFilter] = useState('Expenses');
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -164,21 +169,44 @@ export default function RTALedger({ vendor, onBack }) {
   /* ── derived ── */
   const txnsWithBalance = useMemo(() => {
     let running = 0;
-    return [...rawTxns]
+    const openExpenses = [];
+    const ordered = [...rawTxns]
       .sort((a, b) => new Date(a.date) - new Date(b.date))
       .map(t => {
         running += (t.debit || 0) - (t.credit || 0);
+        if (t.type === 'Expense') {
+          const expense = { ...t, paidAmount: 0, remainingDue: Number(t.debit || 0) };
+          openExpenses.push(expense);
+          return { ...expense, runningBalance: isCash ? 0 : running };
+        }
+
+        if (t.type === 'Payment') {
+          let paymentLeft = Number(t.credit || 0);
+          for (const expense of openExpenses) {
+            if (paymentLeft <= 0) break;
+            const applied = Math.min(expense.remainingDue, paymentLeft);
+            expense.paidAmount += applied;
+            expense.remainingDue -= applied;
+            paymentLeft -= applied;
+          }
+        }
+
         return { ...t, runningBalance: isCash ? 0 : running };
       });
+    return ordered.map(txn => {
+      const latestExpense = openExpenses.find(expense => expense.id === txn.id);
+      return latestExpense
+        ? { ...txn, paidAmount: latestExpense.paidAmount, remainingDue: latestExpense.remainingDue }
+        : txn;
+    });
   }, [rawTxns, isCash]);
 
   const totalDebit = rawTxns.reduce((s, t) => s + (t.debit || 0), 0);
   const totalCredit = rawTxns.reduce((s, t) => s + (t.credit || 0), 0);
   const outstanding = isCash ? 0 : totalDebit - totalCredit;
-  const lastDate = txnsWithBalance.length ? txnsWithBalance[txnsWithBalance.length - 1].date : null;
 
   const filteredLedger = useMemo(() => txnsWithBalance.filter(t => {
-    if (ledgerFilter !== 'All' && !ledgerFilterMatch[ledgerFilter]?.includes(t.type)) return false;
+    if (!ledgerFilterMatch[ledgerFilter]?.includes(t.type)) return false;
     if (search) {
       const q = search.toLowerCase();
       if (!t.desc?.toLowerCase().includes(q) && !t.ref?.toLowerCase().includes(q) && !(t.truckId || '').toLowerCase().includes(q)) return false;
@@ -262,39 +290,47 @@ export default function RTALedger({ vendor, onBack }) {
           </div>
           {/* Outstanding balance highlight */}
           <div className={`shrink-0 rounded-xl px-4 py-2 text-center border ${balBg(outstanding)}`}>
-            <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">Outstanding</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest opacity-70">Balance Due</p>
             <p className="text-lg font-black">₹{Math.abs(outstanding).toLocaleString('en-IN')}</p>
             <p className="text-[10px] font-bold">{balLabel(outstanding)}</p>
           </div>
         </div>
       </div>
 
-      {/* ── Summary Cards ── */}
-      <SummaryCards totalDebit={totalDebit} totalCredit={totalCredit} lastDate={lastDate} isCash={isCash} />
+      {/* ── Clear financial summary ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          ['Total Expenses', totalDebit, 'Fees recorded for vehicles', 'text-rose-600', 'bg-rose-50'],
+          ['Total Paid', totalCredit, 'Payments made to this agent', 'text-emerald-600', 'bg-emerald-50'],
+          ['Balance Due', outstanding, outstanding > 0 ? 'Still payable' : outstanding < 0 ? 'Advance paid' : 'Fully settled', outstanding > 0 ? 'text-amber-600' : 'text-blue-600', outstanding > 0 ? 'bg-amber-50' : 'bg-blue-50'],
+        ].map(([label, value, sub, color, bg]) => (
+          <div key={label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <span className={`inline-flex rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${bg} ${color}`}>{label}</span>
+            <p className={`mt-2 text-2xl font-black ${color}`}>₹{Math.abs(value).toLocaleString('en-IN')}</p>
+            <p className="mt-1 text-[11px] font-medium text-gray-400">{sub}</p>
+          </div>
+        ))}
+      </div>
 
-      {/* ── Tabs ── */}
+      {/* ── Simple ledger filters ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="flex border-b border-gray-100">
-          {['Expenses', 'Payments', 'Ledger'].map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={`flex-1 py-3.5 text-xs font-bold transition-colors ${
-                activeTab === tab
-                  ? 'text-rose-600 border-b-2 border-rose-600 bg-rose-50/40'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}>
-              {tab}
-              {tab === 'Expenses' && expenses.length > 0 && (
-                <span className="ml-1.5 text-[10px] bg-rose-100 text-rose-600 rounded-full px-1.5 py-0.5 font-black">{expenses.length}</span>
-              )}
-              {tab === 'Payments' && payments.length > 0 && (
-                <span className="ml-1.5 text-[10px] bg-green-100 text-green-600 rounded-full px-1.5 py-0.5 font-black">{payments.length}</span>
-              )}
-            </button>
-          ))}
+        <div className="p-4 border-b border-gray-100">
+          <div className="flex flex-wrap gap-2">
+            {LEDGER_FILTERS.map(filter => (
+              <button key={filter} onClick={() => { setLedgerFilter(filter); setPage(1); }}
+                className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-colors ${
+                  ledgerFilter === filter ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}>
+                {filter}
+                {filter === 'Expenses' && expenses.length > 0 && <span className="ml-1.5 opacity-70">({expenses.length})</span>}
+                {filter === 'Payments' && payments.length > 0 && <span className="ml-1.5 opacity-70">({payments.length})</span>}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* ════ EXPENSES TAB ════ */}
-        {activeTab === 'Expenses' && (
+        {/* Expense records remain available through the simple Expenses filter. */}
+        {false && (
           <div>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50">
               <span className="text-xs font-semibold text-gray-500">{expenses.length} total expenses</span>
@@ -311,7 +347,7 @@ export default function RTALedger({ vendor, onBack }) {
                     <th className="py-3 px-4 text-left">Expense Type</th>
                     <th className="py-3 px-4 text-left">Reference</th>
                     <th className="py-3 px-4 text-left">Vehicle</th>
-                    <th className="py-3 px-4 text-right">Amount</th>
+                    <th className="py-3 px-4 text-right">Expense Amount</th>
                     <th className="py-3 px-4 text-left">Status</th>
                   </tr>
                 </thead>
@@ -350,8 +386,8 @@ export default function RTALedger({ vendor, onBack }) {
           </div>
         )}
 
-        {/* ════ PAYMENTS TAB ════ */}
-        {activeTab === 'Payments' && (
+        {/* Payment records remain available through the simple Payments filter. */}
+        {false && (
           <div>
             <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50">
               <span className="text-xs font-semibold text-gray-500">{payments.length} total payments</span>
@@ -369,7 +405,7 @@ export default function RTALedger({ vendor, onBack }) {
                     <th className="py-3 px-4 text-left">Date</th>
                     <th className="py-3 px-4 text-left">Payment Mode</th>
                     <th className="py-3 px-4 text-left">Reference</th>
-                    <th className="py-3 px-4 text-right">Amount</th>
+                    <th className="py-3 px-4 text-right">Paid Amount</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -416,14 +452,8 @@ export default function RTALedger({ vendor, onBack }) {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                {LEDGER_FILTERS.map(f => (
-                  <button key={f} onClick={() => { setLedgerFilter(f); setPage(1); }}
-                    className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
-                      ledgerFilter === f ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                    }`}>{f}</button>
-                ))}
-                {(search || dateFrom || dateTo || ledgerFilter !== 'All') && (
-                  <button onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setLedgerFilter('All'); setPage(1); }}
+                {(search || dateFrom || dateTo) && (
+                  <button onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setPage(1); }}
                     className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-red-500 bg-red-50 hover:bg-red-100 transition-colors">Clear</button>
                 )}
               </div>
@@ -444,9 +474,9 @@ export default function RTALedger({ vendor, onBack }) {
                       <th className="py-3 px-4 text-left">Type</th>
                       <th className="py-3 px-4 text-left">Reference</th>
                       <th className="py-3 px-4 text-left">Description</th>
-                      <th className="py-3 px-4 text-right">Debit</th>
-                      <th className="py-3 px-4 text-right">Credit</th>
-                      <th className="py-3 px-4 text-right">Balance</th>
+                      <th className="py-3 px-4 text-right">Expense</th>
+                      <th className="py-3 px-4 text-right">Paid</th>
+                      <th className="py-3 px-4 text-right">Balance Due</th>
                       <th className="py-3 px-4 text-center">Action</th>
                     </tr>
                   </thead>
@@ -467,18 +497,26 @@ export default function RTALedger({ vendor, onBack }) {
                           }
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap">
-                          {txn.credit > 0
-                            ? <span className="text-xs font-black text-green-600">₹{txn.credit.toLocaleString('en-IN')}</span>
+                          {txn.type === 'Expense' && txn.paidAmount > 0
+                            ? <span className="text-xs font-black text-green-600">₹{txn.paidAmount.toLocaleString('en-IN')}</span>
+                            : txn.credit > 0
+                              ? <span className="text-xs font-black text-green-600">₹{txn.credit.toLocaleString('en-IN')}</span>
                             : <span className="text-gray-300 font-bold text-xs">—</span>
                           }
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap">
-                          <div className={`text-xs font-black ${balColor(txn.runningBalance)}`}>
-                            ₹{Math.abs(txn.runningBalance).toLocaleString('en-IN')}
-                          </div>
-                          <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border inline-block mt-0.5 ${balBg(txn.runningBalance)}`}>
-                            {balLabel(txn.runningBalance)}
-                          </div>
+                          {txn.type === 'Payment' ? (
+                            <span className="text-[10px] font-semibold text-indigo-600">Applied above</span>
+                          ) : (
+                            <>
+                              <div className={`text-xs font-black ${txn.remainingDue > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                ₹{Number(txn.remainingDue || 0).toLocaleString('en-IN')}
+                              </div>
+                              <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border inline-block mt-0.5 ${txn.remainingDue > 0 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
+                                {txn.remainingDue > 0 ? 'Payable' : 'Paid'}
+                              </div>
+                            </>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button onClick={() => setSelectedTxn(txn)}
@@ -489,20 +527,6 @@ export default function RTALedger({ vendor, onBack }) {
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot>
-                    <tr className="border-t-2 border-gray-200 bg-gray-50/80">
-                      <td colSpan={4} className="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wide">Page Totals</td>
-                      <td className="px-4 py-3 text-right"><span className="text-xs font-black text-red-500">₹{paginated.reduce((s,t)=>s+(t.debit||0),0).toLocaleString('en-IN')}</span></td>
-                      <td className="px-4 py-3 text-right"><span className="text-xs font-black text-green-600">₹{paginated.reduce((s,t)=>s+(t.credit||0),0).toLocaleString('en-IN')}</span></td>
-                      <td colSpan={2} className="px-4 py-3 text-right">
-                        {paginated.length > 0 && (
-                          <span className={`text-xs font-black ${balColor(paginated[paginated.length-1].runningBalance)}`}>
-                            ₹{Math.abs(paginated[paginated.length-1].runningBalance).toLocaleString('en-IN')}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  </tfoot>
                 </table>
               )}
             </div>

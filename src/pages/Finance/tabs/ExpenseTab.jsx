@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { TrendingDown, Plus, Eye, Fuel, Wrench, CircleDot, BatteryCharging, UserRound, Utensils, Route, MoreHorizontal, Landmark } from "lucide-react";
 import Modal from "../components/Modal";
@@ -86,6 +86,8 @@ const CATEGORY_ICON_MAP = {
     Toll: Route,
     Miscellaneous: MoreHorizontal,
 };
+
+  const PAYMENT_METHODS = ["Cash", "Bank Transfer", "UPI", "Cheque", "Other"];
 
 function normalizeCategory(category) {
   const map = {
@@ -187,14 +189,43 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
   const [tripContext, setTripContext] = useState(prefetchedTripContext);
   const [tripCostsLoading, setTripCostsLoading] = useState(Boolean(initialTripId && !hasPrefetchedExpenses && !hasPrefetchedFuel));
   const [tripCostsError, setTripCostsError] = useState("");
+  const expenseFetchVersion = useRef(0);
 
   const fetchExpenses = async () => {
+    const requestVersion = ++expenseFetchVersion.current;
     try {
-      const res = await fetch("http://localhost:5001/api/expenses");
+      const res = await fetch(`http://localhost:5001/api/expenses?_=${Date.now()}`, {
+        cache: "no-store",
+      });
       const data = await res.json();
-      if (data.success) setExpenseList(data.data || []);
+      if (data.success && requestVersion === expenseFetchVersion.current) {
+        const nextExpenses = data.data || [];
+        setExpenseList(nextExpenses);
+        return nextExpenses;
+      }
     } catch (error) {
       console.error("Failed to fetch expenses:", error);
+    }
+    return [];
+  };
+
+  const refreshCreatedExpense = async (expenseId) => {
+    const refreshed = await fetchExpenses();
+    if (refreshed.some(expense => String(expense.id) === String(expenseId))) return;
+
+    try {
+      const response = await fetch(`http://localhost:5001/api/expenses/${expenseId}?_=${Date.now()}`, {
+        cache: "no-store",
+      });
+      const result = await response.json();
+      if (result.success && result.data) {
+        setExpenseList(current => [
+          result.data,
+          ...current.filter(expense => String(expense.id) !== String(result.data.id)),
+        ]);
+      }
+    } catch (error) {
+      console.error("Failed to refresh created expense:", error);
     }
   };
 
@@ -634,8 +665,9 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
             if (data.success) {
               alert("Expense saved successfully");
               setTripForm({ category: "", amount: "", date: "", vendor: "", description: "", otherNote: "", paymentMethod: "", truck: "" });
-              fetchExpenses();
+              await refreshCreatedExpense(data.expenseId);
               setView("list");
+              requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
             } else alert(data.message || "Failed to save");
           } catch { alert("Server error"); }
           finally { setTripFormLoading(false); }
@@ -722,6 +754,10 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
             <TrendingDown className="w-4 h-4 text-red-500" /> Expense Logs
           </h2>
           <p className="text-xs text-gray-500 mt-0.5">View all your expense history</p>
+          <p className="text-[11px] font-semibold text-indigo-500 mt-1">
+            Showing {groupedExpenses.length} of {expenseList.length} expense records
+            {selectedTruck !== "All" ? " for the selected vehicle" : " across all vehicles"}
+          </p>
         </div>
         <Can module="Income & Expense" action="create">
           <button
@@ -767,7 +803,7 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
         {filtered.length === 0 ? (
           <div className="py-14 text-center text-gray-400 text-sm">No expense records found for the selected filters.</div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-gray-50 max-h-[620px] overflow-y-auto">
             {groupedExpenses.map((txn) => (
               <div
                 key={txn.id}

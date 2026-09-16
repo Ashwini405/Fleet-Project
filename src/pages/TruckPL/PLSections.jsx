@@ -350,6 +350,21 @@ export function MaintenanceSection({ data, total, prevTotal }) {
 // ── 4. Tyre Section ───────────────────────────────────────────────────────────
 export function TyreSection({ data, total, prevTotal, vehicleNumber }) {
   const navigate = useNavigate();
+  const tyreVendors = [...new Map((data.records || [])
+    .filter(record => record.vendorId || record.vendorName)
+    .map(record => [
+      record.vendorId || String(record.vendorName).trim().toLowerCase(),
+      { id: record.vendorId, name: record.vendorName },
+    ])).values()];
+  const vendorParams = new URLSearchParams({ category: 'tyres' });
+  if (tyreVendors.length === 1) {
+    if (tyreVendors[0].id) vendorParams.set('vendor_id', String(tyreVendors[0].id));
+    if (tyreVendors[0].name) vendorParams.set('vendor_name', tyreVendors[0].name);
+  } else if (tyreVendors.length > 1) {
+    vendorParams.set('vendor_ids', tyreVendors.filter(v => v.id).map(v => v.id).join(','));
+    vendorParams.set('vendor_names', tyreVendors.filter(v => v.name).map(v => v.name).join('|'));
+  }
+  const vendorPath = `/vendors?${vendorParams.toString()}`;
   const typeBadge = (t) => {
     if (t === 'Purchase')    return 'bg-indigo-50 text-indigo-700 border-indigo-200';
     if (t === 'Retreading')  return 'bg-blue-50 text-blue-700 border-blue-200';
@@ -362,7 +377,7 @@ export function TyreSection({ data, total, prevTotal, vehicleNumber }) {
       total={total} totalLabel="Total Tyre Cost" accent="purple" prevTotal={prevTotal}
       source="Tyre Vendor Ledger" records={`${data.transactions || 0} Transactions`}
       viewLabel="View Tyre Vendors →"
-      viewPath="/vendors?category=tyres"
+      viewPath={vendorPath}
     >
       <PLTable
         cols={[
@@ -375,13 +390,13 @@ export function TyreSection({ data, total, prevTotal, vehicleNumber }) {
         ]}
         rows={data.records || []}
         onRowClick={row => {
-          if (!row.vendorId) return;
           const params = new URLSearchParams({
             category: 'tyres',
-            vendor_id: String(row.vendorId),
             tyre_number: row.tyreNumber || '',
             txn_type: row.type || '',
           });
+          if (row.vendorId) params.set('vendor_id', String(row.vendorId));
+          if (row.vendorName) params.set('vendor_name', row.vendorName);
           navigate(`/vendors?${params.toString()}`);
         }}
       />
@@ -485,7 +500,7 @@ export function RTASection({ data, total, prevTotal }) {
 }
 
 // ── EMI Section ────────────────────────────────────────────────────────────────
-export function EmiSection({ data, total, prevTotal }) {
+export function EmiSection({ data, total, prevTotal, vehicleId }) {
   const emiAmount = data?.emiAmount || 0;
   const paymentsCount = data?.paymentsCount || 0;
   const loanTenure = data?.loanTenure;
@@ -496,7 +511,7 @@ export function EmiSection({ data, total, prevTotal }) {
       total={total} totalLabel="Total EMI Paid" accent="amber" prevTotal={prevTotal}
       source="Vehicle Master / EMI Tracker"
       records={`${paymentsCount} Payment${paymentsCount !== 1 ? 's' : ''}${loanTenure ? ` of ${loanTenure}` : ''}`}
-      viewLabel="View Vehicle →" viewPath="/vehicles"
+      viewLabel="View Vehicle →" viewPath={`/vehicles/${vehicleId}`}
     >
       {emiAmount > 0 ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

@@ -67,9 +67,13 @@ export default function TyresLedger({ vendor, onBack, onLedgerUpdated, initialTy
   useEffect(() => {
     if (!initialTyreNumber || rawTxns.length === 0) return;
     const requestedType = String(initialTxnType || '').toLowerCase();
+    const requestedTyre = String(initialTyreNumber).trim().toLowerCase();
     const match = rawTxns.find(txn => {
-      const text = `${txn.ref || ''} ${txn.desc || ''}`.toLowerCase();
-      const tyreMatch = text.includes(String(initialTyreNumber).toLowerCase());
+      const text = [txn.tyreNumber, txn.tyreNo, txn.tyreProfile?.tyreNumber, txn.ref, txn.desc]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      const tyreMatch = text.includes(requestedTyre);
       const typeMatch = !requestedType || (
         requestedType === 'retreading'
           ? txn.type === 'Retreading Service'

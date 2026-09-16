@@ -184,6 +184,7 @@ const getRevenue = async (vehicleId, startDate = null, endDate = null) => {
 const getFuel = async (vehicleId, startDate = null, endDate = null) => {
 
   const dateFilter = (startDate && endDate) ? " AND date BETWEEN ? AND ?" : "";
+  const manualDateFilter = (startDate && endDate) ? " AND expense_date BETWEEN ? AND ?" : "";
 
   const [rows] = await db.query(
     `
@@ -203,6 +204,14 @@ const getFuel = async (vehicleId, startDate = null, endDate = null) => {
     dateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
   );
 
+  const [manualRows] = await db.query(
+    `SELECT expense_date AS date, vendor_payee, description, amount
+     FROM expense_entries
+     WHERE vehicle_id = ? AND expense_category = 'Fuel'
+     ${manualDateFilter}`,
+    manualDateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
+  );
+
   const entries = rows.map(row => ({
     date: row.date,
     station: row.station_name || row.vendor || "—",
@@ -210,6 +219,15 @@ const getFuel = async (vehicleId, startDate = null, endDate = null) => {
     rate: Number(row.rate),
     amount: Number(row.total_cost),
     fuelType: row.fuel_type
+  }));
+
+  manualRows.forEach(row => entries.push({
+    date: row.date,
+    station: row.vendor_payee || row.description || 'Manual fuel expense',
+    litres: 0,
+    rate: 0,
+    amount: Number(row.amount || 0),
+    fuelType: 'Diesel'
   }));
 
   const adBlueEntries = entries.filter(e => e.fuelType === 'AdBlue');
@@ -339,6 +357,15 @@ const getMaintenance = async (vehicleId, startDate = null, endDate = null) => {
     params
   );
 
+  const manualDateFilter = (startDate && endDate) ? " AND expense_date BETWEEN ? AND ?" : "";
+  const [manualRows] = await db.query(
+    `SELECT expense_date, expense_category, vendor_payee, description, amount
+     FROM expense_entries
+     WHERE vehicle_id = ? AND expense_category = 'Maintenance'
+     ${manualDateFilter}`,
+    manualDateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
+  );
+
   const records = [];
 
   serviceRows.forEach(row => {
@@ -372,6 +399,13 @@ const getMaintenance = async (vehicleId, startDate = null, endDate = null) => {
     });
 
   });
+
+  manualRows.forEach(row => records.push({
+    date: row.expense_date,
+    type: row.expense_category,
+    garage: row.vendor_payee || '-',
+    amount: Number(row.amount || 0)
+  }));
 
   records.sort(
     (a, b) =>
@@ -416,7 +450,7 @@ const getTyres = async (vehicleId, vehicleNumber, startDate = null, endDate = nu
       tyres.model,
       tyres.tyre_cost
     FROM tyres
-    LEFT JOIN tyre_vendors tv ON tv.vendor_name = tyres.vendor_name
+    LEFT JOIN tyre_vendors tv ON LOWER(TRIM(tv.vendor_name)) = LOWER(TRIM(tyres.vendor_name))
     WHERE (
       vehicle_id = ?
       OR vehicle_number = ?
@@ -450,7 +484,7 @@ const getTyres = async (vehicleId, vehicleNumber, startDate = null, endDate = nu
       retreading_cost
     FROM tyre_service_history tsh
     LEFT JOIN tyres t ON t.tyre_number = tsh.tyre_number
-    LEFT JOIN tyre_vendors tv ON tv.vendor_name = t.vendor_name
+    LEFT JOIN tyre_vendors tv ON LOWER(TRIM(tv.vendor_name)) = LOWER(TRIM(t.vendor_name))
     WHERE (
       tsh.vehicle_id = ?
       OR tsh.vehicle_no = ?
@@ -466,6 +500,44 @@ const getTyres = async (vehicleId, vehicleNumber, startDate = null, endDate = nu
     serviceDateFilter
       ? [vehicleId, vehicleNumber, vehicleId, vehicleNumber, startDate, endDate]
       : [vehicleId, vehicleNumber, vehicleId, vehicleNumber]
+  );
+
+  // Retreading jobs are stored separately from tyre service history.
+  // Include completed jobs in the vehicle P&L using the actual vendor cost.
+  const retreadDateFilter = (startDate && endDate) ? " AND COALESCE(return_date, sent_date) BETWEEN ? AND ?" : "";
+  const [retreadRows] = await db.query(
+    `
+    SELECT
+      tr.id,
+      COALESCE(tr.return_date, tr.sent_date) AS retread_date,
+      tr.vendor_name,
+      tr.vendor_id,
+      tr.tyre_no,
+      tr.actual_cost,
+      tr.status
+    FROM tyre_retreading tr
+    LEFT JOIN tyres t ON t.tyre_number = tr.tyre_no
+    WHERE (
+      TRIM(tr.vehicle_no) = TRIM(?)
+      OR tr.tyre_id = ?
+      OR t.vehicle_id = ?
+      OR t.vehicle_number = ?
+    )
+      AND COALESCE(tr.actual_cost, 0) > 0
+    ${retreadDateFilter}
+    `,
+    retreadDateFilter
+      ? [vehicleNumber, vehicleId, vehicleId, vehicleNumber, startDate, endDate]
+      : [vehicleNumber, vehicleId, vehicleId, vehicleNumber]
+  );
+
+  const expenseDateFilter = (startDate && endDate) ? " AND expense_date BETWEEN ? AND ?" : "";
+  const [manualExpenseRows] = await db.query(
+    `SELECT expense_date, vendor_payee, description, amount
+     FROM expense_entries
+     WHERE vehicle_id = ? AND expense_category IN ('Tyre', 'Tyres')
+     ${expenseDateFilter}`,
+    expenseDateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
   );
 
   const records = [];
@@ -557,6 +629,28 @@ const getTyres = async (vehicleId, vehicleNumber, startDate = null, endDate = nu
       new Date(b.date) - new Date(a.date)
   );
 
+  retreadRows.forEach(row => {
+    records.push({
+      date: row.retread_date,
+      type: "Retreading",
+      description: "Retreading Cost",
+      vendorId: row.vendor_id,
+      vendorName: row.vendor_name,
+      tyreNumber: row.tyre_no,
+      amount: Number(row.actual_cost)
+    });
+  });
+
+  manualExpenseRows.forEach(row => records.push({
+    date: row.expense_date,
+    type: 'Expense',
+    description: row.description || 'Manual tyre expense',
+    vendorId: null,
+    vendorName: row.vendor_payee || null,
+    tyreNumber: null,
+    amount: Number(row.amount || 0)
+  }));
+
   const totalTyres =
     records.reduce(
       (sum, row) =>
@@ -580,35 +674,35 @@ const getTyres = async (vehicleId, vehicleNumber, startDate = null, endDate = nu
 // Get Battery Expenses
 // ============================================
 const getBattery = async (vehicleId, startDate = null, endDate = null) => {
-
   const dateFilter = (startDate && endDate) ? " AND purchase_date BETWEEN ? AND ?" : "";
+  const manualDateFilter = (startDate && endDate) ? " AND expense_date BETWEEN ? AND ?" : "";
 
   const [rows] = await db.query(
-    `
-    SELECT
-      purchase_date,
-      brand,
-      model,
-      purchase_cost,
-      status
-    FROM batteries
-    WHERE vehicle_id = ?
-    ${dateFilter}
-    ORDER BY purchase_date DESC
-    `,
+    `SELECT purchase_date, brand, model, purchase_cost, status
+     FROM batteries
+     WHERE vehicle_id = ? ${dateFilter}
+     ORDER BY purchase_date DESC`,
     dateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
+  );
+  const [manualRows] = await db.query(
+    `SELECT expense_date, expense_category, description, amount
+     FROM expense_entries
+     WHERE vehicle_id = ? AND expense_category IN ('Battery', 'Batteries')
+     ${manualDateFilter}`,
+    manualDateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
   );
 
   const records = rows.map(row => ({
-
     date: row.purchase_date,
-
     type: row.status,
-
     description: `${row.brand} ${row.model}`,
-
     amount: Number(row.purchase_cost)
-
+  }));
+  manualRows.forEach(row => records.push({
+    date: row.expense_date,
+    type: row.expense_category,
+    description: row.description || 'Manual battery expense',
+    amount: Number(row.amount || 0)
   }));
 
   const totalBattery =
@@ -659,12 +753,23 @@ const getEmiCost = async (vehicleId, startDate = null, endDate = null) => {
   const emiAmount = Number(row?.emi_amount || 0);
   const paymentsCount = Number(row?.paymentsCount || 0);
 
+  const manualDateFilter = (startDate && endDate) ? " AND expense_date BETWEEN ? AND ?" : "";
+  const [manualRows] = await db.query(
+    `SELECT COALESCE(SUM(amount), 0) AS total
+     FROM expense_entries
+     WHERE vehicle_id = ? AND expense_category = 'EMI'
+     ${manualDateFilter}`,
+    manualDateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
+  );
+  const manualEmiTotal = Number(manualRows[0]?.total || 0);
+
   return {
     emiAmount,
     financierName: row?.financier_name || null,
     loanTenure: row?.loan_tenure || null,
     paymentsCount,
-    totalEMI: emiAmount * paymentsCount
+    manualEmiTotal,
+    totalEMI: (emiAmount * paymentsCount) + manualEmiTotal
   };
 };
 
@@ -699,6 +804,15 @@ LIMIT 1
 [vehicleId]
 );
 
+  const [manualRows] = await db.query(
+    `SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
+     FROM expense_entries
+     WHERE vehicle_id = ? AND expense_category IN ('Driver Salary', 'Salary')`,
+    [vehicleId]
+  );
+  const manualSalaryTotal = Number(manualRows[0]?.total || 0);
+  const manualSalaryCount = Number(manualRows[0]?.count || 0);
+
   if (!rows.length) {
 
     return {
@@ -709,10 +823,11 @@ LIMIT 1
 
       totalDeductions: 0,
 
-      netDriverCost: 0
+      netDriverCost: manualSalaryTotal,
+      manualSalaryTotal,
+      manualSalaryCount
 
     };
-
   }
 
   const s = rows[0];
@@ -725,7 +840,9 @@ LIMIT 1
 
     totalDeductions: Number(s.total_deductions),
 
-    netDriverCost: Number(s.net_payable)
+    netDriverCost: Number(s.net_payable) + manualSalaryTotal,
+    manualSalaryTotal,
+    manualSalaryCount
 
   };
 
@@ -805,9 +922,13 @@ const getMiscExpenses = async (vehicleId, startDate = null, endDate = null) => {
       'Fuel',
       'Maintenance',
       'Tyre',
+      'Tyres',
       'Battery',
+      'Batteries',
       'Driver Settlement',
       'Salary',
+      'Driver Salary',
+      'EMI',
       'RTA'
     )
     ${dateFilter}
@@ -946,6 +1067,7 @@ const getTruckPLList = async (startDate = null, endDate = null, options = {}) =>
                         SELECT 1 FROM income_entries ie
                         WHERE ie.trip_id = trips.id OR ie.trip_id = trips.trip_id
                     ) THEN freight_amount ELSE 0 END), 0) AS trip_revenue
+
            FROM trips
            WHERE vehicle_id IN (?)
              ${tripDateFilter}
@@ -1011,7 +1133,7 @@ const getTruckPLList = async (startDate = null, endDate = null, options = {}) =>
                 COALESCE(SUM(CASE WHEN expense_category = 'EMI' THEN amount ELSE 0 END),0) AS emi_total
              FROM expense_entries
              WHERE vehicle_id IN (?)
-               AND expense_category NOT IN ('Fuel','Maintenance','Tyre','Battery','Driver Settlement','Salary','RTA')
+               AND expense_category NOT IN ('Fuel','Maintenance','Tyre','Tyres','Battery','Batteries','Driver Salary','Driver Settlement','Salary','EMI','RTA')
                ${miscDateFilter}
              GROUP BY vehicle_id`,
             [vehicleIds, ...dateParams]
