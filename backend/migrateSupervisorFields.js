@@ -24,6 +24,13 @@ async function run() {
     console.log('supervisors.notes already exists');
   }
 
+  if (!(await columnExists('supervisors', 'wallet_balance'))) {
+    await db.query(`ALTER TABLE supervisors ADD COLUMN wallet_balance DECIMAL(10,2) DEFAULT 0.00`);
+    console.log('Added supervisors.wallet_balance');
+  } else {
+    console.log('supervisors.wallet_balance already exists');
+  }
+
   // Backfill a code for any existing supervisors that don't have one yet
   const [rows] = await db.query(
     `SELECT id FROM supervisors WHERE supervisor_code IS NULL OR supervisor_code = '' ORDER BY id`

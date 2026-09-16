@@ -92,6 +92,8 @@ import React from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X, MapPin, Phone, Briefcase, CalendarCheck, Trash2, Edit } from 'lucide-react';
 
+const UPLOADS_BASE_URL = 'http://localhost:5001/uploads/';
+
 export default function ViewSupervisorModal({ isOpen, onClose, staff, onSuccess, onEdit }) {
   if (!isOpen || !staff) return null;
 
@@ -139,9 +141,17 @@ export default function ViewSupervisorModal({ isOpen, onClose, staff, onSuccess,
             <div className="space-y-4">
               <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white grid place-items-center text-xl font-bold">
-                    {(staff.full_name || '').split(' ').map((n) => n[0]).join('')}
-                  </div>
+                  {staff.profile_photo ? (
+                    <img
+                      src={`${UPLOADS_BASE_URL}${staff.profile_photo}`}
+                      alt={`${staff.full_name || 'Supervisor'} profile`}
+                      className="w-14 h-14 rounded-2xl object-cover"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white grid place-items-center text-xl font-bold">
+                      {(staff.full_name || '').split(' ').map((n) => n[0]).join('')}
+                    </div>
+                  )}
                   <div>
                     <h3 className="font-bold text-gray-900">{staff.full_name}</h3>
                     <p className="text-sm text-gray-500">Supervisor ID • {staff.supervisor_code || '—'}</p>
@@ -196,6 +206,23 @@ export default function ViewSupervisorModal({ isOpen, onClose, staff, onSuccess,
                 </div>
               </div>
 
+              {/* Wallet Balance */}
+              <div className={`p-5 rounded-3xl border ${
+                (staff.wallet_balance ?? 0) < 1000
+                  ? 'bg-red-50 border-red-200'
+                  : 'bg-green-50 border-green-200'
+              }`}>
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">Wallet Balance</p>
+                <p className={`text-2xl font-black ${
+                  (staff.wallet_balance ?? 0) < 1000 ? 'text-red-600' : 'text-green-700'
+                }`}>
+                  ₹{Number(staff.wallet_balance ?? 0).toLocaleString('en-IN')}
+                </p>
+                {(staff.wallet_balance ?? 0) < 1000 && (
+                  <p className="text-xs text-red-500 font-semibold mt-1">⚠️ Low balance — top up needed</p>
+                )}
+              </div>
+
               {/* Documents */}
               <div className="p-5 bg-white rounded-3xl border border-gray-100">
                 <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">Documents</p>
@@ -209,7 +236,7 @@ export default function ViewSupervisorModal({ isOpen, onClose, staff, onSuccess,
                       <span className="text-xs text-slate-600 font-medium">{doc.label}</span>
                       {doc.file ? (
                         <a
-                          href={`http://localhost:5001/uploads/${doc.file}`}
+                          href={`${UPLOADS_BASE_URL}${doc.file}`}
                           target="_blank"
                           rel="noreferrer"
                           className="text-xs font-bold text-blue-600 hover:text-blue-800"

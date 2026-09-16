@@ -1,15 +1,15 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   FiArrowLeft, FiPlus, FiEye, FiX, FiInbox, FiSearch,
-  FiCalendar, FiChevronLeft, FiChevronRight,
+  FiChevronLeft, FiChevronRight,
   FiDownload, FiPrinter, FiPhone, FiMapPin, FiDroplet, FiZap,
 } from 'react-icons/fi';
 import axios from 'axios';
-import { TypeBadge, RecordPaymentModal, SummaryCards } from './shared';
+import { TypeBadge, RecordPaymentModal } from './shared';
 import { PAGE_SIZE, MODAL_ANIM } from './shared/constants';
 
 /* ── constants ─────────────────────────────────────────────────────────── */
-const FILTERS = ['All', 'Fuel Fills', 'Payments', 'Adjustments'];
+const FILTERS = ['Fuel Fills', 'Payments', 'Adjustments'];
 const filterMatch = {
   'Fuel Fills':  ['Fuel Fill'],
   Payments:      ['Payment'],
@@ -44,6 +44,12 @@ function balanceLabel(b) {
   if (b > 0)  return 'Payable';
   if (b < 0)  return 'Advance';
   return 'Settled';
+}
+
+function balanceMeaning(b) {
+  if (b > 0) return 'Amount still due';
+  if (b < 0) return 'Advance / overpaid';
+  return 'Fully settled';
 }
 
 function balanceBg(b) {
@@ -145,15 +151,39 @@ function FuelVendorCard({ vendor }) {
   );
 }
 
+function FuelFinanceSummary({ totalCost, totalPaid, isCash }) {
+  const balanceDue = isCash ? 0 : Math.max(0, totalCost - totalPaid);
+  const cards = [
+    { label: 'Total Fuel Cost', value: totalCost, color: 'text-red-600', bg: 'bg-red-50', sub: 'Fuel purchased' },
+    { label: 'Total Paid', value: totalPaid, color: 'text-green-600', bg: 'bg-green-50', sub: isCash ? 'Paid at purchase' : 'Payments recorded' },
+    { label: 'Balance Due', value: balanceDue, color: balanceDue > 0 ? 'text-amber-600' : 'text-green-600', bg: balanceDue > 0 ? 'bg-amber-50' : 'bg-green-50', sub: balanceDue > 0 ? 'Still payable' : 'Fully settled' },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {cards.map(card => (
+        <div key={card.label} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <div className={`inline-flex px-2.5 py-1 rounded-lg ${card.bg} ${card.color} text-[10px] font-black uppercase tracking-widest`}>
+            {card.label}
+          </div>
+          <div className={`mt-3 text-2xl font-black ${card.color}`}>₹{card.value.toLocaleString('en-IN')}</div>
+          <div className="mt-1 text-[11px] font-medium text-gray-400">{card.sub}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ════════════════════════════════════════════════════════════════════════ */
 export default function FuelLedger({ vendor, onBack }) {
   const isCash = (vendor.payment_terms || 'credit') === 'cash';
+  const visibleFilters = isCash ? [] : ['Payments'];
   const [rawTxns, setRawTxns] = useState([]);
   const [poList, setPoList] = useState([]);
-  const [activeFilter, setActiveFilter] = useState('All');
+  const [activeFilter, setActiveFilter] = useState('Fuel Fills');
   const [search,       setSearch]       = useState('');
-  const [dateFrom,     setDateFrom]     = useState('');
-  const [dateTo,       setDateTo]       = useState('');
+  const [vehicleFilter, setVehicleFilter] = useState('');
+  const [fuelTypeFilter, setFuelTypeFilter] = useState('');
   const [page,         setPage]         = useState(1);
   const [selectedTxn,  setSelectedTxn]  = useState(null);
   const [payModalOpen, setPayModalOpen] = useState(false);
@@ -170,12 +200,15 @@ export default function FuelLedger({ vendor, onBack }) {
         const transactions = response.data.transactions || [];
         setRawTxns(transactions);
         setPoList(
-          transactions.map((txn) => ({
-            poRef: txn.ref,
+          transactions.filter(txn => txn.type === 'Fuel Fill').map((txn) => ({
+            poKey: String(txn.id),
+            poRef: txn.ref || `Fuel ${txn.tripNumber || txn.truckId || txn.id}`,
             desc: txn.desc,
+            vehicle: txn.truckId,
+            trip: txn.tripNumber,
             date: txn.date,
             amount: txn.debit || 0,
-            paidAmount: 0,
+            paidAmount: txn.paidAmount || txn.credit || 0,
             allocations: [],
           }))
         );
@@ -210,24 +243,30 @@ export default function FuelLedger({ vendor, onBack }) {
   const totalDebit = txnsWithBalance.reduce((sum, txn) => sum + Number(txn.debit || 0), 0);
   const totalCredit = txnsWithBalance.reduce((sum, txn) => sum + Number(txn.credit || 0), 0);
   const lastDate = txnsWithBalance.length ? txnsWithBalance[txnsWithBalance.length - 1].date : null;
+  const vehicleOptions = useMemo(() => [...new Set(txnsWithBalance.map(t => t.truckId).filter(Boolean))].sort(), [txnsWithBalance]);
+  const fuelTypeOptions = useMemo(() => [...new Set(txnsWithBalance.map(t => t.fuelType).filter(Boolean))].sort(), [txnsWithBalance]);
 
   const filtered = useMemo(() => txnsWithBalance.filter(t => {
-    if (activeFilter !== 'All' && !filterMatch[activeFilter]?.includes(t.type)) return false;
+    if (!filterMatch[activeFilter]?.includes(t.type)) return false;
+    if (vehicleFilter && t.truckId !== vehicleFilter) return false;
+    if (fuelTypeFilter && t.fuelType !== fuelTypeFilter) return false;
     if (search) {
       const q = search.toLowerCase();
       const hit =
         t.desc?.toLowerCase().includes(q) ||
         t.ref?.toLowerCase().includes(q)  ||
-        (t.truckId || '').toLowerCase().includes(q);
+        (t.truckId || '').toLowerCase().includes(q) ||
+        String(t.tripNumber || '').toLowerCase().includes(q) ||
+        (t.driverName || '').toLowerCase().includes(q);
       if (!hit) return false;
     }
-    if (dateFrom && t.date < dateFrom) return false;
-    if (dateTo   && t.date > dateTo)   return false;
     return true;
-  }), [txnsWithBalance, activeFilter, search, dateFrom, dateTo]);
+  }), [txnsWithBalance, activeFilter, search, vehicleFilter, fuelTypeFilter]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const isPaymentFilter = activeFilter === 'Payments';
+  const showOutstanding = !isCash && !isPaymentFilter;
 
   /* payment handler — RecordPaymentModal already POSTs the payment itself and
      calls onSave() with no arguments; refetch from the server instead of
@@ -282,7 +321,7 @@ export default function FuelLedger({ vendor, onBack }) {
       <FuelVendorCard vendor={vendor} />
 
       {/* Summary cards */}
-      <SummaryCards totalDebit={totalDebit} totalCredit={totalCredit} lastDate={lastDate} isCash={isCash} />
+      <FuelFinanceSummary totalCost={totalDebit} totalPaid={totalCredit} isCash={isCash} />
 
       {/* Ledger table card */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -295,28 +334,40 @@ export default function FuelLedger({ vendor, onBack }) {
               <input
                 type="text" value={search}
                 onChange={e => { setSearch(e.target.value); setPage(1); }}
-                placeholder="Search reference, vehicle, description…"
+                placeholder="Search trip, vehicle, driver…"
                 className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-200"
               />
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <FiCalendar size={13} className="text-gray-400 shrink-0" />
-              <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-                className="border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-400" />
-              <span className="text-gray-300 font-bold">–</span>
-              <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }}
-                className="border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-amber-400" />
-            </div>
+            <select
+              value={vehicleFilter}
+              onChange={e => { setVehicleFilter(e.target.value); setPage(1); }}
+              className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:border-amber-400"
+            >
+              <option value="">All Vehicles</option>
+              {vehicleOptions.map(vehicle => <option key={vehicle} value={vehicle}>{vehicle}</option>)}
+            </select>
+            <select
+              value={fuelTypeFilter}
+              onChange={e => { setFuelTypeFilter(e.target.value); setPage(1); }}
+              className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:border-amber-400"
+            >
+              <option value="">All Fuel Types</option>
+              {fuelTypeOptions.map(fuelType => <option key={fuelType} value={fuelType}>{fuelType}</option>)}
+            </select>
           </div>
           <div className="flex flex-wrap gap-2">
-            {FILTERS.map(f => (
+            <button onClick={() => { setActiveFilter('Fuel Fills'); setPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
+                activeFilter === 'Fuel Fills' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}>Fuel Records</button>
+            {visibleFilters.map(f => (
               <button key={f} onClick={() => { setActiveFilter(f); setPage(1); }}
                 className={`px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
                   activeFilter === f ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                 }`}>{f}</button>
             ))}
-            {(search || dateFrom || dateTo || activeFilter !== 'All') && (
-              <button onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setActiveFilter('All'); setPage(1); }}
+            {(search || vehicleFilter || fuelTypeFilter || activeFilter !== 'Fuel Fills') && (
+              <button onClick={() => { setSearch(''); setVehicleFilter(''); setFuelTypeFilter(''); setActiveFilter('Fuel Fills'); setPage(1); }}
                 className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-red-500 bg-red-50 hover:bg-red-100 transition-colors">
                 Clear
               </button>
@@ -340,11 +391,11 @@ export default function FuelLedger({ vendor, onBack }) {
               <p className="text-xs text-gray-400">
                 {rawTxns.length === 0
                   ? 'Fuel fill and payment entries will appear here once recorded.'
-                  : 'Try clearing the search or date range filters.'}
+                  : 'Try clearing the search or changing the vehicle or trip number.'}
               </p>
             </div>
           ) : (
-            <table className="w-full text-left border-collapse min-w-[820px]">
+            <table className={`w-full text-left border-collapse ${isPaymentFilter ? 'min-w-[760px]' : 'min-w-[820px]'}`}>
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50/60 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
                   <th className="py-3 px-4">Date</th>
@@ -354,9 +405,9 @@ export default function FuelLedger({ vendor, onBack }) {
                   <th className="py-3 px-4 text-right">Fuel Qty</th>
                   <th className="py-3 px-4 text-right">Rate/L</th>
                   <th className="py-3 px-4">Description</th>
-                  <th className="py-3 px-4 text-right">Debit</th>
-                  <th className="py-3 px-4 text-right">Credit</th>
-                  <th className="py-3 px-4 text-right">Balance</th>
+                  {!isPaymentFilter && <th className="py-3 px-4 text-right">Fuel Cost</th>}
+                  <th className="py-3 px-4 text-right">{isPaymentFilter ? 'Paid Amount' : 'Paid'}</th>
+                  {showOutstanding && <th className="py-3 px-4 text-right">Balance Due</th>}
                   <th className="py-3 px-4 text-center">Action</th>
                 </tr>
               </thead>
@@ -411,36 +462,58 @@ export default function FuelLedger({ vendor, onBack }) {
                       {/* Description */}
                       <td className="py-3 px-4 max-w-[200px]">
                         <div className="text-xs font-semibold text-gray-700 truncate">{txn.desc}</div>
+                        {txn.tripNumber && (
+                          <div className="text-[10px] text-indigo-600 mt-0.5 font-medium truncate">Trip: {txn.tripNumber}</div>
+                        )}
+                        {txn.driverName && (
+                          <div className="text-[10px] text-gray-400 mt-0.5 font-medium truncate">Driver: {txn.driverName}</div>
+                        )}
                         {txn.allocSummary && (
                           <div className="text-[10px] text-blue-500 mt-0.5 font-medium truncate">Applied: {txn.allocSummary}</div>
+                        )}
+                        {txn.paymentMethod && (
+                          <div className="text-[10px] text-green-600 mt-0.5 font-medium truncate">Paid by: {txn.paymentMethod}</div>
+                        )}
+                        {txn.appliedLabel && (
+                          <div className="text-[10px] text-indigo-600 mt-0.5 font-medium truncate">Applied to: {txn.appliedLabel}</div>
                         )}
                       </td>
 
                       {/* Debit */}
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
-                        {txn.debit > 0
-                          ? <span className="font-bold text-red-500 text-xs">₹{txn.debit.toLocaleString('en-IN')}</span>
-                          : <span className="text-gray-300 font-bold text-xs">—</span>
-                        }
-                      </td>
+                      {!isPaymentFilter && (
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          {txn.debit > 0
+                            ? <span className="font-bold text-red-500 text-xs">₹{txn.debit.toLocaleString('en-IN')}</span>
+                            : <span className="text-gray-300 font-bold text-xs">—</span>
+                          }
+                        </td>
+                      )}
 
                       {/* Credit */}
                       <td className="py-3 px-4 text-right whitespace-nowrap">
-                        {txn.credit > 0
-                          ? <span className="font-bold text-green-600 text-xs">₹{txn.credit.toLocaleString('en-IN')}</span>
+                        {(txn.paidAmount || txn.credit) > 0
+                          ? <span className="font-bold text-green-600 text-xs">₹{(txn.paidAmount || txn.credit).toLocaleString('en-IN')}</span>
                           : <span className="text-gray-300 font-bold text-xs">—</span>
                         }
                       </td>
 
                       {/* Running Balance */}
-                      <td className="py-3 px-4 text-right whitespace-nowrap">
-                        <div className={`text-xs font-black ${balanceColor(txn.runningBalance)}`}>
-                          ₹{Math.abs(txn.runningBalance).toLocaleString('en-IN')}
-                        </div>
-                        <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border inline-block mt-0.5 ${balanceBg(txn.runningBalance)}`}>
-                          {balanceLabel(txn.runningBalance)}
-                        </div>
-                      </td>
+                      {showOutstanding && (
+                        <td className="py-3 px-4 text-right whitespace-nowrap">
+                          {isFuel ? (
+                            <>
+                              <div className={`text-xs font-black ${txn.remainingDue > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                                ₹{Number(txn.remainingDue || 0).toLocaleString('en-IN')}
+                              </div>
+                              <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border inline-block mt-0.5 ${txn.remainingDue > 0 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
+                                {txn.remainingDue > 0 ? 'Payable' : 'Paid'}
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-[10px] font-semibold text-indigo-600">Applied above</span>
+                          )}
+                        </td>
+                      )}
 
                       {/* Action */}
                       <td className="py-3 px-4 text-center">
@@ -463,23 +536,22 @@ export default function FuelLedger({ vendor, onBack }) {
                   <td colSpan={7} className="py-3 px-4 text-xs font-bold text-gray-500 uppercase tracking-wide">
                     Page Totals
                   </td>
-                  <td className="py-3 px-4 text-right">
+                  {!isPaymentFilter && <td className="py-3 px-4 text-right">
                     <span className="text-xs font-black text-red-500">
                       ₹{paginated.reduce((s, t) => s + (t.debit || 0), 0).toLocaleString('en-IN')}
                     </span>
-                  </td>
+                  </td>}
                   <td className="py-3 px-4 text-right">
                     <span className="text-xs font-black text-green-600">
                       ₹{paginated.reduce((s, t) => s + (t.credit || 0), 0).toLocaleString('en-IN')}
                     </span>
                   </td>
-                  <td colSpan={2} className="py-3 px-4 text-right">
-                    {paginated.length > 0 && (
-                      <div className={`text-xs font-black ${balanceColor(paginated[paginated.length - 1].runningBalance)}`}>
-                        ₹{Math.abs(paginated[paginated.length - 1].runningBalance).toLocaleString('en-IN')}
-                      </div>
-                    )}
-                  </td>
+                  {showOutstanding && <td className="py-3 px-4 text-right">
+                    <div className="text-xs font-black text-red-500">
+                      ₹{paginated.reduce((sum, transaction) => sum + Number(transaction.remainingDue || 0), 0).toLocaleString('en-IN')}
+                    </div>
+                  </td>}
+                  {!showOutstanding && <td />}
                 </tr>
               </tfoot>
             </table>
@@ -548,6 +620,8 @@ export default function FuelLedger({ vendor, onBack }) {
                 ['Vendor',      vendor.vendor_name, null],
                 selectedTxn.ref     ? ['Reference', null, <span className="text-sm font-bold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">{selectedTxn.ref}</span>] : null,
                 selectedTxn.truckId ? ['Vehicle',   null, <span className="text-sm font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg">{selectedTxn.truckId}</span>] : null,
+                selectedTxn.tripNumber ? ['Trip Number', selectedTxn.tripNumber, null] : null,
+                selectedTxn.driverName ? ['Driver', selectedTxn.driverName, null] : null,
                 selectedTxn.fuelQty  ? ['Fuel Qty',  null, <span className="text-sm font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg">{selectedTxn.fuelQty}</span>] : null,
                 selectedTxn.ratePerL ? ['Rate / L',  selectedTxn.ratePerL, null] : null,
                 selectedTxn.fuelType ? ['Fuel Type', null, <span className="text-sm font-bold text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-lg">{selectedTxn.fuelType}</span>] : null,
@@ -561,14 +635,71 @@ export default function FuelLedger({ vendor, onBack }) {
               {/* Amount */}
               <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
                 <span className="text-xs font-semibold text-gray-400">Amount</span>
-                {selectedTxn.debit > 0
+                {selectedTxn.debit > 0 && selectedTxn.credit > 0
+                  ? <div className="flex flex-col items-end gap-0.5">
+                      <span className="text-sm font-extrabold text-red-500">₹{selectedTxn.debit.toLocaleString('en-IN')} <span className="text-xs font-semibold text-gray-400">Fuel Cost</span></span>
+                      <span className="text-sm font-extrabold text-green-600">₹{selectedTxn.credit.toLocaleString('en-IN')} <span className="text-xs font-semibold text-gray-400">Paid</span></span>
+                    </div>
+                  : selectedTxn.debit > 0
                   ? <span className="text-sm font-extrabold text-red-500">₹{selectedTxn.debit.toLocaleString('en-IN')} <span className="text-xs font-semibold text-gray-400">Debit</span></span>
                   : <span className="text-sm font-extrabold text-green-600">₹{selectedTxn.credit.toLocaleString('en-IN')} <span className="text-xs font-semibold text-gray-400">Credit</span></span>
                 }
               </div>
 
+              {selectedTxn.type === 'Fuel Fill' && (
+                <>
+                  <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                    <span className="text-xs font-semibold text-gray-400">Paid Against This Fuel</span>
+                    <span className="text-sm font-extrabold text-green-600">₹{Number(selectedTxn.paidAmount || selectedTxn.credit || 0).toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                    <span className="text-xs font-semibold text-gray-400">Balance Due For This Fuel</span>
+                    <span className={`text-sm font-extrabold ${selectedTxn.remainingDue > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                      ₹{Number(selectedTxn.remainingDue || 0).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </>
+              )}
+
+              {selectedTxn.paymentMethod && (
+                <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+                  <span className="text-xs font-semibold text-gray-400">Payment Method</span>
+                  <span className="text-sm font-bold text-green-700">{selectedTxn.paymentMethod}</span>
+                </div>
+              )}
+
+              {selectedTxn.appliedLabel && (
+                <div className="flex justify-between items-start py-2.5 border-b border-gray-50">
+                  <span className="text-xs font-semibold text-gray-400">Applied To</span>
+                  <span className="text-sm font-semibold text-indigo-600 text-right ml-4">{selectedTxn.appliedLabel}</span>
+                </div>
+              )}
+
+              {selectedTxn.paymentMethod && (
+                <div className="flex justify-between items-start py-2.5 border-b border-gray-50">
+                  <span className="text-xs font-semibold text-gray-400">Receipt Proof</span>
+                  {selectedTxn.receiptFiles?.length > 0 ? (
+                    <div className="flex flex-col items-end gap-1 ml-4">
+                      {selectedTxn.receiptFiles.map((file, index) => (
+                        <a
+                          key={`${file}-${index}`}
+                          href={`http://localhost:5001/uploads/${String(file).replace(/\\/g, '/')}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-sm font-bold text-blue-600 hover:underline"
+                        >
+                          View receipt {index + 1}
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-sm font-semibold text-gray-400">No receipt uploaded</span>
+                  )}
+                </div>
+              )}
+
               {/* Running balance */}
-              <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
+              {!isCash && <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
                 <span className="text-xs font-semibold text-gray-400">Running Balance</span>
                 <div className="text-right">
                   <span className={`text-sm font-black ${balanceColor(selectedTxn.runningBalance)}`}>
@@ -578,7 +709,7 @@ export default function FuelLedger({ vendor, onBack }) {
                     {balanceLabel(selectedTxn.runningBalance)}
                   </span>
                 </div>
-              </div>
+              </div>}
 
               {/* Description */}
               <div className="flex justify-between items-start py-2.5 border-b border-gray-50">

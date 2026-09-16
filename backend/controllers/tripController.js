@@ -9,6 +9,22 @@ const createTrip = async (req, res) => {
     console.log("REQ BODY:", req.body);
     const tripData = req.body;
 
+    // Auto-generate serial trip ID
+    const [[lastTrip]] = await db.query('SELECT trip_id FROM trips ORDER BY id DESC LIMIT 1');
+    let nextNum = 1001;
+    if (lastTrip?.trip_id) {
+      const match = lastTrip.trip_id.match(/(\d+)$/);
+      if (match) nextNum = parseInt(match[1]) + 1;
+    }
+    tripData.trip_id = `TRIP-${nextNum}`;
+
+    // Sanitize integer FK fields — empty string '' causes MySQL integer error
+    const intOrNull = (v) => (v === '' || v === null || v === undefined) ? null : Number(v) || null;
+    tripData.driver_id     = intOrNull(tripData.driver_id);
+    tripData.supervisor_id = intOrNull(tripData.supervisor_id);
+    tripData.station_id    = intOrNull(tripData.station_id);
+    tripData.vehicle_id    = intOrNull(tripData.vehicle_id);
+
     // ── Block vehicles under repair ──────────────────────────────────────
     if (tripData.vehicle_id) {
       const [[vehicle]] = await db.query(
@@ -43,10 +59,23 @@ const createTrip = async (req, res) => {
 
     const newTrip = await Trip.create(tripData);
 
+    // ── Deduct total advance from supervisor wallet ──────────────────────
+    const totalAdvance =
+      (Number(tripData.driver_advance)  || 0) +
+      (Number(tripData.hamali_advance)  || 0) +
+      (Number(tripData.other_advance)   || 0);
+
+    if (tripData.supervisor_id && totalAdvance > 0) {
+      await db.query(
+        `UPDATE supervisors SET wallet_balance = wallet_balance - ? WHERE id = ?`,
+        [totalAdvance, tripData.supervisor_id]
+      );
+    }
+
     res.status(201).json({
       success: true,
       message: 'Trip created successfully',
-      data: { id: newTrip.insertId }
+      data: { id: newTrip.insertId, trip_id: tripData.trip_id }
     });
 
   } catch (error) {
@@ -98,6 +127,28 @@ const addExpense = async (req, res) => {
       success: false,
       message: 'Server Error'
     });
+  }
+};
+
+const updateExpense = async (req, res) => {
+  try {
+    const result = await Trip.updateExpense(req.params.tripId, req.params.expenseId, req.body);
+    if (!result.affectedRows) return res.status(404).json({ success: false, message: 'Trip expense not found' });
+    res.json({ success: true, message: 'Trip expense updated successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to update trip expense' });
+  }
+};
+
+const deleteExpense = async (req, res) => {
+  try {
+    const result = await Trip.deleteExpense(req.params.tripId, req.params.expenseId);
+    if (!result.affectedRows) return res.status(404).json({ success: false, message: 'Trip expense not found' });
+    res.json({ success: true, message: 'Trip expense deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ success: false, message: 'Failed to delete trip expense' });
   }
 };
 
@@ -210,12 +261,35 @@ const deleteTrip = async (req, res) => {
 const getExpenses = async (req, res) => {
   try {
     const { tripId } = req.params;
+    const [[tripRow]] = await db.query('SELECT id, trip_id AS trip_code FROM trips WHERE id = ? OR trip_id = ?', [tripId, tripId]);
+    const tripKeys = [...new Set([tripId, tripRow?.id, tripRow?.trip_code].filter(value => value !== undefined && value !== null))];
+    let tripExpenses = [];
+    if (tripKeys.length) {
+      const placeholders = tripKeys.map(() => '?').join(',');
+      const [rows] = await db.query(
+        `SELECT * FROM trip_expenses WHERE trip_id IN (${placeholders}) ORDER BY created_at DESC`,
+        tripKeys
+      );
+      tripExpenses = rows;
+    }
 
-    const expenses = await Trip.getExpenses(tripId);
+    // expense_entries table (Finance module) — match by numeric trip id
+    let financeExpenses = [];
+    if (tripRow) {
+      const [rows] = await db.query(
+        `SELECT id, expense_category AS type, expense_category, amount, description AS notes, description,
+          expense_date, expense_date AS date, expense_date AS created_at,
+          vendor_payee, payment_method, payment_status, vehicle_id, vehicle_number,
+                trip_id, trip_number, created_by, created_at AS recorded_at, attachment
+         FROM expense_entries WHERE trip_id = ? AND entry_status != 'Deleted'`,
+        [tripRow.id]
+      );
+      financeExpenses = rows.map(r => ({ ...r, _source: 'finance' }));
+    }
 
     res.status(200).json({
       success: true,
-      data: expenses
+      data: [...tripExpenses, ...financeExpenses]
     });
 
   } catch (error) {
@@ -230,8 +304,27 @@ const getExpenses = async (req, res) => {
 const getFuel = async (req, res) => {
   try {
     const { tripId } = req.params;
-
-    const fuel = await Trip.getFuel(tripId);
+    const [[tripRow]] = await db.query('SELECT id, trip_id AS trip_code FROM trips WHERE id = ? OR trip_id = ?', [tripId, tripId]);
+    const tripKeys = [...new Set([tripId, tripRow?.id, tripRow?.trip_code].filter(value => value !== undefined && value !== null))];
+    const placeholders = tripKeys.map(() => '?').join(',');
+    const [legacyFuel] = tripKeys.length
+      ? await db.query(`SELECT * FROM trip_fuel WHERE trip_id IN (${placeholders}) ORDER BY created_at DESC`, tripKeys)
+      : [[]];
+    let fuel = [];
+    if (tripRow?.id) {
+      const [canonicalFuel] = await db.query(
+        `SELECT f.*, v.vehicle_no, s.full_name AS supervisor_name
+         FROM fuel_entries f
+         LEFT JOIN vehicles v ON f.vehicle_id = v.id
+         LEFT JOIN supervisors s ON v.supervisor_id = s.id
+         WHERE f.trip_id = ?
+         ORDER BY f.date DESC, f.created_at DESC`,
+        [tripRow.id]
+      );
+      fuel = canonicalFuel.length > 0 ? canonicalFuel : legacyFuel;
+    } else {
+      fuel = legacyFuel;
+    }
 
     res.status(200).json({
       success: true,
@@ -255,13 +348,45 @@ const updateTripStatus = async (req, res) => {
 
     await Trip.update(id, { trip_status: status });
 
-    // When a trip is completed, push the closing odometer to the vehicle
-    if (status === 'Completed') {
-      const trip = await Trip.getById(id);
-      if (trip?.vehicle_id && trip?.closing_km) {
+    const trip = await Trip.getById(id);
+
+    // ── On Completed: push closing odometer to vehicle ───────────────────
+    if (status === 'Completed' && trip?.vehicle_id && trip?.closing_km) {
+      await db.query(
+        `UPDATE vehicles SET current_odometer = GREATEST(IFNULL(current_odometer,0), ?) WHERE id = ?`,
+        [trip.closing_km, trip.vehicle_id]
+      );
+    }
+
+    // ── On Closed: settle supervisor wallet (refund unspent advance) ─────
+    if (status === 'Closed' && trip?.supervisor_id) {
+      const [[fuelRow]] = await db.query(
+        `SELECT COALESCE(SUM(quantity * rate), 0) AS fuel_cost FROM trip_fuel WHERE trip_id = ?`,
+        [trip.id]
+      );
+      const [[expRow]] = await db.query(
+        `SELECT COALESCE(SUM(amount), 0) AS exp_cost FROM trip_expenses WHERE trip_id IN (?, ?)`,
+        [String(trip.id), String(trip.trip_id)]
+      );
+      const [[financeExpRow]] = await db.query(
+        `SELECT COALESCE(SUM(amount), 0) AS exp_cost
+         FROM expense_entries
+         WHERE trip_id = ? AND entry_status != 'Deleted'`,
+        [trip.id]
+      );
+      const totalAdvance =
+        (Number(trip.driver_advance) || 0) +
+        (Number(trip.hamali_advance) || 0) +
+        (Number(trip.other_advance)  || 0);
+      const totalSpent = Number(fuelRow.fuel_cost) + Number(expRow.exp_cost) + Number(financeExpRow.exp_cost);
+      const refund = totalAdvance - totalSpent;
+
+      // refund > 0 → driver returned cash, add back to wallet
+      // refund < 0 → supervisor paid extra, deduct more from wallet
+      if (refund !== 0) {
         await db.query(
-          `UPDATE vehicles SET current_odometer = GREATEST(IFNULL(current_odometer,0), ?) WHERE id = ?`,
-          [trip.closing_km, trip.vehicle_id]
+          `UPDATE supervisors SET wallet_balance = wallet_balance + ? WHERE id = ?`,
+          [refund, trip.supervisor_id]
         );
       }
     }
@@ -345,6 +470,8 @@ module.exports = {
   updateTrip,
   deleteTrip,
   addExpense,   // ✅ ADD
+  updateExpense,
+  deleteExpense,
   addFuel,
   getExpenses,   // ✅ ADD
   getFuel,

@@ -7,17 +7,33 @@ const Expense = {
   // =========================================
 
   getAllExpenses: async () => {
-
-    const [rows] = await db.query(`
-
-      SELECT *
+    const [financeRows] = await db.query(`
+      SELECT *, 'finance' AS record_source
       FROM expense_entries
       WHERE entry_status != 'Deleted'
-      ORDER BY created_at DESC
-
     `);
-
-    return rows;
+    const [tripRows] = await db.query(`
+      SELECT
+        te.id,
+        CONCAT('TRIP-', te.id) AS expense_number,
+        te.type AS expense_category,
+        v.id AS vehicle_id,
+        v.vehicle_no AS vehicle_number,
+        t.id AS trip_id,
+        t.trip_id AS trip_number,
+        DATE(te.created_at) AS expense_date,
+        te.amount,
+        'Paid' AS payment_status,
+        te.notes AS description,
+        te.notes,
+        'Trip' AS created_by,
+        te.created_at,
+        'trip' AS record_source
+      FROM trip_expenses te
+      LEFT JOIN trips t ON t.id = te.trip_id OR t.trip_id = te.trip_id
+      LEFT JOIN vehicles v ON v.id = t.vehicle_id
+    `);
+    return [...financeRows, ...tripRows].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   },
 
@@ -37,6 +53,16 @@ const Expense = {
 
     return rows[0];
 
+  },
+
+  getExpensesByTrip: async (tripId) => {
+    const [rows] = await db.query(`
+      SELECT *
+      FROM expense_entries
+      WHERE trip_id = ? AND entry_status != 'Deleted'
+      ORDER BY expense_date DESC, created_at DESC
+    `, [tripId]);
+    return rows;
   },
 
   // =========================================
@@ -323,6 +349,22 @@ const Expense = {
 
     }
 
+  },
+
+  updateExpense: async (id, data) => {
+    const [result] = await db.query(
+      "UPDATE expense_entries SET ? WHERE id = ? AND entry_status != 'Deleted'",
+      [data, id]
+    );
+    return result;
+  },
+
+  deleteExpense: async (id) => {
+    const [result] = await db.query(
+      "UPDATE expense_entries SET entry_status = 'Deleted' WHERE id = ?",
+      [id]
+    );
+    return result;
   },
 
 };

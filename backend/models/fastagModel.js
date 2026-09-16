@@ -117,8 +117,33 @@ const Fastag = {
       JOIN fastag_accounts fa ON fa.id = t.fastag_account_id
       LEFT JOIN vehicles v ON v.id = fa.vehicle_id
       ${whereClause}
-      ORDER BY t.date DESC, t.id DESC`,
-      params
+      UNION ALL
+      SELECT
+        CONCAT('fuel-month-', fa.vehicle_id, '-', DATE_FORMAT(MIN(f.date), '%Y-%m')) AS id,
+        MAX(fa.id) AS fastag_account_id,
+        'fuel_monthly' AS type,
+        SUM(f.total_cost) AS amount,
+        STR_TO_DATE(CONCAT(DATE_FORMAT(MIN(f.date), '%Y-%m'), '-01'), '%Y-%m-%d') AS date,
+        CONCAT('Fuel usage - ', DATE_FORMAT(MIN(f.date), '%M %Y')) AS toll_plaza_name,
+        MAX(fa.balance) AS balance_after,
+        NULL AS reference_no,
+        NULL AS proof_upload,
+        'Fuel Logs' AS created_by,
+        NULL AS created_at,
+        MAX(v.vehicle_no) AS vehicle_no,
+        MAX(fa.fastag_id) AS fastag_id
+      FROM fuel_entries f
+      JOIN fastag_accounts fa ON fa.id = f.fastag_account_id
+      LEFT JOIN vehicles v ON v.id = f.vehicle_id
+      WHERE f.payment_method = 'FASTag Wallet'
+        AND f.fastag_account_id IS NOT NULL
+        ${filters.type && filters.type !== 'fuel_monthly' ? 'AND 1 = 0' : ''}
+        ${filters.vehicleId ? 'AND fa.vehicle_id = ?' : ''}
+        ${filters.from ? 'AND f.date >= ?' : ''}
+        ${filters.to ? 'AND f.date <= ?' : ''}
+      GROUP BY fa.vehicle_id, DATE_FORMAT(f.date, '%Y-%m')
+      ORDER BY date DESC, id DESC`,
+      [...params, ...(filters.vehicleId ? [filters.vehicleId] : []), ...(filters.from ? [filters.from] : []), ...(filters.to ? [filters.to] : [])]
     );
     return rows;
   },

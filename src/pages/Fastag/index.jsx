@@ -2,10 +2,12 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   FiCreditCard, FiPlus, FiTrendingDown, FiAlertTriangle, FiTruck,
   FiSearch, FiFilter, FiRefreshCw,
+  FiEdit2,
 } from 'react-icons/fi';
 import CreateAccountModal from './CreateAccountModal';
 import RechargeModal from './RechargeModal';
 import TollDeductionModal from './TollDeductionModal';
+import EditAccountModal from './EditAccountModal';
 
 const API = 'http://localhost:5001/api';
 const TABS = ['Dashboard', 'Accounts', 'Transactions'];
@@ -33,6 +35,7 @@ export default function FastagModule() {
   const [createOpen, setCreateOpen] = useState(false);
   const [rechargeOpen, setRechargeOpen] = useState(false);
   const [tollOpen, setTollOpen] = useState(false);
+  const [editAccount, setEditAccount] = useState(null);
 
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -70,7 +73,50 @@ export default function FastagModule() {
     const lowBalance = accounts.filter(a => Number(a.balance) < Number(a.low_balance_threshold || 200));
     const totalRecharged = transactions.filter(t => t.type === 'recharge').reduce((s, t) => s + Number(t.amount), 0);
     const totalTollSpend = transactions.filter(t => t.type === 'toll_deduction').reduce((s, t) => s + Number(t.amount), 0);
-    return { totalBalance, lowBalance, totalRecharged, totalTollSpend };
+    const monthlyFuelSpend = transactions.filter(t => t.type === 'fuel_monthly').reduce((s, t) => s + Number(t.amount), 0);
+    const monthlyTollSpend = transactions
+      .filter(t => t.type === 'toll_deduction')
+      .reduce((groups, transaction) => {
+        const month = String(transaction.date).slice(0, 7);
+        const key = `${month}-${transaction.vehicle_no || 'unknown'}`;
+        const current = groups.get(key) || { month, vehicle: transaction.vehicle_no || '—', amount: 0 };
+        current.amount += Number(transaction.amount || 0);
+        groups.set(key, current);
+        return groups;
+      }, new Map());
+    const monthlyRecharge = transactions
+      .filter(t => t.type === 'recharge')
+      .reduce((groups, transaction) => {
+        const month = String(transaction.date).slice(0, 7);
+        const key = `${month}-${transaction.vehicle_no || 'unknown'}`;
+        const current = groups.get(key) || { month, vehicle: transaction.vehicle_no || '—', amount: 0 };
+        current.amount += Number(transaction.amount || 0);
+        groups.set(key, current);
+        return groups;
+      }, new Map());
+    const monthlyVehicleSummary = transactions
+      .filter(t => ['recharge', 'toll_deduction', 'fuel_monthly'].includes(t.type))
+      .reduce((groups, transaction) => {
+        const month = String(transaction.date).slice(0, 7);
+        const vehicle = transaction.vehicle_no || '—';
+        const key = `${month}-${vehicle}`;
+        const current = groups.get(key) || { month, vehicle, recharge: 0, toll: 0, fuel: 0 };
+        if (transaction.type === 'recharge') current.recharge += Number(transaction.amount || 0);
+        if (transaction.type === 'toll_deduction') current.toll += Number(transaction.amount || 0);
+        if (transaction.type === 'fuel_monthly') current.fuel += Number(transaction.amount || 0);
+        groups.set(key, current);
+        return groups;
+      }, new Map());
+    return {
+      totalBalance,
+      lowBalance,
+      totalRecharged,
+      totalTollSpend,
+      monthlyFuelSpend,
+      monthlyTollSpend: [...monthlyTollSpend.values()],
+      monthlyRecharge: [...monthlyRecharge.values()],
+      monthlyVehicleSummary: [...monthlyVehicleSummary.values()],
+    };
   }, [accounts, transactions]);
 
   const filteredTransactions = useMemo(() => {
@@ -86,7 +132,7 @@ export default function FastagModule() {
 
   const renderDashboard = () => (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <Card icon={<FiCreditCard className="w-5 h-5 text-indigo-600" />} accent="bg-indigo-50"
           label="Total Balance Across Fleet" value={INR(totals.totalBalance)} sub={`${accounts.length} accounts`} />
         <Card icon={<FiAlertTriangle className="w-5 h-5 text-red-600" />} accent="bg-red-50"
@@ -95,6 +141,8 @@ export default function FastagModule() {
           label="Total Recharged" value={INR(totals.totalRecharged)} sub="All time" />
         <Card icon={<FiTrendingDown className="w-5 h-5 text-amber-600" />} accent="bg-amber-50"
           label="Total Toll Spend" value={INR(totals.totalTollSpend)} sub="All time" />
+        <Card icon={<FiTrendingDown className="w-5 h-5 text-cyan-600" />} accent="bg-cyan-50"
+          label="Monthly Fuel Usage" value={INR(totals.monthlyFuelSpend)} sub="From Fuel Logs" />
       </div>
 
       {totals.lowBalance.length > 0 && (
@@ -120,13 +168,14 @@ export default function FastagModule() {
 
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-slate-100">
-          <h3 className="text-sm font-bold text-slate-800">Recent Transactions</h3>
+          <h3 className="text-sm font-bold text-slate-800">Recent Monthly Entries</h3>
+          <p className="text-xs text-slate-400 mt-0.5">Recharge and toll amounts recorded for each vehicle</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                {['Date', 'Vehicle', 'Type', 'Details', 'Amount', 'Balance After'].map(h => (
+                {['Month', 'Vehicle', 'Activity', 'Amount'].map(h => (
                   <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -134,22 +183,52 @@ export default function FastagModule() {
             <tbody className="divide-y divide-slate-100">
               {transactions.slice(0, 8).map(t => (
                 <tr key={t.id} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-2.5 text-xs text-slate-600 whitespace-nowrap">{new Date(t.date).toLocaleDateString('en-IN')}</td>
+                  <td className="px-4 py-2.5 text-xs text-slate-600 whitespace-nowrap">{new Date(t.date).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</td>
                   <td className="px-4 py-2.5 font-bold text-slate-800 whitespace-nowrap">{t.vehicle_no || '—'}</td>
                   <td className="px-4 py-2.5">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${t.type === 'recharge' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                      {t.type === 'recharge' ? 'Recharge' : 'Toll'}
+                      {t.type === 'recharge' ? 'Recharge' : t.type === 'fuel_monthly' ? 'Monthly Fuel' : 'Toll'}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-slate-500">{t.toll_plaza_name || t.reference_no || '—'}</td>
                   <td className={`px-4 py-2.5 font-bold whitespace-nowrap ${t.type === 'recharge' ? 'text-emerald-600' : 'text-rose-600'}`}>
                     {t.type === 'recharge' ? '+' : '-'}{INR(t.amount)}
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-slate-500 whitespace-nowrap">{INR(t.balance_after)}</td>
                 </tr>
               ))}
               {transactions.length === 0 && (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400">No transactions yet.</td></tr>
+                <tr><td colSpan={4} className="px-4 py-10 text-center text-slate-400">No monthly entries yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100">
+          <h3 className="text-sm font-bold text-slate-800">Monthly Vehicle Summary</h3>
+          <p className="text-xs text-slate-400 mt-0.5">At a glance: recharge, toll deducted, and fuel usage for each vehicle</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                {['Month', 'Vehicle', 'Recharge', 'Toll Deducted', 'Fuel Usage'].map(h => (
+                  <th key={h} className="px-5 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {totals.monthlyVehicleSummary.map(row => (
+                <tr key={`${row.month}-${row.vehicle}`}>
+                  <td className="px-5 py-3 text-xs font-semibold text-slate-600">{row.month}</td>
+                  <td className="px-5 py-3 font-bold text-slate-800">{row.vehicle}</td>
+                  <td className="px-5 py-3 font-bold text-emerald-600">{INR(row.recharge)}</td>
+                  <td className="px-5 py-3 font-bold text-rose-600">{INR(row.toll)}</td>
+                  <td className="px-5 py-3 font-bold text-cyan-600">{INR(row.fuel)}</td>
+                </tr>
+              ))}
+              {totals.monthlyVehicleSummary.length === 0 && (
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-xs text-slate-400">No monthly vehicle activity recorded yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -164,7 +243,7 @@ export default function FastagModule() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50 border-b border-slate-200">
-              {['Vehicle', 'Fastag ID', 'Bank / Issuer', 'Balance', 'Threshold', 'Status'].map(h => (
+              {['Vehicle', 'Fastag ID', 'Bank / Issuer', 'Balance', 'Threshold', 'Status', 'Action'].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
               ))}
             </tr>
@@ -187,11 +266,20 @@ export default function FastagModule() {
                       {low ? 'Low Balance' : a.status}
                     </span>
                   </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => setEditAccount(a)}
+                      title="Edit FASTag account"
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-bold text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700"
+                    >
+                      <FiEdit2 className="h-3.5 w-3.5" /> Edit
+                    </button>
+                  </td>
                 </tr>
               );
             })}
             {accounts.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-12 text-center text-slate-400">No Fastag accounts yet. Click "Add Account" to register one.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-12 text-center text-slate-400">No Fastag accounts yet. Click "Add Account" to register one.</td></tr>
             )}
           </tbody>
         </table>
@@ -214,6 +302,7 @@ export default function FastagModule() {
             <option value="all">All Types</option>
             <option value="recharge">Recharge</option>
             <option value="toll_deduction">Toll Deduction</option>
+            <option value="fuel_monthly">Monthly Fuel Usage</option>
           </select>
         </div>
         <span className="text-xs text-slate-400 ml-auto">{filteredTransactions.length} transactions</span>
@@ -224,7 +313,7 @@ export default function FastagModule() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-200">
-                {['Date', 'Vehicle', 'Type', 'Details', 'Reference', 'Amount', 'Balance After'].map(h => (
+                {['Date', 'Vehicle', 'Type', 'Details', 'Reference', 'Amount', 'Wallet Balance'].map(h => (
                   <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -236,7 +325,7 @@ export default function FastagModule() {
                   <td className="px-4 py-2.5 font-bold text-slate-800 whitespace-nowrap">{t.vehicle_no || '—'}</td>
                   <td className="px-4 py-2.5">
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${t.type === 'recharge' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                      {t.type === 'recharge' ? 'Recharge' : 'Toll'}
+                      {t.type === 'recharge' ? 'Recharge' : t.type === 'fuel_monthly' ? 'Monthly Fuel' : 'Toll'}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-xs text-slate-500">{t.toll_plaza_name || '—'}</td>
@@ -308,6 +397,8 @@ export default function FastagModule() {
         onSuccess={() => { setRechargeOpen(false); refreshAll(); }} />
       <TollDeductionModal isOpen={tollOpen} accounts={accounts} onClose={() => setTollOpen(false)}
         onSuccess={() => { setTollOpen(false); refreshAll(); }} />
+      <EditAccountModal account={editAccount} isOpen={Boolean(editAccount)} onClose={() => setEditAccount(null)}
+        onSuccess={() => { setEditAccount(null); refreshAll(); }} />
     </div>
   );
 }

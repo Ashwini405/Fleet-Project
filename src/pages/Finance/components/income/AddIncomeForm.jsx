@@ -127,10 +127,20 @@ const EMPTY = {
   linkedInvoice: "",
   rentalDesc: "", rentalStart: "", rentalEnd: "",
   plantId: "", refundType: "", refundReference: "",
-  amount: "", paymentDate: "", paymentStatus: "", refNumber: "", desc: "",
+  amount: "", receivedAmount: "", paymentDate: "", paymentStatus: "", refNumber: "", desc: "",
 };
 
-export default function AddIncomeForm({ onBack }) {
+const toDateInputValue = (value) => {
+  if (!value) return '';
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return text.slice(0, 10);
+  const pad = (part) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+
+export default function AddIncomeForm({ onBack, onSaved, initialTripId = null, initialVehicleId = null, initialIncome = null }) {
   const [form, setForm]       = useState(EMPTY);
   const [submitted, setSub]   = useState(false);
   const [vehicles, setVehicles] = useState([]);
@@ -141,49 +151,80 @@ export default function AddIncomeForm({ onBack }) {
 
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
-  // Fetch vehicles from database
   const fetchVehicles = async () => {
     try {
       const res = await fetch('http://localhost:5001/api/vehicles');
       const data = await res.json();
-      if (data.success) {
-        setVehicles(data.data || []);
-      }
-    } catch (error) {
-      console.log('Fetch vehicles error:', error);
-    }
+      if (data.success) setVehicles(data.data || []);
+    } catch (error) { console.log('Fetch vehicles error:', error); }
   };
 
-  // Fetch plants/stations from database
   const fetchPlants = async () => {
     try {
       const res = await fetch('http://localhost:5001/api/stations');
       const data = await res.json();
-      if (data.success) {
-        setPlants(data.data || []);
-      }
-    } catch (error) {
-      console.log('Fetch plants error:', error);
-    }
+      if (data.success) setPlants(data.data || []);
+    } catch (error) { console.log('Fetch plants error:', error); }
   };
 
-  // Fetch trips by vehicle ID
   const fetchTripsByVehicle = async (vehicleId) => {
     try {
       const res = await fetch(`http://localhost:5001/api/income/vehicle-trips/${vehicleId}`);
       const data = await res.json();
-      if (data.success) {
-        setTrips(data.data || []);
-      }
-    } catch (error) {
-      console.log('Fetch trips error:', error);
-    }
+      if (data.success) return data.data || [];
+    } catch (error) { console.log('Fetch trips error:', error); }
+    return [];
   };
 
   useEffect(() => {
     fetchVehicles();
     fetchPlants();
   }, []);
+
+  // Auto-select vehicle + trip when opened from TripDetails
+  useEffect(() => {
+    if (!initialVehicleId || vehicles.length === 0 || initialIncome) return;
+    fetchTripsByVehicle(initialVehicleId).then(fetchedTrips => {
+      setTrips(fetchedTrips);
+      setForm(f => ({ ...f, truck: String(initialVehicleId), category: 'Freight' }));
+      if (initialTripId) {
+        const t = fetchedTrips.find(x => String(x.id) === String(initialTripId));
+        if (t) {
+          setForm(f => ({
+            ...f,
+            truck: String(initialVehicleId),
+            category: 'Freight',
+            linkedTrip: String(initialTripId),
+            route: `${t.source || ''} - ${t.destination || ''}`,
+            freightStart: t.start_time ? t.start_time.split('T')[0] : '',
+            freightEnd: t.eta ? t.eta.split('T')[0] : '',
+          }));
+        }
+      }
+    });
+  }, [initialVehicleId, vehicles]);
+
+  useEffect(() => {
+    if (!initialIncome) return;
+    setForm({
+      ...EMPTY,
+      truck: String(initialIncome.vehicle_id || initialVehicleId || ''),
+      category: initialIncome.income_category || 'Freight',
+      linkedTrip: String(initialIncome.trip_id || initialTripId || ''),
+      route: initialIncome.place_of_running || '',
+      freightStart: toDateInputValue(initialIncome.freight_start_date),
+      freightEnd: toDateInputValue(initialIncome.freight_end_date),
+      amount: initialIncome.amount ?? '',
+      receivedAmount: initialIncome.received_amount ?? 0,
+      paymentDate: toDateInputValue(initialIncome.payment_received_date),
+      paymentStatus: initialIncome.payment_status || 'Pending',
+      refNumber: initialIncome.bank_reference_number || '',
+      desc: initialIncome.description || '',
+      plantId: initialIncome.station_id || '',
+      refundType: initialIncome.refund_type || '',
+      refundReference: initialIncome.refund_reference || '',
+    });
+  }, [initialIncome, initialTripId, initialVehicleId]);
 
   const onCategory = (val) => setForm(f => ({
     ...f, category: val,
@@ -198,12 +239,18 @@ export default function AddIncomeForm({ onBack }) {
       ...f,
       linkedTrip: id,
       route: `${t?.source || ''} - ${t?.destination || ''}`,
-      freightStart: t?.start_time
-        ? t.start_time.split("T")[0]
-        : "",
-      freightEnd: t?.eta
-        ? t.eta.split("T")[0]
-        : "",
+      freightStart: t?.start_time ? t.start_time.split('T')[0] : '',
+      freightEnd: t?.eta ? t.eta.split('T')[0] : '',
+    }));
+  };
+
+  const onPaymentStatus = (status) => {
+    setForm(current => ({
+      ...current,
+      paymentStatus: status,
+      receivedAmount: status === 'Received'
+        ? current.amount
+        : status === 'Pending' ? 0 : '',
     }));
   };
 
@@ -232,14 +279,24 @@ export default function AddIncomeForm({ onBack }) {
         refund_reference: form.refundReference || null,
       };
 
-      const res = await fetch('http://localhost:5001/api/income', {
-        method: 'POST',
+      const res = await fetch(initialIncome
+        ? `http://localhost:5001/api/income/${initialIncome.id}`
+        : 'http://localhost:5001/api/income', {
+        method: initialIncome ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({
+          ...payload,
+          received_amount: initialIncome
+            ? form.paymentStatus === 'Received'
+              ? Number(form.amount || 0)
+              : Number(form.receivedAmount || 0)
+            : undefined,
+        })
       });
       const data = await res.json();
       if (data.success) {
-        alert('Income Added Successfully');
+        alert(initialIncome ? 'Income Updated Successfully' : 'Income Added Successfully');
+        onSaved?.();
         onBack();
       } else {
         alert(data.message || 'Failed to add income');
@@ -281,8 +338,14 @@ export default function AddIncomeForm({ onBack }) {
             <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
           <div>
-            <p className="text-sm font-extrabold text-white leading-tight">Add Income Entry</p>
-            <p className="text-[10px] text-white/40 mt-0.5">Record a new income transaction</p>
+            <p className="text-sm font-extrabold text-white leading-tight">
+              {initialIncome ? 'Edit Income Entry' : 'Add Income Entry'}
+            </p>
+            <p className="text-[10px] text-white/40 mt-0.5">
+              {initialIncome
+                ? `${initialIncome.income_number || 'Income record'}${initialIncome.trip_number ? ` · Trip ${initialIncome.trip_number}` : ''}`
+                : 'Record a new income transaction'}
+            </p>
           </div>
         </div>
         <button
@@ -305,12 +368,10 @@ export default function AddIncomeForm({ onBack }) {
                 value={form.truck}
                 onChange={(e) => {
                   const vehicleId = e.target.value;
-
                   setTrips([]);
-                  set("linkedTrip", "");
-
-                  set("truck", vehicleId);
-                  fetchTripsByVehicle(vehicleId);
+                  set('linkedTrip', '');
+                  set('truck', vehicleId);
+                  fetchTripsByVehicle(vehicleId).then(setTrips);
                 }}
                 className={sel}
                 required
@@ -526,7 +587,7 @@ export default function AddIncomeForm({ onBack }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <F label="Payment Status" required hint="Is this the full amount, partial, or still pending?">
               <Sel>
-                <select value={form.paymentStatus} onChange={e => set("paymentStatus", e.target.value)} className={sel} required>
+                <select value={form.paymentStatus} onChange={e => onPaymentStatus(e.target.value)} className={sel} required>
                   <option value="">— Select Status —</option>
                   <option value="Received">Received — Full amount received</option>
                   <option value="Partial">Partial — Partial amount received</option>
@@ -534,6 +595,19 @@ export default function AddIncomeForm({ onBack }) {
                 </select>
               </Sel>
             </F>
+            {initialIncome && form.paymentStatus !== "Received" && (
+              <F label="Amount Received (₹)" required hint="Enter the amount collected so far.">
+                <input
+                  type="number"
+                  min="0"
+                  max={Number(form.amount) || undefined}
+                  value={form.receivedAmount}
+                  onChange={e => set("receivedAmount", e.target.value)}
+                  className={input + " font-mono"}
+                  required
+                />
+              </F>
+            )}
             <F label="Bank Reference No." hint="e.g. NEFT-8822311, RTGS-7731002">
               <div className="relative">
                 <CreditCard className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300 pointer-events-none" />

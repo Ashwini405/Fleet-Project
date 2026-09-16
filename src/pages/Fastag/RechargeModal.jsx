@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiX, FiAlertCircle, FiLoader } from 'react-icons/fi';
 
-const emptyForm = { fastag_account_id: '', amount: '', date: new Date().toISOString().split('T')[0], reference_no: '' };
+const emptyForm = { fastag_account_id: '', amount: '', month: new Date().toISOString().slice(0, 7) };
 
 export default function RechargeModal({ isOpen, accounts, onClose, onSuccess }) {
   const [form, setForm] = useState(emptyForm);
@@ -28,7 +28,7 @@ export default function RechargeModal({ isOpen, accounts, onClose, onSuccess }) 
       const res = await fetch('http://localhost:5001/api/fastag/recharge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, date: `${form.month}-01` }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.message || 'Failed to record recharge');
@@ -77,18 +77,15 @@ export default function RechargeModal({ isOpen, accounts, onClose, onSuccess }) 
                 className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Date</label>
-              <input type="date" value={form.date} onChange={e => set('date', e.target.value)}
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Recharge Month</label>
+              <input type="month" value={form.month} onChange={e => set('month', e.target.value)}
                 className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Reference No.</label>
-            <input type="text" value={form.reference_no} onChange={e => set('reference_no', e.target.value)}
-              placeholder="UPI / transaction ref"
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
-          </div>
+          <p className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-xs font-medium text-emerald-800">
+            Monthly total entry: individual recharge references are not required here.
+          </p>
 
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} disabled={loading}

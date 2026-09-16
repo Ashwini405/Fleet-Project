@@ -5,8 +5,8 @@ import IncomeTable        from "../components/income/IncomeTable";
 import AddIncomeForm      from "../components/income/AddIncomeForm";
 import IncomeDetailsModal from "../components/income/IncomeDetailsModal";
 
-export default function IncomeTab({ selectedTruck, dateFrom, dateTo }) {
-  const [view,    setView]    = useState("list");
+export default function IncomeTab({ selectedTruck, dateFrom, dateTo, initialTripId, initialVehicleId }) {
+  const [view,    setView]    = useState(initialTripId ? "add" : "list");
   const [viewTxn, setViewTxn] = useState(null);
   const [incomeList, setIncomeList] = useState([]);
 
@@ -73,7 +73,7 @@ export default function IncomeTab({ selectedTruck, dateFrom, dateTo }) {
             exit={{ opacity: 0, x: -24 }}
             transition={{ duration: 0.2 }}
           >
-            <AddIncomeForm onBack={() => setView("list")} />
+            <AddIncomeForm onBack={() => setView("list")} initialTripId={initialTripId} initialVehicleId={initialVehicleId} />
           </motion.div>
         ) : (
           <motion.div

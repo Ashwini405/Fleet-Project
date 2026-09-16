@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Briefcase, CreditCard } from 'lucide-react';
+import { X, User, Briefcase, CreditCard, FileUp } from 'lucide-react';
 
 export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess }) {
   const [activeTab, setActiveTab] = useState('personal');
@@ -12,12 +12,14 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
     status: 'active',
     address: '',
     station_id: '',
+    wallet_balance: '',
     bank_name: '',
     account_number: '',
     ifsc_code: '',
     notes: ''
   });
   const [saving, setSaving] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState(null);
 
   // Fetch stations from backend — only once the modal is actually opened
   useEffect(() => {
@@ -43,11 +45,13 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
         status: staff.status || 'active',
         address: staff.address || '',
         station_id: staff.station_id || '',
+        wallet_balance: staff.wallet_balance ?? '',
         bank_name: staff.bank_name || '',
         account_number: staff.account_number || '',
         ifsc_code: staff.ifsc_code || '',
         notes: staff.notes || ''
       });
+      setProfilePhoto(null);
     }
   }, [staff]);
 
@@ -62,10 +66,13 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
     try {
       setSaving(true);
 
+      const body = new FormData();
+      Object.entries(formData).forEach(([key, value]) => body.append(key, value));
+      if (profilePhoto) body.append('profile_photo', profilePhoto);
+
       const response = await fetch(`http://localhost:5001/api/supervisors/${staff.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body
       });
       const result = await response.json();
 
@@ -86,7 +93,8 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
   const tabs = [
     { id: 'personal', label: 'Personal', icon: <User className="w-4 h-4" /> },
     { id: 'work', label: 'Work', icon: <Briefcase className="w-4 h-4" /> },
-    { id: 'bank', label: 'Bank', icon: <CreditCard className="w-4 h-4" /> }
+    { id: 'bank', label: 'Bank', icon: <CreditCard className="w-4 h-4" /> },
+    { id: 'uploads', label: 'Uploads', icon: <FileUp className="w-4 h-4" /> }
   ];
 
   return (
@@ -195,6 +203,18 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                       className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all resize-none"
                     ></textarea>
                   </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Wallet Balance (₹)</label>
+                    <input
+                      type="number"
+                      name="wallet_balance"
+                      value={formData.wallet_balance}
+                      onChange={handleChange}
+                      placeholder="e.g. 10000"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">Current cash balance of this supervisor</p>
+                  </div>
                 </motion.div>
               )}
 
@@ -250,6 +270,33 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                       onChange={handleChange}
                       className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all uppercase"
                     />
+                  </div>
+                </motion.div>
+              )}
+
+              {activeTab === 'uploads' && (
+                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+                  <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 border-dashed rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
+                        <FileUp className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">Profile Photo</p>
+                        <p className="text-[11px] text-gray-500">
+                          {profilePhoto?.name || (staff.profile_photo ? 'Photo uploaded' : 'PNG or JPG (Max. 5MB)')}
+                        </p>
+                      </div>
+                    </div>
+                    <label className="cursor-pointer px-4 py-2 bg-white border border-gray-200 hover:border-blue-500 hover:text-blue-600 rounded-lg text-sm font-bold text-gray-600 transition-colors shadow-sm">
+                      {profilePhoto || staff.profile_photo ? 'Change' : 'Select Photo'}
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".jpg,.jpeg,.png"
+                        onChange={(event) => setProfilePhoto(event.target.files[0] || null)}
+                      />
+                    </label>
                   </div>
                 </motion.div>
               )}

@@ -11,7 +11,7 @@ const supervisorUpload = upload.fields([
 
 router.post('/', supervisorUpload, controller.createSupervisor);
 router.get('/', controller.getSupervisors);
-router.put('/:id', controller.updateSupervisor);
+router.put('/:id', supervisorUpload, controller.updateSupervisor);
 router.delete('/:id', controller.deleteSupervisor);
 
 module.exports = router;

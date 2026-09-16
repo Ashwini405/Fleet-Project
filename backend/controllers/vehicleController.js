@@ -2,6 +2,16 @@ const Vehicle = require('../models/vehicleModel');
 const db = require('../config/db'); // imported once for reuse
 const lifecycle = require('../services/maintenanceLifecycleService');
 
+async function syncFastagAccount(vehicleId, fastagId) {
+  if (!fastagId) return;
+  await db.query(
+    `INSERT INTO fastag_accounts (vehicle_id, fastag_id)
+     VALUES (?, ?)
+     ON DUPLICATE KEY UPDATE fastag_id = VALUES(fastag_id)`,
+    [vehicleId, fastagId]
+  );
+}
+
 // @desc    Get all vehicles
 // @route   GET /api/vehicles
 const getVehicles = async (req, res) => {
@@ -159,6 +169,7 @@ const createVehicle = async (req, res) => {
     };
 
     const result = await Vehicle.create(data);
+    await syncFastagAccount(result.insertId, data.fastag_id);
     console.log("✅ INSERT RESULT:", result);  // 🔍 DEBUG
 
     res.status(201).json({
@@ -208,6 +219,7 @@ const updateVehicle = async (req, res) => {
     };
 
     await Vehicle.update(vehicleId, data);
+    await syncFastagAccount(vehicleId, data.fastag_id);
 
     res.status(200).json({
       success: true,

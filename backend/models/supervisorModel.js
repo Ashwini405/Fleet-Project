@@ -7,9 +7,9 @@ const Supervisor = {
     const [result] = await db.query(
       `INSERT INTO supervisors
       (full_name, mobile, id_card_number, status, address, station_id,
-       bank_name, account_number, ifsc_code, notes,
+       wallet_balance, bank_name, account_number, ifsc_code, notes,
        profile_photo, id_document, bank_document)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.full_name,
         data.mobile,
@@ -17,6 +17,7 @@ const Supervisor = {
         data.status,
         data.address,
         data.station_id || null,
+        data.wallet_balance ? Number(data.wallet_balance) : 0,
         data.bank_name,
         data.account_number,
         data.ifsc_code,
@@ -53,7 +54,8 @@ const Supervisor = {
     const [result] = await db.query(
       `UPDATE supervisors SET
         full_name=?, mobile=?, id_card_number=?, status=?, address=?, station_id=?,
-        bank_name=?, account_number=?, ifsc_code=?, notes=?
+        wallet_balance=?, bank_name=?, account_number=?, ifsc_code=?, notes=?,
+        profile_photo=COALESCE(?, profile_photo)
        WHERE id=?`,
       [
         data.full_name,
@@ -62,10 +64,12 @@ const Supervisor = {
         data.status,
         data.address,
         data.station_id || null,
+        data.wallet_balance !== '' && data.wallet_balance != null ? Number(data.wallet_balance) : 0,
         data.bank_name,
         data.account_number,
         data.ifsc_code,
         data.notes || null,
+        data.profile_photo || null,
         id
       ]
     );

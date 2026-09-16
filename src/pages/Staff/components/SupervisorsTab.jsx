@@ -5,6 +5,8 @@ import AddSupervisorModal from './AddSupervisorModal';
 import ViewSupervisorModal from './ViewSupervisorModal';
 import EditSupervisorModal from './EditSupervisorModal';
 
+const UPLOADS_BASE_URL = 'http://localhost:5001/uploads/';
+
 export default function SupervisorsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -92,9 +94,17 @@ export default function SupervisorsTab() {
                   className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
                 >
                   <td className="py-2 px-2 md:py-4 md:px-4">
-                    <div className="w-10 h-10 rounded-full border border-gray-200 bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500 shrink-0">
-                      {person.full_name?.split(' ').map(n => n[0]).join('') || '?'}
-                    </div>
+                    {person.profile_photo ? (
+                      <img
+                        src={`${UPLOADS_BASE_URL}${person.profile_photo}`}
+                        alt={`${person.full_name || 'Supervisor'} profile`}
+                        className="w-10 h-10 rounded-full border border-gray-200 object-cover shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full border border-gray-200 bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500 shrink-0">
+                        {person.full_name?.split(' ').map(n => n[0]).join('') || '?'}
+                      </div>
+                    )}
                   </td>
                   <td className="py-2 px-2 md:py-4 md:px-4">
                     <span className="font-bold text-gray-800 text-sm tracking-tight">{person.full_name}</span>

@@ -1004,7 +1004,7 @@ export default function TripMaster() {
                         {currentView.columnOrder.map(columnKey => {
                           if (!currentView.columns.includes(columnKey)) return null;
                           return (
-                            <td key={columnKey} className="px-6 py-4 whitespace-nowrap cursor-pointer" onClick={() => navigate(`/trips/${trip.id}`)}>
+                            <td key={columnKey} className="px-6 py-4 whitespace-nowrap cursor-pointer" onClick={() => trip.id && navigate(`/trips/${trip.id}`)}>
                               {columnKey === 'tripId' ? (
                                 <div className="flex items-center gap-2">
                                   <span className={`w-1 h-8 rounded-full shrink-0 ${

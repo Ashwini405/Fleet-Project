@@ -30,7 +30,8 @@ const VendorPayment = {
       amount,
       payment_mode,
       reference_number,
-      notes
+      notes,
+      receipt_files
     } = data;
 
     const [result] = await db.query(
@@ -43,10 +44,11 @@ const VendorPayment = {
         amount,
         payment_mode,
         reference_number,
-        notes
+        notes,
+        receipt_files
       )
       VALUES
-      (?, ?, ?, ?, ?, ?, ?)
+      (?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         vendor_id,
@@ -55,7 +57,8 @@ const VendorPayment = {
         amount,
         payment_mode,
         reference_number || null,
-        notes || null
+        notes || null,
+        receipt_files || null
       ]
     );
 

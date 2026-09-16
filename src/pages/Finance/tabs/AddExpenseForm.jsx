@@ -411,7 +411,7 @@ function DynamicExpenseSection({
   );
 }
 
-export default function AddExpenseForm({ onBack }) {
+export default function AddExpenseForm({ onBack, initialVehicleId = null, initialTripId = null }) {
   const [vehicles, setVehicles] = useState([]);
   const [trips, setTrips] = useState([]);
   const [drivers, setDrivers] = useState([]);
@@ -572,6 +572,20 @@ export default function AddExpenseForm({ onBack }) {
     fetchTrips();
     fetchDrivers();
   }, []);
+
+  // Auto-select vehicle + trip when opened from TripDetails
+  useEffect(() => {
+    if (!initialVehicleId || vehicles.length === 0) return;
+    setForm(f => ({ ...f, truck: String(initialVehicleId) }));
+  }, [initialVehicleId, vehicles]);
+
+  useEffect(() => {
+    if (!initialTripId || trips.length === 0) return;
+    const t = trips.find(x => String(x.id) === String(initialTripId));
+    if (t) {
+      setModuleFields(f => ({ ...f, linkedTrip: t.trip_id || String(t.id), driverName: t.driver_name || '', _numericTripId: initialTripId }));
+    }
+  }, [initialTripId, trips]);
 
   useEffect(() => {
     if (!form.truck) {
@@ -841,6 +855,7 @@ export default function AddExpenseForm({ onBack }) {
         toll_route: moduleFields.route,
         toll_receipt_number: moduleFields.receiptNumber,
         // Trip link
+        trip_id: moduleFields._numericTripId || initialTripId || null,
         linked_trip_id: moduleFields.linkedTrip,
         // Miscellaneous
         expense_title: moduleFields.expenseTitle,

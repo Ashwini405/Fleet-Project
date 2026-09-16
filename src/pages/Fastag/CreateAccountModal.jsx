@@ -25,7 +25,16 @@ export default function CreateAccountModal({ isOpen, onClose, onSuccess }) {
 
   if (!isOpen) return null;
 
-  const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setError(''); };
+  const set = (k, v) => {
+    setForm(f => ({
+      ...f,
+      [k]: v,
+      ...(k === 'vehicle_id'
+        ? { fastag_id: vehicles.find(vehicle => String(vehicle.id) === String(v))?.fastag_id || f.fastag_id }
+        : {}),
+    }));
+    setError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();

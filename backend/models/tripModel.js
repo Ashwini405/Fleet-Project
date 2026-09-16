@@ -64,6 +64,37 @@ addExpense: async (tripId, expenseData) => {
   return result;
 },
 
+updateExpense: async (tripId, expenseId, expenseData) => {
+  const { amount, type, notes } = expenseData;
+  const [[trip]] = await db.query(
+    `SELECT id, trip_id AS trip_code FROM trips WHERE id = ? OR trip_id = ? LIMIT 1`,
+    [tripId, tripId]
+  );
+  const tripKeys = [tripId, trip?.id, trip?.trip_code]
+    .filter(value => value !== undefined && value !== null)
+    .map(value => String(value));
+  const [result] = await db.query(
+    `UPDATE trip_expenses SET amount=?, type=?, notes=? WHERE id=? AND trip_id IN (${tripKeys.map(() => '?').join(',')})`,
+    [amount || 0, type || 'Misc', notes || '', expenseId, ...tripKeys]
+  );
+  return result;
+},
+
+deleteExpense: async (tripId, expenseId) => {
+  const [[trip]] = await db.query(
+    `SELECT id, trip_id AS trip_code FROM trips WHERE id = ? OR trip_id = ? LIMIT 1`,
+    [tripId, tripId]
+  );
+  const tripKeys = [tripId, trip?.id, trip?.trip_code]
+    .filter(value => value !== undefined && value !== null)
+    .map(value => String(value));
+  const [result] = await db.query(
+    `DELETE FROM trip_expenses WHERE id=? AND trip_id IN (${tripKeys.map(() => '?').join(',')})`,
+    [expenseId, ...tripKeys]
+  );
+  return result;
+},
+
 // 🔥 ADD FUEL
 addFuel: async (tripId, fuelData) => {
   const { quantity, rate, vendor } = fuelData;

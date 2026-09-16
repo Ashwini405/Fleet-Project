@@ -3,17 +3,20 @@ import { FiX, FiCheckCircle } from 'react-icons/fi';
 import axios from 'axios';
 import { PAYMENT_METHODS, MODAL_ANIM } from './constants';
 
-function computePreview(poList, paymentAmount) {
+function computePreview(poList, paymentAmount, selectedKeys) {
   const amt = Number(paymentAmount);
   if (!amt || !poList?.length) return [];
   let remaining = amt;
   const preview = [];
-  for (const po of poList) {
+  const allocationList = selectedKeys.size > 0
+    ? poList.filter(po => selectedKeys.has(po.poKey || po.poRef))
+    : poList;
+  for (const po of allocationList) {
     if (remaining <= 0) break;
     const balance = po.amount - po.paidAmount;
     if (balance <= 0) continue;
     const apply = Math.min(remaining, balance);
-    preview.push({ poRef: po.poRef, desc: po.desc, apply, balance });
+    preview.push({ poKey: po.poKey || po.poRef, poRef: po.poRef, desc: po.desc, apply, balance });
     remaining -= apply;
   }
   return preview;
@@ -38,13 +41,15 @@ export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, ve
   const [errors, setErrors] = useState({});
   const [toast, setToast]   = useState(false);
   const [loading, setLoading] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState(new Set());
+  const [billProof, setBillProof] = useState(null);
 
   if (!isOpen) return null;
 
   const set = (k, v) => { setForm(p => ({ ...p, [k]: v })); setErrors(p => ({ ...p, [k]: null })); };
 
   const openPOs    = (poList || []).filter(po => po.amount - po.paidAmount > 0);
-  const preview    = computePreview(openPOs, form.amount);
+  const preview    = computePreview(openPOs, form.amount, selectedKeys);
   const totalAmt   = Number(form.amount) || 0;
   const unallocated = Math.max(0, totalAmt - preview.reduce((s, p) => s + p.apply, 0));
 
@@ -67,15 +72,25 @@ export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, ve
     try {
       setLoading(true);
 
-      await axios.post("http://localhost:5001/api/vendors/payments", {
+      const allocationIds = [...selectedKeys];
+      const allocationNote = allocationIds.length
+        ? `__fuel_allocation_ids:${allocationIds.join(',')}__`
+        : '';
+      const notes = [allocationNote, form.remarks].filter(Boolean).join(' ');
+
+      const payload = new FormData();
+      Object.entries({
         vendor_id: vendor?.id,
         vendor_category: vendorCategory,
         payment_date: form.date,
         amount: totalAmt,
         payment_mode: form.method,
         reference_number: form.ref,
-        notes: form.remarks
-      });
+        notes
+      }).forEach(([key, value]) => payload.append(key, value));
+      if (billProof) payload.append('bill_proof', billProof);
+
+      await axios.post("http://localhost:5001/api/vendors/payments", payload);
 
       setToast(true);
 
@@ -86,6 +101,7 @@ export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, ve
       setTimeout(() => {
         setToast(false);
         setForm(EMPTY);
+        setBillProof(null);
         setErrors({});
         onClose();
       }, 1400);
@@ -183,18 +199,29 @@ export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, ve
                   className={iCls + ' resize-none'} />
               </div>
 
+              <div>
+                <label className={loCls}>Bill Proof</label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,application/pdf"
+                  onChange={e => setBillProof(e.target.files?.[0] || null)}
+                  className="w-full p-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-600"
+                />
+                <p className="text-[10px] text-gray-400 mt-1">Upload bill image or PDF, maximum 5 MB.</p>
+              </div>
+
               {/* PO Allocation Preview */}
               {openPOs.length > 0 && (
                 <div className="border border-gray-100 rounded-xl overflow-hidden">
                   <div className="bg-gray-50 px-4 py-2.5 border-b border-gray-100 flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Purchase Order Allocation</span>
-                    <span className="text-[10px] text-gray-400">{openPOs.length} open PO{openPOs.length > 1 ? 's' : ''} · Auto-allocated oldest first</span>
+                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Fuel Bill Allocation</span>
+                    <span className="text-[10px] text-gray-400">Select a bill/trip or leave blank for oldest first</span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
-                          <th className="py-2 px-3">PO Ref</th>
+                          <th className="py-2 px-3">Select / Fuel Record</th>
                           <th className="py-2 px-3 text-right">Balance</th>
                           <th className="py-2 px-3 text-right">Will Apply</th>
                           <th className="py-2 px-3 text-center">Status After</th>
@@ -202,15 +229,32 @@ export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, ve
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {openPOs.map(po => {
-                          const p = preview.find(x => x.poRef === po.poRef);
+                          const poKey = po.poKey || po.poRef;
+                          const p = preview.find(x => x.poKey === poKey);
                           const balance = po.amount - po.paidAmount;
                           const willApply = p?.apply || 0;
                           const newPaid = po.paidAmount + willApply;
                           const afterStatus = newPaid <= 0 ? 'Unpaid' : newPaid >= po.amount ? 'Paid' : 'Partially Paid';
                           return (
-                            <tr key={po.poRef} className={`${willApply > 0 ? 'bg-blue-50/40' : ''}`}>
+                            <tr key={poKey} className={`${willApply > 0 ? 'bg-blue-50/40' : ''}`}>
                               <td className="py-2 px-3">
-                                <span className="text-xs font-bold text-gray-700">{po.poRef}</span>
+                                <label className="flex items-start gap-2 cursor-pointer">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedKeys.has(poKey)}
+                                    onChange={() => setSelectedKeys(previous => {
+                                      const next = new Set(previous);
+                                      if (next.has(poKey)) next.delete(poKey); else next.add(poKey);
+                                      return next;
+                                    })}
+                                    className="mt-0.5 accent-blue-600"
+                                  />
+                                  <span>
+                                    <span className="text-xs font-bold text-gray-700">{po.poRef}</span>
+                                    {po.vehicle && <div className="text-[10px] text-blue-600">Vehicle: {po.vehicle}</div>}
+                                    {po.trip && <div className="text-[10px] text-indigo-600">Trip: {po.trip}</div>}
+                                  </span>
+                                </label>
                                 {po.desc && <div className="text-[10px] text-gray-400">{po.desc}</div>}
                               </td>
                               <td className="py-2 px-3 text-right">
@@ -242,7 +286,7 @@ export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, ve
                   </div>
                   {totalAmt > 0 && unallocated > 0 && (
                     <div className="px-4 py-2.5 bg-amber-50 border-t border-amber-100">
-                      <span className="text-xs font-semibold text-amber-700">₹{unallocated.toLocaleString()} unallocated — all open POs fully covered</span>
+                      <span className="text-xs font-semibold text-amber-700">₹{unallocated.toLocaleString()} remains unallocated — selected fuel bill balance is fully covered</span>
                     </div>
                   )}
                 </div>

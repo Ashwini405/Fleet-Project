@@ -1,622 +1,522 @@
 import React, { useState, useEffect } from 'react';
-import { FiX, FiDownload, FiTrash2, FiInfo } from 'react-icons/fi';
+import { FiX, FiTrash2, FiAlertTriangle, FiCheckCircle } from 'react-icons/fi';
+
+const inp = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition';
+const inpDisabled = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-100 text-slate-600 cursor-not-allowed';
+const lbl = 'block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5';
 
 export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
-  const [addForm, setAddForm] = useState({
+  const [vehicles, setVehicles] = useState([]);
+  const [fuelVendors, setFuelVendors] = useState([]);
+  const [vehicleInfo, setVehicleInfo] = useState(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [errors, setErrors] = useState({});
+
+  const PAYMENT_TERMS_MAP = {
+    cash: 'Cash',
+    credit: 'Credit',
+    fuel_card: 'Fuel Card',
+    upi: 'UPI',
+    fastag: 'FASTag Wallet',
+    driver_advance: 'Driver Advance',
+  };
+
+  const VENDOR_REQUIRED = ['Cash', 'Credit', 'Fuel Card', 'UPI'];
+
+  const [fastagInfo, setFastagInfo] = useState(null);   // { balance, fastag_id }
+  const [supervisorWallet, setSupervisorWallet] = useState(null); // balance number
+
+  const [form, setForm] = useState({
     date: new Date().toISOString().split('T')[0],
-    vehicle: '',
-    fuelType: 'Diesel',
-    stationName: '',
-    paymentMethod: 'Cash',
-    tripId: '',
-    currentOdo: '',
+    vehicle_id: '',
+    vehicle_no: '',
+    vendor: '',
+    current_odo: '',
     qty: '',
     rate: '',
-    fullTank: false,
-    billNumber: '',
-    vendor: '',
-    vendorType: 'Petrol Pump',
-    remarks: '',
-    location: '',
-    filledBy: 'Driver',
-    vehicleId: '',
+    payment_method: 'Cash',
+    full_tank: true,
   });
 
-  const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [errors, setErrors] = useState({});
-  const [alerts, setAlerts] = useState([]);
-  const [suggestions, setSuggestions] = useState({});
-  const [vehicleInfo, setVehicleInfo] = useState(null);
-  const [trips, setTrips] = useState([]); // kept for potential future use
-  const [fuelVendors, setFuelVendors] = useState([]);
+  const vendorTerm = form.payment_method === 'Credit' ? 'credit' : 'cash';
+  const visibleFuelVendors = fuelVendors.filter(v => (v.payment_terms || 'credit') === vendorTerm);
 
-  // ─── Fetch fuel vendors from database ────────────────────────────────────
+  // ── Fetch vehicles & vendors on open ──────────────────────────────────────
   useEffect(() => {
-    fetchFuelVendors();
-  }, []);
+    if (!isOpen) return;
+    fetch('http://localhost:5001/api/vehicles')
+      .then(r => r.json()).then(d => d.success && setVehicles(d.data)).catch(() => {});
+    fetch('http://localhost:5001/api/fuel-vendors')
+      .then(r => r.json()).then(d => d.success && setFuelVendors(d.data || [])).catch(() => {});
+  }, [isOpen]);
 
-  const fetchFuelVendors = async () => {
-    try {
-      const response = await fetch('http://localhost:5001/api/fuel-vendors');
-      const data = await response.json();
-      if (data.success) {
-        setFuelVendors(data.data || []);
-      }
-    } catch (error) {
-      console.error('Error fetching fuel vendors:', error);
+  // ── Pre-fill from trip prop ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!trip) return;
+    const vehicleNo = trip.vehicle || trip.vehicle_no || trip.truck_no || '';
+    const vehicleId = trip.vehicle_id || trip.vehicleId || '';
+    setForm(p => ({ ...p, vehicle_id: vehicleId, vehicle_no: vehicleNo }));
+    if (vehicleId) {
+      fetchVehicleInfo(vehicleId);
+    } else if (vehicleNo) {
+      fetch('http://localhost:5001/api/vehicles')
+        .then(r => r.json())
+        .then(d => {
+          const vehicle = (d.data || []).find(item => item.vehicle_no === vehicleNo);
+          if (vehicle) {
+            setForm(p => ({ ...p, vehicle_id: vehicle.id, vehicle_no: vehicle.vehicle_no }));
+            fetchVehicleInfo(vehicle.id);
+          }
+        })
+        .catch(() => {});
     }
-  };
-
-  // ─── Populate vehicle and trip info from the `trip` prop ────────────────
-  useEffect(() => {
-    if (trip) {
-      setAddForm(prev => ({
-        ...prev,
-        vehicle: trip.vehicle || '',
-        tripId: trip.id || '',
-        vehicleId: trip.vehicle_id || ''
-      }));
+    if (trip.supervisor_id) {
+      fetch('http://localhost:5001/api/supervisors')
+        .then(r => r.json())
+        .then(sd => {
+          const sup = (sd.data || []).find(s => s.id === trip.supervisor_id);
+          if (sup) setSupervisorWallet(Number(sup.wallet_balance || 0));
+        }).catch(() => {});
     }
   }, [trip]);
 
-  // ─── Fetch vehicle details (driver, previous ODO, etc.) ─────────────────
-  useEffect(() => {
-    if (!trip?.vehicle_id) return;
-
-    fetch(`http://localhost:5001/api/vehicles/${trip.vehicle_id}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.data) {
-          const v = data.data;
+  // ── Fetch vehicle info when vehicle selected ──────────────────────────────
+  const fetchVehicleInfo = (vehicleId) => {
+    fetch(`http://localhost:5001/api/vehicles/${vehicleId}`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.data) {
+          const v = d.data;
           setVehicleInfo({
-            driver: v.driver_name,
-            prevOdo: v.initial_odometer,
-            expectedMileage: v.expected_mileage || 4.5,
-            tankCapacity: v.tank_capacity || 200,
+            driver: v.driver_name || '—',
+            lastOdo: v.current_odometer ?? v.initial_odometer ?? 0,
+            expectedMileage: Number(v.mileage) || 4.5,
+            tankCapacity: Number(v.tank_capacity) || 200,
+            fuelType: v.fuel_type || 'Diesel',
           });
         }
-      })
-      .catch(err => console.error('Error fetching vehicle details:', err));
-  }, [trip]);
+      }).catch(() => {});
+    // fetch fastag balance for this vehicle
+    fetch(`http://localhost:5001/api/fastag/${vehicleId}/transactions`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.success && d.account) setFastagInfo({ balance: Number(d.account.balance || 0), fastag_id: d.account.fastag_id });
+        else setFastagInfo(null);
+      }).catch(() => setFastagInfo(null));
+  };
 
-  // ─── Derived values ─────────────────────────────────────────────────────
-  const prevOdo = vehicleInfo ? vehicleInfo.prevOdo : 0;
-  const distance = vehicleInfo && addForm.currentOdo
-    ? Math.max(0, Number(addForm.currentOdo) - prevOdo)
-    : 0;
-  const calculatedCost = addForm.qty && addForm.rate
-    ? parseFloat(addForm.qty) * parseFloat(addForm.rate)
-    : 0;
-  const calculatedMileage = distance > 0 && addForm.qty
-    ? (distance / parseFloat(addForm.qty)).toFixed(2)
-    : '0.00';
+  const handleVehicleChange = (e) => {
+    const vehicleNo = e.target.value;
+    const vehicle = vehicles.find(v => v.vehicle_no === vehicleNo);
+    setForm(p => ({ ...p, vehicle_no: vehicleNo, vehicle_id: vehicle?.id || '' }));
+    setVehicleInfo(null);
+    setFastagInfo(null);
+    if (vehicle?.id) fetchVehicleInfo(vehicle.id);
+  };
 
-  const canSave = addForm.vehicle && addForm.vehicleId && addForm.currentOdo && addForm.qty && addForm.rate && addForm.vendor && uploadedFiles.length > 0;
-
-  // ─── Form change handler (generic) ──────────────────────────────────────
-  const handleFormChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    const fieldValue = type === 'checkbox' ? checked : value;
-
-    setAddForm(prev => {
-      const updated = { ...prev, [name]: fieldValue };
-      if (name === 'fullTank' && fieldValue && vehicleInfo) {
-        updated.qty = vehicleInfo.tankCapacity.toString();
-      }
-      return updated;
+  const handlePaymentChange = (method) => {
+    const needsVendor = VENDOR_REQUIRED.includes(method);
+    const requiredTerm = method === 'Credit' ? 'credit' : 'cash';
+    setForm(p => {
+      const selectedVendor = fuelVendors.find(v => v.vendor_name === p.vendor);
+      const compatibleVendor = selectedVendor && (selectedVendor.payment_terms || 'credit') === requiredTerm;
+      return {
+        ...p,
+        payment_method: method,
+        vendor: needsVendor && compatibleVendor ? p.vendor : '',
+      };
     });
-
-    if (errors[name]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
+    if (!needsVendor) setErrors(p => { const n = { ...p }; delete n.vendor; return n; });
   };
 
-  // ─── File upload handlers ───────────────────────────────────────────────
-  const handleFileUpload = (e) => {
-    const files = Array.from(e.target.files || []);
-    const newFiles = files.map(file => ({
-      id: Math.random(),
-      file,
-      preview: URL.createObjectURL(file)
-    }));
-    setUploadedFiles(prev => [...prev, ...newFiles]);
+  const handleVendorChange = (e) => {
+    const vendorName = e.target.value;
+    setForm(p => ({ ...p, vendor: vendorName }));
+    if (errors.vendor) setErrors(p => { const n = { ...p }; delete n.vendor; return n; });
   };
 
-  const removeFile = (fileId) => {
-    setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
+  const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setForm(p => ({ ...p, [name]: type === 'checkbox' ? checked : value }));
+    if (errors[name]) setErrors(p => { const n = { ...p }; delete n[name]; return n; });
   };
 
-  // ─── Validation ─────────────────────────────────────────────────────────
-  const validateForm = () => {
-    const newErrors = {};
-    if (!addForm.currentOdo) {
-      newErrors.currentOdo = 'Current odometer reading required';
-    } else if (Number(addForm.currentOdo) <= prevOdo) {
-      newErrors.distance = 'Current odometer must be greater than previous reading';
-    }
-    if (!addForm.qty) {
-      newErrors.qty = 'Liters must be greater than 0';
-    } else if (Number(addForm.qty) <= 0) {
-      newErrors.qty = 'Liters must be greater than 0';
-    }
-    if (!addForm.rate) {
-      newErrors.rate = 'Fuel rate required';
-    } else if (Number(addForm.rate) <= 0) {
-      newErrors.rate = 'Rate must be greater than 0';
-    }
-    if (!addForm.vendor) {
-      newErrors.vendor = 'Vendor selection required';
-    }
-    if (uploadedFiles.length === 0) {
-      newErrors.proof = 'Fuel receipt / photo proof is required';
-    }
-    if (distance <= 0 && addForm.currentOdo) {
-      newErrors.distance = 'Invalid distance calculation';
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  // ── Auto calculations ─────────────────────────────────────────────────────
+  const lastOdo = vehicleInfo?.lastOdo ?? 0;
+  const distance = form.current_odo && Number(form.current_odo) > lastOdo
+    ? Number(form.current_odo) - lastOdo : 0;
+  const totalCost = form.qty && form.rate
+    ? (parseFloat(form.qty) * parseFloat(form.rate)).toFixed(2) : 0;
+  const mileage = distance > 0 && form.qty && parseFloat(form.qty) > 0
+    ? (distance / parseFloat(form.qty)).toFixed(2) : null;
+
+  // mileage alert
+  const expMileage = vehicleInfo?.expectedMileage || 0;
+  const mileageStatus = mileage && expMileage > 0
+    ? parseFloat(mileage) < expMileage * 0.75 ? 'critical'
+      : parseFloat(mileage) < expMileage * 0.90 ? 'warning' : 'good'
+    : null;
+
+  // ── Validation ────────────────────────────────────────────────────────────
+  const validate = () => {
+    const err = {};
+    if (!form.vehicle_no) err.vehicle_no = 'Select a vehicle';
+    if (!form.vendor) err.vendor = VENDOR_REQUIRED.includes(form.payment_method) ? 'Select a vendor' : 'Enter station / pump name';
+    if (!form.current_odo) err.current_odo = 'Enter current odometer';
+    else if (Number(form.current_odo) <= lastOdo)
+      err.current_odo = `Must be greater than last ODO (${lastOdo.toLocaleString()} km)`;
+    if (!form.qty || parseFloat(form.qty) <= 0) err.qty = 'Enter quantity';
+    if (!form.rate || parseFloat(form.rate) <= 0) err.rate = 'Enter rate';
+    if (uploadedFiles.length === 0) err.proof = 'Upload receipt / proof photo';
+    setErrors(err);
+    return Object.keys(err).length === 0;
   };
 
-  // ─── Alerts & suggestions (same as before) ──────────────────────────────
-  const generateAlerts = () => {
-    const newAlerts = [];
-    if (vehicleInfo && calculatedMileage !== '0.00') {
-      const mileageVar = parseFloat(calculatedMileage) - vehicleInfo.expectedMileage;
-      if (mileageVar < -1) {
-        newAlerts.push({
-          type: 'critical',
-          icon: '🚨',
-          message: `Critical: Mileage ${calculatedMileage} KMPL is significantly below expected ${vehicleInfo.expectedMileage} KMPL`
-        });
-      } else if (mileageVar < -0.3) {
-        newAlerts.push({
-          type: 'warning',
-          icon: '⚠️',
-          message: `Warning: Mileage ${calculatedMileage} KMPL is below expected ${vehicleInfo.expectedMileage} KMPL`
-        });
-      }
-    }
-    if (vehicleInfo && addForm.qty && parseFloat(addForm.qty) > vehicleInfo.tankCapacity) {
-      newAlerts.push({
-        type: 'warning',
-        icon: '⚠️',
-        message: `Fuel quantity (${addForm.qty}L) exceeds tank capacity (${vehicleInfo.tankCapacity}L)`
-      });
-    }
-    setAlerts(newAlerts);
-  };
-
-  const generateSuggestions = () => {
-    const newSuggestions = {};
-    if (trip && vehicleInfo && trip.est_distance) {
-      const fuelReq = (trip.est_distance / vehicleInfo.expectedMileage).toFixed(1);
-      newSuggestions.fuelRequired = `For this trip (${trip.est_distance} km), suggested fuel is ${fuelReq}L based on expected mileage`;
-    }
-    if (vehicleInfo && calculatedMileage !== '0.00') {
-      const mileageVar = parseFloat(calculatedMileage) - vehicleInfo.expectedMileage;
-      if (mileageVar < -0.5) {
-        newSuggestions.efficiency = 'Consider checking vehicle maintenance. Mileage is below expected range.';
-      }
-    }
-    setSuggestions(newSuggestions);
-  };
-
-  useEffect(() => {
-    if (addForm.vehicle && addForm.currentOdo && addForm.qty && addForm.rate) {
-      generateAlerts();
-      generateSuggestions();
-    } else {
-      setAlerts([]);
-      setSuggestions({});
-    }
-  }, [addForm]);
-
-  // ─── Save handler (with extra safety and debug log) ─────────────────────
+  // ── Save ──────────────────────────────────────────────────────────────────
   const handleSave = async () => {
-    if (!validateForm()) return;
-
-    // Extra safety: ensure quantity is a positive number
-    const quantityNum = parseFloat(addForm.qty);
-    if (isNaN(quantityNum) || quantityNum <= 0) {
-      alert('Liters must be greater than 0');
-      return;
-    }
-
-    const fuelData = {
-      date: addForm.date,
-      vehicle_id: Number(addForm.vehicleId),
-      vehicle_no: addForm.vehicle,
-      trip_id: Number(addForm.tripId),
-      fuel_type: addForm.fuelType,
-      station_name: addForm.stationName,
-      payment_method: addForm.paymentMethod,
-      driver_name: vehicleInfo?.driver,
-      previous_odo: prevOdo,
-      expected_mileage: vehicleInfo?.expectedMileage,
-      tank_capacity: vehicleInfo?.tankCapacity,
-      current_odo: Number(addForm.currentOdo),
-      distance: distance,
-      quantity: quantityNum,
-      rate: parseFloat(addForm.rate) || 0,
-      total_cost: calculatedCost,
-      mileage: calculatedMileage,
-      bill_number: addForm.billNumber,
-      full_tank: addForm.fullTank,
-      vendor: addForm.vendor,
-      vendor_type: addForm.vendorType,
-      location: addForm.location,
-      filled_by: addForm.filledBy,
-      remarks: addForm.remarks,
-      receipt_files: JSON.stringify(uploadedFiles.map(f => f.file.name)),
-    };
-
-    console.log('FINAL FUEL DATA:', fuelData);
-
+    if (!validate()) return;
+    setSaving(true);
     try {
-      const response = await fetch('http://localhost:5001/api/fuel', {
+      const payload = new FormData();
+      const fields = {
+        date: form.date,
+        vehicle_id: Number(form.vehicle_id),
+        vehicle_no: form.vehicle_no,
+        trip_id: trip?.id ? Number(trip.id) : '',
+        fuel_type: vehicleInfo?.fuelType || 'Diesel',
+        driver_name: vehicleInfo?.driver || '',
+        previous_odo: lastOdo,
+        expected_mileage: vehicleInfo?.expectedMileage || '',
+        tank_capacity: vehicleInfo?.tankCapacity || '',
+        current_odo: Number(form.current_odo),
+        distance,
+        quantity: parseFloat(form.qty),
+        rate: parseFloat(form.rate),
+        mileage: mileage || 0,
+        vendor: form.vendor,
+        payment_method: form.payment_method,
+        full_tank: form.full_tank,
+      };
+      Object.entries(fields).forEach(([key, value]) => payload.append(key, value));
+      uploadedFiles.forEach(file => payload.append('receipt_files', file));
+
+      const res = await fetch('http://localhost:5001/api/fuel', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(fuelData),
+        body: payload,
       });
-      const result = await response.json();
-      if (result.success) {
-        alert('Fuel entry saved successfully');
-        if (onSave) onSave(fuelData);
-        onClose();
-        // Reset form
-        setAddForm({
-          date: new Date().toISOString().split('T')[0],
-          vehicle: '',
-          fuelType: 'Diesel',
-          stationName: '',
-          paymentMethod: 'Cash',
-          tripId: '',
-          currentOdo: '',
-          qty: '',
-          rate: '',
-          fullTank: false,
-          billNumber: '',
-          vendor: '',
-          vendorType: 'Petrol Pump',
-          remarks: '',
-          location: '',
-          filledBy: 'Driver',
-          vehicleId: '',
-        });
-        setUploadedFiles([]);
-        setAlerts([]);
-        setErrors({});
-        setSuggestions({});
-        setVehicleInfo(null);
+      const data = await res.json();
+      if (data.success) {
+        onSave?.();
+        handleClose();
       } else {
-        alert('Failed to save fuel entry: ' + result.message);
+        alert('Failed: ' + data.message);
       }
-    } catch (error) {
-      console.error('Error saving fuel entry:', error);
-      alert('Could not connect to backend. Is the server running?');
+    } catch {
+      alert('Could not connect to backend.');
+    } finally {
+      setSaving(false);
     }
+  };
+
+  const handleClose = () => {
+    setForm({
+      date: new Date().toISOString().split('T')[0],
+      vehicle_id: '', vehicle_no: '', vendor: '',
+      current_odo: '', qty: '', rate: '',
+      payment_method: 'Cash', full_tank: true,
+    });
+    setVehicleInfo(null);
+    setUploadedFiles([]);
+    setErrors({});
+    onClose();
   };
 
   if (!isOpen) return null;
 
-  // ─── UI constants (unchanged) ───────────────────────────────────────────
-  const inputClass = "w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500";
-  const inputAutoClass = "w-full px-3 py-2 border border-slate-200 bg-slate-50 rounded-lg text-sm text-slate-600 cursor-not-allowed";
-  const inputCalcClass = "w-full px-3 py-2 border border-slate-200 rounded-lg text-sm font-semibold flex items-center";
-  const labelClass = "block text-xs font-bold text-slate-600 uppercase mb-1 tracking-wider";
+  const canSave = form.vehicle_no && form.vendor && form.current_odo &&
+    Number(form.current_odo) > lastOdo && form.qty && form.rate && uploadedFiles.length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
-      <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm" onClick={onClose} />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col">
 
-      <div className="relative bg-white w-full sm:rounded-2xl shadow-2xl sm:max-w-2xl max-h-[95vh] flex flex-col animate-in zoom-in-95 duration-200 rounded-t-2xl">
-
-        {/* Modal Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">⛽</span>
+        {/* ── Header ── */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">⛽</span>
             <div>
-              <h2 className="text-base font-bold text-slate-800">New Fuel Entry</h2>
-              <p className="text-xs text-slate-400">Fill all details to log a fuel transaction</p>
+              <h2 className="text-base font-bold text-slate-800">Add Fuel Entry</h2>
+              {trip && (
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {trip.tripId} · {trip.vehicle} · {trip.source} → {trip.destination}
+                </p>
+              )}
             </div>
           </div>
-          <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors">
+          <button onClick={handleClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition">
             <FiX className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Scrollable Body */}
-        <div className="overflow-y-auto flex-1 p-5 space-y-4">
+        {/* ── Auto-calc summary bar (shows once data entered) ── */}
+        {(distance > 0 || totalCost > 0 || mileage) && (
+          <div className="grid grid-cols-3 divide-x divide-slate-100 border-b border-slate-100 bg-slate-50 shrink-0">
+            <div className="px-5 py-3 text-center">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Distance</p>
+              <p className="text-lg font-black text-slate-800">{distance > 0 ? `${distance.toLocaleString()} km` : '—'}</p>
+            </div>
+            <div className="px-5 py-3 text-center">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Mileage</p>
+              <p className={`text-lg font-black ${mileageStatus === 'critical' ? 'text-red-600' : mileageStatus === 'warning' ? 'text-amber-600' : 'text-green-600'}`}>
+                {mileage ? `${mileage} KMPL` : '—'}
+              </p>
+            </div>
+            <div className="px-5 py-3 text-center">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Cost</p>
+              <p className="text-lg font-black text-indigo-700">{totalCost > 0 ? `₹${Number(totalCost).toLocaleString('en-IN')}` : '—'}</p>
+            </div>
+          </div>
+        )}
 
-          {/* SECTION 1: Basic Info */}
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 space-y-3">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">🚛 Basic Info</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass}>Date</label>
-                <input type="date" name="date" value={addForm.date} onChange={handleFormChange} className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Vehicle *</label>
-                <input type="text" value={addForm.vehicle || ''} readOnly className={inputAutoClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Fuel Type</label>
-                <select name="fuelType" value={addForm.fuelType} onChange={handleFormChange} className={inputClass}>
-                  <option>Diesel</option><option>Petrol</option><option>CNG</option><option>AdBlue</option>
+        {/* ── Body ── */}
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+          {/* Row 1 — Date & Vehicle */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={lbl}>Date</label>
+              <input type="date" name="date" value={form.date} onChange={handleChange} className={inp} />
+            </div>
+            <div>
+              <label className={lbl}>Vehicle Number <span className="text-red-500">*</span></label>
+              {trip ? (
+                <input value={form.vehicle_no} disabled className={inpDisabled} />
+              ) : (
+                <select name="vehicle_no" value={form.vehicle_no} onChange={handleVehicleChange}
+                  className={errors.vehicle_no ? `${inp} border-red-300` : inp}>
+                  <option value="">— Select Vehicle —</option>
+                  {vehicles.map(v => <option key={v.id} value={v.vehicle_no}>{v.vehicle_no}</option>)}
                 </select>
-              </div>
-              <div>
-                <label className={labelClass}>Fuel Station Name</label>
-                <input type="text" name="stationName" value={addForm.stationName} onChange={handleFormChange} placeholder="e.g. HP Petrol Pump" className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Payment Method</label>
-                <select name="paymentMethod" value={addForm.paymentMethod} onChange={handleFormChange} className={inputClass}>
-                  <option>Cash</option><option>Card</option><option>UPI</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Trip ID</label>
-                <input type="text" value={trip?.tripId || ''} readOnly className={inputAutoClass} />
-              </div>
+              )}
+              {errors.vehicle_no && <p className="text-xs text-red-500 mt-1">{errors.vehicle_no}</p>}
             </div>
           </div>
 
-          {/* SECTION 2: Auto Data */}
-          <div className="bg-indigo-50/60 rounded-xl p-4 border border-indigo-100 space-y-3">
-            <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">⚡ Auto-Fetched Data</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div>
-                <label className={labelClass + " text-indigo-600"}>Driver (Auto)</label>
-                <input readOnly value={vehicleInfo?.driver || ''} className={inputAutoClass} />
-              </div>
-              <div>
-                <label className={labelClass + " text-indigo-600"}>Previous ODO (Auto)</label>
-                <input readOnly value={vehicleInfo ? prevOdo.toLocaleString() + ' km' : ''} className={inputAutoClass} />
-              </div>
-              <div>
-                <label className={labelClass + " text-indigo-600"}>Expected Mileage (Auto)</label>
-                <input readOnly value={vehicleInfo ? `${vehicleInfo.expectedMileage} KMPL` : ''} className={inputAutoClass} />
-              </div>
-              <div>
-                <label className={labelClass + " text-indigo-600"}>Tank Capacity (Auto)</label>
-                <input readOnly value={vehicleInfo ? `${vehicleInfo.tankCapacity} L` : ''} className={inputAutoClass} />
-              </div>
+          {/* Row 2 — Driver (auto) */}
+          <div>
+            <label className={lbl}>Driver (Auto)</label>
+            <input value={vehicleInfo?.driver || ''} disabled className={inpDisabled}
+              placeholder="Select vehicle first" />
+          </div>
+
+          {/* Row 3 — Last ODO (auto) & Current ODO */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={lbl}>Last Odometer (Auto)</label>
+              <input value={vehicleInfo ? `${lastOdo.toLocaleString()} km` : ''} disabled
+                className={inpDisabled} placeholder="Select vehicle first" />
+            </div>
+            <div>
+              <label className={lbl}>Current Odometer <span className="text-red-500">*</span></label>
+              <input type="number" name="current_odo" value={form.current_odo} onChange={handleChange}
+                placeholder={vehicleInfo ? `> ${lastOdo.toLocaleString()}` : 'Enter reading'}
+                className={errors.current_odo ? `${inp} border-red-300` : inp} />
+              {errors.current_odo && <p className="text-xs text-red-500 mt-1">{errors.current_odo}</p>}
             </div>
           </div>
 
-          {/* SECTION 3: Odometer & Distance */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200 space-y-3">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">📍 Odometer Reading</p>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className={labelClass}>Previous ODO</label>
-                <input readOnly value={vehicleInfo ? prevOdo.toLocaleString() : ''} className={inputAutoClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Current ODO *</label>
-                <input
-                  type="number"
-                  name="currentOdo"
-                  value={addForm.currentOdo}
-                  onChange={handleFormChange}
-                  placeholder="Enter reading"
-                  className={`${inputClass} ${errors.currentOdo ? 'border-red-300 focus:border-red-500' : ''}`}
-                />
-                {errors.currentOdo && <p className="text-xs text-red-600 mt-1">{errors.currentOdo}</p>}
-              </div>
-              <div>
-                <label className={labelClass + " text-emerald-600"}>Distance (Auto)</label>
-                <div className={`${inputCalcClass} ${distance > 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'text-slate-600'}`}>
-                  {distance > 0 ? `${distance.toLocaleString()} km` : '—'}
-                </div>
-                {errors.distance && <p className="text-xs text-red-600 mt-1">{errors.distance}</p>}
-              </div>
+          {/* Row 4 — Qty & Rate */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className={lbl}>Quantity (Litres) <span className="text-red-500">*</span></label>
+              <input type="number" name="qty" value={form.qty} onChange={handleChange}
+                placeholder="e.g. 120" min="1"
+                className={errors.qty ? `${inp} border-red-300` : inp} />
+              {errors.qty && <p className="text-xs text-red-500 mt-1">{errors.qty}</p>}
+              {vehicleInfo && form.qty && parseFloat(form.qty) > vehicleInfo.tankCapacity && (
+                <p className="text-xs text-amber-600 mt-1">⚠️ Exceeds tank capacity ({vehicleInfo.tankCapacity} L)</p>
+              )}
+            </div>
+            <div>
+              <label className={lbl}>Rate per Litre (₹) <span className="text-red-500">*</span></label>
+              <input type="number" name="rate" value={form.rate} onChange={handleChange}
+                placeholder="e.g. 96.50" step="0.01" min="0.01"
+                className={errors.rate ? `${inp} border-red-300` : inp} />
+              {errors.rate && <p className="text-xs text-red-500 mt-1">{errors.rate}</p>}
             </div>
           </div>
 
-          {/* SECTION 4: Fuel Details */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200 space-y-3">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">⛽ Fuel Details</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass}>Quantity (L) *</label>
-                <input
-                  type="number"
-                  name="qty"
-                  value={addForm.qty}
-                  onChange={handleFormChange}
-                  placeholder="e.g. 120"
-                  min="1"
-                  className={`${inputClass} ${errors.qty ? 'border-red-300 focus:border-red-500' : ''}`}
-                />
-                {errors.qty && <p className="text-xs text-red-600 mt-1">{errors.qty}</p>}
-              </div>
-              <div>
-                <label className={labelClass}>Rate per Litre (₹) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  name="rate"
-                  value={addForm.rate}
-                  onChange={handleFormChange}
-                  placeholder="e.g. 96.50"
-                  min="0.01"
-                  className={`${inputClass} ${errors.rate ? 'border-red-300 focus:border-red-500' : ''}`}
-                />
-                {errors.rate && <p className="text-xs text-red-600 mt-1">{errors.rate}</p>}
-              </div>
-              <div>
-                <label className={labelClass}>Fuel Bill Number</label>
-                <input type="text" name="billNumber" value={addForm.billNumber} onChange={handleFormChange} placeholder="e.g. BILL-2025-001" className={inputClass} />
-              </div>
-              <div className="flex items-center gap-3 pt-5">
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" name="fullTank" checked={addForm.fullTank} onChange={handleFormChange} className="sr-only peer" />
-                  <div className="w-10 h-5 bg-slate-200 peer-checked:bg-indigo-600 rounded-full transition-colors after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-5"></div>
-                </label>
-                <span className="text-sm font-semibold text-slate-700">Full Tank Fill</span>
-                {addForm.fullTank && vehicleInfo && (
-                  <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">Auto-set to {vehicleInfo.tankCapacity}L</span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 5: Cost & Performance */}
-          <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-200 space-y-3">
-            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">📊 Cost & Performance (Auto-Calculated)</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass + " text-emerald-700"}>Total Cost (₹)</label>
-                <div className={`${inputCalcClass} ${calculatedCost > 0 ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'text-slate-600'}`}>
-                  {calculatedCost > 0 ? `₹ ${calculatedCost.toFixed(2)}` : '—'}
-                </div>
-              </div>
-              <div>
-                <label className={labelClass + " text-emerald-700"}>Mileage (KMPL)</label>
-                <div className={`${inputCalcClass} ${calculatedMileage !== '0.00' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'text-slate-600'}`}>
-                  {calculatedMileage !== '0.00' ? `${calculatedMileage} km/L` : '—'}
-                </div>
-              </div>
-            </div>
-
-            {trip && vehicleInfo && trip.est_distance && (
-              <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs font-bold text-blue-700 mb-2">🚚 Trip Integration</p>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-blue-600">Trip Distance:</span> {trip.est_distance} km</div>
-                  <div><span className="text-blue-600">Suggested Fuel:</span> {(trip.est_distance / vehicleInfo.expectedMileage).toFixed(1)} L</div>
-                </div>
-              </div>
-            )}
-
-            {Object.keys(suggestions).length > 0 && (
-              <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-xs font-bold text-amber-700 mb-2 flex items-center gap-1">
-                  <FiInfo className="w-3 h-3" /> Smart Suggestions
-                </p>
-                {suggestions.fuelRequired && <p className="text-sm text-amber-700">{suggestions.fuelRequired}</p>}
-                {suggestions.efficiency && <p className="text-sm text-amber-700">{suggestions.efficiency}</p>}
-              </div>
-            )}
-          </div>
-
-          {/* SECTION 6: Vendor & Upload */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200 space-y-3">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">🏪 Vendor & Receipt</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className={labelClass}>Vendor Type</label>
-                <select name="vendorType" value={addForm.vendorType} onChange={handleFormChange} className={inputClass}>
-                  <option>Petrol Pump</option><option>Internal</option><option>Other</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelClass}>Fuel Vendor *</label>
-                <select name="vendor" value={addForm.vendor} onChange={handleFormChange} className={`${inputClass} ${errors.vendor ? 'border-red-300' : ''}`}>
-                  <option value="">Select vendor...</option>
-                  {fuelVendors.map((vendor) => (
-                    <option key={vendor.id} value={vendor.vendor_name}>
-                      {vendor.vendor_name}
-                    </option>
-                  ))}
-                </select>
-                {errors.vendor && <p className="text-xs text-red-600 mt-1">{errors.vendor}</p>}
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelClass}>Upload Receipt / Proof Photo <span className="text-red-500">*</span></label>
-                <label className={`flex items-center justify-center gap-2 w-full px-3 py-3 border-2 border-dashed rounded-lg bg-slate-50 hover:bg-slate-100 cursor-pointer transition-colors text-sm font-bold ${
-                  errors.proof ? 'border-red-400 text-red-500' : 'border-slate-300 text-indigo-600'
-                }`}>
-                  <FiDownload className="w-4 h-4" /> Click to upload bill / photo
-                  <input type="file" multiple accept="image/*,.pdf" onChange={handleFileUpload} className="hidden" />
-                </label>
-                {errors.proof && <p className="text-xs text-red-600 mt-1">{errors.proof}</p>}
-                {uploadedFiles.length === 0 && !errors.proof && (
-                  <p className="text-xs text-amber-600 mt-1">⚠️ Proof is mandatory — entry cannot be saved without it</p>
-                )}
-                {uploadedFiles.length > 0 && (
-                  <div className="mt-3 space-y-2">
-                    {uploadedFiles.map(file => (
-                      <div key={file.id} className="flex items-center gap-3 p-2 bg-slate-50 border border-slate-200 rounded-lg">
-                        {file.file.type.startsWith('image/') ? (
-                          <img src={file.preview} alt={file.file.name} className="w-10 h-10 object-cover rounded" />
-                        ) : (
-                          <div className="w-10 h-10 bg-slate-200 rounded flex items-center justify-center text-xs font-bold text-slate-600">PDF</div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-700 truncate">{file.file.name}</p>
-                          <p className="text-xs text-slate-500">{(file.file.size / 1024).toFixed(1)} KB</p>
-                        </div>
-                        <button onClick={() => removeFile(file.id)} className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded">
-                          <FiTrash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* SECTION 7: Alerts */}
-          {alerts.length > 0 && (
-            <div className="bg-red-50 rounded-xl p-4 border border-red-200 space-y-3">
-              <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">🚨 Alerts & Warnings</p>
-              <div className="space-y-2">
-                {alerts.map((alert, idx) => (
-                  <div key={idx} className={`flex items-start gap-3 p-3 rounded-lg ${alert.type === 'warning' ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'}`}>
-                    <div className={`text-lg ${alert.type === 'warning' ? 'text-yellow-600' : 'text-red-600'}`}>{alert.icon}</div>
-                    <p className={`text-sm font-medium ${alert.type === 'warning' ? 'text-yellow-800' : 'text-red-800'}`}>{alert.message}</p>
-                  </div>
+          {/* Row 5 — Payment Method first, then conditional vendor */}
+          <div className="space-y-3">
+            <div>
+              <label className={lbl}>Payment Method</label>
+              <div className="flex flex-wrap gap-2">
+                {['Cash', 'Fuel Card', 'Credit', 'UPI', 'FASTag Wallet', 'Driver Advance'].map(opt => (
+                  <button key={opt} type="button"
+                    onClick={() => handlePaymentChange(opt)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${
+                      form.payment_method === opt
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-slate-600 border-slate-200 hover:border-indigo-300'
+                    }`}>
+                    {opt}
+                  </button>
                 ))}
               </div>
             </div>
-          )}
 
-          {/* SECTION 8: Extra Info */}
-          <div className="bg-white rounded-xl p-4 border border-slate-200 space-y-3">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">📝 Extra Info</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Vendor — only for Cash / Credit / Fuel Card / UPI */}
+            {VENDOR_REQUIRED.includes(form.payment_method) && (
               <div>
-                <label className={labelClass}>Location</label>
-                <input type="text" name="location" value={addForm.location} onChange={handleFormChange} placeholder="e.g. NH-44, Kurnool" className={inputClass} />
-              </div>
-              <div>
-                <label className={labelClass}>Fuel Filled By</label>
-                <select name="filledBy" value={addForm.filledBy} onChange={handleFormChange} className={inputClass}>
-                  <option>Driver</option><option>Supervisor</option>
+                <label className={lbl}>Vendor <span className="text-red-500">*</span></label>
+                <select name="vendor" value={form.vendor} onChange={handleVendorChange}
+                  className={errors.vendor ? `${inp} border-red-300` : inp}>
+                  <option value="">— Select Vendor —</option>
+                  {visibleFuelVendors.map(v => (
+                    <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>
+                  ))}
                 </select>
+                {errors.vendor && <p className="text-xs text-red-500 mt-1">{errors.vendor}</p>}
               </div>
-              <div className="sm:col-span-2">
-                <label className={labelClass}>Remarks / Notes</label>
-                <textarea name="remarks" value={addForm.remarks} onChange={handleFormChange} rows={2} placeholder="Any additional notes..." className={`${inputClass} resize-none`} />
+            )}
+
+            {/* FASTag / Driver Advance — free text station name */}
+            {!VENDOR_REQUIRED.includes(form.payment_method) && (
+              <div>
+                <label className={lbl}>Station / Pump Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text" name="vendor" value={form.vendor} onChange={handleChange}
+                  placeholder="e.g. HP Pump, Hyderabad Highway"
+                  className={errors.vendor ? `${inp} border-red-300` : inp}
+                />
+                {errors.vendor && <p className="text-xs text-red-500 mt-1">{errors.vendor}</p>}
+              </div>
+            )}
+
+            {/* FASTag Wallet — show vehicle fastag balance */}
+            {form.payment_method === 'FASTag Wallet' && (
+              <div className={`px-4 py-3 rounded-xl border text-sm ${
+                fastagInfo === null ? 'bg-red-50 border-red-200 text-red-700'
+                : fastagInfo.balance < 500 ? 'bg-amber-50 border-amber-200 text-amber-700'
+                : 'bg-green-50 border-green-200 text-green-700'
+              }`}>
+                {fastagInfo === null ? (
+                  <span className="font-semibold">⚠️ No FASTag account linked to this vehicle</span>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">🏷️ FASTag: {fastagInfo.fastag_id || 'Linked'}</span>
+                    <span className="font-bold">Balance: ₹{fastagInfo.balance.toLocaleString('en-IN')}
+                      {fastagInfo.balance < 500 && <span className="ml-2 text-xs">⚠️ Low</span>}
+                    </span>
+                  </div>
+                )}
+                {totalCost > 0 && fastagInfo && (
+                  <p className="text-xs mt-1 opacity-80">Monthly fuel usage to report: ₹{Number(totalCost).toLocaleString('en-IN')}</p>
+                )}
+              </div>
+            )}
+
+            {/* Driver Advance — show supervisor wallet balance */}
+            {form.payment_method === 'Driver Advance' && (
+              <div className={`px-4 py-3 rounded-xl border text-sm ${
+                supervisorWallet === null ? 'bg-slate-50 border-slate-200 text-slate-600'
+                : supervisorWallet < 1000 ? 'bg-amber-50 border-amber-200 text-amber-700'
+                : 'bg-green-50 border-green-200 text-green-700'
+              }`}>
+                {supervisorWallet === null ? (
+                  <span className="font-semibold">👤 Supervisor wallet info not available</span>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">👤 Supervisor Wallet</span>
+                    <span className="font-bold">Balance: ₹{supervisorWallet.toLocaleString('en-IN')}
+                      {supervisorWallet < 1000 && <span className="ml-2 text-xs">⚠️ Low</span>}
+                    </span>
+                  </div>
+                )}
+                {totalCost > 0 && supervisorWallet !== null && (
+                  <p className="text-xs mt-1 opacity-80">After deduction: ₹{(supervisorWallet - Number(totalCost)).toLocaleString('en-IN')}</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Row 6 — Receipt upload */}
+          <div>
+            <label className={lbl}>Receipt / Proof Photo <span className="text-red-500">*</span></label>
+            <label className={`flex items-center justify-center gap-2 w-full px-4 py-3 border-2 border-dashed rounded-xl cursor-pointer transition text-sm font-semibold ${
+              errors.proof ? 'border-red-300 text-red-500 bg-red-50' : 'border-slate-300 text-indigo-600 hover:bg-indigo-50 hover:border-indigo-300'
+            }`}>
+              📎 Click to upload bill / photo
+              <input type="file" multiple accept="image/*,.pdf" className="hidden"
+                onChange={e => {
+                  const files = Array.from(e.target.files || []);
+                  setUploadedFiles(p => [...p, ...files]);
+                  if (errors.proof) setErrors(p => { const n = { ...p }; delete n.proof; return n; });
+                }} />
+            </label>
+            {errors.proof && <p className="text-xs text-red-500 mt-1">{errors.proof}</p>}
+            {uploadedFiles.length > 0 && (
+              <div className="mt-2 space-y-1.5">
+                {uploadedFiles.map((file, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg">
+                    <span className="text-xs text-slate-700 font-medium truncate">{file.name}</span>
+                    <button onClick={() => setUploadedFiles(p => p.filter((_, idx) => idx !== i))}
+                      className="ml-2 text-red-400 hover:text-red-600 shrink-0">
+                      <FiTrash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Row 7 — Full tank toggle */}
+          <div className="flex items-center gap-3 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+            <input type="checkbox" id="full_tank" name="full_tank" checked={form.full_tank}
+              onChange={handleChange} className="w-4 h-4 accent-indigo-600 cursor-pointer" />
+            <label htmlFor="full_tank" className="text-sm font-semibold text-slate-700 cursor-pointer select-none">
+              Full Tank Fill
+            </label>
+            <span className="text-xs text-slate-400">
+              {form.full_tank ? '✅ Full tank — mileage will be calculated' : '⚠️ Partial fill — mileage calculation may be inaccurate'}
+            </span>
+          </div>
+
+          {/* Mileage alert */}
+          {mileageStatus && mileageStatus !== 'good' && (
+            <div className={`flex items-start gap-3 px-4 py-3 rounded-xl border text-sm ${
+              mileageStatus === 'critical' ? 'bg-red-50 border-red-200 text-red-700' : 'bg-amber-50 border-amber-200 text-amber-700'
+            }`}>
+              <FiAlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-bold">{mileageStatus === 'critical' ? 'Critical: Very Low Mileage' : 'Warning: Below Expected Mileage'}</p>
+                <p className="text-xs mt-0.5">Actual {mileage} KMPL vs expected {expMileage} KMPL</p>
               </div>
             </div>
-          </div>
+          )}
+          {mileageStatus === 'good' && (
+            <div className="flex items-center gap-2 px-4 py-3 rounded-xl border bg-green-50 border-green-200 text-green-700 text-sm">
+              <FiCheckCircle className="w-4 h-4 shrink-0" />
+              <span className="font-semibold">Good mileage — {mileage} KMPL (expected {expMileage} KMPL)</span>
+            </div>
+          )}
 
         </div>
 
-        {/* Footer */}
-        <div className="px-5 py-4 border-t border-slate-100 bg-white flex justify-end gap-3 shrink-0">
-          <button onClick={onClose} className="px-5 py-2.5 border border-slate-200 bg-white text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-50">
+        {/* ── Footer ── */}
+        <div className="px-6 py-4 border-t border-slate-100 bg-white flex items-center justify-between shrink-0 rounded-b-2xl">
+          <button onClick={handleClose}
+            className="px-5 py-2.5 text-sm font-semibold text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition">
             Cancel
           </button>
-          <button
-            onClick={handleSave}
-            disabled={!canSave}
-            title={uploadedFiles.length === 0 ? 'Upload proof receipt to enable save' : ''}
-            className={`px-6 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm transition-colors ${
-              canSave ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            ⛽ {uploadedFiles.length === 0 ? 'Upload Proof to Save' : 'Save Fuel Entry'}
+          <button onClick={handleSave} disabled={!canSave || saving}
+            className={`px-6 py-2.5 text-sm font-bold rounded-lg shadow transition flex items-center gap-2 ${
+              canSave && !saving
+                ? 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+            }`}>
+            {saving ? <><div className="w-4 h-4 border-2 border-slate-300 border-t-white rounded-full animate-spin" />Saving...</> : '⛽ Save Entry'}
           </button>
         </div>
 

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useLocation, useSearchParams } from "react-router-dom";
 import { LayoutGrid, TrendingUp, TrendingDown, Truck } from "lucide-react";
 import FilterBar    from "./components/FilterBar";
 import OverviewTab  from "./tabs/OverviewTab";
@@ -14,21 +15,25 @@ const TABS = [
 ];
 
 export default function Finance() {
-  const [activeTab,     setActiveTab]     = useState("overview");
-  const [selectedTruck, setSelectedTruck] = useState("All");
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const urlTab       = searchParams.get("tab");
+  const urlTripId    = searchParams.get("trip_id");    // auto-open add form
+  const urlViewTrip  = searchParams.get("view_trip");  // open list, highlight trip
+  const urlVehicleId = searchParams.get("vehicle_id");
+
+  const [activeTab,     setActiveTab]     = useState(urlTab || "overview");
+  const [selectedTruck, setSelectedTruck] = useState(urlVehicleId || "All");
   const [dateFrom,      setDateFrom]      = useState("");
   const [dateTo,        setDateTo]        = useState("");
   const [vehicles,      setVehicles]      = useState([]);
 
-  // Fetch vehicles from database on mount
   React.useEffect(() => {
     const fetchVehicles = async () => {
       try {
         const res = await fetch('http://localhost:5001/api/vehicles');
         const data = await res.json();
-        if (data.success) {
-          setVehicles(data.data || []);
-        }
+        if (data.success) setVehicles(data.data || []);
       } catch (error) {
         console.error('Failed to fetch vehicles:', error);
       }
@@ -37,12 +42,22 @@ export default function Finance() {
   }, []);
 
   const sharedProps = { selectedTruck, dateFrom, dateTo };
+  // trip_id  → auto-open add form with pre-fill
+  // view_trip → open list only (no form)
+  const tripProps = {
+    initialTripId:    urlTripId || urlViewTrip || null,
+    initialVehicleId: urlVehicleId || null,
+    viewOnlyTrip: Boolean(urlViewTrip && !urlTripId),
+    prefetchedTripContext: location.state?.tripContext || null,
+    prefetchedTripExpenses: location.state?.tripExpenses || [],
+    prefetchedTripFuel: location.state?.tripFuel || [],
+  };
 
   const renderTab = () => {
     switch (activeTab) {
       case "overview": return <OverviewTab  {...sharedProps} />;
-      case "income":   return <IncomeTab    {...sharedProps} />;
-      case "expense":  return <ExpenseTab   {...sharedProps} />;
+      case "income":   return <IncomeTab    {...sharedProps} {...tripProps} />;
+      case "expense":  return <ExpenseTab   {...sharedProps} {...tripProps} />;
       case "trucks":   return <TrucksTab    {...sharedProps} />;
       default:         return null;
     }

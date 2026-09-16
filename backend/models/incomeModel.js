@@ -114,6 +114,31 @@ const Income = {
 
   },
 
+  updateIncome: async (id, data) => {
+    const [result] = await db.query(
+      `UPDATE income_entries SET
+        income_category=?, place_of_running=?, freight_start_date=?, freight_end_date=?,
+        amount=?, received_amount=?, pending_amount=?, payment_status=?,
+        payment_received_date=?, bank_reference_number=?, description=?
+       WHERE id=?`,
+      [
+        data.income_category,
+        data.place_of_running,
+        data.freight_start_date,
+        data.freight_end_date,
+        data.amount,
+        data.received_amount,
+        data.pending_amount,
+        data.payment_status,
+        data.payment_received_date,
+        data.bank_reference_number,
+        data.description,
+        id,
+      ]
+    );
+    return result;
+  },
+
   // =====================================================
   // GET ALL INCOME
   // =====================================================
