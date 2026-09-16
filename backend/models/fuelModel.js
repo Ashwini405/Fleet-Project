@@ -16,7 +16,7 @@ getAll: async () => {
   const [rows] = await db.query(`
     SELECT f.*,
            v.vehicle_no,
-           t.trip_id,
+          t.trip_id AS trip_number,
            t.driver_name,
            s.full_name AS supervisor_name   -- ✅ ADD THIS
     FROM fuel_entries f

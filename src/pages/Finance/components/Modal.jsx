@@ -7,7 +7,7 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = "ma
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div
-        className={`bg-white rounded-2xl shadow-2xl w-full ${maxWidth} overflow-hidden`}
+        className={`bg-white rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[90vh] flex flex-col overflow-hidden`}
         style={{ animation: "modalIn 0.22s ease-out" }}
       >
         {/* Header */}
@@ -22,7 +22,7 @@ export default function Modal({ isOpen, onClose, title, children, maxWidth = "ma
         </div>
 
         {/* Body */}
-        <div className="p-5">{children}</div>
+        <div className="p-5 overflow-y-auto">{children}</div>
       </div>
 
       <style>{`

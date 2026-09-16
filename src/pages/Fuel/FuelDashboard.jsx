@@ -66,6 +66,7 @@ export default function FuelDashboard() {
   const [statusFilter, setStatus]   = useState('all');
   const [vehicleFilter, setVehicle] = useState('all');
   const [dateFilter, setDate]       = useState('all');
+  const linkedVehicleId = new URLSearchParams(window.location.search).get('vehicle_id');
 
   const fetchData = () => {
     setLoading(true);
@@ -139,6 +140,7 @@ export default function FuelDashboard() {
 
       return {
         tripId:          t.trip_id,
+        vehicleId:        t.vehicle_id,
         vehicle:         t.truck_no || t.vehicle_no || '',
         route:           `${t.source || '—'} → ${t.destination || '—'}`,
         source:          t.source || '',
@@ -196,6 +198,7 @@ export default function FuelDashboard() {
     const q = search.toLowerCase();
     const now = new Date();
     return tripRows.filter(t => {
+      if (linkedVehicleId && String(t.vehicleId) !== String(linkedVehicleId)) return false;
       if (search && !(
         t.tripId.toLowerCase().includes(q) ||
         t.vehicle.toLowerCase().includes(q) ||
@@ -217,7 +220,7 @@ export default function FuelDashboard() {
       }
       return true;
     });
-  }, [tripRows, search, statusFilter, vehicleFilter, dateFilter]);
+  }, [tripRows, search, statusFilter, vehicleFilter, dateFilter, linkedVehicleId]);
 
   // ─── Drill-down ───────────────────────────────────────────────────────────
   if (selectedTrip) {

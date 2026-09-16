@@ -180,6 +180,7 @@ export function AuditTrail({ totals }) {
   const steps = [
     { label: 'Trip Revenue',      value: totals.totalRevenue || 0,   sign: '+', color: 'text-green-700',  dot: 'bg-green-500'   },
     { label: 'Fuel Expenses',     value: totals.totalFuel || 0,          sign: '−', color: 'text-red-600',    dot: 'bg-red-500'     },
+    { label: 'Fastag Expenses',   value: totals.totalFastag || 0,        sign: '−', color: 'text-red-600',    dot: 'bg-violet-500'  },
     { label: 'Maintenance',       value: totals.totalMaintenance || 0,         sign: '−', color: 'text-red-600',    dot: 'bg-amber-500'   },
     { label: 'Tyres',             value: totals.totalTyres || 0,         sign: '−', color: 'text-red-600',    dot: 'bg-purple-500'  },
     { label: 'Battery',           value: totals.totalBattery || 0,       sign: '−', color: 'text-red-600',    dot: 'bg-blue-500'    },

@@ -36,7 +36,7 @@ const WarrantyDocLink = ({ filename, label }) => {
   );
 };
 
-export default function TyresLedger({ vendor, onBack, onLedgerUpdated }) {
+export default function TyresLedger({ vendor, onBack, onLedgerUpdated, initialTyreNumber, initialTxnType }) {
   const isCash = (vendor.payment_terms || 'credit') === 'cash';
   const FILTERS = isCash ? BASE_FILTERS.filter(f => f !== 'Payments') : BASE_FILTERS;
   const [rawTxns, setRawTxns] = useState([]);
@@ -63,6 +63,22 @@ export default function TyresLedger({ vendor, onBack, onLedgerUpdated }) {
   useEffect(() => {
     fetchLedger();
   }, [vendor.id]);
+
+  useEffect(() => {
+    if (!initialTyreNumber || rawTxns.length === 0) return;
+    const requestedType = String(initialTxnType || '').toLowerCase();
+    const match = rawTxns.find(txn => {
+      const text = `${txn.ref || ''} ${txn.desc || ''}`.toLowerCase();
+      const tyreMatch = text.includes(String(initialTyreNumber).toLowerCase());
+      const typeMatch = !requestedType || (
+        requestedType === 'retreading'
+          ? txn.type === 'Retreading Service'
+          : txn.type.toLowerCase().includes(requestedType)
+      );
+      return tyreMatch && typeMatch;
+    });
+    if (match) setSelectedTxn(match);
+  }, [initialTyreNumber, initialTxnType, rawTxns]);
 
   const fetchLedger = async () => {
     try {
@@ -94,16 +110,22 @@ export default function TyresLedger({ vendor, onBack, onLedgerUpdated }) {
 
   // ── Computed values ───────────────────────────────────────────────────────
   const txnsWithBalance = useMemo(() => {
-    return [...rawTxns].sort((a, b) => new Date(a.date) - new Date(b.date));
+    return [...rawTxns].sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [rawTxns]);
 
   const totalDebit = rawTxns.reduce((s, t) => s + (t.debit || 0), 0);
   const totalCredit = rawTxns.reduce((s, t) => s + (t.credit || 0), 0);
-  const lastDate = txnsWithBalance.length ? txnsWithBalance[txnsWithBalance.length - 1].date : null;
+  const lastDate = txnsWithBalance.length ? txnsWithBalance[0].date : null;
 
   const filtered = useMemo(() => txnsWithBalance.filter(t => {
     if (activeFilter !== 'All' && !filterMatch[activeFilter]?.includes(t.type)) return false;
-    if (search && !t.desc?.toLowerCase().includes(search.toLowerCase()) && !t.ref?.toLowerCase().includes(search.toLowerCase())) return false;
+    if (search && ![
+      t.desc,
+      t.ref,
+      t.tyreNumber,
+      t.tyreProfile?.tyreNumber,
+      t.tyreNo,
+    ].some(value => String(value || '').toLowerCase().includes(search.toLowerCase()))) return false;
     if (dateFrom && t.date < dateFrom) return false;
     if (dateTo && t.date > dateTo) return false;
     return true;
@@ -174,6 +196,7 @@ export default function TyresLedger({ vendor, onBack, onLedgerUpdated }) {
                 <tr className="border-b border-gray-100 text-gray-400 text-[10px] font-bold uppercase tracking-wider bg-gray-50/50">
                   <th className="py-3 px-3 md:px-5">Date</th>
                   <th className="py-3 px-3 md:px-5">Type</th>
+                  <th className="py-3 px-3 md:px-5">Tyre Number</th>
                   <th className="py-3 px-3 md:px-5 hidden sm:table-cell">Reference</th>
                   <th className="py-3 px-3 md:px-5">Description</th>
                   <th className="py-3 px-3 md:px-5 text-right">Amount</th>
@@ -185,6 +208,7 @@ export default function TyresLedger({ vendor, onBack, onLedgerUpdated }) {
                   <tr key={txn.id} className="hover:bg-indigo-50/30 transition-colors">
                     <td className="py-3 px-3 md:px-5"><span className="text-xs font-bold text-gray-600 whitespace-nowrap">{fmtDate(txn.date)}</span></td>
                     <td className="py-3 px-3 md:px-5"><TypeBadge type={txn.type} /></td>
+                    <td className="py-3 px-3 md:px-5"><span className="text-xs font-bold text-indigo-700 whitespace-nowrap">{txn.tyreNumber || txn.tyreProfile?.tyreNumber || txn.tyreNo || txn.ref || '—'}</span></td>
                     <td className="py-3 px-3 md:px-5 hidden sm:table-cell"><span className="text-[11px] font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">{txn.ref || '—'}</span></td>
                     <td className="py-3 px-3 md:px-5">
                       <div className="text-xs md:text-sm font-semibold text-gray-700">{txn.desc}</div>

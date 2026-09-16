@@ -20,6 +20,14 @@ export default function Sidebar({ onClose }) {
   const [open, setOpen] = useState(sidebar[0]?.key || null);
   const [collapsed, setCollapsed] = useState(false);
   const navigate = useNavigate();
+  const visibleSidebar = sidebar.map(group => ({
+    ...group,
+    items: group.items
+      .filter(item => item.path !== '/reports/trucks')
+      .map(item => item.path === '/reports'
+        ? { ...item, name: 'Profit & Loss Reports' }
+        : item),
+  }));
 
   const handleLogout = async () => {
     await logout();
@@ -76,7 +84,7 @@ export default function Sidebar({ onClose }) {
         )}
 
         {/* Dynamic Groups (backend-filtered by permission) */}
-        {sidebar.map((group) => {
+        {visibleSidebar.map((group) => {
           const GroupIcon = GROUP_ICONS[group.icon] || Settings;
 
           return (

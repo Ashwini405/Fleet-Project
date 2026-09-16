@@ -35,6 +35,20 @@ function DetailRow({ label, value, mono }) {
   );
 }
 
+function formatDateTime(value) {
+  if (!value) return "—";
+  const text = String(value);
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00` : text);
+  if (Number.isNaN(date.getTime())) return text;
+  const hasTime = /T\d{2}:\d{2}|\d{2}:\d{2}/.test(text);
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    ...(hasTime ? { hour: "2-digit", minute: "2-digit", hour12: true } : {}),
+  });
+}
+
 export default function OverviewTab({ selectedTruck, dateFrom, dateTo }) {
   const [viewTxn, setViewTxn] = useState(null);
   const [incomeList, setIncomeList] = useState([]);
@@ -215,10 +229,10 @@ export default function OverviewTab({ selectedTruck, dateFrom, dateTo }) {
 
             {viewTxn._type === "income" ? (
               <>
-                <DetailRow label="Payment Received" value={viewTxn.payment_received_date || "—"} />
+                <DetailRow label="Payment Received" value={formatDateTime(viewTxn.payment_received_date)} />
                 <DetailRow label="Category"         value={viewTxn.income_category || "—"} />
                 <DetailRow label="Place of Running" value={viewTxn.place_of_running || "—"} />
-                <DetailRow label="Freight Range"    value={viewTxn.freight_start_date && viewTxn.freight_end_date ? `${viewTxn.freight_start_date} → ${viewTxn.freight_end_date}` : "—"} />
+                <DetailRow label="Freight Range"    value={viewTxn.freight_start_date && viewTxn.freight_end_date ? `${formatDateTime(viewTxn.freight_start_date)} → ${formatDateTime(viewTxn.freight_end_date)}` : "—"} />
                 <DetailRow label="Bank Reference"   value={viewTxn.bank_reference_number || "—"} mono />
                 <DetailRow label="Vehicle"          value={viewTxn.vehicle_number || "—"} />
                 <DetailRow label="Description"      value={`"${viewTxn.description || "—"}"`} />

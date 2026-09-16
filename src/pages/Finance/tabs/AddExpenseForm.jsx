@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { TrendingDown, ArrowLeft, Landmark, Fuel, Wrench, CircleDot, BatteryCharging, UserRound, Utensils, Route, MoreHorizontal } from "lucide-react";
 
+const today = () => new Date().toISOString().split("T")[0];
+
 const EXPENSE_CATEGORIES = [
   "Fuel",
   "Maintenance",
@@ -11,6 +13,7 @@ const EXPENSE_CATEGORIES = [
   "Food Allowance",
   "Toll",
   "Miscellaneous",
+  "Other",
 ];
 
 const MODULE_CONFIG = {
@@ -133,6 +136,17 @@ const MODULE_CONFIG = {
       { key: "expenseTitle", label: "Expense Title", type: "text", placeholder: "e.g. Parking fee, Stationary" },
     ],
   },
+  Other: {
+    title: "Other Expense",
+    description: "Record an expense that does not fit the standard categories.",
+    badge: "Manual Expense Entry",
+    flowSteps: null,
+    color: "neutral",
+    icon: MoreHorizontal,
+    fields: [
+      { key: "otherExpenseNote", label: "Other Expense Details", type: "text", placeholder: "Describe what this expense is for" },
+    ],
+  },
 };
 
 const TONE = {
@@ -203,6 +217,7 @@ const CATEGORY_TONE = {
   "Food Allowance": "yellow",
   Toll: "gray",
   Miscellaneous: "neutral",
+  Other: "neutral",
 };
 
 const fmtDate = (d) => (d ? new Date(d).toLocaleDateString("en-IN") : "—");
@@ -427,7 +442,7 @@ export default function AddExpenseForm({ onBack, initialVehicleId = null, initia
   const [form, setForm] = useState({ truck: "", category: "" });
   const [moduleFields, setModuleFields] = useState({});
   const [sharedFields, setSharedFields] = useState({
-    expenseDate: "",
+    expenseDate: today(),
     amount: "",
     paymentMethod: "",
     vendor: "",
@@ -804,6 +819,10 @@ export default function AddExpenseForm({ onBack, initialVehicleId = null, initia
       alert("Please select a truck and expense category");
       return;
     }
+    if (form.category === "Other" && !String(moduleFields.otherExpenseNote || "").trim()) {
+      alert("Please describe what this other expense is for");
+      return;
+    }
 
     try {
       setLoading(true);
@@ -859,6 +878,7 @@ export default function AddExpenseForm({ onBack, initialVehicleId = null, initia
         linked_trip_id: moduleFields.linkedTrip,
         // Miscellaneous
         expense_title: moduleFields.expenseTitle,
+        other_expense_note: moduleFields.otherExpenseNote,
       };
 
       const res = await fetch("http://localhost:5001/api/expenses", {
@@ -966,7 +986,7 @@ export default function AddExpenseForm({ onBack, initialVehicleId = null, initia
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className={labelCls}>Expense Date</label>
+                <label className={labelCls}>Expense Date <span className="normal-case tracking-normal text-gray-400">(DD/MM/YYYY)</span></label>
                 <input
                   type="date"
                   value={sharedFields.expenseDate}
@@ -1026,11 +1046,11 @@ export default function AddExpenseForm({ onBack, initialVehicleId = null, initia
               <label className={labelCls}>Description</label>
               <textarea
                 rows={3}
-                placeholder="Enter expense purpose or notes"
+                placeholder={form.category === "Other" ? "Optional additional notes" : "Enter expense purpose or notes"}
                 value={sharedFields.description}
                 onChange={setSharedField("description")}
                 className={`${inputCls} ${tone.ring} resize-none`}
-                required
+                required={form.category !== "Other"}
               />
             </div>
 

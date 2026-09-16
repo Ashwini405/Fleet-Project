@@ -5,7 +5,7 @@ import AddTyreVendorModal from '../components/AddTyreVendorModal';
 import EditTyreVendorModal from '../components/EditTyreVendorModal';
 import TyresLedger from '../components/TyresLedger';
 
-export default function TyresVendorPage() {
+export default function TyresVendorPage({ initialVendorId, initialTyreNumber, initialTxnType }) {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [balances, setBalances] = useState({}); // vendorId -> { totalDebit, totalCredit }, null on fetch error
@@ -54,6 +54,12 @@ export default function TyresVendorPage() {
     fetchTyreVendors();
   }, []);
 
+  useEffect(() => {
+    if (!initialVendorId || vendors.length === 0) return;
+    const vendor = vendors.find(item => String(item.id) === String(initialVendorId));
+    if (vendor) setSelectedVendor(vendor);
+  }, [initialVendorId, vendors]);
+
   // Filter vendors based on search term and payment terms
   const filtered = vendors
     .filter(v => !search || v.vendor_name?.toLowerCase().includes(search.toLowerCase()))
@@ -67,6 +73,8 @@ export default function TyresVendorPage() {
         vendor={selectedVendor}
         onBack={clearSelection}
         onLedgerUpdated={() => fetchBalances([selectedVendor])}
+        initialTyreNumber={initialTyreNumber}
+        initialTxnType={initialTxnType}
       />
     );
   }

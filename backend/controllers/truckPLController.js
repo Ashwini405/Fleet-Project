@@ -21,8 +21,9 @@ const getTruckPL = async (req, res) => {
     // ── STEP 2: Fetch all financial data ──
     const revenue = await truckPLModel.getRevenue(vehicleId);
     const fuel = await truckPLModel.getFuel(vehicleId);
+    const fastag = await truckPLModel.getFastagExpenses(vehicleId);
     const maintenance = await truckPLModel.getMaintenance(vehicleId);
-    const tyres = await truckPLModel.getTyres(vehicleId);
+    const tyres = await truckPLModel.getTyres(vehicleId, info.vehicle_no);
     const battery = await truckPLModel.getBattery(vehicleId);
     const emi = await truckPLModel.getEmiCost(vehicleId);
     const driverSettlement = await truckPLModel.getDriverSettlement(vehicleId);
@@ -45,6 +46,7 @@ const getTruckPL = async (req, res) => {
       driverSettlement.netDriverCost +
       rta.totalRTA +
       misc.totalMisc +
+      fastag.total +
       emi.totalEMI;
 
     const netProfit = totalRevenue - totalExpenses;
@@ -56,6 +58,7 @@ const getTruckPL = async (req, res) => {
     const totals = {
       totalRevenue,
       totalFuel: fuel.totalFuel,
+      totalFastag: fastag.total,
       totalAdBlue: fuel.totalAdBlue,
       totalMaintenance: maintenance.totalMaintenance,
       totalTyres: tyres.totalTyres,
@@ -76,6 +79,7 @@ const getTruckPL = async (req, res) => {
         info,
         revenue,
         fuel,
+        fastag,
         maintenance,
         tyres,
         battery,

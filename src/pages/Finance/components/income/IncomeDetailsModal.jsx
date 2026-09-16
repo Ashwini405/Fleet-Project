@@ -28,6 +28,21 @@ const inputClass =
 
 const formatMoney = (value = 0) => `Rs. ${Number(value).toLocaleString("en-IN")}`;
 
+function formatDateTime(value) {
+  if (!value) return "—";
+  const text = String(value);
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text}T00:00:00` : text);
+  if (Number.isNaN(date.getTime())) return text;
+
+  const hasTime = /T\d{2}:\d{2}|\d{2}:\d{2}/.test(text);
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    ...(hasTime ? { hour: "2-digit", minute: "2-digit", hour12: true } : {}),
+  });
+}
+
 function Section({ title, children, action }) {
   return (
     <section className="rounded-xl border border-slate-200 bg-white">
@@ -421,13 +436,15 @@ export default function IncomeDetailsModal({ txn, onClose, onUpdate }) {
               <div className="space-y-4">
                 <Section title="Transaction Details">
                   <div className="grid gap-3">
-                    <DetailItem icon={Calendar} label="Payment Date" value={txn.payment_received_date} />
+                    <DetailItem icon={Calendar} label="Payment Date" value={formatDateTime(txn.payment_received_date)} />
                     <DetailItem icon={TrendingUp} label="Category" value={txn.income_category} />
                     <DetailItem icon={MapPin} label="Place of Running" value={txn.place_of_running} />
                     <DetailItem
                       icon={Calendar}
                       label="Freight Range"
-                      value={txn.freight_start_date && txn.freight_end_date ? `${txn.freight_start_date} to ${txn.freight_end_date}` : null}
+                      value={txn.freight_start_date && txn.freight_end_date
+                        ? `${formatDateTime(txn.freight_start_date)} to ${formatDateTime(txn.freight_end_date)}`
+                        : null}
                       mono
                     />
                     <DetailItem icon={Landmark} label="Bank Reference" value={txn.bank_reference_number} mono />

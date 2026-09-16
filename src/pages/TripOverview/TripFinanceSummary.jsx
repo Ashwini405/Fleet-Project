@@ -84,9 +84,9 @@ function summarizeEntries(entries) {
   };
 }
 
-export default function TripFinanceSummary({ tripId, onAddIncome, onEditIncome, vehicleId, expenses = [], fuelEntries = [], refreshKey = 0 }) {
+export default function TripFinanceSummary({ tripId, onAddIncome, onEditIncome, onIncomeTotal, vehicleId, expenses = [], fuelEntries = [], refreshKey = 0 }) {
   const navigate = useNavigate();
-  const financeIncomeViewUrl  = `/finance?tab=trucks${vehicleId ? `&vehicle_id=${vehicleId}` : ''}`;
+  const financeIncomeViewUrl  = `/finance?tab=trucks&profit_trip_id=${tripId}${vehicleId ? `&vehicle_id=${vehicleId}` : ''}`;
   const financeIncomeAddUrl   = `/finance?tab=income&trip_id=${tripId}${vehicleId ? `&vehicle_id=${vehicleId}` : ''}`;
   const financeExpenseUrl     = `/finance?tab=expense&trip_id=${tripId}${vehicleId ? `&vehicle_id=${vehicleId}` : ''}`;
   const [expanded, setExpanded] = useState(false);
@@ -154,7 +154,9 @@ export default function TripFinanceSummary({ tripId, onAddIncome, onEditIncome, 
       .then(r => r.json())
       .then(res => {
         if (cancelled) return;
-        setEntries(res.success ? res.data : []);
+        const nextEntries = res.success ? res.data : [];
+        setEntries(nextEntries);
+        onIncomeTotal?.(nextEntries.reduce((sum, entry) => sum + Number(entry.amount || 0), 0));
       })
       .catch(err => {
         console.error(err);
@@ -165,7 +167,7 @@ export default function TripFinanceSummary({ tripId, onAddIncome, onEditIncome, 
       });
 
     return () => { cancelled = true; };
-  }, [tripId, refreshKey]);
+  }, [tripId, refreshKey, onIncomeTotal]);
 
   if (loading) {
     return (

@@ -4,6 +4,7 @@ import { FiX } from 'react-icons/fi';
 const STATUS_OPTIONS = ['Excellent', 'Good', 'Average', 'Low Margin', 'Loss'];
 
 export default function FiltersPanel({ filters, onChange, onReset, onClose, data }) {
+  const truckNumbers = [...new Set(data.map(r => r.truckNo).filter(Boolean))].sort();
   const plants  = [...new Set(data.map(r => r.plant))].sort();
   const models  = [...new Set(data.map(r => r.vehicleModel))].sort();
   const drivers = [...new Set(data.map(r => r.driver))].sort();
@@ -32,6 +33,21 @@ export default function FiltersPanel({ filters, onChange, onReset, onClose, data
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+        {/* Vehicle Number */}
+        <div>
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 block">
+            Vehicle Number
+          </label>
+          <select
+            value={filters.truckNo}
+            onChange={e => set('truckNo', e.target.value)}
+            className="w-full px-3 py-2 text-xs font-medium border border-slate-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 text-slate-700"
+          >
+            <option value="">All Vehicles</option>
+            {truckNumbers.map(number => <option key={number} value={number}>{number}</option>)}
+          </select>
+        </div>
 
         {/* Running Plant */}
         <div>

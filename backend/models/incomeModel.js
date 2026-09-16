@@ -36,6 +36,10 @@ const Income = {
         route_to,
         place_of_running,
 
+        rental_description,
+        rental_start_date,
+        rental_end_date,
+
         freight_start_date,
         freight_end_date,
 
@@ -58,7 +62,7 @@ const Income = {
 
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
 
       )`,
 
@@ -87,6 +91,10 @@ const Income = {
         data.route_from,
         data.route_to,
         data.place_of_running,
+
+        data.rental_description,
+        data.rental_start_date,
+        data.rental_end_date,
 
         data.freight_start_date,
         data.freight_end_date,
@@ -117,13 +125,16 @@ const Income = {
   updateIncome: async (id, data) => {
     const [result] = await db.query(
       `UPDATE income_entries SET
-        income_category=?, place_of_running=?, freight_start_date=?, freight_end_date=?,
+        income_category=?, place_of_running=?, rental_description=?, rental_start_date=?, rental_end_date=?, freight_start_date=?, freight_end_date=?,
         amount=?, received_amount=?, pending_amount=?, payment_status=?,
         payment_received_date=?, bank_reference_number=?, description=?
        WHERE id=?`,
       [
         data.income_category,
         data.place_of_running,
+        data.rental_description,
+        data.rental_start_date,
+        data.rental_end_date,
         data.freight_start_date,
         data.freight_end_date,
         data.amount,

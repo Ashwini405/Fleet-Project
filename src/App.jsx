@@ -1,6 +1,6 @@
 
 import React, { useState, lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route, useLocation, useSearchParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { Menu } from "lucide-react";
 import Sidebar from "./layout/Sidebar";
 import { DUMMY_VEHICLES } from "./pages/vehicleData";
@@ -40,7 +40,6 @@ const Finance               = lazy(() => import("./pages/Finance"));
 const Vendors               = lazy(() => import("./pages/Vendors"));
 const Payments              = lazy(() => import("./pages/Payments"));
 const Reports               = lazy(() => import("./pages/Reports"));
-const TruckPLList           = lazy(() => import("./pages/trucksPL/TrucksPLList"));
 const TruckPLDetail         = lazy(() => import("./pages/TruckPL"));
 const Staff                 = lazy(() => import("./pages/Staff"));
 const DriverProfile         = lazy(() => import("./pages/Staff/DriverProfile"));
@@ -167,7 +166,7 @@ function InnerApp() {
                     <Route path="/fastag" element={<ProtectedRoute module="Fastag" action="view"><Fastag /></ProtectedRoute>} />
                     <Route path="/tenders" element={<ProtectedRoute module="Tender Data" action="view"><Tenders /></ProtectedRoute>} />
                     <Route path="/reports" element={<ProtectedRoute module="Reports" action="view"><Reports /></ProtectedRoute>} />
-                    <Route path="/reports/trucks" element={<ProtectedRoute module="Truck Profit & Loss" action="view"><TruckPLList /></ProtectedRoute>} />
+                    <Route path="/reports/trucks" element={<Navigate to="/reports" replace />} />
                     <Route path="/reports/trucks/:truckId" element={<ProtectedRoute module="Truck Profit & Loss" action="view"><TruckPLDetail /></ProtectedRoute>} />
                     <Route path="/staff" element={<ProtectedRoute module="Staff Management" action="view"><Staff /></ProtectedRoute>} />
                     <Route path="/staff/drivers/:id" element={<ProtectedRoute module="Staff Management" action="view"><DriverProfile /></ProtectedRoute>} />
