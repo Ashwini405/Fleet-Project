@@ -130,7 +130,7 @@ export default function AddStationModal({ isOpen, onClose, onSuccess }) {
                     />
                  </div>
 
-                 <div>
+                 {/* <div>
                     <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Manager Name</label>
                     <input 
                       type="text"
@@ -140,7 +140,7 @@ export default function AddStationModal({ isOpen, onClose, onSuccess }) {
                       className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-teal-500 focus:ring-1 focus:ring-teal-500 text-sm transition-all"
                       required 
                     />
-                 </div>
+                 </div> */}
 
                  <div>
                     <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Contact Number</label>

@@ -10,6 +10,7 @@ const labelOptCls = "block text-xs font-bold text-gray-400 uppercase tracking-wi
 
 const EMPTY = {
   name: '', mobile: '', email: '', address: '', gst: '', status: 'Active', paymentTerms: 'credit',
+  contactPerson: '', designation: '',
   bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '',
   openingBalance: '0',
 };
@@ -58,6 +59,8 @@ export default function AddGarageModal({ isOpen, onClose }) {
         opening_balance: form.openingBalance,
         status: form.status,
         payment_terms: form.paymentTerms,
+        contact_person: form.contactPerson,
+        designation: form.designation,
         bank_name: form.bankName,
         custom_bank_name: form.customBank,
         account_number_or_upi: form.accountNo,
@@ -154,22 +157,49 @@ export default function AddGarageModal({ isOpen, onClose }) {
                     <label className={labelCls}>Payment Terms</label>
                     <div className="flex gap-2">
                       {['credit', 'cash'].map(pt => (
-                        <button key={pt} type="button" onClick={() => set('paymentTerms', pt)}
+                        <button key={pt} type="button" onClick={() => {
+                          if (pt === 'cash') {
+                            setForm(p => ({ ...p, paymentTerms: 'cash', bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '', openingBalance: '0' }));
+                          } else {
+                            set('paymentTerms', pt);
+                          }
+                        }}
                           className={`flex-1 py-3 rounded-xl text-sm font-bold capitalize border transition-colors ${
                             form.paymentTerms === pt
-                              ? 'bg-blue-600 text-white border-blue-600'
+                              ? pt === 'cash' ? 'bg-violet-600 text-white border-violet-600' : 'bg-blue-600 text-white border-blue-600'
                               : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
                           }`}>
                           {pt}
                         </button>
                       ))}
                     </div>
+                    {form.paymentTerms === 'cash' && (
+                      <p className="text-[11px] text-violet-500 font-semibold mt-1.5">Cash garage — payment is made upfront. No ledger balance tracking.</p>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Bank Details */}
+            {/* Contact Person */}
+            <div className="pt-2 border-t border-gray-100">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Contact Person (Optional)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className={labelOptCls}>Contact Person Name</label>
+                  <input type="text" value={form.contactPerson} onChange={e => set('contactPerson', e.target.value)}
+                    placeholder="e.g. Ramesh Kumar" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelOptCls}>Designation</label>
+                  <input type="text" value={form.designation} onChange={e => set('designation', e.target.value)}
+                    placeholder="e.g. Sales Manager" className={inputCls} />
+                </div>
+              </div>
+            </div>
+
+            {/* Bank Details — credit only */}
+            {form.paymentTerms === 'credit' && (
             <div className="pt-2 border-t border-gray-100">
               <p className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
                 <FiHome size={12} /> Bank Details (Optional)
@@ -209,8 +239,10 @@ export default function AddGarageModal({ isOpen, onClose }) {
                 </div>
               </div>
             </div>
+            )}
 
-            {/* Opening Balance */}
+            {/* Opening Balance — credit only */}
+            {form.paymentTerms === 'credit' && (
             <div className="pt-2 border-t border-gray-100">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">Financial Details (Optional)</p>
               <div className="w-full sm:w-1/2">
@@ -219,6 +251,7 @@ export default function AddGarageModal({ isOpen, onClose }) {
                   min="0" placeholder="0" className={inputCls} />
               </div>
             </div>
+            )}
 
             <div className="pt-2">
               <button 

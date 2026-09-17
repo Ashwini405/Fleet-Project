@@ -364,6 +364,13 @@ export default function AddVehicle() {
       }
     }
 
+    // Clear supervisor when plant changes
+    if (name === 'assignedPlant') {
+      setFormData(prev => ({ ...prev, assignedPlant: value, supervisor: '' }));
+      if (formErrors[name]) setFormErrors(prev => ({ ...prev, [name]: undefined }));
+      return;
+    }
+
     // Update state only after all validations pass
     setFormData(prev => ({ ...prev, [name]: value }));
 
@@ -640,9 +647,17 @@ export default function AddVehicle() {
               Operations Assignment
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <SelectGroup label="Assign Supervisor" name="supervisor" options={supervisors.map(s => ({ label: s.full_name, value: s.id }))} formData={formData} handleChange={handleChange} />
-              <SelectGroup label="Assign Driver" name="assignedDriver" options={drivers.map(d => ({ label: d.full_name, value: d.id }))} formData={formData} handleChange={handleChange} />
               <SelectGroup label="Assigned Plant" name="assignedPlant" options={stations.map(st => ({ label: st.station_name, value: st.id }))} formData={formData} handleChange={handleChange} />
+              <SelectGroup
+                label="Assign Supervisor"
+                name="supervisor"
+                options={supervisors
+                  .filter(s => !formData.assignedPlant || String(s.station_id) === String(formData.assignedPlant))
+                  .map(s => ({ label: s.full_name, value: s.id }))}
+                formData={formData}
+                handleChange={handleChange}
+              />
+              <SelectGroup label="Assign Driver" name="assignedDriver" options={drivers.map(d => ({ label: d.full_name, value: d.id }))} formData={formData} handleChange={handleChange} />
               <InputGroup label="Default Route (Optional)" name="defaultRoute" placeholder="e.g. Hyderabad → Pune" formData={formData} handleChange={handleChange} />
             </div>
           </section>
