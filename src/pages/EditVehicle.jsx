@@ -19,7 +19,7 @@ const InputGroup = ({ label, name, type = 'text', placeholder, formData, handleC
   </div>
 );
 
-const SelectGroup = ({ label, name, options, formData, handleChange }) => (
+const SelectGroup = ({ label, name, options, formData, handleChange, placeholder }) => (
   <div>
     <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
     <select
@@ -28,9 +28,9 @@ const SelectGroup = ({ label, name, options, formData, handleChange }) => (
       onChange={handleChange}
       className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors"
     >
-      <option value="" disabled>Select {label}</option>
+      <option value="">{placeholder || `Select ${label}`}</option>
       {options.map(opt => (
-        <option key={opt.value || opt} value={opt.value || opt}>{opt.label || opt}</option>
+        <option key={opt.value !== undefined ? opt.value : opt} value={opt.value !== undefined ? opt.value : opt}>{opt.label || opt}</option>
       ))}
     </select>
   </div>
@@ -519,7 +519,21 @@ export default function EditVehicle() {
               <SelectGroup
                 label="Assign Driver"
                 name="assignedDriver"
-                options={drivers.map(d => ({ label: d.full_name, value: d.id }))}
+                placeholder="-- None / Unassign Driver --"
+                options={drivers.map(d => {
+                  const isCurrent = (formData.assignedDriver && Number(d.id) === Number(formData.assignedDriver)) ||
+                                    (vehicle && Number(d.assigned_vehicle_id) === Number(vehicle.id));
+                  let statusText = 'Available';
+                  if (isCurrent) {
+                    statusText = 'Current Driver';
+                  } else if (d.assigned_vehicle_no) {
+                    statusText = `Assigned to ${d.assigned_vehicle_no}`;
+                  }
+                  return {
+                    label: `${d.full_name} (${d.mobile || 'No Phone'}) — (${statusText})`,
+                    value: d.id
+                  };
+                })}
                 formData={formData}
                 handleChange={handleChange}
               />

@@ -60,6 +60,54 @@ const getDriverByVehicle = async (vehicleNo) => {
 };
 
 // =====================================
+// Get Driver By ID Direct (with vehicle & plant resolution)
+// =====================================
+const getDriverById = async (driverId) => {
+  const [rows] = await db.query(
+    `
+    SELECT
+      d.id AS driver_id,
+      d.full_name AS driver_name,
+      d.station_id,
+      s.station_name AS plant_name,
+      COALESCE(v.id, (SELECT vehicle_id FROM trips WHERE driver_id = d.id AND vehicle_id IS NOT NULL ORDER BY trip_date DESC, id DESC LIMIT 1)) AS vehicle_id,
+      COALESCE(v.vehicle_no, (SELECT truck_no FROM trips WHERE driver_id = d.id AND truck_no IS NOT NULL AND truck_no <> '' ORDER BY trip_date DESC, id DESC LIMIT 1)) AS vehicle_no,
+      COALESCE(s.station_name, (SELECT source_plant FROM trips WHERE driver_id = d.id AND source_plant IS NOT NULL AND source_plant <> '' ORDER BY trip_date DESC, id DESC LIMIT 1)) AS source_plant
+    FROM drivers d
+    LEFT JOIN stations s ON d.station_id = s.id
+    LEFT JOIN vehicles v ON (v.assigned_driver = d.id OR d.vehicle_id = v.id)
+    WHERE d.id = ?
+    LIMIT 1
+    `,
+    [driverId]
+  );
+
+  return rows[0];
+};
+
+// =====================================
+// Get All Active Drivers for Settlement Dropdown
+// =====================================
+const getAllSettlementDrivers = async () => {
+  const [rows] = await db.query(`
+    SELECT
+      d.id AS driver_id,
+      d.full_name AS driver_name,
+      d.station_id,
+      COALESCE(s.station_name, (SELECT source_plant FROM trips WHERE driver_id = d.id AND source_plant IS NOT NULL AND source_plant <> '' ORDER BY trip_date DESC, id DESC LIMIT 1)) AS plant_name,
+      COALESCE((SELECT vehicle_no FROM vehicles WHERE assigned_driver = d.id LIMIT 1), (SELECT truck_no FROM trips WHERE driver_id = d.id AND truck_no IS NOT NULL AND truck_no <> '' ORDER BY trip_date DESC, id DESC LIMIT 1)) AS vehicle_no
+    FROM drivers d
+    LEFT JOIN stations s ON d.station_id = s.id
+    WHERE d.status = 'Active' OR d.status IS NULL
+    GROUP BY d.id
+    ORDER BY d.full_name ASC
+  `);
+
+  return rows;
+};
+
+
+// =====================================
 // Get Driver Trip Details
 // =====================================
 const getDriverDetails = async (
@@ -353,6 +401,8 @@ module.exports = {
   getPlants,
   getVehiclesByPlant,
   getDriverByVehicle,
+  getDriverById,
+  getAllSettlementDrivers,
   getDriverDetails,
   createSettlement,
   getSettlements,

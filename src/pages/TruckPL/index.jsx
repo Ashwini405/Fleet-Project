@@ -150,7 +150,9 @@ export default function TruckPLDetail() {
           <DriverSettlementSection
             data={d.driverSettlement}
             prevTotal={0}
-            settlementRef={d.driverSettlement.settlement?.settlement_no}
+            settlementRef={d.driverSettlement?.settlement?.settlement_no}
+            vehicleNo={d.info?.vehicle_no}
+            vehicleId={d.info?.id}
           />
           <EmiSection
             data={d.emi}
@@ -162,6 +164,8 @@ export default function TruckPLDetail() {
             data={d.rta}
             total={d.totals.totalRTA}
             prevTotal={0}
+            vehicleNumber={d.info.vehicle_no}
+            vehicleId={d.info.id}
           />
           <MiscExpenseSection
             data={d.misc}

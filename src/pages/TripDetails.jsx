@@ -368,26 +368,41 @@ export default function TripDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [trip, setTrip] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Fetch trip data from backend
   useEffect(() => {
-    if (!id || id === 'null') return;
+    if (!id || id === 'null') {
+      setError('Invalid Trip ID');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
     fetch(`http://localhost:5001/api/trips/${id}`)
       .then(res => res.json())
       .then(data => {
-        if (data.success) {
+        if (data.success && data.data) {
           setTrip(data.data);
         } else {
-          console.error('Failed to fetch trip:', data.message);
+          setError(data.message || 'Trip not found');
         }
       })
-      .catch(err => console.error('Error fetching trip:', err));
+      .catch(err => {
+        console.error('Error fetching trip:', err);
+        setError('Unable to load trip details. Please check connection.');
+      })
+      .finally(() => setLoading(false));
   }, [id]);
 
   // 🔥 FETCH EXPENSES
   useEffect(() => {
     if (!trip) return;
-    const refreshExpenses = () => fetch(`http://localhost:5001/api/trips/${id}/expense`)
+    const targetKey = trip.trip_id || trip.id || id;
+    const refreshExpenses = () => fetch(`http://localhost:5001/api/trips/${targetKey}/expense`)
       .then(res => res.json())
       .then(data => {
         if (data.success) {
@@ -403,40 +418,33 @@ export default function TripDetails() {
   // 🔥 FETCH FUEL — from both fuel table (FuelLogs) and trip_fuel table
   useEffect(() => {
     if (!trip) return;
+    const targetKey = trip.trip_id || trip.id || id;
     Promise.all([
-      fetch(`http://localhost:5001/api/trips/${id}/fuel`).then(r => r.json()),
-      fetch(`http://localhost:5001/api/fuel/trip/${trip.id}`).then(r => r.json())
+      fetch(`http://localhost:5001/api/trips/${targetKey}/fuel`).then(r => r.json()).catch(() => ({ success: false })),
+      fetch(`http://localhost:5001/api/fuel/trip/${trip.id || id}`).then(r => r.json()).catch(() => ({ success: false }))
     ]).then(([tripFuel, fuelLog]) => {
-      const fromTripFuel = tripFuel.success ? tripFuel.data.map(f => ({
-  id: f.id,
-  quantity: Number(f.quantity || 0),
-  rate: Number(f.rate || 0),
-  vendor: f.vendor || '—',
-  created_at: f.created_at,
+      const fromTripFuel = tripFuel.success && Array.isArray(tripFuel.data) ? tripFuel.data.map(f => ({
+        id: f.id,
+        quantity: Number(f.quantity || 0),
+        rate: Number(f.rate || 0),
+        vendor: f.vendor || '—',
+        created_at: f.created_at,
+        location: f.location ? f.location : '—',
+        supervisor_name: f.supervisor_name || f.added_by || '—',
+        receipt_files: f.receipt_files
+      })) : [];
 
-  // ✅ LOCATION
-  location: f.location ? f.location : '—',
+      const fromFuelLog = fuelLog.success && Array.isArray(fuelLog.data) ? fuelLog.data.map(f => ({
+        id: `fl-${f.id}`,
+        quantity: Number(f.quantity || 0),
+        rate: Number(f.rate || 0),
+        vendor: f.vendor || '—',
+        created_at: f.date || f.created_at,
+        location: f.location || '—',
+        supervisor_name: f.supervisor_name || f.filled_by || '—',
+        receipt_files: f.receipt_files
+      })) : [];
 
-  // ✅ SAME KEY AS UI
-  supervisor_name: f.supervisor_name || f.added_by || '—',
-  receipt_files: f.receipt_files
-
-})) : [];
-      const fromFuelLog = fuelLog.success ? fuelLog.data.map(f => ({
-  id: `fl-${f.id}`,
-  quantity: Number(f.quantity || 0),
-  rate: Number(f.rate || 0),
-  vendor: f.vendor || '—',
-  created_at: f.date || f.created_at,
-
-  // ✅ LOCATION FIX
-  location: f.location || '—',
-
-  // ✅ FINAL FIX (IMPORTANT)
-  supervisor_name: f.supervisor_name || f.filled_by || '—',
-  receipt_files: f.receipt_files
-
-})) : [];
       // fuel_entries is canonical; use legacy trip_fuel only when no canonical rows exist.
       setFuelEntries(fromFuelLog.length > 0 ? fromFuelLog : fromTripFuel);
     }).catch(err => console.error(err));
@@ -465,8 +473,31 @@ export default function TripDetails() {
       }).catch(() => {});
   }, [trip]);
 
-  if (!trip) {
-    return <div className="p-5 text-center text-slate-500">Loading trip details...</div>;
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-20 min-h-[400px]">
+        <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+        <p className="mt-4 text-sm text-slate-500 font-medium">Loading trip details...</p>
+      </div>
+    );
+  }
+
+  if (error || !trip) {
+    return (
+      <div className="p-10 text-center flex flex-col items-center justify-center min-h-[400px]">
+        <div className="inline-flex items-center gap-2 bg-red-50 text-red-600 border border-red-200 px-6 py-4 rounded-2xl mb-4">
+          <FiAlertTriangle className="w-5 h-5" />
+          <span className="font-bold text-sm">{error || 'Trip Not Found'}</span>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">Could not find trip #{id} in the database.</p>
+        <button 
+          onClick={() => navigate('/trips')}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition-colors shadow-sm"
+        >
+          <FiArrowLeft className="w-4 h-4" /> Back to Trip Master
+        </button>
+      </div>
+    );
   }
 
   // ─── Aggregated values (must come first) ───────────────────────────────────────────────────────

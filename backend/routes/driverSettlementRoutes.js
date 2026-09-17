@@ -6,6 +6,8 @@ const {
   getPlants,
   getVehiclesByPlant,
   getDriverByVehicle,
+  getDriverByIdDirect,
+  getSettlementDrivers,
   createSettlement,
   getSettlements,
   getPendingSettlements,
@@ -16,6 +18,22 @@ const {
   duplicateSettlement
 } = require(
   "../controllers/driverSettlementController"
+);
+
+// ====================================
+// All Settlement Drivers List
+// ====================================
+router.get(
+  "/drivers",
+  getSettlementDrivers
+);
+
+// ====================================
+// Driver Details Directly by Driver ID
+// ====================================
+router.get(
+  "/driver-by-id/:driverId",
+  getDriverByIdDirect
 );
 
 // ====================================
@@ -35,12 +53,13 @@ router.get(
 );
 
 // ====================================
-// Driver Details
+// Driver Details by Vehicle
 // ====================================
 router.get(
   "/driver/:vehicleNo",
   getDriverByVehicle
 );
+
 
 // ====================================
 // Save Settlement

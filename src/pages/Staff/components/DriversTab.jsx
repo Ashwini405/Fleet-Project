@@ -138,6 +138,8 @@ import { Truck, Plus, Search, MapPin, Eye } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AddDriverModal from './AddDriverModal';
 
+const UPLOADS_BASE_URL = 'http://localhost:5001/uploads/';
+
 export default function DriversTab() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
@@ -227,12 +229,36 @@ export default function DriversTab() {
                   className="hover:bg-slate-50/70 transition-colors group cursor-pointer"
                 >
                   <td className="py-2 px-2 md:py-4 md:px-4">
-                    <div className="w-10 h-10 rounded-full border border-gray-200 bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500 shrink-0">
-                      {(person.full_name || '').split(' ').map(n => n[0]).join('')}
-                    </div>
+                    {person.profile_photo ? (
+                      <div className="w-10 h-10 rounded-full border border-gray-200 overflow-hidden shrink-0 bg-gray-100 shadow-sm">
+                        <img
+                          src={`${UPLOADS_BASE_URL}${person.profile_photo}`}
+                          alt={`${person.full_name || 'Driver'} profile`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.parentElement.innerHTML = `<div class="w-full h-full flex items-center justify-center text-sm font-bold text-gray-500">${((person.full_name || '').split(' ').map(n => n[0]).join('') || 'D').toUpperCase()}</div>`;
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-full border border-gray-200 bg-gray-100 flex items-center justify-center text-sm font-bold text-gray-500 shrink-0">
+                        {((person.full_name || '').split(' ').map(n => n[0]).join('') || 'D').toUpperCase()}
+                      </div>
+                    )}
                   </td>
                   <td className="py-2 px-2 md:py-4 md:px-4">
-                    <span className="font-bold text-gray-800 text-sm tracking-tight">{person.full_name}</span>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-gray-800 text-sm tracking-tight">{person.full_name}</span>
+                      {person.assigned_vehicle_no ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-600 mt-0.5">
+                          <Truck className="w-3 h-3 text-indigo-500" />
+                          {person.assigned_vehicle_no}
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 mt-0.5">Unassigned</span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-2 px-2 md:py-4 md:px-4 hidden sm:table-cell">
                     <span className="text-[11px] font-bold text-slate-500 tracking-wider">

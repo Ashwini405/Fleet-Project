@@ -31,7 +31,7 @@ const InputGroup = ({ label, name, type = "text", placeholder, formData, handleC
   );
 };
 
-const SelectGroup = ({ label, name, options, formData, handleChange, error }) => (
+const SelectGroup = ({ label, name, options, formData, handleChange, error, placeholder }) => (
   <div>
     <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
     <select
@@ -40,9 +40,9 @@ const SelectGroup = ({ label, name, options, formData, handleChange, error }) =>
       onChange={handleChange}
       className={`w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors ${error ? 'border-red-300' : 'border-slate-200'}`}
     >
-      <option value="" disabled>Select {label}</option>
+      <option value="">{placeholder || `Select ${label}`}</option>
       {options.map(opt => (
-        <option key={opt.value || opt} value={opt.value || opt}>
+        <option key={opt.value !== undefined ? opt.value : opt} value={opt.value !== undefined ? opt.value : opt}>
           {opt.label || opt}
         </option>
       ))}
@@ -641,7 +641,19 @@ export default function AddVehicle() {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <SelectGroup label="Assign Supervisor" name="supervisor" options={supervisors.map(s => ({ label: s.full_name, value: s.id }))} formData={formData} handleChange={handleChange} />
-              <SelectGroup label="Assign Driver" name="assignedDriver" options={drivers.map(d => ({ label: d.full_name, value: d.id }))} formData={formData} handleChange={handleChange} />
+              <SelectGroup
+                label="Assign Driver"
+                name="assignedDriver"
+                placeholder="-- Select Driver (Optional) --"
+                options={drivers.map(d => ({
+                  label: d.assigned_vehicle_no
+                    ? `${d.full_name} (${d.mobile || 'No Phone'}) — (Assigned to ${d.assigned_vehicle_no})`
+                    : `${d.full_name} (${d.mobile || 'No Phone'}) — Available`,
+                  value: d.id
+                }))}
+                formData={formData}
+                handleChange={handleChange}
+              />
               <SelectGroup label="Assigned Plant" name="assignedPlant" options={stations.map(st => ({ label: st.station_name, value: st.id }))} formData={formData} handleChange={handleChange} />
               <InputGroup label="Default Route (Optional)" name="defaultRoute" placeholder="e.g. Hyderabad → Pune" formData={formData} handleChange={handleChange} />
             </div>

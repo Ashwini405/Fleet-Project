@@ -16,6 +16,7 @@ export default function EditDriverModal({ isOpen, onClose, onSuccess, driver }) 
     joining_date: '',
     status: 'active',
     address: '',
+    wallet_balance: '',
     station_id: '',
     vehicle_id: '',
     bank_name: '',
@@ -42,6 +43,7 @@ export default function EditDriverModal({ isOpen, onClose, onSuccess, driver }) 
       joining_date: driver.joining_date ? driver.joining_date.slice(0, 10) : '',
       status: driver.status || 'active',
       address: driver.address || '',
+      wallet_balance: driver.wallet_balance !== null && driver.wallet_balance !== undefined ? driver.wallet_balance : '0',
       station_id: driver.station_id || '',
       vehicle_id: driver.vehicle_id || '',
       bank_name: driver.bank_name || '',
@@ -81,11 +83,33 @@ export default function EditDriverModal({ isOpen, onClose, onSuccess, driver }) 
     e.preventDefault();
     if (!driver?.id) return;
 
+    if (!formData.full_name?.trim()) {
+      setActiveTab('personal');
+      setToast({ type: 'error', message: 'Please enter the driver full name.' });
+      setTimeout(() => setToast(null), 3500);
+      return;
+    }
+
+    if (!formData.mobile?.trim()) {
+      setActiveTab('personal');
+      setToast({ type: 'error', message: 'Please enter the driver mobile number.' });
+      setTimeout(() => setToast(null), 3500);
+      return;
+    }
+
+    const cleanMobile = formData.mobile.trim().replace(/[^0-9+]/g, '');
+    if (cleanMobile.length < 10) {
+      setActiveTab('personal');
+      setToast({ type: 'error', message: 'Please enter a valid 10-digit mobile number.' });
+      setTimeout(() => setToast(null), 3500);
+      return;
+    }
+
     const form = new FormData();
 
     Object.keys(formData).forEach(key => {
-      if (formData[key] !== '' && formData[key] !== null) {
-        form.append(key, formData[key]);
+      if (formData[key] !== '' && formData[key] !== null && formData[key] !== undefined) {
+        form.append(key, typeof formData[key] === 'string' ? formData[key].trim() : formData[key]);
       }
     });
 
@@ -261,6 +285,21 @@ export default function EditDriverModal({ isOpen, onClose, onSuccess, driver }) 
                       <option value="inactive">Inactive</option>
                     </select>
                   </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                      Wallet Balance (₹) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      name="wallet_balance"
+                      placeholder="0.00"
+                      value={formData.wallet_balance}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
+                      required
+                    />
+                  </div>
                   <div className="col-span-2">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Full Address</label>
                     <textarea
@@ -299,10 +338,22 @@ export default function EditDriverModal({ isOpen, onClose, onSuccess, driver }) 
                       onChange={handleChange}
                       className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
                     >
-                      <option value="">-- None / Select Truck --</option>
-                      {vehicles.map(v => (
-                        <option key={v.id} value={v.id}>{v.vehicle_no}</option>
-                      ))}
+                      <option value="">-- None / Unassign Truck --</option>
+                      {vehicles.map(v => {
+                        const isCurrent = (formData.vehicle_id && Number(v.id) === Number(formData.vehicle_id)) ||
+                                          (driver && (Number(v.assigned_driver) === Number(driver.id) || Number(v.driver_id) === Number(driver.id)));
+                        let status = 'Available';
+                        if (isCurrent) {
+                          status = 'Current Truck';
+                        } else if (v.driver_name) {
+                          status = `Assigned to ${v.driver_name}`;
+                        }
+                        return (
+                          <option key={v.id} value={v.id}>
+                            {v.vehicle_no} — ({status})
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </motion.div>

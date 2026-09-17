@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { vendorCategories } from './data/dummyData';
 import DashboardPage    from './pages/DashboardPage';
@@ -34,10 +34,18 @@ export default function Vendors() {
   const requestedVendorIds = searchParams.get('vendor_ids');
   const requestedVendorNames = searchParams.get('vendor_names');
   const requestedTyreNumber = searchParams.get('tyre_number');
-  const requestedTxnType = searchParams.get('txn_type');
+  const requestedVehicleNo = searchParams.get('vehicle_no');
   const [activePage, setActivePage] = useState(requestedCategory || 'dashboard'); // 'dashboard' | category.id
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [selectedType, setSelectedType] = useState(null);
+
+  useEffect(() => {
+    if (requestedCategory) {
+      setActivePage(requestedCategory);
+      setSelectedVendor(null);
+      setSelectedType(null);
+    }
+  }, [requestedCategory, requestedVendorId, requestedVendorIds]);
 
   const handleVendorClick = (vendor) => {
     setSelectedVendor(vendor);
@@ -115,7 +123,14 @@ export default function Vendors() {
         ) : activePage === 'fuel' ? (
           <FuelVendorPage />
         ) : activePage === 'rta' ? (
-          <RTAPage />
+          <RTAPage
+            onVendorClick={handleVendorClick}
+            initialVendorId={requestedVendorId}
+            initialVendorName={requestedVendorName}
+            initialVendorIds={requestedVendorIds}
+            initialVendorNames={requestedVendorNames}
+            initialVehicleNo={requestedVehicleNo}
+          />
         ) : activePage === 'labour' ? (
           <LabourPage />
         ) : null}

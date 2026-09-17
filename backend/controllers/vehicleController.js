@@ -53,6 +53,7 @@ v.axle_positions,
         fa.status AS fastag_status,
 
         v.vehicle_status,
+        v.assigned_driver,
 
         d.id AS driver_id,
         d.full_name AS driver_name,
@@ -178,13 +179,35 @@ const createVehicle = async (req, res) => {
     };
 
     const result = await Vehicle.create(data);
-    await syncFastagAccount(result.insertId, data.fastag_id);
+    const newVehicleId = result.insertId;
+    await syncFastagAccount(newVehicleId, data.fastag_id);
+
+    // Strict 1-to-1 driver assignment sync
+    const assignedDriverId = data.assigned_driver && Number(data.assigned_driver) ? Number(data.assigned_driver) : null;
+    if (assignedDriverId) {
+      // Clear any other vehicle that had this driver assigned
+      await db.query(
+        "UPDATE vehicles SET assigned_driver = NULL WHERE assigned_driver = ? AND id <> ?",
+        [assignedDriverId, newVehicleId]
+      );
+      // Clear any other driver that had this new vehicle assigned
+      await db.query(
+        "UPDATE drivers SET vehicle_id = NULL WHERE vehicle_id = ? AND id <> ?",
+        [newVehicleId, assignedDriverId]
+      );
+      // Assign vehicle to driver
+      await db.query(
+        "UPDATE drivers SET vehicle_id = ? WHERE id = ?",
+        [newVehicleId, assignedDriverId]
+      );
+    }
+
     console.log("✅ INSERT RESULT:", result);  // 🔍 DEBUG
 
     res.status(201).json({
       success: true,
       message: 'Vehicle created successfully',
-      data: { id: result.insertId }
+      data: { id: newVehicleId }
     });
 
   } catch (error) {
@@ -227,8 +250,57 @@ const updateVehicle = async (req, res) => {
       rc_document: files.rc_document?.[0]?.filename || existingVehicle.rc_document
     };
 
+    // If assigned_driver is explicitly blank in request body, ensure it is set to null
+    if (req.body.assigned_driver === '' || req.body.assigned_driver === null) {
+      data.assigned_driver = null;
+    }
+
     await Vehicle.update(vehicleId, data);
     await syncFastagAccount(vehicleId, data.fastag_id);
+
+    // Strict 1-to-1 driver assignment sync
+    const oldDriverId = existingVehicle.assigned_driver ? Number(existingVehicle.assigned_driver) : null;
+    const hasDriverField = req.body.assigned_driver !== undefined;
+    const newDriverId = data.assigned_driver && Number(data.assigned_driver) ? Number(data.assigned_driver) : null;
+
+    if (hasDriverField) {
+      if (newDriverId) {
+        // If vehicle had a previous driver who is different, unassign old driver
+        if (oldDriverId && Number(oldDriverId) !== Number(newDriverId)) {
+          await db.query(
+            "UPDATE drivers SET vehicle_id = NULL WHERE id = ? AND vehicle_id = ?",
+            [oldDriverId, vehicleId]
+          );
+        }
+        // Unassign any other vehicle having this driver
+        await db.query(
+          "UPDATE vehicles SET assigned_driver = NULL WHERE assigned_driver = ? AND id <> ?",
+          [newDriverId, vehicleId]
+        );
+        // Unassign any other driver having this vehicle
+        await db.query(
+          "UPDATE drivers SET vehicle_id = NULL WHERE vehicle_id = ? AND id <> ?",
+          [vehicleId, newDriverId]
+        );
+        // Assign this vehicle to driver
+        await db.query(
+          "UPDATE drivers SET vehicle_id = ? WHERE id = ?",
+          [vehicleId, newDriverId]
+        );
+      } else {
+        // Vehicle unassigned from driver
+        if (oldDriverId) {
+          await db.query(
+            "UPDATE drivers SET vehicle_id = NULL WHERE id = ? AND vehicle_id = ?",
+            [oldDriverId, vehicleId]
+          );
+        }
+        await db.query(
+          "UPDATE drivers SET vehicle_id = NULL WHERE vehicle_id = ?",
+          [vehicleId]
+        );
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -256,6 +328,12 @@ const deleteVehicle = async (req, res) => {
 
     // 🔥 delete child records (fuel_entries) first to avoid FK constraint
     await db.query("DELETE FROM fuel_entries WHERE vehicle_id = ?", [vehicleId]);
+
+    // Unassign driver from this vehicle
+    await db.query("UPDATE drivers SET vehicle_id = NULL WHERE vehicle_id = ?", [vehicleId]);
+    if (existingVehicle.assigned_driver) {
+      await db.query("UPDATE drivers SET vehicle_id = NULL WHERE id = ?", [existingVehicle.assigned_driver]);
+    }
 
     // then delete the vehicle
     await Vehicle.delete(vehicleId);

@@ -432,9 +432,13 @@ export function BatterySection({ data, total, prevTotal }) {
 }
 
 // ── 6. Driver Settlement Section ──────────────────────────────────────────────
-export function DriverSettlementSection({ data, prevTotal, settlementRef }) {
+export function DriverSettlementSection({ data = {}, prevTotal, settlementRef, vehicleNo, vehicleId }) {
+  const navigate = useNavigate();
   // Extract settlement data from the API response
-  const s = data.settlement || {};
+  const s = data?.settlement || {};
+  const settlementCount = data?.settlementCount || (s?.id ? 1 : 0);
+  const driverInfo = data?.driverInfo || {};
+  const pending = data?.pendingDetails || {};
   
   const Row = ({ label, value, bold, indent, color }) => (
     <div className={`flex justify-between items-center py-2 ${indent ? 'pl-4 border-l-2 border-slate-100' : ''} ${bold ? 'border-t border-slate-100 mt-1 pt-3' : ''}`}>
@@ -443,57 +447,130 @@ export function DriverSettlementSection({ data, prevTotal, settlementRef }) {
     </div>
   );
   
+  const countLabel = settlementCount === 1 ? '1 Approved Settlement' : `${settlementCount} Settlements`;
+  const recordsText = settlementCount > 0
+    ? `Settlement: ${settlementRef || s.settlement_no || 'Recorded'} · ${countLabel}`
+    : '0 Settlements Recorded';
+
+  const prepareParams = new URLSearchParams();
+  prepareParams.set('tab', 'prepare');
+  if (vehicleNo) prepareParams.set('truckNo', vehicleNo);
+  if (driverInfo.id) prepareParams.set('driverId', String(driverInfo.id));
+  if (driverInfo.name) prepareParams.set('driverName', driverInfo.name);
+  if (driverInfo.plant) prepareParams.set('plant', driverInfo.plant);
+  const preparePath = `/payments?${prepareParams.toString()}`;
+
+  const historyParams = new URLSearchParams();
+  historyParams.set('tab', 'history');
+  if (vehicleNo) historyParams.set('vehicle', vehicleNo);
+  if (s?.settlement_no) historyParams.set('settlementNo', s.settlement_no);
+  if (s?.statement_month && !s.statement_month.includes('Months')) historyParams.set('month', s.statement_month);
+  const historyPath = `/payments?${historyParams.toString()}`;
+
+  const viewPath = settlementCount > 0 ? historyPath : preparePath;
+  const viewLabel = settlementCount > 0 ? 'View Settlement →' : '+ Prepare Settlement →';
+
   return (
     <PLSection
       title="Driver Settlement" subtitle="Salary · Battha · Allowances · Deductions"
-      total={data.netDriverCost} totalLabel="Net Driver Cost" accent="teal" prevTotal={prevTotal}
-      source="Operational Payments" records={`Settlement: ${settlementRef || "-"} · 1 Approved Settlement`}
-      viewLabel="View Settlement →" viewPath="/payments"
+      total={data.netDriverCost || 0} totalLabel="Net Driver Cost" accent="teal" prevTotal={prevTotal}
+      source="Operational Payments" records={recordsText}
+      viewLabel={viewLabel} viewPath={viewPath}
     >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Earnings</p>
-          <Row label="Fixed Salary"       value={Number(s.fixed_salary || 0)} indent />
-          <Row label="Battha"             value={Number(s.total_battha || 0)} indent />
-          <Row label="Loading Charges"    value={Number(s.loading_charges || 0)} indent />
-          <Row label="Unloading Charges"  value={Number(s.unloading_charges || 0)} indent />
-          <Row label="Bonus"              value={Number(s.bonus || 0)} indent />
-          <Row label="Other Allowances"   value={Number(s.other_allowances || 0)} indent />
-          <Row label="Gross Earnings"     value={data.grossEarnings || 0} bold color="text-green-700" />
-        </div>
-        <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Deductions</p>
-          <Row label="Driver Advance"    value={Number(s.driver_advance || 0)} indent />
-          <Row label="Penalty"           value={Number(s.penalty || 0)} indent />
-          <Row label="Other Deductions"  value={Number(s.other_deductions || 0)} indent />
-          <Row label="Total Deductions"  value={data.totalDeductions || 0} bold color="text-red-600" />
-          <div className="mt-4 p-4 bg-teal-50 rounded-xl border border-teal-200">
-            <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest mb-1">Net Driver Cost</p>
-            <p className="text-2xl font-black text-teal-800">{INR(data.netDriverCost || 0)}</p>
-            <p className="text-[11px] text-teal-600 mt-0.5">Gross Earnings − Total Deductions</p>
+      {settlementCount === 0 ? (
+        <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-5 text-center">
+          <div className="max-w-md mx-auto space-y-3">
+            <p className="text-xs font-bold text-slate-700">No monthly settlement generated yet for this vehicle</p>
+            <p className="text-xs text-slate-500">
+              {driverInfo.name 
+                ? `Assigned Driver: ${driverInfo.name} ${pending.tripCount > 0 ? `• ${pending.tripCount} trips logged` : ''}`
+                : 'Generate a monthly settlement in Operational Payments to calculate salary, battha, and advances.'}
+            </p>
+            <button
+              onClick={() => navigate(preparePath)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-sm transition-colors"
+            >
+              + Prepare Settlement for {vehicleNo || 'this Truck'}
+            </button>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Earnings</p>
+            <Row label="Fixed Salary"       value={Number(s.fixed_salary || 0)} indent />
+            <Row label="Battha"             value={Number(s.total_battha || 0)} indent />
+            <Row label="Loading Charges"    value={Number(s.loading_charges || 0)} indent />
+            <Row label="Unloading Charges"  value={Number(s.unloading_charges || 0)} indent />
+            <Row label="Bonus"              value={Number(s.bonus || 0)} indent />
+            <Row label="Other Allowances"   value={Number(s.other_allowances || 0)} indent />
+            <Row label="Gross Earnings"     value={data.grossEarnings || 0} bold color="text-green-700" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Deductions</p>
+            <Row label="Driver Advance"    value={Number(s.driver_advance || 0)} indent />
+            <Row label="Penalty"           value={Number(s.penalty || 0)} indent />
+            <Row label="Other Deductions"  value={Number(s.other_deductions || 0)} indent />
+            <Row label="Total Deductions"  value={data.totalDeductions || 0} bold color="text-red-600" />
+            <div className="mt-4 p-4 bg-teal-50 rounded-xl border border-teal-200">
+              <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest mb-1">Net Driver Cost</p>
+              <p className="text-2xl font-black text-teal-800">{INR(data.netDriverCost || 0)}</p>
+              <p className="text-[11px] text-teal-600 mt-0.5">Gross Earnings − Total Deductions</p>
+            </div>
+          </div>
+        </div>
+      )}
     </PLSection>
   );
 }
 
 // ── 7. RTA Section ────────────────────────────────────────────────────────────
-export function RTASection({ data, total, prevTotal }) {
+export function RTASection({ data, total, prevTotal, vehicleNumber }) {
+  const navigate = useNavigate();
+  const rtaVendors = [...new Map((data.records || [])
+    .filter(record => record.vendorId || record.vendorName)
+    .map(record => [
+      record.vendorId || String(record.vendorName).trim().toLowerCase(),
+      { id: record.vendorId, name: record.vendorName },
+    ])).values()];
+
+  const vendorParams = new URLSearchParams({ category: 'rta' });
+  if (vehicleNumber) vendorParams.set('vehicle_no', vehicleNumber);
+
+  if (rtaVendors.length === 1) {
+    if (rtaVendors[0].id) vendorParams.set('vendor_id', String(rtaVendors[0].id));
+    if (rtaVendors[0].name) vendorParams.set('vendor_name', rtaVendors[0].name);
+  } else if (rtaVendors.length > 1) {
+    vendorParams.set('vendor_ids', rtaVendors.filter(v => v.id).map(v => v.id).join(','));
+    vendorParams.set('vendor_names', rtaVendors.filter(v => v.name).map(v => v.name).join('|'));
+  }
+  const vendorPath = `/vendors?${vendorParams.toString()}`;
+
   return (
     <PLSection
       title="RTA Expenses" subtitle="Permit · Road Tax · Insurance · Fitness"
       total={total} totalLabel="Total RTA Cost" accent="slate" prevTotal={prevTotal}
-      source="Vehicle Master / RTA" records={`${data.transactions || 0} Entries`}
-      viewLabel="View RTA Records →" viewPath="/vehicles"
+      source="RTA Vendor Ledger" records={`${data.transactions || 0} Entries`}
+      viewLabel="View RTA Records →" viewPath={vendorPath}
     >
       <PLTable
         cols={[
-          { key: 'date',   label: 'Date'         },
-          { key: 'type',   label: 'Expense Type' },
-          { key: 'amount', label: 'Amount', right: true },
+          { key: 'date',       label: 'Date'         },
+          { key: 'type',       label: 'Expense Type' },
+          { key: 'vendorName', label: 'Agent / Vendor' },
+          { key: 'reference',  label: 'Reference' },
+          { key: 'amount',     label: 'Amount', right: true },
         ]}
         rows={data.records || []}
+        onRowClick={row => {
+          const params = new URLSearchParams({
+            category: 'rta',
+            vehicle_no: vehicleNumber || '',
+          });
+          if (row.vendorId) params.set('vendor_id', String(row.vendorId));
+          if (row.vendorName) params.set('vendor_name', row.vendorName);
+          navigate(`/vendors?${params.toString()}`);
+        }}
       />
     </PLSection>
   );

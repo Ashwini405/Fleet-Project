@@ -18,17 +18,19 @@ const getTruckPL = async (req, res) => {
       });
     }
 
+    const { startDate, endDate } = req.query;
+
     // ── STEP 2: Fetch all financial data ──
-    const revenue = await truckPLModel.getRevenue(vehicleId);
-    const fuel = await truckPLModel.getFuel(vehicleId);
-    const fastag = await truckPLModel.getFastagExpenses(vehicleId);
-    const maintenance = await truckPLModel.getMaintenance(vehicleId);
-    const tyres = await truckPLModel.getTyres(vehicleId, info.vehicle_no);
-    const battery = await truckPLModel.getBattery(vehicleId);
-    const emi = await truckPLModel.getEmiCost(vehicleId);
-    const driverSettlement = await truckPLModel.getDriverSettlement(vehicleId);
-    const rta = await truckPLModel.getRTAExpenses(info.vehicle_no);
-    const misc = await truckPLModel.getMiscExpenses(vehicleId);
+    const revenue = await truckPLModel.getRevenue(vehicleId, startDate, endDate);
+    const fuel = await truckPLModel.getFuel(vehicleId, startDate, endDate);
+    const fastag = await truckPLModel.getFastagExpenses(vehicleId, startDate, endDate);
+    const maintenance = await truckPLModel.getMaintenance(vehicleId, startDate, endDate);
+    const tyres = await truckPLModel.getTyres(vehicleId, info.vehicle_no, startDate, endDate);
+    const battery = await truckPLModel.getBattery(vehicleId, startDate, endDate);
+    const emi = await truckPLModel.getEmiCost(vehicleId, startDate, endDate);
+    const driverSettlement = await truckPLModel.getDriverSettlement(vehicleId, startDate, endDate);
+    const rta = await truckPLModel.getRTAExpenses(info.vehicle_no, startDate, endDate);
+    const misc = await truckPLModel.getMiscExpenses(vehicleId, startDate, endDate);
 
     // ── STEP 3: Calculate totals ──
     const totalRevenue = revenue.totals.totalRevenue;

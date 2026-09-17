@@ -2,98 +2,252 @@ import React, { useState, useMemo, useEffect } from 'react';
 import {
   FiArrowLeft, FiPlus, FiEye, FiX, FiInbox,
   FiSearch, FiCalendar, FiChevronLeft, FiChevronRight,
-  FiFileText, FiPhone, FiMapPin,
+  FiFileText, FiPhone, FiMapPin, FiPaperclip, FiExternalLink,
+  FiCheckCircle, FiClock, FiCreditCard, FiDollarSign, FiTag, FiTruck,
 } from 'react-icons/fi';
-import axios from 'axios';
-import { TypeBadge } from './shared';
+import api from '../../../services/api';
 import AddExpenseModal from './AddExpenseModal';
 import AddPaymentModal from './AddPaymentModal';
-import { PAGE_SIZE, MODAL_ANIM, PAYMENT_METHODS } from './shared/constants';
+import { PAGE_SIZE, MODAL_ANIM } from './shared/constants';
 
 /* ─── constants ─────────────────────────────────────────────────────────── */
 const LEDGER_FILTERS = ['Expenses', 'Payments'];
-const ledgerFilterMatch = {
-  Expenses:    ['Expense'],
-  Payments:    ['Payment'],
-};
 
 /* ─── helpers ───────────────────────────────────────────────────────────── */
 function fmtDate(d) {
   if (!d) return '—';
-  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '—';
+  return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
+
 function balColor(b) {
-  if (b > 0)  return 'text-red-500';
-  if (b < 0)  return 'text-blue-600';
+  if (b > 0) return 'text-red-500';
+  if (b < 0) return 'text-blue-600';
   return 'text-green-600';
 }
+
 function balLabel(b) {
-  if (b > 0)  return 'Payable';
-  if (b < 0)  return 'Advance';
+  if (b > 0) return 'Payable';
+  if (b < 0) return 'Advance';
   return 'Settled';
 }
+
 function balBg(b) {
-  if (b > 0)  return 'bg-red-50 text-red-600 border-red-200';
-  if (b < 0)  return 'bg-blue-50 text-blue-600 border-blue-200';
+  if (b > 0) return 'bg-red-50 text-red-600 border-red-200';
+  if (b < 0) return 'bg-blue-50 text-blue-600 border-blue-200';
   return 'bg-green-50 text-green-600 border-green-200';
 }
 
+function PaymentModeBadge({ mode }) {
+  const m = (mode || 'Cash').toUpperCase();
+  let cls = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (m.includes('UPI')) {
+    cls = 'bg-purple-50 text-purple-700 border-purple-200';
+  } else if (m.includes('BANK') || m.includes('NEFT') || m.includes('RTGS') || m.includes('TRANSFER')) {
+    cls = 'bg-blue-50 text-blue-700 border-blue-200';
+  } else if (m.includes('CHEQUE')) {
+    cls = 'bg-amber-50 text-amber-700 border-amber-200';
+  } else if (m.includes('CARD')) {
+    cls = 'bg-indigo-50 text-indigo-700 border-indigo-200';
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border ${cls}`}>
+      <FiCreditCard size={10} />
+      {mode || 'Cash'}
+    </span>
+  );
+}
+
 /* ─── Transaction Detail Modal ──────────────────────────────────────────── */
-function TxnDetailModal({ txn, agentName, onClose }) {
+function TxnDetailModal({ txn, agentName, onClose, onPayExpense }) {
+  if (!txn) return null;
+  const isExpense = txn.type === 'Expense';
+  const docUrl = txn.doc
+    ? (txn.doc.startsWith('http') ? txn.doc : `http://localhost:5001${txn.doc}`)
+    : null;
+  const isDocImage = docUrl && /\.(png|jpe?g|webp|gif)$/i.test(docUrl);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden max-h-[90vh] flex flex-col" style={{ animation: 'modalSlideIn 0.2s ease-out' }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden max-h-[92vh] flex flex-col" style={{ animation: 'modalSlideIn 0.2s ease-out' }}>
+        
+        {/* Header */}
         <div className="flex justify-between items-center px-5 py-4 bg-gray-900 shrink-0">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-widest text-rose-400">Transaction Details</p>
+            <p className={`text-[10px] font-bold uppercase tracking-widest ${isExpense ? 'text-rose-400' : 'text-emerald-400'}`}>
+              {isExpense ? 'Expense Transaction Details' : 'Payment Transaction Details'}
+            </p>
             <p className="text-sm font-bold text-white mt-0.5">{agentName}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-full transition-colors"><FiX size={16} /></button>
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:bg-gray-800 hover:text-white rounded-full transition-colors">
+            <FiX size={16} />
+          </button>
         </div>
-        <div className="p-5 overflow-y-auto space-y-0">
-          {[
-            ['Date',        fmtDate(txn.date), null],
-            ['Type',        null, <TypeBadge type={txn.type} />],
-            ['Reference',   txn.ref || '—', null],
-            txn.truckId ? ['Vehicle', null, <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded-lg">{txn.truckId}</span>] : null,
-            txn.expenseType ? ['Expense Type', txn.expenseType, null] : null,
-          ].filter(Boolean).map(([label, text, node]) => (
-            <div key={label} className="flex justify-between items-center py-2.5 border-b border-gray-50">
-              <span className="text-xs font-semibold text-gray-400">{label}</span>
-              {node || <span className="text-sm font-bold text-gray-800">{text}</span>}
+
+        {/* Content */}
+        <div className="p-5 overflow-y-auto space-y-3 divide-y divide-gray-100">
+          
+          <div className="space-y-2.5 pb-2">
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-semibold text-gray-400">Date</span>
+              <span className="text-sm font-bold text-gray-800">{fmtDate(txn.date)}</span>
             </div>
-          ))}
-          <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
-            <span className="text-xs font-semibold text-gray-400">Amount</span>
-            {txn.debit > 0
-              ? <span className="text-sm font-extrabold text-red-500">₹{txn.debit.toLocaleString('en-IN')} <span className="text-xs font-normal text-gray-400">Expense</span></span>
-              : <span className="text-sm font-extrabold text-green-600">₹{txn.credit.toLocaleString('en-IN')} <span className="text-xs font-normal text-gray-400">Paid</span></span>
-            }
+
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-semibold text-gray-400">Transaction Type</span>
+              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
+                isExpense ? 'bg-rose-50 text-rose-600 border-rose-200' : 'bg-emerald-50 text-emerald-600 border-emerald-200'
+              }`}>
+                {txn.type}
+              </span>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-semibold text-gray-400">Reference / UTR</span>
+              <span className="text-xs font-mono font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
+                {txn.ref || '—'}
+              </span>
+            </div>
           </div>
-          <div className="flex justify-between items-center py-2.5 border-b border-gray-50">
-            <span className="text-xs font-semibold text-gray-400">Balance Due</span>
-            <div className="text-right">
-              {txn.type === 'Payment' ? (
-                <span className="text-xs font-semibold text-indigo-600">Applied to expenses</span>
+
+          {/* Details Section */}
+          <div className="space-y-2.5 pt-2 pb-2">
+            {isExpense ? (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-semibold text-gray-400">Expense Type</span>
+                  <span className="text-sm font-bold text-gray-800">{txn.expenseType || txn.desc}</span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-semibold text-gray-400">Vehicle Number</span>
+                  {txn.truckId ? (
+                    <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg">
+                      {txn.truckId}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-gray-400 font-semibold">—</span>
+                  )}
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-semibold text-gray-400">Total Expense Amount</span>
+                  <span className="text-sm font-extrabold text-rose-600">₹{Number(txn.debit || 0).toLocaleString('en-IN')}</span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-semibold text-gray-400">Amount Paid</span>
+                  <span className="text-sm font-extrabold text-emerald-600">₹{Number(txn.paidAmount || 0).toLocaleString('en-IN')}</span>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-semibold text-gray-400">Balance Due</span>
+                  <div className="text-right">
+                    <span className={`text-sm font-black ${txn.remainingDue > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                      ₹{Number(txn.remainingDue || 0).toLocaleString('en-IN')}
+                    </span>
+                    <span className={`ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full border ${txn.remainingDue > 0 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
+                      {txn.remainingDue > 0 ? 'Payable' : 'Paid'}
+                    </span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-semibold text-gray-400">Payment Mode</span>
+                  <PaymentModeBadge mode={txn.method} />
+                </div>
+
+                <div className="flex justify-between items-start">
+                  <span className="text-xs font-semibold text-gray-400 shrink-0">Paid For</span>
+                  <div className="text-right ml-4">
+                    <p className="text-xs font-bold text-gray-800">{txn.paidFor || 'General Account Payment'}</p>
+                    {txn.truckId && (
+                      <span className="inline-block mt-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded">
+                        Vehicle: {txn.truckId}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-semibold text-gray-400">Amount Paid</span>
+                  <span className="text-base font-black text-emerald-600">₹{Number(txn.credit || 0).toLocaleString('en-IN')}</span>
+                </div>
+              </>
+            )}
+
+            {txn.notes && (
+              <div className="flex justify-between items-start pt-1">
+                <span className="text-xs font-semibold text-gray-400 shrink-0">Notes</span>
+                <span className="text-xs font-medium text-gray-600 text-right ml-4">{txn.notes}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Proof Document Section */}
+          {docUrl && (
+            <div className="pt-3 space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                  {isExpense ? 'Challan / Proof Document' : 'Payment Receipt / Screenshot'}
+                </span>
+                <a
+                  href={docUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700 hover:underline"
+                >
+                  <FiExternalLink size={12} /> Open Full
+                </a>
+              </div>
+
+              {isDocImage ? (
+                <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50 max-h-48 flex items-center justify-center">
+                  <img
+                    src={docUrl}
+                    alt="Proof Preview"
+                    className="max-h-48 w-full object-contain"
+                  />
+                </div>
               ) : (
-                <>
-                  <span className={`text-sm font-black ${txn.remainingDue > 0 ? 'text-red-500' : 'text-green-600'}`}>
-                    ₹{Number(txn.remainingDue || 0).toLocaleString('en-IN')}
-                  </span>
-                  <span className={`ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full border ${txn.remainingDue > 0 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
-                    {txn.remainingDue > 0 ? 'Payable' : 'Paid'}
-                  </span>
-                </>
+                <a
+                  href={docUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 p-3 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-700 transition-colors"
+                >
+                  <FiPaperclip className="text-rose-500 shrink-0" size={16} />
+                  <span className="truncate flex-1">View Attached Document</span>
+                  <FiExternalLink size={13} className="text-gray-400" />
+                </a>
               )}
             </div>
-          </div>
-          <div className="flex justify-between items-start py-2.5">
-            <span className="text-xs font-semibold text-gray-400 shrink-0">Description</span>
-            <span className="text-sm font-semibold text-gray-700 text-right ml-4">{txn.desc}</span>
-          </div>
+          )}
         </div>
-        <div className="px-5 pb-5 shrink-0">
-          <button onClick={onClose} className="w-full py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-bold text-sm transition-colors">Close</button>
+
+        {/* Footer Actions */}
+        <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex gap-2 shrink-0">
+          {isExpense && txn.remainingDue > 0 && onPayExpense && (
+            <button
+              onClick={() => {
+                onClose();
+                onPayExpense(txn);
+              }}
+              className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-sm transition-colors flex items-center justify-center gap-1.5"
+            >
+              <FiDollarSign size={14} /> Pay Balance (₹{Number(txn.remainingDue).toLocaleString('en-IN')})
+            </button>
+          )}
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-bold text-xs transition-colors"
+          >
+            Close
+          </button>
         </div>
       </div>
       <style>{MODAL_ANIM}</style>
@@ -102,19 +256,26 @@ function TxnDetailModal({ txn, agentName, onClose }) {
 }
 
 /* ════════════════════════════════════════════════════════════════════════ */
-export default function RTALedger({ vendor, onBack }) {
+export default function RTALedger({ vendor, onBack, initialVehicleNo }) {
   const isCash = (vendor.payment_terms || 'credit') === 'cash';
   const [rawTxns, setRawTxns] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('Ledger');
   const [ledgerFilter, setLedgerFilter] = useState('Expenses');
   const [search, setSearch] = useState('');
+  const [selectedVehicle, setSelectedVehicle] = useState(initialVehicleNo || 'All');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [page, setPage] = useState(1);
   const [selectedTxn, setSelectedTxn] = useState(null);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [selectedExpenseForPayment, setSelectedExpenseForPayment] = useState(null);
+
+  useEffect(() => {
+    if (initialVehicleNo) {
+      setSelectedVehicle(initialVehicleNo);
+    }
+  }, [initialVehicleNo]);
 
   // ── Fetch ledger from database (expenses + payments) ─────────────────────
   useEffect(() => {
@@ -126,36 +287,46 @@ export default function RTALedger({ vendor, onBack }) {
       setLoading(true);
 
       const [expenseResponse, paymentResponse] = await Promise.all([
-        axios.get(`http://localhost:5001/api/rta-expenses/${vendor.id}`),
-        axios.get(`http://localhost:5001/api/rta-payments/${vendor.id}`),
+        api.get(`/rta-expenses/${vendor.id}`),
+        api.get(`/rta-payments/${vendor.id}`),
       ]);
 
-      const expenses = expenseResponse.data.data || [];
-      const payments = paymentResponse.data.data || [];
+      const expenses = expenseResponse.data?.data || (Array.isArray(expenseResponse.data) ? expenseResponse.data : []);
+      const payments = paymentResponse.data?.data || (Array.isArray(paymentResponse.data) ? paymentResponse.data : []);
 
       const mappedExpenses = expenses.map((exp) => ({
         id: `EXP-${exp.id}`,
+        rawId: exp.id,
         date: exp.expense_date,
         truckId: exp.vehicle_no,
         type: 'Expense',
         expenseType: exp.expense_type,
         ref: exp.reference_no,
         desc: `${exp.expense_type} — ${exp.vehicle_no}`,
-        debit: Number(exp.amount),
+        debit: Number(exp.amount || 0),
         credit: 0,
         notes: exp.notes,
+        doc: exp.document,
       }));
 
       const mappedPayments = payments.map((pay) => ({
         id: `PAY-${pay.id}`,
+        rawId: pay.id,
+        expenseId: pay.expense_id ? Number(pay.expense_id) : null,
         date: pay.payment_date,
         type: 'Payment',
         ref: pay.reference_no,
-        desc: pay.payment_method,
+        truckId: pay.vehicle_no || null,
+        expenseType: pay.expense_type || null,
+        expenseRef: pay.expense_reference_no || null,
+        desc: pay.expense_type
+          ? `Paid for ${pay.expense_type}${pay.vehicle_no ? ` (${pay.vehicle_no})` : ''}`
+          : (pay.notes || `Payment via ${pay.payment_method || 'Cash'}`),
         debit: 0,
-        credit: Number(pay.amount),
-        method: pay.payment_method,
+        credit: Number(pay.amount || 0),
+        method: pay.payment_method || 'Cash',
         notes: pay.notes,
+        doc: pay.receipt_document,
       }));
 
       setRawTxns([...mappedExpenses, ...mappedPayments]);
@@ -166,61 +337,108 @@ export default function RTALedger({ vendor, onBack }) {
     }
   };
 
-  /* ── derived ── */
+  /* ── Balance Due & Payment Allocation (Strict 1-to-1 Explicit Matching) ── */
   const txnsWithBalance = useMemo(() => {
-    let running = 0;
-    const openExpenses = [];
-    const ordered = [...rawTxns]
-      .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .map(t => {
-        running += (t.debit || 0) - (t.credit || 0);
-        if (t.type === 'Expense') {
-          const expense = { ...t, paidAmount: 0, remainingDue: Number(t.debit || 0) };
-          openExpenses.push(expense);
-          return { ...expense, runningBalance: isCash ? 0 : running };
-        }
+    const expensesList = rawTxns.filter(t => t.type === 'Expense');
+    const paymentsList = rawTxns.filter(t => t.type === 'Payment');
 
-        if (t.type === 'Payment') {
-          let paymentLeft = Number(t.credit || 0);
-          for (const expense of openExpenses) {
-            if (paymentLeft <= 0) break;
-            const applied = Math.min(expense.remainingDue, paymentLeft);
-            expense.paidAmount += applied;
-            expense.remainingDue -= applied;
-            paymentLeft -= applied;
-          }
-        }
-
-        return { ...t, runningBalance: isCash ? 0 : running };
-      });
-    return ordered.map(txn => {
-      const latestExpense = openExpenses.find(expense => expense.id === txn.id);
-      return latestExpense
-        ? { ...txn, paidAmount: latestExpense.paidAmount, remainingDue: latestExpense.remainingDue }
-        : txn;
+    // Sum up payments specifically linked to each expense (by expenseId)
+    const expensePaidMap = new Map();
+    paymentsList.forEach(pay => {
+      if (pay.expenseId) {
+        const current = expensePaidMap.get(pay.expenseId) || 0;
+        expensePaidMap.set(pay.expenseId, current + Number(pay.credit || 0));
+      }
     });
+
+    // Calculate updated expenses
+    const updatedExpenses = expensesList.map(exp => {
+      const paidAmount = expensePaidMap.get(exp.rawId) || 0;
+      const remainingDue = Math.max(0, Number(exp.debit || 0) - paidAmount);
+      return {
+        ...exp,
+        paidAmount,
+        remainingDue,
+      };
+    });
+
+    // Map of expenses for payment label lookup
+    const expenseMap = new Map(updatedExpenses.map(e => [e.rawId, e]));
+
+    // Updated payments with clear target expense details
+    const updatedPayments = paymentsList.map(pay => {
+      const targetExp = pay.expenseId ? expenseMap.get(pay.expenseId) : null;
+
+      let paidForLabel = 'General Account Payment';
+      if (targetExp) {
+        paidForLabel = `${targetExp.expenseType || 'Expense'}${targetExp.truckId ? ` — ${targetExp.truckId}` : ''}`;
+      } else if (pay.expenseType) {
+        paidForLabel = `${pay.expenseType}${pay.truckId ? ` — ${pay.truckId}` : ''}`;
+      }
+
+      return {
+        ...pay,
+        targetExpense: targetExp || null,
+        paidFor: paidForLabel,
+        truckId: pay.truckId || targetExp?.truckId || null,
+        expenseType: pay.expenseType || targetExp?.expenseType || null,
+      };
+    });
+
+    return [...updatedExpenses, ...updatedPayments];
   }, [rawTxns, isCash]);
+
+  const pendingExpenses = useMemo(() => {
+    return txnsWithBalance.filter(t => t.type === 'Expense' && (t.remainingDue > 0));
+  }, [txnsWithBalance]);
 
   const totalDebit = rawTxns.reduce((s, t) => s + (t.debit || 0), 0);
   const totalCredit = rawTxns.reduce((s, t) => s + (t.credit || 0), 0);
   const outstanding = isCash ? 0 : totalDebit - totalCredit;
 
-  const filteredLedger = useMemo(() => txnsWithBalance.filter(t => {
-    if (!ledgerFilterMatch[ledgerFilter]?.includes(t.type)) return false;
-    if (search) {
-      const q = search.toLowerCase();
-      if (!t.desc?.toLowerCase().includes(q) && !t.ref?.toLowerCase().includes(q) && !(t.truckId || '').toLowerCase().includes(q)) return false;
-    }
-    if (dateFrom && t.date < dateFrom) return false;
-    if (dateTo && t.date > dateTo) return false;
-    return true;
-  }), [txnsWithBalance, ledgerFilter, search, dateFrom, dateTo]);
+  const expenses = useMemo(() => txnsWithBalance.filter(t => t.type === 'Expense'), [txnsWithBalance]);
+  const payments = useMemo(() => txnsWithBalance.filter(t => t.type === 'Payment'), [txnsWithBalance]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredLedger.length / PAGE_SIZE));
-  const paginated = filteredLedger.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  // Unique vehicles present in transactions
+  const uniqueVehicles = useMemo(() => {
+    const vSet = new Set();
+    rawTxns.forEach(t => {
+      if (t.truckId && String(t.truckId).trim()) {
+        vSet.add(String(t.truckId).trim());
+      }
+    });
+    return Array.from(vSet).sort();
+  }, [rawTxns]);
 
-  const expenses = rawTxns.filter(t => t.type === 'Expense');
-  const payments = rawTxns.filter(t => t.type === 'Payment');
+  // Tab-specific filtered data
+  const filteredData = useMemo(() => {
+    const list = ledgerFilter === 'Expenses' ? expenses : payments;
+    return list.filter(t => {
+      if (selectedVehicle !== 'All' && (t.truckId || '').trim() !== selectedVehicle) {
+        return false;
+      }
+      if (search) {
+        const q = search.toLowerCase();
+        if (
+          !t.desc?.toLowerCase().includes(q) &&
+          !t.ref?.toLowerCase().includes(q) &&
+          !(t.truckId || '').toLowerCase().includes(q) &&
+          !(t.expenseType || '').toLowerCase().includes(q) &&
+          !(t.method || '').toLowerCase().includes(q) &&
+          !(t.notes || '').toLowerCase().includes(q) &&
+          !(t.paidFor || '').toLowerCase().includes(q)
+        ) {
+          return false;
+        }
+      }
+      if (dateFrom && t.date < dateFrom) return false;
+      if (dateTo && t.date > dateTo) return false;
+      return true;
+    });
+  }, [ledgerFilter, expenses, payments, search, selectedVehicle, dateFrom, dateTo]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / PAGE_SIZE));
+  const paginated = filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   if (loading) {
     return (
@@ -247,7 +465,7 @@ export default function RTALedger({ vendor, onBack }) {
             <FiPlus size={13} /> Add Expense
           </button>
           {!isCash && (
-            <button onClick={() => setPaymentOpen(true)}
+            <button onClick={() => { setSelectedExpenseForPayment(null); setPaymentOpen(true); }}
               className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-sm transition-colors">
               <FiPlus size={13} /> Add Payment
             </button>
@@ -268,11 +486,22 @@ export default function RTALedger({ vendor, onBack }) {
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                   vendor.status === 'Inactive' ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-600 border-green-100'
                 }`}>{vendor.status || 'Active'}</span>
+                
                 {(vendor.agent_type || vendor.agentType || vendor.vendorCategory) && (
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-100">
                     {vendor.agent_type || vendor.agentType || vendor.vendorCategory}
                   </span>
                 )}
+
+                {/* Vendor Payment Type: Credit vs Cash */}
+                <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border uppercase tracking-wider ${
+                  isCash
+                    ? 'bg-violet-50 text-violet-700 border-violet-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}>
+                  {isCash ? <FiDollarSign size={10} /> : <FiCreditCard size={10} />}
+                  {isCash ? 'Cash Account' : 'Credit Account'}
+                </span>
               </div>
               <h2 className="text-lg font-black text-gray-800 tracking-tight truncate">{vendor.vendor_name || vendor.name}</h2>
             </div>
@@ -297,12 +526,12 @@ export default function RTALedger({ vendor, onBack }) {
         </div>
       </div>
 
-      {/* ── Clear financial summary ── */}
+      {/* ── Clear financial summary cards ── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          ['Total Expenses', totalDebit, 'Fees recorded for vehicles', 'text-rose-600', 'bg-rose-50'],
-          ['Total Paid', totalCredit, 'Payments made to this agent', 'text-emerald-600', 'bg-emerald-50'],
-          ['Balance Due', outstanding, outstanding > 0 ? 'Still payable' : outstanding < 0 ? 'Advance paid' : 'Fully settled', outstanding > 0 ? 'text-amber-600' : 'text-blue-600', outstanding > 0 ? 'bg-amber-50' : 'bg-blue-50'],
+          ['Total Expenses', totalDebit, `${expenses.length} fee records registered`, 'text-rose-600', 'bg-rose-50'],
+          ['Total Paid', totalCredit, `${payments.length} payment records made`, 'text-emerald-600', 'bg-emerald-50'],
+          ['Balance Due', outstanding, outstanding > 0 ? `${pendingExpenses.length} pending expense(s)` : outstanding < 0 ? 'Advance balance with agent' : 'All fees fully settled', outstanding > 0 ? 'text-amber-600' : 'text-blue-600', outstanding > 0 ? 'bg-amber-50' : 'bg-blue-50'],
         ].map(([label, value, sub, color, bg]) => (
           <div key={label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
             <span className={`inline-flex rounded-lg px-2.5 py-1 text-[10px] font-black uppercase tracking-widest ${bg} ${color}`}>{label}</span>
@@ -312,246 +541,359 @@ export default function RTALedger({ vendor, onBack }) {
         ))}
       </div>
 
-      {/* ── Simple ledger filters ── */}
+      {/* ── Ledger Data Table ── */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-4 border-b border-gray-100">
-          <div className="flex flex-wrap gap-2">
+        
+        {/* Tab Selection */}
+        <div className="p-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex gap-2">
             {LEDGER_FILTERS.map(filter => (
-              <button key={filter} onClick={() => { setLedgerFilter(filter); setPage(1); }}
-                className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-colors ${
-                  ledgerFilter === filter ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
-                }`}>
+              <button
+                key={filter}
+                onClick={() => { setLedgerFilter(filter); setPage(1); }}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                  ledgerFilter === filter
+                    ? 'bg-gray-900 text-white shadow-sm'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
                 {filter}
-                {filter === 'Expenses' && expenses.length > 0 && <span className="ml-1.5 opacity-70">({expenses.length})</span>}
-                {filter === 'Payments' && payments.length > 0 && <span className="ml-1.5 opacity-70">({payments.length})</span>}
+                <span className={`ml-2 text-[10px] px-1.5 py-0.5 rounded-full ${
+                  ledgerFilter === filter ? 'bg-gray-700 text-gray-200' : 'bg-gray-200 text-gray-600'
+                }`}>
+                  {filter === 'Expenses' ? expenses.length : payments.length}
+                </span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Expense records remain available through the simple Expenses filter. */}
-        {false && (
-          <div>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50">
-              <span className="text-xs font-semibold text-gray-500">{expenses.length} total expenses</span>
-              <button onClick={() => setExpenseOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold text-xs transition-colors">
-                <FiPlus size={12} /> Add Expense
-              </button>
+        {/* Search, Vehicle & Date Filters */}
+        <div className="p-4 border-b border-gray-100 space-y-3 bg-gray-50/40">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+              <input
+                type="text"
+                value={search}
+                onChange={e => { setSearch(e.target.value); setPage(1); }}
+                placeholder={ledgerFilter === 'Expenses' ? 'Search expense type, reference, vehicle plate…' : 'Search payment mode, reference / UTR, vehicle, notes…'}
+                className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:border-rose-400 focus:ring-1 focus:ring-rose-100 bg-white"
+              />
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/60 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
-                    <th className="py-3 px-4 text-left">Date</th>
-                    <th className="py-3 px-4 text-left">Expense Type</th>
-                    <th className="py-3 px-4 text-left">Reference</th>
-                    <th className="py-3 px-4 text-left">Vehicle</th>
-                    <th className="py-3 px-4 text-right">Expense Amount</th>
-                    <th className="py-3 px-4 text-left">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {expenses.map(exp => (
-                    <tr key={exp.id} className="hover:bg-rose-50/20 transition-colors">
-                      <td className="px-4 py-3 text-xs font-semibold text-gray-600 whitespace-nowrap">{fmtDate(exp.date)}</td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs font-bold text-gray-800">{exp.expenseType || exp.desc}</span>
-                      </td>
-                      <td className="px-4 py-3"><span className="text-[11px] font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">{exp.ref || '—'}</span></td>
-                      <td className="px-4 py-3">
-                        {exp.truckId
-                          ? <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2 py-1 rounded">{exp.truckId}</span>
-                          : <span className="text-gray-300 font-bold text-xs">—</span>
-                        }
-                      </td>
-                      <td className="px-4 py-3 text-right"><span className="text-xs font-black text-red-500">₹{exp.debit.toLocaleString('en-IN')}</span></td>
-                      <td className="px-4 py-3">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-100">
-                          Completed
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {expenses.length === 0 && (
-                    <tr><td colSpan={6} className="py-14 text-center">
-                      <FiInbox size={32} className="text-gray-200 mx-auto mb-2" />
-                      <p className="text-sm font-semibold text-gray-400">No expenses recorded</p>
-                      <p className="text-xs text-gray-400 mt-1">Add an expense to get started.</p>
-                    </td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
 
-        {/* Payment records remain available through the simple Payments filter. */}
-        {false && (
-          <div>
-            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-50">
-              <span className="text-xs font-semibold text-gray-500">{payments.length} total payments</span>
-              {!isCash && (
-                <button onClick={() => setPaymentOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition-colors">
-                  <FiPlus size={12} /> Add Payment
+            {/* Vehicle Filter */}
+            <div className="flex items-center gap-1.5 bg-white border border-gray-200 rounded-xl px-3 py-1.5 shrink-0 shadow-2xs">
+              <FiTruck size={14} className="text-gray-400 shrink-0" />
+              <select
+                value={selectedVehicle}
+                onChange={e => { setSelectedVehicle(e.target.value); setPage(1); }}
+                className="text-xs bg-transparent text-gray-700 font-semibold focus:outline-none cursor-pointer pr-1"
+              >
+                <option value="All">All Vehicles {uniqueVehicles.length > 0 ? `(${uniqueVehicles.length})` : ''}</option>
+                {uniqueVehicles.map(v => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <FiCalendar size={13} className="text-gray-400 shrink-0" />
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={e => { setDateFrom(e.target.value); setPage(1); }}
+                className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:border-rose-400"
+              />
+              <span className="text-gray-300 font-bold">–</span>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={e => { setDateTo(e.target.value); setPage(1); }}
+                className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs bg-white focus:outline-none focus:border-rose-400"
+              />
+              {(search || dateFrom || dateTo || selectedVehicle !== 'All') && (
+                <button
+                  onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setSelectedVehicle('All'); setPage(1); }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-red-500 bg-red-50 hover:bg-red-100 transition-colors"
+                >
+                  Clear
                 </button>
               )}
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50/60 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
-                    <th className="py-3 px-4 text-left">Date</th>
-                    <th className="py-3 px-4 text-left">Payment Mode</th>
-                    <th className="py-3 px-4 text-left">Reference</th>
-                    <th className="py-3 px-4 text-right">Paid Amount</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {payments.map(pay => (
-                    <tr key={pay.id} className="hover:bg-green-50/20 transition-colors">
-                      <td className="px-4 py-3 text-xs font-semibold text-gray-600 whitespace-nowrap">{fmtDate(pay.date)}</td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs font-bold text-gray-700">{pay.method || 'Cash'}</span>
-                      </td>
-                      <td className="px-4 py-3"><span className="text-[11px] font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">{pay.ref || '—'}</span></td>
-                      <td className="px-4 py-3 text-right"><span className="text-xs font-black text-green-600">₹{pay.credit.toLocaleString('en-IN')}</span></td>
-                    </tr>
-                  ))}
-                  {payments.length === 0 && (
-                    <tr><td colSpan={4} className="py-14 text-center">
-                      <FiInbox size={32} className="text-gray-200 mx-auto mb-2" />
-                      <p className="text-sm font-semibold text-gray-400">No payments recorded</p>
-                    </td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
           </div>
-        )}
+        </div>
 
-        {/* ════ LEDGER TAB ════ */}
-        {activeTab === 'Ledger' && (
-          <div>
-            <div className="p-4 border-b border-gray-100 space-y-3">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
-                  <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
-                  <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }}
-                    placeholder="Search description, reference, vehicle…"
-                    className="w-full pl-8 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-rose-400 focus:ring-1 focus:ring-rose-100" />
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <FiCalendar size={13} className="text-gray-400 shrink-0" />
-                  <input type="date" value={dateFrom} onChange={e => { setDateFrom(e.target.value); setPage(1); }}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-rose-400" />
-                  <span className="text-gray-300 font-bold">–</span>
-                  <input type="date" value={dateTo} onChange={e => { setDateTo(e.target.value); setPage(1); }}
-                    className="border border-gray-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-rose-400" />
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {(search || dateFrom || dateTo) && (
-                  <button onClick={() => { setSearch(''); setDateFrom(''); setDateTo(''); setPage(1); }}
-                    className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-red-500 bg-red-50 hover:bg-red-100 transition-colors">Clear</button>
-                )}
-              </div>
+        {/* ════ TABLE CONTENT ════ */}
+        <div className="overflow-x-auto">
+          {paginated.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-400">
+              <FiInbox size={36} className="text-gray-300" />
+              <p className="font-semibold text-sm">
+                {ledgerFilter === 'Expenses'
+                  ? (expenses.length === 0 ? 'No expenses recorded yet.' : 'No expenses match your search.')
+                  : (payments.length === 0 ? 'No payments recorded yet.' : 'No payments match your search.')}
+              </p>
+              <p className="text-xs text-gray-400">
+                {ledgerFilter === 'Expenses' ? 'Click "+ Add Expense" to record a new fee.' : 'Click "+ Add Payment" to record a transaction.'}
+              </p>
             </div>
+          ) : ledgerFilter === 'Expenses' ? (
+            /* ─── EXPENSES TABLE ─── */
+            <table className="w-full text-sm min-w-[760px]">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/80 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
+                  <th className="py-3 px-4 text-left">Date</th>
+                  <th className="py-3 px-4 text-left">Expense Type</th>
+                  <th className="py-3 px-4 text-left">Vehicle</th>
+                  <th className="py-3 px-4 text-left">Reference</th>
+                  <th className="py-3 px-4 text-right">Expense Amount</th>
+                  <th className="py-3 px-4 text-right">Paid</th>
+                  <th className="py-3 px-4 text-right">Balance Due</th>
+                  <th className="py-3 px-4 text-center">Proof</th>
+                  <th className="py-3 px-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {paginated.map(exp => (
+                  <tr key={exp.id} className="hover:bg-rose-50/20 transition-colors">
+                    
+                    {/* Date */}
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <span className="text-xs font-bold text-gray-700">{fmtDate(exp.date)}</span>
+                    </td>
 
-            <div className="overflow-x-auto">
-              {paginated.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 gap-2 text-gray-400">
-                  <FiInbox size={36} className="text-gray-300" />
-                  <p className="font-semibold text-sm">{rawTxns.length === 0 ? 'No ledger transactions available.' : 'No transactions match your filters.'}</p>
-                  <p className="text-xs text-gray-400">{rawTxns.length === 0 ? 'Add an expense or payment to get started.' : 'Try clearing the filters.'}</p>
-                </div>
-              ) : (
-                <table className="w-full text-sm min-w-[640px]">
-                  <thead>
-                    <tr className="border-b border-gray-100 bg-gray-50/60 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
-                      <th className="py-3 px-4 text-left">Date</th>
-                      <th className="py-3 px-4 text-left">Type</th>
-                      <th className="py-3 px-4 text-left">Reference</th>
-                      <th className="py-3 px-4 text-left">Description</th>
-                      <th className="py-3 px-4 text-right">Expense</th>
-                      <th className="py-3 px-4 text-right">Paid</th>
-                      <th className="py-3 px-4 text-right">Balance Due</th>
-                      <th className="py-3 px-4 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-50">
-                    {paginated.map(txn => (
-                      <tr key={txn.id} className={`transition-colors ${txn.type === 'Payment' ? 'hover:bg-green-50/20' : 'hover:bg-rose-50/20'}`}>
-                        <td className="px-4 py-3 whitespace-nowrap"><span className="text-xs font-bold text-gray-700">{fmtDate(txn.date)}</span></td>
-                        <td className="px-4 py-3"><TypeBadge type={txn.type} /></td>
-                        <td className="px-4 py-3"><span className="text-[11px] font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded">{txn.ref || '—'}</span></td>
-                        <td className="px-4 py-3 max-w-[200px]">
-                          <div className="text-xs font-semibold text-gray-700 truncate">{txn.desc}</div>
-                          {txn.truckId && <div className="text-[10px] text-gray-400 mt-0.5">Vehicle: {txn.truckId}</div>}
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          {txn.debit > 0
-                            ? <span className="text-xs font-black text-red-500">₹{txn.debit.toLocaleString('en-IN')}</span>
-                            : <span className="text-gray-300 font-bold text-xs">—</span>
-                          }
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          {txn.type === 'Expense' && txn.paidAmount > 0
-                            ? <span className="text-xs font-black text-green-600">₹{txn.paidAmount.toLocaleString('en-IN')}</span>
-                            : txn.credit > 0
-                              ? <span className="text-xs font-black text-green-600">₹{txn.credit.toLocaleString('en-IN')}</span>
-                            : <span className="text-gray-300 font-bold text-xs">—</span>
-                          }
-                        </td>
-                        <td className="px-4 py-3 text-right whitespace-nowrap">
-                          {txn.type === 'Payment' ? (
-                            <span className="text-[10px] font-semibold text-indigo-600">Applied above</span>
-                          ) : (
-                            <>
-                              <div className={`text-xs font-black ${txn.remainingDue > 0 ? 'text-red-500' : 'text-green-600'}`}>
-                                ₹{Number(txn.remainingDue || 0).toLocaleString('en-IN')}
-                              </div>
-                              <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border inline-block mt-0.5 ${txn.remainingDue > 0 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
-                                {txn.remainingDue > 0 ? 'Payable' : 'Paid'}
-                              </div>
-                            </>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-center">
-                          <button onClick={() => setSelectedTxn(txn)}
-                            className="p-2 text-gray-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors">
-                            <FiEye size={14} />
+                    {/* Expense Type */}
+                    <td className="px-4 py-3.5">
+                      <div className="font-bold text-xs text-gray-800">{exp.expenseType || exp.desc}</div>
+                      {exp.notes && <div className="text-[10px] text-gray-400 truncate max-w-[180px]">{exp.notes}</div>}
+                    </td>
+
+                    {/* Vehicle */}
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      {exp.truckId ? (
+                        <span className="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg">
+                          {exp.truckId}
+                        </span>
+                      ) : (
+                        <span className="text-gray-300 font-bold text-xs">—</span>
+                      )}
+                    </td>
+
+                    {/* Reference */}
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <span className="text-[11px] font-mono font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                        {exp.ref || '—'}
+                      </span>
+                    </td>
+
+                    {/* Expense Amount */}
+                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                      <span className="text-xs font-black text-rose-600">₹{Number(exp.debit).toLocaleString('en-IN')}</span>
+                    </td>
+
+                    {/* Paid Amount */}
+                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                      {exp.paidAmount > 0 ? (
+                        <span className="text-xs font-black text-emerald-600">₹{Number(exp.paidAmount).toLocaleString('en-IN')}</span>
+                      ) : (
+                        <span className="text-gray-300 font-bold text-xs">—</span>
+                      )}
+                    </td>
+
+                    {/* Balance Due */}
+                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                      {exp.remainingDue > 0 ? (
+                        <div>
+                          <div className="text-xs font-black text-red-500">₹{Number(exp.remainingDue).toLocaleString('en-IN')}</div>
+                          <span className="inline-block text-[9px] font-bold px-1.5 py-0.2 rounded-full border bg-red-50 text-red-600 border-red-200">
+                            Payable
+                          </span>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="text-xs font-black text-emerald-600">₹0</div>
+                          <span className="inline-block text-[9px] font-bold px-1.5 py-0.2 rounded-full border bg-green-50 text-green-600 border-green-200">
+                            Paid
+                          </span>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Proof Document */}
+                    <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                      {exp.doc ? (
+                        <a
+                          href={exp.doc.startsWith('http') ? exp.doc : `http://localhost:5001${exp.doc}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="View Proof / Challan"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-lg text-xs font-bold transition-colors"
+                        >
+                          <FiPaperclip size={11} /> Proof
+                        </a>
+                      ) : (
+                        <span className="text-gray-300 font-bold text-xs">—</span>
+                      )}
+                    </td>
+
+                    {/* Action */}
+                    <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-1.5">
+                        {!isCash && exp.remainingDue > 0 && (
+                          <button
+                            onClick={() => {
+                              setSelectedExpenseForPayment(exp);
+                              setPaymentOpen(true);
+                            }}
+                            title={`Pay ${exp.expenseType || 'expense'} (Due: ₹${Number(exp.remainingDue).toLocaleString('en-IN')})`}
+                            className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors inline-flex items-center gap-1 shadow-xs"
+                          >
+                            ₹ Pay
                           </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                        )}
+                        <button
+                          onClick={() => setSelectedTxn(exp)}
+                          title="View Expense Details"
+                          className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        >
+                          <FiEye size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            /* ─── PAYMENTS TABLE ─── */
+            <table className="w-full text-sm min-w-[760px]">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/80 text-gray-400 text-[10px] font-bold uppercase tracking-wider">
+                  <th className="py-3 px-4 text-left">Date</th>
+                  <th className="py-3 px-4 text-left">Payment Mode</th>
+                  <th className="py-3 px-4 text-left">Reference / UTR</th>
+                  <th className="py-3 px-4 text-left">Paid For (Expense & Vehicle)</th>
+                  <th className="py-3 px-4 text-right">Amount Paid</th>
+                  <th className="py-3 px-4 text-center">Receipt Proof</th>
+                  <th className="py-3 px-4 text-left">Notes</th>
+                  <th className="py-3 px-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {paginated.map(pay => (
+                  <tr key={pay.id} className="hover:bg-green-50/20 transition-colors">
+                    
+                    {/* Date */}
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <span className="text-xs font-bold text-gray-700">{fmtDate(pay.date)}</span>
+                    </td>
 
-            {filteredLedger.length > PAGE_SIZE && (
-              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
-                <span className="text-xs text-gray-400 font-medium">
-                  Showing {(page-1)*PAGE_SIZE+1}–{Math.min(page*PAGE_SIZE, filteredLedger.length)} of {filteredLedger.length}
-                </span>
-                <div className="flex items-center gap-1">
-                  <button onClick={() => setPage(p => Math.max(1,p-1))} disabled={page===1}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 transition-colors">
-                    <FiChevronLeft size={15} />
-                  </button>
-                  {Array.from({length:totalPages},(_,i)=>i+1).map(n=>(
-                    <button key={n} onClick={()=>setPage(n)}
-                      className={`w-7 h-7 rounded-lg text-xs font-bold transition-colors ${page===n?'bg-gray-900 text-white':'text-gray-500 hover:bg-gray-100'}`}>{n}</button>
-                  ))}
-                  <button onClick={() => setPage(p => Math.min(totalPages,p+1))} disabled={page===totalPages}
-                    className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 transition-colors">
-                    <FiChevronRight size={15} />
-                  </button>
-                </div>
-              </div>
-            )}
+                    {/* Payment Mode */}
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <PaymentModeBadge mode={pay.method} />
+                    </td>
+
+                    {/* Reference / UTR */}
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <span className="text-[11px] font-mono font-medium text-gray-600 bg-gray-100 px-2 py-0.5 rounded">
+                        {pay.ref || '—'}
+                      </span>
+                    </td>
+
+                    {/* Paid For (Expense & Vehicle) */}
+                    <td className="px-4 py-3.5 max-w-[220px]">
+                      <div className="font-bold text-xs text-gray-800 truncate">
+                        {pay.paidFor || 'General Account Payment'}
+                      </div>
+                      {pay.truckId && (
+                        <div className="mt-0.5">
+                          <span className="text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-1.5 py-0.2 rounded">
+                            {pay.truckId}
+                          </span>
+                        </div>
+                      )}
+                    </td>
+
+                    {/* Amount Paid */}
+                    <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                      <span className="text-xs font-black text-emerald-600">₹{Number(pay.credit).toLocaleString('en-IN')}</span>
+                    </td>
+
+                    {/* Receipt Proof */}
+                    <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                      {pay.doc ? (
+                        <a
+                          href={pay.doc.startsWith('http') ? pay.doc : `http://localhost:5001${pay.doc}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="View Payment Receipt / Screenshot"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-bold transition-colors"
+                        >
+                          <FiPaperclip size={11} /> Receipt
+                        </a>
+                      ) : (
+                        <span className="text-gray-300 font-bold text-xs">—</span>
+                      )}
+                    </td>
+
+                    {/* Notes */}
+                    <td className="px-4 py-3.5 text-left max-w-[150px]">
+                      <span className="text-xs text-gray-500 font-medium truncate block">
+                        {pay.notes || '—'}
+                      </span>
+                    </td>
+
+                    {/* Action */}
+                    <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                      <button
+                        onClick={() => setSelectedTxn(pay)}
+                        title="View Payment Details"
+                        className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+                      >
+                        <FiEye size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {/* Pagination */}
+        {filteredData.length > PAGE_SIZE && (
+          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-gray-50/40">
+            <span className="text-xs text-gray-400 font-medium">
+              Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filteredData.length)} of {filteredData.length}
+            </span>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+              >
+                <FiChevronLeft size={15} />
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(n => (
+                <button
+                  key={n}
+                  onClick={() => setPage(n)}
+                  className={`w-7 h-7 rounded-lg text-xs font-bold transition-colors ${
+                    page === n ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 disabled:opacity-30 transition-colors"
+              >
+                <FiChevronRight size={15} />
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -566,14 +908,27 @@ export default function RTALedger({ vendor, onBack }) {
       />
       <AddPaymentModal
         isOpen={paymentOpen}
-        onClose={() => setPaymentOpen(false)}
+        onClose={() => {
+          setPaymentOpen(false);
+          setSelectedExpenseForPayment(null);
+        }}
         onSave={fetchLedger}
         agentName={vendor.vendor_name || vendor.name}
         outstanding={outstanding}
         vendorId={vendor.id}
+        pendingExpenses={pendingExpenses}
+        targetExpense={selectedExpenseForPayment}
       />
       {selectedTxn && (
-        <TxnDetailModal txn={selectedTxn} agentName={vendor.vendor_name || vendor.name} onClose={() => setSelectedTxn(null)} />
+        <TxnDetailModal
+          txn={selectedTxn}
+          agentName={vendor.vendor_name || vendor.name}
+          onClose={() => setSelectedTxn(null)}
+          onPayExpense={(exp) => {
+            setSelectedExpenseForPayment(exp);
+            setPaymentOpen(true);
+          }}
+        />
       )}
     </div>
   );
