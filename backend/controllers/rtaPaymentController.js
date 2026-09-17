@@ -3,13 +3,19 @@ require("../models/rtaPaymentModel");
 
 const createPayment = async (req, res) => {
   try {
-    await rtaPaymentModel.createPayment(
-      req.body
-    );
+    const receipt_document = req.file
+      ? `/uploads/${req.file.filename}`
+      : (req.body.receipt_document || req.body.document || null);
+
+    await rtaPaymentModel.createPayment({
+      ...req.body,
+      receipt_document,
+    });
 
     res.status(201).json({
       success: true,
       message: "Payment added successfully",
+      receipt_document,
     });
 
   } catch (error) {

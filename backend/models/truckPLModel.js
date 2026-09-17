@@ -776,76 +776,165 @@ const getEmiCost = async (vehicleId, startDate = null, endDate = null) => {
 // ============================================
 // Get Driver Settlement
 // ============================================
-const getDriverSettlement = async (vehicleId) => {
+const getDriverSettlement = async (vehicleId, startDate = null, endDate = null) => {
+
+  const dateFilter = (startDate && endDate) ? " AND (ds.created_at BETWEEN ? AND ? OR ds.statement_month BETWEEN DATE_FORMAT(?, '%Y-%m') AND DATE_FORMAT(?, '%Y-%m'))" : "";
+  const dateParams = (startDate && endDate) ? [startDate, endDate, startDate, endDate] : [];
 
   const [rows] = await db.query(
-`
-SELECT
-  settlement_no,
-  statement_month,
-  fixed_salary,
-  total_battha,
-  loading_charges,
-  unloading_charges,
-  bonus,
-  other_allowances,
-  total_earnings,
-  driver_advance,
-  penalty,
-  other_deductions,
-  total_deductions,
-  net_payable,
-  status
-FROM driver_settlements
-WHERE vehicle_id = ?
-ORDER BY created_at DESC
-LIMIT 1
-`,
-[vehicleId]
-);
+    `
+    SELECT
+      ds.id,
+      ds.settlement_no,
+      ds.statement_month,
+      ds.vehicle_id,
+      ds.vehicle_no,
+      ds.driver_id,
+      ds.driver_name,
+      ds.plant_name,
+      ds.fixed_salary,
+      ds.total_battha,
+      ds.loading_charges,
+      ds.unloading_charges,
+      ds.bonus,
+      ds.other_allowances,
+      ds.total_earnings,
+      ds.driver_advance,
+      ds.penalty,
+      ds.other_deductions,
+      ds.total_deductions,
+      ds.net_payable,
+      ds.status,
+      ds.created_at
+    FROM driver_settlements ds
+    WHERE (
+      ds.vehicle_id = ?
+      OR ds.vehicle_no = (SELECT vehicle_no FROM vehicles WHERE id = ?)
+      OR ds.vehicle_no = ?
+      OR (
+        (ds.vehicle_id IS NULL OR ds.vehicle_id = 0)
+        AND ds.driver_id = (SELECT assigned_driver FROM vehicles WHERE id = ?)
+      )
+    )
+    ${dateFilter}
+    ORDER BY ds.created_at DESC
+    `,
+    [vehicleId, vehicleId, String(vehicleId), vehicleId, ...dateParams]
+  );
 
   const [manualRows] = await db.query(
     `SELECT COALESCE(SUM(amount), 0) AS total, COUNT(*) AS count
      FROM expense_entries
-     WHERE vehicle_id = ? AND expense_category IN ('Driver Salary', 'Salary')`,
-    [vehicleId]
+     WHERE vehicle_id = ? AND expense_category IN ('Driver Salary', 'Salary')
+     ${(startDate && endDate) ? " AND expense_date BETWEEN ? AND ?" : ""}`,
+    (startDate && endDate) ? [vehicleId, startDate, endDate] : [vehicleId]
   );
   const manualSalaryTotal = Number(manualRows[0]?.total || 0);
   const manualSalaryCount = Number(manualRows[0]?.count || 0);
 
+  // Get vehicle's assigned driver and plant info
+  const [vehicleInfoRows] = await db.query(
+    `SELECT v.id, v.vehicle_no, v.assigned_driver, d.id as driver_id, d.full_name as driver_name, s.station_name as plant_name
+     FROM vehicles v
+     LEFT JOIN drivers d ON v.assigned_driver = d.id
+     LEFT JOIN stations s ON v.station_id = s.id
+     WHERE v.id = ?`,
+    [vehicleId]
+  );
+  const vehicleInfo = vehicleInfoRows[0] || {};
+
+  // Check un-settled trips for this vehicle
+  const [unsettledTripRows] = await db.query(
+    `SELECT COUNT(*) as trip_count, COALESCE(SUM(driver_advance), 0) as advance_total
+     FROM trips
+     WHERE vehicle_id = ? ${(startDate && endDate) ? " AND trip_date BETWEEN ? AND ?" : ""}`,
+    (startDate && endDate) ? [vehicleId, startDate, endDate] : [vehicleId]
+  );
+  const pendingTripCount = Number(unsettledTripRows[0]?.trip_count || 0);
+  const pendingAdvanceTotal = Number(unsettledTripRows[0]?.advance_total || 0);
+
   if (!rows.length) {
-
     return {
-
       settlement: null,
-
+      settlements: [],
+      settlementCount: 0,
+      driverInfo: {
+        id: vehicleInfo.driver_id || null,
+        name: vehicleInfo.driver_name || null,
+        plant: vehicleInfo.plant_name || null,
+        vehicleNo: vehicleInfo.vehicle_no || null
+      },
+      pendingDetails: {
+        tripCount: pendingTripCount,
+        advanceTotal: pendingAdvanceTotal
+      },
       grossEarnings: 0,
-
       totalDeductions: 0,
-
       netDriverCost: manualSalaryTotal,
       manualSalaryTotal,
       manualSalaryCount
-
     };
   }
 
-  const s = rows[0];
+  // Calculate totals across settlements for this vehicle/period
+  const totalFixedSalary = rows.reduce((s, r) => s + Number(r.fixed_salary || 0), 0);
+  const totalBattha = rows.reduce((s, r) => s + Number(r.total_battha || 0), 0);
+  const totalLoading = rows.reduce((s, r) => s + Number(r.loading_charges || 0), 0);
+  const totalUnloading = rows.reduce((s, r) => s + Number(r.unloading_charges || 0), 0);
+  const totalBonus = rows.reduce((s, r) => s + Number(r.bonus || 0), 0);
+  const totalOtherAllowances = rows.reduce((s, r) => s + Number(r.other_allowances || 0), 0);
+  const totalGrossEarnings = rows.reduce((s, r) => s + Number(r.total_earnings || (Number(r.fixed_salary || 0) + Number(r.total_battha || 0) + Number(r.loading_charges || 0) + Number(r.unloading_charges || 0) + Number(r.bonus || 0) + Number(r.other_allowances || 0))), 0);
 
-  return {
+  const totalAdvance = rows.reduce((s, r) => s + Number(r.driver_advance || 0), 0);
+  const totalPenalty = rows.reduce((s, r) => s + Number(r.penalty || 0), 0);
+  const totalOtherDeductions = rows.reduce((s, r) => s + Number(r.other_deductions || 0), 0);
+  const totalDeductions = rows.reduce((s, r) => s + Number(r.total_deductions || (Number(r.driver_advance || 0) + Number(r.penalty || 0) + Number(r.other_deductions || 0))), 0);
+  const totalNetPayable = rows.reduce((s, r) => s + Number(r.net_payable || 0), 0);
 
-    settlement: s,
+  const latest = rows[0];
 
-    grossEarnings: Number(s.total_earnings),
-
-    totalDeductions: Number(s.total_deductions),
-
-    netDriverCost: Number(s.net_payable) + manualSalaryTotal,
-    manualSalaryTotal,
-    manualSalaryCount
-
+  // Aggregated summary object with breakdown
+  const aggregatedSettlement = {
+    id: latest.id,
+    settlement_no: latest.settlement_no,
+    statement_month: rows.length === 1 ? latest.statement_month : `${rows.length} Months (${latest.statement_month})`,
+    status: latest.status,
+    driver_name: latest.driver_name,
+    plant_name: latest.plant_name,
+    fixed_salary: totalFixedSalary,
+    total_battha: totalBattha,
+    loading_charges: totalLoading,
+    unloading_charges: totalUnloading,
+    bonus: totalBonus,
+    other_allowances: totalOtherAllowances,
+    total_earnings: totalGrossEarnings,
+    driver_advance: totalAdvance,
+    penalty: totalPenalty,
+    other_deductions: totalOtherDeductions,
+    total_deductions: totalDeductions,
+    net_payable: totalNetPayable
   };
 
+  return {
+    settlement: aggregatedSettlement,
+    settlements: rows,
+    settlementCount: rows.length,
+    driverInfo: {
+      id: vehicleInfo.driver_id || latest.driver_id || null,
+      name: vehicleInfo.driver_name || latest.driver_name || null,
+      plant: vehicleInfo.plant_name || latest.plant_name || null,
+      vehicleNo: vehicleInfo.vehicle_no || latest.vehicle_no || null
+    },
+    pendingDetails: {
+      tripCount: pendingTripCount,
+      advanceTotal: pendingAdvanceTotal
+    },
+    grossEarnings: totalGrossEarnings,
+    totalDeductions: totalDeductions,
+    netDriverCost: totalNetPayable + manualSalaryTotal,
+    manualSalaryTotal,
+    manualSalaryCount
+  };
 };
 
 // ============================================
@@ -853,30 +942,46 @@ LIMIT 1
 // ============================================
 const getRTAExpenses = async (vehicleNo, startDate = null, endDate = null) => {
 
-  const dateFilter = (startDate && endDate) ? " AND expense_date BETWEEN ? AND ?" : "";
+  const dateFilter = (startDate && endDate) ? " AND e.expense_date BETWEEN ? AND ?" : "";
 
   const [rows] = await db.query(
     `
     SELECT
-      expense_date,
-      expense_type,
-      amount,
-      reference_no
-    FROM rta_expenses
-    WHERE vehicle_no = ?
+      e.id,
+      e.vendor_id,
+      v.vendor_name,
+      e.expense_date,
+      e.expense_type,
+      e.amount,
+      e.reference_no,
+      e.notes,
+      e.document
+    FROM rta_expenses e
+    LEFT JOIN rta_vendors v ON e.vendor_id = v.id
+    WHERE e.vehicle_no = ?
     ${dateFilter}
-    ORDER BY expense_date DESC
+    ORDER BY e.expense_date DESC
     `,
     dateFilter ? [vehicleNo, startDate, endDate] : [vehicleNo]
   );
 
   const records = rows.map(row => ({
 
+    id: row.id,
+
+    vendorId: row.vendor_id,
+
+    vendorName: row.vendor_name || 'RTA Agent',
+
     date: row.expense_date,
 
     type: row.expense_type,
 
     reference: row.reference_no,
+
+    notes: row.notes,
+
+    document: row.document,
 
     amount: Number(row.amount)
 
@@ -1112,14 +1217,17 @@ const getTruckPLList = async (startDate = null, endDate = null, options = {}) =>
             [vehicleIds, ...dateParams]
         ),
         db.query(
-            `SELECT ds.vehicle_id, ds.net_payable
-             FROM driver_settlements ds
-             INNER JOIN (
-                 SELECT vehicle_id, MAX(created_at) AS max_created
-                 FROM driver_settlements
-                 WHERE vehicle_id IN (?)
-                 GROUP BY vehicle_id
-             ) latest ON ds.vehicle_id = latest.vehicle_id AND ds.created_at = latest.max_created`,
+            `SELECT 
+               v.id AS vehicle_id, 
+               COALESCE(SUM(ds.net_payable), 0) AS net_payable
+             FROM vehicles v
+             LEFT JOIN driver_settlements ds ON (
+               ds.vehicle_id = v.id 
+               OR (ds.vehicle_no IS NOT NULL AND ds.vehicle_no <> '' AND ds.vehicle_no = v.vehicle_no)
+               OR ((ds.vehicle_id IS NULL OR ds.vehicle_id = 0) AND ds.driver_id = v.assigned_driver)
+             )
+             WHERE v.id IN (?)
+             GROUP BY v.id`,
             [vehicleIds]
         ),
         db.query(

@@ -4,13 +4,15 @@ import {
   FiChevronRight, FiEdit2, FiToggleLeft, FiToggleRight,
   FiEye, FiX, FiCheckCircle, FiUser,
 } from 'react-icons/fi';
-import axios from 'axios';
+import api from '../../../services/api';
 import AddRTAVendorModal from '../components/AddRTAVendorModal';
 import RTALedger from '../components/RTALedger';
 
 // ── View Modal ──────────────────────────────────────────────────────────────
 function ViewAgentModal({ vendor, onClose, onEdit }) {
+  const isCash = (vendor.payment_terms || 'credit') === 'cash';
   const rows = [
+    ['Payment Terms', isCash ? 'Cash Account' : 'Credit Account'],
     ['Mobile',        vendor.mobile_number || vendor.contact || vendor.mobile || '—'],
     ['Email',         vendor.email || '—'],
     ['Address',       vendor.address_location || vendor.address || '—'],
@@ -35,7 +37,7 @@ function ViewAgentModal({ vendor, onClose, onEdit }) {
           </button>
         </div>
         <div className="p-5 max-h-[70vh] overflow-y-auto">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 flex-wrap mb-4">
             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${
               vendor.status === 'Inactive' ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-600 border-green-100'
             }`}>{vendor.status || 'Active'}</span>
@@ -44,6 +46,13 @@ function ViewAgentModal({ vendor, onClose, onEdit }) {
                 {vendor.agent_type || vendor.agentType || vendor.vendorCategory}
               </span>
             )}
+            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border uppercase tracking-wider ${
+              isCash
+                ? 'bg-violet-50 text-violet-700 border-violet-200'
+                : 'bg-amber-50 text-amber-700 border-amber-200'
+            }`}>
+              {isCash ? 'Cash Account' : 'Credit Account'}
+            </span>
           </div>
           <div className="space-y-0">
             {rows.map(([label, val]) => (
@@ -186,7 +195,13 @@ function EditAgentModal({ vendor, onClose, onSave }) {
 }
 
 // ── Main Page ───────────────────────────────────────────────────────────────
-export default function RTAPage() {
+export default function RTAPage({
+  initialVendorId,
+  initialVendorName,
+  initialVendorIds,
+  initialVendorNames,
+  initialVehicleNo,
+}) {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -198,6 +213,21 @@ export default function RTAPage() {
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [toast, setToast] = useState(null);
 
+  // Scoped filters when navigating from P&L or external link
+  const [vehicleScope, setVehicleScope] = useState(initialVehicleNo || '');
+  const [allowedIds, setAllowedIds] = useState(
+    (initialVendorIds || '').split(',').map(v => v.trim()).filter(Boolean)
+  );
+  const [allowedNames, setAllowedNames] = useState(
+    (initialVendorNames || '').split('|').map(v => v.trim().toLowerCase()).filter(Boolean)
+  );
+
+  useEffect(() => {
+    setVehicleScope(initialVehicleNo || '');
+    setAllowedIds((initialVendorIds || '').split(',').map(v => v.trim()).filter(Boolean));
+    setAllowedNames((initialVendorNames || '').split('|').map(v => v.trim().toLowerCase()).filter(Boolean));
+  }, [initialVehicleNo, initialVendorIds, initialVendorNames]);
+
   const showToast = (msg, type = 'success') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 2800);
@@ -206,7 +236,7 @@ export default function RTAPage() {
   // ── Fetch RTA vendors from database ──────────────────────────────────────
   const fetchRTAVendors = async () => {
     try {
-      const response = await axios.get('http://localhost:5001/api/rta-vendors');
+      const response = await api.get('/rta-vendors');
       if (response.data.success) {
         setVendors(response.data.data || []);
       }
@@ -221,19 +251,45 @@ export default function RTAPage() {
     fetchRTAVendors();
   }, []);
 
+  // ── Auto-select single vendor if passed via URL ─────────────────────────
+  useEffect(() => {
+    if (vendors.length === 0) return;
+    if (initialVendorId || initialVendorName) {
+      const vendor = vendors.find(item => (
+        initialVendorId && String(item.id) === String(initialVendorId)
+      ) || (
+        !initialVendorId && initialVendorName &&
+        String(item.vendor_name || '').trim().toLowerCase() === String(initialVendorName).trim().toLowerCase()
+      ));
+      if (vendor) {
+        setSelectedVendor(vendor);
+      }
+    } else {
+      setSelectedVendor(null);
+    }
+  }, [initialVendorId, initialVendorName, vendors]);
+
   // ── Filter vendors ────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return vendors.filter(v => {
-      if (statusFilter !== 'All' && v.status !== statusFilter) return false;
-      if (paymentFilter !== 'all' && (v.payment_terms || 'credit') !== paymentFilter) return false;
-      if (!q) return true;
-      return (
-        (v.vendor_name || '').toLowerCase().includes(q) ||
-        (v.mobile_number || '').includes(q)
-      );
-    });
-  }, [vendors, search, statusFilter, paymentFilter]);
+    return vendors
+      .filter(v => {
+        if (!allowedIds.length && !allowedNames.length) return true;
+        return (
+          allowedIds.includes(String(v.id)) ||
+          allowedNames.includes(String(v.vendor_name || '').trim().toLowerCase())
+        );
+      })
+      .filter(v => {
+        if (statusFilter !== 'All' && v.status !== statusFilter) return false;
+        if (paymentFilter !== 'all' && (v.payment_terms || 'credit') !== paymentFilter) return false;
+        if (!q) return true;
+        return (
+          (v.vendor_name || '').toLowerCase().includes(q) ||
+          (v.mobile_number || '').includes(q)
+        );
+      });
+  }, [vendors, search, statusFilter, paymentFilter, allowedIds, allowedNames]);
 
   // ── Add handler ──────────────────────────────────────────────────────────
   const handleAdd = async () => {
@@ -244,7 +300,7 @@ export default function RTAPage() {
   // ── Edit handler ──────────────────────────────────────────────────────────
   const handleEdit = async (updated) => {
     try {
-      await axios.put(`http://localhost:5001/api/rta-vendors/${updated.id}`, {
+      await api.put(`/rta-vendors/${updated.id}`, {
         vendor_name: updated.vendor_name,
         mobile_number: updated.mobile_number,
         email: updated.email,
@@ -267,7 +323,7 @@ export default function RTAPage() {
   const toggleStatus = async (vendor) => {
     try {
       const next = vendor.status === 'Active' ? 'Inactive' : 'Active';
-      await axios.put(`http://localhost:5001/api/rta-vendors/${vendor.id}`, {
+      await api.put(`/rta-vendors/${vendor.id}`, {
         ...vendor,
         status: next,
       });
@@ -281,7 +337,13 @@ export default function RTAPage() {
 
   if (selectedVendor) {
     const live = vendors.find(v => v.id === selectedVendor.id) || selectedVendor;
-    return <RTALedger vendor={live} onBack={() => setSelectedVendor(null)} />;
+    return (
+      <RTALedger
+        vendor={live}
+        onBack={() => setSelectedVendor(null)}
+        initialVehicleNo={vehicleScope || initialVehicleNo}
+      />
+    );
   }
 
   if (loading) {
@@ -345,6 +407,28 @@ export default function RTAPage() {
         </div>
       </div>
 
+      {/* Vehicle Filter Scope Banner */}
+      {(allowedIds.length > 0 || allowedNames.length > 0) && (
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-rose-50 border border-rose-200 rounded-2xl px-5 py-3 text-xs font-medium text-rose-900 animate-fade-in">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0"></span>
+            <span>
+              Showing <strong>{filtered.length}</strong> RTA Agent{filtered.length !== 1 ? 's' : ''} associated with vehicle <strong>{vehicleScope || initialVehicleNo}</strong>
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setAllowedIds([]);
+              setAllowedNames([]);
+              setVehicleScope('');
+            }}
+            className="px-3 py-1 bg-white hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold transition-colors shadow-2xs"
+          >
+            Show All Agents
+          </button>
+        </div>
+      )}
+
       {/* Status filter tabs */}
       <div className="flex flex-wrap items-center gap-2">
         {['All', 'Active', 'Inactive'].map(f => (
@@ -382,10 +466,17 @@ export default function RTAPage() {
                 <div className="w-10 h-10 bg-rose-50 text-rose-500 rounded-xl flex items-center justify-center border border-rose-100 shrink-0">
                   <FiFileText size={18} />
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap justify-end">
                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                     vendor.status === 'Inactive' ? 'bg-red-50 text-red-500 border-red-100' : 'bg-green-50 text-green-600 border-green-100'
                   }`}>{vendor.status || 'Active'}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${
+                    (vendor.payment_terms || 'credit') === 'cash'
+                      ? 'bg-violet-50 text-violet-700 border-violet-200'
+                      : 'bg-amber-50 text-amber-700 border-amber-200'
+                  }`}>
+                    {(vendor.payment_terms || 'credit') === 'cash' ? 'Cash' : 'Credit'}
+                  </span>
                   <FiChevronRight className="text-gray-300 group-hover:text-rose-500 transition-colors" size={16} />
                 </div>
               </div>
@@ -483,6 +574,7 @@ export default function RTAPage() {
           setAddOpen(false);
           fetchRTAVendors();
         }}
+        onAdd={fetchRTAVendors}
         existingVendors={vendors}
       />
 

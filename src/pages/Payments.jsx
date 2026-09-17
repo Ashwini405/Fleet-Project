@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import {
   FiSearch, FiCheckCircle, FiFileText, FiX, FiCheck,
@@ -14,6 +15,7 @@ import {
 } from './PaymentTabs';
 
 export default function Payments() {
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('3. Settlement History');
   const [settlementStatus, setSettlementStatus] = useState('Draft');
   const [draftId, setDraftId] = useState('');
@@ -22,6 +24,7 @@ export default function Payments() {
   // ── Database states ──
   const [plants, setPlants] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [allDrivers, setAllDrivers] = useState([]);
   const [driver, setDriver] = useState(null);
   const [vehicleId, setVehicleId] = useState('');
   const [driverId, setDriverId] = useState('');
@@ -74,11 +77,12 @@ export default function Payments() {
   const [paymentNotes, setPaymentNotes] = useState('');
 
   // ──────────────────────────────────────────────────────
-  // 1. FETCH PLANTS
+  // 1. FETCH INITIAL DATA
   // ──────────────────────────────────────────────────────
   useEffect(() => {
     fetchPlants();
-    fetchPendingSettlements(); // STEP 4: Added this
+    fetchDrivers();
+    fetchPendingSettlements();
     fetchHistoryList();
   }, []);
 
@@ -86,11 +90,20 @@ export default function Payments() {
     try {
       const res = await axios.get('http://localhost:5001/api/driver-settlements/plants');
       setPlants(res.data.data || []);
-      if (res.data.data && res.data.data.length > 0) {
+      if (res.data.data && res.data.data.length > 0 && !plant) {
         setPlant(res.data.data[0].source_plant);
       }
     } catch (error) {
       console.error('Error fetching plants:', error);
+    }
+  };
+
+  const fetchDrivers = async () => {
+    try {
+      const res = await axios.get('http://localhost:5001/api/driver-settlements/drivers');
+      setAllDrivers(res.data.data || []);
+    } catch (error) {
+      console.error('Error fetching drivers:', error);
     }
   };
 
@@ -100,7 +113,6 @@ export default function Payments() {
   useEffect(() => {
     if (!plant) {
       setVehicles([]);
-      setTruckNo('');
       return;
     }
     fetchVehicles();
@@ -110,26 +122,128 @@ export default function Payments() {
     try {
       const res = await axios.get(`http://localhost:5001/api/driver-settlements/vehicles/${plant}`);
       setVehicles(res.data.data || []);
-      setTruckNo('');
     } catch (error) {
       console.error('Error fetching vehicles:', error);
     }
   };
 
   // ──────────────────────────────────────────────────────
-  // 3. FETCH DRIVER WHEN VEHICLE CHANGES (UPDATED)
+  // 3. LOAD DRIVER DIRECTLY OR BY TRUCK
   // ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!truckNo || !statementMonth) {
+  const loadDriverSettlementDirect = async (dId, mth, fallbackPlant, fallbackTruck) => {
+    try {
+      const currentMonth = mth || statementMonth || new Date().toISOString().slice(0, 7);
+      const res = await axios.get(
+        `http://localhost:5001/api/driver-settlements/driver-by-id/${dId}?month=${currentMonth}`
+      );
+      if (res.data?.success && res.data.data) {
+        const data = res.data.data;
+        setDriver({
+          id: data.driver_id,
+          full_name: data.driver_name,
+        });
+        setDriverId(data.driver_id);
+        setVehicleId(data.vehicle_id || '');
+        const chosenTruck = data.vehicle_no || fallbackTruck || '';
+        const chosenPlant = data.plant_name || data.source_plant || fallbackPlant || '';
+        if (chosenTruck) setTruckNo(chosenTruck);
+        if (chosenPlant) {
+          setPlant(chosenPlant);
+          try {
+            const vRes = await axios.get(`http://localhost:5001/api/driver-settlements/vehicles/${chosenPlant}`);
+            setVehicles(vRes.data.data || []);
+          } catch (e) {
+            console.error('Error fetching plant vehicles:', e);
+          }
+        }
+        setTotalTrips(Number(data.total_trips) || 0);
+        setTotalAdvances(Number(data.total_advance) || 0);
+      }
+    } catch (err) {
+      console.error('Driver direct fetch error:', err);
+    }
+  };
+
+  const handleSelectDriver = (selectedId) => {
+    if (!selectedId) {
       setDriver(null);
-      setVehicleId('');
       setDriverId('');
+      setVehicleId('');
+      setTruckNo('');
       setTotalTrips(0);
       setTotalAdvances(0);
       return;
     }
+    loadDriverSettlementDirect(selectedId, statementMonth);
+  };
+
+  // ──────────────────────────────────────────────────────
+  // 4. HANDLE URL SEARCH PARAMS (Auto-Prefill from Driver Profile / P&L)
+  // ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    const driverIdParam = searchParams.get('driverId');
+    const monthParam = searchParams.get('month');
+    const truckParam = searchParams.get('truckNo') || searchParams.get('vehicle');
+    const plantParam = searchParams.get('plant');
+    const settlementNoParam = searchParams.get('settlementNo');
+    const driverParam = searchParams.get('driver') || searchParams.get('driverName');
+
+    if (monthParam) {
+      setStatementMonth(monthParam);
+    }
+
+    if (tabParam === 'history' || tabParam === '3' || settlementNoParam || (tabParam !== 'prepare' && tabParam !== '1' && !driverIdParam && truckParam)) {
+      setActiveTab('3. Settlement History');
+      if (truckParam) setHistoryFilterVehicle(truckParam);
+      if (monthParam) setHistoryFilterMonth(monthParam);
+      if (driverParam) setHistoryFilterDriver(driverParam);
+    } else if (tabParam === 'prepare' || tabParam === '1' || driverIdParam) {
+      setActiveTab('1. Prepare Settlement');
+      const year = new Date().getFullYear();
+      const seq = String(pendingList.length + historyList.length + 1).padStart(3, '0');
+      setDraftId(prev => prev || `SET-${year}-${seq}`);
+
+      if (driverIdParam) {
+        loadDriverSettlementDirect(driverIdParam, monthParam, plantParam, truckParam);
+      }
+    }
+  }, [searchParams]);
+
+  // Auto-open settlement detail if settlementNo was specified in URL
+  useEffect(() => {
+    const settlementNoParam = searchParams.get('settlementNo');
+    if (settlementNoParam && historyList.length > 0) {
+      const match = historyList.find(i => 
+        String(i.settlement_no || '').toLowerCase() === settlementNoParam.toLowerCase() ||
+        String(i.id || '').toLowerCase() === settlementNoParam.toLowerCase()
+      );
+      if (match) {
+        setDetailItem(match);
+        setIsDetailOpen(true);
+      }
+    }
+  }, [searchParams, historyList]);
+
+  // Refresh driver settlement details when month changes
+  useEffect(() => {
+    if (!statementMonth) return;
+    if (driverId) {
+      loadDriverSettlementDirect(driverId, statementMonth, plant, truckNo);
+    } else if (truckNo) {
+      fetchDriver();
+    }
+  }, [statementMonth]);
+
+  // ──────────────────────────────────────────────────────
+  // 5. FETCH DRIVER WHEN VEHICLE CHANGES
+  // ──────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!truckNo || !statementMonth) {
+      return;
+    }
     fetchDriver();
-  }, [truckNo, statementMonth]);
+  }, [truckNo]);
 
   const fetchDriver = async () => {
     try {
@@ -139,24 +253,21 @@ export default function Payments() {
 
       const data = response.data.data || {};
 
-      setDriver({
-        id: data.driver_id,
-        full_name: data.driver_name,
-      });
-
-      setVehicleId(data.vehicle_id || '');
-      setDriverId(data.driver_id || '');
-      setTotalTrips(data.total_trips || 0);
-      setTotalAdvances(data.total_advance || 0);
+      if (data.driver_id) {
+        setDriver({
+          id: data.driver_id,
+          full_name: data.driver_name,
+        });
+        setVehicleId(data.vehicle_id || '');
+        setDriverId(data.driver_id || '');
+        setTotalTrips(Number(data.total_trips) || 0);
+        setTotalAdvances(Number(data.total_advance) || 0);
+      }
     } catch (error) {
       console.error('Driver Fetch Error:', error);
-      setDriver(null);
-      setVehicleId('');
-      setDriverId('');
-      setTotalTrips(0);
-      setTotalAdvances(0);
     }
   };
+
 
   // ──────────────────────────────────────────────────────
   // 4. FETCH PENDING SETTLEMENTS (STEP 4)
@@ -205,9 +316,9 @@ export default function Payments() {
 
   const filteredHistory = historyList.filter(item => {
     if (historyFilterMonth && item.statement_month !== historyFilterMonth) return false;
-    if (historyFilterDriver && item.driver_name !== historyFilterDriver) return false;
+    if (historyFilterDriver && String(item.driver_name || '').toLowerCase() !== historyFilterDriver.toLowerCase()) return false;
     if (historyFilterStatus && item.status !== historyFilterStatus) return false;
-    if (historyFilterVehicle && item.vehicle_no !== historyFilterVehicle) return false;
+    if (historyFilterVehicle && String(item.vehicle_no || '').toLowerCase() !== historyFilterVehicle.toLowerCase()) return false;
     if (historyFilterDateFrom && item.payment_date && item.payment_date.slice(0, 10) < historyFilterDateFrom) return false;
     if (historyFilterDateTo && item.payment_date && item.payment_date.slice(0, 10) > historyFilterDateTo) return false;
     return true;
@@ -596,7 +707,9 @@ export default function Payments() {
           <PrepareSettlementTab
             plants={plants}
             vehicles={vehicles}
+            allDrivers={allDrivers}
             driver={driver}
+            onSelectDriver={handleSelectDriver}
             plant={plant} setPlant={setPlant}
             truckNo={truckNo} setTruckNo={setTruckNo}
             statementMonth={statementMonth} setStatementMonth={setStatementMonth}

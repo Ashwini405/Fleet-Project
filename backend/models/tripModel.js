@@ -40,8 +40,8 @@ getById: async (tripId) => {
     LEFT JOIN drivers d ON t.driver_id = d.id
     LEFT JOIN supervisors s ON t.supervisor_id = s.id
     LEFT JOIN stations st ON t.station_id = st.id
-    WHERE t.trip_id = ? AND t.is_deleted = 0
-  `, [tripId]);
+    WHERE (t.trip_id = ? OR t.id = ?) AND t.is_deleted = 0
+  `, [tripId, tripId]);
   return rows[0];
 },
 
@@ -134,8 +134,8 @@ getFuel: async (tripId) => {
   // ✅ UPDATE TRIP
   update: async (id, tripData) => {
     const [result] = await db.query(
-      'UPDATE trips SET ? WHERE trip_id = ?',
-      [tripData, id]
+      'UPDATE trips SET ? WHERE trip_id = ? OR id = ?',
+      [tripData, id, id]
     );
     return result;
   },
@@ -143,8 +143,8 @@ getFuel: async (tripId) => {
   // ✅ SOFT DELETE TRIP
   softDelete: async (id) => {
     const [result] = await db.query(
-      `UPDATE trips SET is_deleted = 1, deleted_at = NOW() WHERE trip_id = ?`,
-      [id]
+      `UPDATE trips SET is_deleted = 1, deleted_at = NOW() WHERE trip_id = ? OR id = ?`,
+      [id, id]
     );
     return result;
   },
@@ -158,8 +158,8 @@ getFuel: async (tripId) => {
        LEFT JOIN drivers d ON t.driver_id = d.id
        LEFT JOIN supervisors s ON t.supervisor_id = s.id
        LEFT JOIN stations st ON t.station_id = st.id
-       WHERE t.trip_id = ?`,
-      [tripId]
+       WHERE (t.trip_id = ? OR t.id = ?)`,
+      [tripId, tripId]
     );
     return rows[0];
   },

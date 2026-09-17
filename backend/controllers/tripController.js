@@ -108,6 +108,33 @@ const getTrips = async (req, res) => {
   }
 };
 
+// ✅ GET SINGLE TRIP
+const getTripById = async (req, res) => {
+  try {
+    const id = req.params.id;
+    const trip = await Trip.getById(id);
+
+    if (!trip) {
+      return res.status(404).json({
+        success: false,
+        message: 'Trip not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: trip
+    });
+
+  } catch (error) {
+    console.error('getTripById error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server Error'
+    });
+  }
+};
+
 const addExpense = async (req, res) => {
   try {
     const { tripId } = req.params;
@@ -163,32 +190,6 @@ const addFuel = async (req, res) => {
       success: true,
       message: 'Fuel entry added successfully',
       data: result
-    });
-
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      success: false,
-      message: 'Server Error'
-    });
-  }
-};
-
-// ✅ GET BY ID
-const getTripById = async (req, res) => {
-  try {
-    const trip = await Trip.getById(req.params.id);
-
-    if (!trip) {
-      return res.status(404).json({
-        success: false,
-        message: 'Trip not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: trip
     });
 
   } catch (error) {

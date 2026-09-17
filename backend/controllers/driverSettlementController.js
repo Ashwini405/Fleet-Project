@@ -51,7 +51,7 @@ const getVehiclesByPlant = async (
 };
 
 // ======================================
-// Get Driver Details
+// Get Driver Details by Vehicle
 // ======================================
 const getDriverByVehicle = async (
   req,
@@ -108,6 +108,70 @@ const getDriverByVehicle = async (
       error
     );
 
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// ======================================
+// Get Driver Details directly by Driver ID
+// ======================================
+const getDriverByIdDirect = async (req, res) => {
+  try {
+    const driverId = req.params.driverId;
+    const month = req.query.month || new Date().toISOString().slice(0, 7);
+
+    const driver = await driverSettlementModel.getDriverById(driverId);
+
+    if (!driver) {
+      return res.status(404).json({
+        success: false,
+        message: "Driver not found",
+      });
+    }
+
+    let tripData = {
+      total_trips: 0,
+      total_advance: 0,
+    };
+
+    if (driverId && month) {
+      tripData = await driverSettlementModel.getDriverDetails(
+        driverId,
+        month
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ...driver,
+        ...tripData,
+      },
+    });
+  } catch (error) {
+    console.error("Get Driver By ID Error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// ======================================
+// Get All Active Drivers for Settlement Selector
+// ======================================
+const getSettlementDrivers = async (req, res) => {
+  try {
+    const drivers = await driverSettlementModel.getAllSettlementDrivers();
+    res.status(200).json({
+      success: true,
+      data: drivers,
+    });
+  } catch (error) {
+    console.error("Get Settlement Drivers Error:", error);
     res.status(500).json({
       success: false,
       message: error.message,
@@ -349,6 +413,8 @@ module.exports = {
   getPlants,
   getVehiclesByPlant,
   getDriverByVehicle,
+  getDriverByIdDirect,
+  getSettlementDrivers,
   createSettlement,
   getSettlements,
   getPendingSettlements,

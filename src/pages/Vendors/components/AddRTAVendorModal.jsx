@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { FiX, FiHome, FiCheckCircle } from 'react-icons/fi';
+import api from '../../../services/api';
 
 const AGENT_TYPES  = ['Individual Agent', 'RTO Office', 'Transport Consultant', 'Other'];
 const BANK_OPTIONS = ['HDFC Bank', 'State Bank of India (SBI)', 'ICICI Bank', 'Axis Bank', 'Canara Bank', 'Union Bank', 'Indian Bank', 'Bank of Baroda', 'Others'];
@@ -16,18 +16,22 @@ const EMPTY = {
   bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '', notes: '',
 };
 
-function validate(form, existing) {
+function validate(form, existing = []) {
   const e = {};
-  if (!form.name.trim())      e.name      = 'Agent / office name is required';
-  if (!form.mobile.trim())    e.mobile    = 'Mobile number is required';
+  if (!form.name || !form.name.trim())      e.name      = 'Agent / office name is required';
+  if (!form.mobile || !form.mobile.trim())    e.mobile    = 'Mobile number is required';
   else if (!/^\d{10}$/.test(form.mobile.trim())) e.mobile = 'Enter a valid 10-digit mobile number';
   if (!form.agentType)        e.agentType = 'Agent type is required';
   if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) e.email = 'Enter a valid email address';
-  const dup = existing.find(v =>
-    v.name.trim().toLowerCase() === form.name.trim().toLowerCase() &&
-    (v.contact || v.mobile || '').replace(/\D/g, '') === form.mobile.trim()
-  );
-  if (dup) e.name = 'An agent with this name and mobile already exists';
+  
+  if (Array.isArray(existing) && form.name && form.mobile) {
+    const dup = existing.find(v => {
+      const vName = (v.vendor_name || v.name || '').trim().toLowerCase();
+      const vMob  = (v.mobile_number || v.contact || v.mobile || '').replace(/\D/g, '');
+      return vName && vName === form.name.trim().toLowerCase() && vMob === form.mobile.trim();
+    });
+    if (dup) e.name = 'An agent with this name and mobile already exists';
+  }
   return e;
 }
 
@@ -73,7 +77,7 @@ export default function AddRTAVendorModal({ isOpen, onClose, onAdd, existingVend
         notes: form.notes.trim(),
       };
 
-      const response = await axios.post("http://localhost:5001/api/rta-vendors", payload);
+      const response = await api.post("/rta-vendors", payload);
 
       if (response.data.success) {
         setSuccess(true);
@@ -82,12 +86,11 @@ export default function AddRTAVendorModal({ isOpen, onClose, onAdd, existingVend
           setSuccess(false);
           setForm(EMPTY);
           setErrors({});
-          onClose();
-
           if (onAdd) {
             onAdd();
           }
-        }, 1200);
+          onClose();
+        }, 800);
       }
     } catch (error) {
       console.error("Create RTA Vendor Error:", error);
@@ -96,6 +99,7 @@ export default function AddRTAVendorModal({ isOpen, onClose, onAdd, existingVend
       setLoading(false);
     }
   };
+
 
   const handleClose = () => { setForm(EMPTY); setErrors({}); onClose(); };
 

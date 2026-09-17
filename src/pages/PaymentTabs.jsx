@@ -10,7 +10,9 @@ import {
 export function PrepareSettlementTab({
   plants,
   vehicles,
+  allDrivers = [],
   driver,
+  onSelectDriver,
 
   plant,
   setPlant,
@@ -81,7 +83,34 @@ export function PrepareSettlementTab({
             }[settlementStatus]}
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Driver Name (Direct Selector) */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider">Driver *</label>
+                {driverName && <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">Selected</span>}
+              </div>
+              <select
+                value={driver?.id || ''}
+                onChange={(e) => onSelectDriver && onSelectDriver(e.target.value)}
+                className="w-full text-sm font-bold text-slate-800 border border-slate-300 rounded-lg px-3 py-2 focus:ring-1 focus:ring-indigo-500 focus:outline-none"
+              >
+                <option value="">{driverName ? `${driverName} (Active)` : '-- Select Driver --'}</option>
+                {allDrivers && allDrivers.map((d) => (
+                  <option key={d.driver_id} value={d.driver_id}>
+                    {d.driver_name} {d.vehicle_no ? `(${d.vehicle_no})` : ''} {d.plant_name ? `• ${d.plant_name}` : ''}
+                  </option>
+                ))}
+              </select>
+              {driverName ? (
+                <p className="text-[10px] text-emerald-600 font-semibold pl-1 mt-1 flex items-center gap-1">
+                  <FiCheck className="w-3 h-3 text-emerald-600" /> Loaded: {driverName}
+                </p>
+              ) : (
+                <p className="text-[10px] text-slate-400 font-medium pl-1 mt-1">Pick driver or select plant/truck</p>
+              )}
+            </div>
+
             {/* Running Plant */}
             <div>
               <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Running Plant</label>
@@ -99,7 +128,7 @@ export function PrepareSettlementTab({
             <div>
               <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Truck No *</label>
               <select value={truckNo} onChange={(e) => setTruckNo(e.target.value)} className="w-full text-sm font-bold text-slate-800 border border-slate-300 rounded-lg px-3 py-2 focus:ring-1 focus:ring-indigo-500 focus:outline-none">
-                <option value="">Select Vehicle</option>
+                <option value="">{truckNo ? truckNo : 'Select Vehicle'}</option>
                 {vehicles.map((v, index) => (
                   <option key={v.vehicle_id || index} value={v.vehicle_no}>
                     {v.vehicle_no}
@@ -108,34 +137,35 @@ export function PrepareSettlementTab({
               </select>
             </div>
 
-            {/* Driver Name */}
-            <div>
-              <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Driver Name</label>
-              {driverName ? (
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center w-full text-sm border border-indigo-200 bg-indigo-50/40 rounded-lg px-3 py-2 gap-2">
-                    <span className="w-2 h-2 rounded-full bg-green-500 shrink-0"></span>
-                    <span className="font-bold text-slate-800 flex-1">{driverName}</span>
-                  </div>
-                  <p className="text-[10px] text-slate-400 font-medium pl-1">Auto-fetched from database</p>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center w-full text-sm border border-red-200 bg-red-50/40 rounded-lg px-3 py-2 gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-500 shrink-0"></span>
-                    <span className="font-semibold text-red-500 flex-1">No Driver Assigned</span>
-                  </div>
-                  <p className="text-[10px] text-red-400 font-medium pl-1">Assign a driver in Vehicle Master first</p>
-                </div>
-              )}
-            </div>
-
             {/* Statement Month */}
             <div>
               <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1.5 tracking-wider">Statement Month</label>
               <input type="month" value={statementMonth} onChange={(e) => setStatementMonth(e.target.value)} className="w-full text-sm border border-slate-300 rounded-lg px-3 py-2 font-medium focus:ring-1 focus:ring-indigo-500 focus:outline-none" />
             </div>
           </div>
+
+          {/* Active settlement driver data summary banner */}
+          {driverName && (
+            <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-indigo-50/60 -mx-5 -mb-5 px-5 py-3 rounded-b-xl">
+              <div className="flex items-center gap-2 text-xs text-indigo-950 font-medium">
+                <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse"></span>
+                <span>
+                  Preparing Settlement for: <strong className="font-bold text-indigo-700">{driverName}</strong>
+                  {truckNo ? ` (${truckNo})` : ''}
+                  {plant ? ` • Plant: ${plant}` : ''}
+                  {` • Month: ${statementMonth}`}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs font-bold">
+                <span className="bg-white border border-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg shadow-2xs">
+                  {totalTrips} Month Trips
+                </span>
+                <span className="bg-red-50 border border-red-200 text-red-700 px-2.5 py-1 rounded-lg shadow-2xs">
+                  ₹{Number(totalAdvances).toLocaleString()} Pending Advances (Auto-Deducted)
+                </span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Earnings Card */}
@@ -384,31 +414,68 @@ export function PrepareSettlementTab({
 // ─────────────────────────────────────────────
 // TAB 2: PENDING APPROVAL
 // ─────────────────────────────────────────────
-export function PendingApprovalTab({ pendingList, onView, onApprove, onReject, vehicles }) {
+export function PendingApprovalTab({ pendingList, onView, onApprove, onReject, vehicles = [] }) {
+  const [filterTruck, setFilterTruck] = React.useState('');
+  const [filterMonth, setFilterMonth] = React.useState('');
+
+  const uniqueTrucks = [...new Set([
+    ...pendingList.map(i => i.vehicle_no).filter(Boolean),
+    ...vehicles.map(v => v.vehicle_no).filter(Boolean)
+  ])].sort();
+
+  const uniqueMonths = [...new Set(pendingList.map(i => i.statement_month).filter(Boolean))].sort().reverse();
+
+  const filteredList = pendingList.filter(item => {
+    if (filterTruck && item.vehicle_no !== filterTruck) return false;
+    if (filterMonth && item.statement_month !== filterMonth) return false;
+    return true;
+  });
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
       <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-wrap gap-3 items-center">
         <span className="text-xs font-bold text-slate-400 uppercase tracking-widest hidden sm:block">Filter:</span>
-        <select className="text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none">
-          <option>All Trucks</option>
-          {vehicles.map(v => (
-            <option key={v.vehicle_id || v.vehicle_no} value={v.vehicle_no}>{v.vehicle_no}</option>
+        <select 
+          value={filterTruck} 
+          onChange={(e) => setFilterTruck(e.target.value)}
+          className="text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none"
+        >
+          <option value="">All Trucks / Vehicles</option>
+          {uniqueTrucks.map(truck => (
+            <option key={truck} value={truck}>{truck}</option>
           ))}
         </select>
-        <select className="text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none">
-          <option>All Months</option>
-          <option>2026-01</option>
-          <option>2025-12</option>
+        <select 
+          value={filterMonth} 
+          onChange={(e) => setFilterMonth(e.target.value)}
+          className="text-sm font-semibold text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none"
+        >
+          <option value="">All Months</option>
+          {uniqueMonths.map(month => (
+            <option key={month} value={month}>{month}</option>
+          ))}
         </select>
-        <span className="ml-auto text-xs text-slate-400 font-medium">{pendingList.length} pending</span>
+        {(filterTruck || filterMonth) && (
+          <button 
+            onClick={() => { setFilterTruck(''); setFilterMonth(''); }}
+            className="text-xs font-bold text-indigo-500 hover:text-indigo-700 underline"
+          >
+            Clear
+          </button>
+        )}
+        <span className="ml-auto text-xs text-slate-400 font-medium">{filteredList.length} of {pendingList.length} pending</span>
       </div>
 
-      {pendingList.length === 0 ? (
+      {filteredList.length === 0 ? (
         <div className="py-20 text-center">
           <div className="flex flex-col items-center gap-2 text-slate-400">
             <FiCheckCircle className="w-10 h-10 opacity-20" />
-            <p className="text-sm font-semibold">All caught up!</p>
-            <p className="text-xs">No settlements pending approval.</p>
+            <p className="text-sm font-semibold">
+              {pendingList.length === 0 ? 'All caught up!' : 'No matching settlements'}
+            </p>
+            <p className="text-xs">
+              {pendingList.length === 0 ? 'No settlements pending approval.' : 'Try adjusting the truck or month filter.'}
+            </p>
           </div>
         </div>
       ) : (
@@ -416,13 +483,13 @@ export function PendingApprovalTab({ pendingList, onView, onApprove, onReject, v
           <table className="w-full text-sm text-left">
             <thead className="bg-slate-50 border-b-2 border-slate-100">
               <tr>
-                {['Settlement ID', 'Driver', 'Vehicle', 'Month', 'Net Payable', 'Submitted', 'Status', 'Actions'].map(h => (
+                {['Settlement ID', 'Driver', 'Vehicle / Truck', 'Month', 'Net Payable', 'Submitted', 'Status', 'Actions'].map(h => (
                   <th key={h} className="py-3 px-4 text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {pendingList.map(item => (
+              {filteredList.map(item => (
                 <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                   <td className="py-3 px-4 font-bold text-indigo-600 text-xs">{item.id}</td>
                   <td className="py-3 px-4">
@@ -430,7 +497,7 @@ export function PendingApprovalTab({ pendingList, onView, onApprove, onReject, v
                     <div className="text-[11px] text-slate-400">{item.plant_name}</div>
                   </td>
                   <td className="py-3 px-4">
-                    <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{item.vehicle_no}</span>
+                    <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{item.vehicle_no || '—'}</span>
                   </td>
                   <td className="py-3 px-4 font-semibold text-slate-700">{item.statement_month}</td>
                   <td className="py-3 px-4">

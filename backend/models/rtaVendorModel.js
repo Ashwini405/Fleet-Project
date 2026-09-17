@@ -1,5 +1,21 @@
 const db = require("../config/db");
 
+// Ensure payment_terms column exists
+(async () => {
+  try {
+    const [cols] = await db.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'rta_vendors'`
+    );
+    const colNames = cols.map(c => c.COLUMN_NAME);
+    if (!colNames.includes('payment_terms')) {
+      await db.query(`ALTER TABLE rta_vendors ADD COLUMN payment_terms VARCHAR(50) DEFAULT 'credit'`);
+      console.log('rta_vendors: added payment_terms column');
+    }
+  } catch (err) {
+    console.error('rta_vendors column check error:', err.message);
+  }
+})();
+
 const getAllVendors = async () => {
   const [rows] = await db.query(`
     SELECT *
@@ -9,6 +25,7 @@ const getAllVendors = async () => {
 
   return rows;
 };
+
 
 const getVendorById = async (id) => {
   const [rows] = await db.query(

@@ -463,6 +463,7 @@ export default function AddDriverModal({ isOpen, onClose, onSuccess }) {
     joining_date: '',
     status: 'active',
     address: '',
+    wallet_balance: '',
     station_id: '',
     vehicle_id: '',
     bank_name: '',
@@ -508,16 +509,38 @@ export default function AddDriverModal({ isOpen, onClose, onSuccess }) {
     });
   };
 
-  // 🔥 UPDATED: submit using FormData to include files
+  // 🔥 UPDATED: submit using FormData to include files & validations
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!formData.full_name?.trim()) {
+      setActiveTab('personal');
+      setToast({ type: 'error', message: 'Please enter the driver full name.' });
+      setTimeout(() => setToast(null), 3500);
+      return;
+    }
+
+    if (!formData.mobile?.trim()) {
+      setActiveTab('personal');
+      setToast({ type: 'error', message: 'Please enter the driver mobile number.' });
+      setTimeout(() => setToast(null), 3500);
+      return;
+    }
+
+    const cleanMobile = formData.mobile.trim().replace(/[^0-9+]/g, '');
+    if (cleanMobile.length < 10) {
+      setActiveTab('personal');
+      setToast({ type: 'error', message: 'Please enter a valid 10-digit mobile number.' });
+      setTimeout(() => setToast(null), 3500);
+      return;
+    }
 
     const form = new FormData();
 
     // Append all text fields
     Object.keys(formData).forEach(key => {
-      if (formData[key]) {
-        form.append(key, formData[key]);
+      if (formData[key] !== '' && formData[key] !== null && formData[key] !== undefined) {
+        form.append(key, typeof formData[key] === 'string' ? formData[key].trim() : formData[key]);
       }
     });
 
@@ -686,6 +709,21 @@ export default function AddDriverModal({ isOpen, onClose, onSuccess }) {
                       <option value="inactive">Inactive</option>
                     </select>
                   </div>
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                      Wallet Balance (₹) <span className="text-red-500">*</span>
+                    </label>
+                    <input 
+                      type="number"
+                      step="any"
+                      name="wallet_balance"
+                      placeholder="0.00" 
+                      value={formData.wallet_balance}
+                      onChange={handleChange}
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all" 
+                      required 
+                    />
+                  </div>
                   <div className="col-span-2">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Full Address</label>
                     <textarea 
@@ -727,11 +765,16 @@ export default function AddDriverModal({ isOpen, onClose, onSuccess }) {
                       className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
                     >
                       <option value="">-- None / Select Truck --</option>
-                      {vehicles.map(v => (
-                        <option key={v.id} value={v.id}>
-                          {v.vehicle_no}
-                        </option>
-                      ))}
+                      {vehicles.map(v => {
+                        const status = v.driver_name
+                          ? `(Assigned to ${v.driver_name})`
+                          : `(Available)`;
+                        return (
+                          <option key={v.id} value={v.id}>
+                            {v.vehicle_no} — {status}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </motion.div>

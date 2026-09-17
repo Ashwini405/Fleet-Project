@@ -29,12 +29,29 @@ export default function ViewDriverModal({ isOpen, onClose, staff }) {
             <div className="space-y-4">
               <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
                 <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white grid place-items-center text-xl font-bold">
-                    {(staff.full_name || '').split(' ').map((n) => n[0]).join('')}
-                  </div>
+                  {staff.profile_photo ? (
+                    <div className="w-14 h-14 rounded-2xl overflow-hidden shadow-sm border border-gray-200 shrink-0 bg-gray-100">
+                      <img
+                        src={`http://localhost:5001/uploads/${staff.profile_photo}`}
+                        alt={staff.full_name}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.target.style.display = 'none';
+                          e.target.parentElement.innerHTML = `<div class="w-full h-full bg-slate-900 text-white grid place-items-center text-xl font-bold">${((staff.full_name || '').split(' ').map((n) => n[0]).join('') || 'D').toUpperCase()}</div>`;
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white grid place-items-center text-xl font-bold shrink-0">
+                      {((staff.full_name || '').split(' ').map((n) => n[0]).join('') || 'D').toUpperCase()}
+                    </div>
+                  )}
                   <div>
                     <h3 className="font-bold text-gray-900">{staff.full_name}</h3>
                     <p className="text-sm text-gray-500">Driver ID • {staff.id_card_number}</p>
+                    <p className="text-xs font-semibold text-emerald-600 mt-0.5">
+                      Wallet: ₹{Number(staff.wallet_balance || 0).toLocaleString()}
+                    </p>
                   </div>
                 </div>
               </div>

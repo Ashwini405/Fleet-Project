@@ -4,13 +4,16 @@ const rtaExpenseModel = require(
 
 const createExpense = async (req, res) => {
   try {
-    await rtaExpenseModel.createExpense(
-      req.body
-    );
+    const document = req.file ? `/uploads/${req.file.filename}` : (req.body.document || null);
+    await rtaExpenseModel.createExpense({
+      ...req.body,
+      document,
+    });
 
     res.status(201).json({
       success: true,
       message: "Expense added successfully",
+      document,
     });
   } catch (error) {
     console.error(
