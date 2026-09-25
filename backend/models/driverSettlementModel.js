@@ -153,7 +153,61 @@ const getDriverDetails = async (
 // =====================================
 // Create Settlement
 // =====================================
+const ensureUniqueSettlementNo = async (preferredNo) => {
+  const baseYear = new Date().getFullYear();
+  const rawNo = String(preferredNo || '').trim();
+
+  if (rawNo) {
+    const [existingRows] = await db.query(
+      'SELECT id FROM driver_settlements WHERE settlement_no = ? LIMIT 1',
+      [rawNo]
+    );
+
+    if (existingRows.length === 0) {
+      return rawNo;
+    }
+  }
+
+  const [latestRows] = await db.query(
+    `SELECT settlement_no
+     FROM driver_settlements
+     WHERE settlement_no LIKE ?
+     ORDER BY created_at DESC, id DESC
+     LIMIT 1`,
+    [`SET-${baseYear}-%`]
+  );
+
+  let nextSeq = 1;
+  if (latestRows[0]?.settlement_no) {
+    const match = String(latestRows[0].settlement_no).match(/SET-(\d{4})-(\d+)/);
+    if (match && Number(match[1]) === baseYear) {
+      nextSeq = Number(match[2]) + 1;
+    }
+  }
+
+  let candidate = `SET-${baseYear}-${String(nextSeq).padStart(3, '0')}`;
+  let attempt = 0;
+
+  while (attempt < 1000) {
+    const [dupRows] = await db.query(
+      'SELECT id FROM driver_settlements WHERE settlement_no = ? LIMIT 1',
+      [candidate]
+    );
+
+    if (dupRows.length === 0) {
+      return candidate;
+    }
+
+    attempt += 1;
+    nextSeq += 1;
+    candidate = `SET-${baseYear}-${String(nextSeq).padStart(3, '0')}`;
+  }
+
+  return `SET-${baseYear}-${Date.now().toString().slice(-6)}`;
+};
+
 const createSettlement = async (data) => {
+  const settlementNo = await ensureUniqueSettlementNo(data.settlement_no);
 
   const [result] = await db.query(
     `
@@ -193,7 +247,7 @@ const createSettlement = async (data) => {
     )
     `,
     [
-      data.settlement_no,
+      settlementNo,
       data.plant_name,
       data.vehicle_id,
       data.vehicle_no,

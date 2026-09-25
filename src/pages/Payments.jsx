@@ -200,9 +200,7 @@ export default function Payments() {
       if (driverParam) setHistoryFilterDriver(driverParam);
     } else if (tabParam === 'prepare' || tabParam === '1' || driverIdParam) {
       setActiveTab('1. Prepare Settlement');
-      const year = new Date().getFullYear();
-      const seq = String(pendingList.length + historyList.length + 1).padStart(3, '0');
-      setDraftId(prev => prev || `SET-${year}-${seq}`);
+      setDraftId(prev => prev || buildUniqueSettlementNo([...pendingList, ...historyList]));
 
       if (driverIdParam) {
         loadDriverSettlementDirect(driverIdParam, monthParam, plantParam, truckParam);
@@ -295,6 +293,25 @@ export default function Payments() {
     }
   };
 
+  const buildUniqueSettlementNo = (existingList = []) => {
+    const used = new Set(
+      (existingList || [])
+        .map(item => String(item?.settlement_no || '').trim())
+        .filter(Boolean)
+    );
+
+    const year = new Date().getFullYear();
+    let seq = 1;
+
+    while (true) {
+      const candidate = `SET-${year}-${String(seq).padStart(3, '0')}`;
+      if (!used.has(candidate)) {
+        return candidate;
+      }
+      seq += 1;
+    }
+  };
+
   // ──────────────────────────────────────────────────────
   // CALCULATIONS
   // ──────────────────────────────────────────────────────
@@ -328,9 +345,7 @@ export default function Payments() {
   // HANDLERS
   // ──────────────────────────────────────────────────────
   const handleNewSettlement = () => {
-    const year = new Date().getFullYear();
-    const seq = String(pendingList.length + historyList.length + 1).padStart(3, '0');
-    setDraftId(`SET-${year}-${seq}`);
+    setDraftId(buildUniqueSettlementNo([...pendingList, ...historyList]));
     setPlant(plants[0]?.source_plant || '');
     setTruckNo('');
     setStatementMonth(new Date().toISOString().slice(0, 7));

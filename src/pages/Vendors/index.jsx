@@ -34,6 +34,7 @@ export default function Vendors() {
   const requestedVendorIds = searchParams.get('vendor_ids');
   const requestedVendorNames = searchParams.get('vendor_names');
   const requestedTyreNumber = searchParams.get('tyre_number');
+  const requestedTxnType = searchParams.get('txn_type') || searchParams.get('transaction_type') || searchParams.get('type');
   const requestedVehicleNo = searchParams.get('vehicle_no');
   const [activePage, setActivePage] = useState(requestedCategory || 'dashboard'); // 'dashboard' | category.id
   const [selectedVendor, setSelectedVendor] = useState(null);
