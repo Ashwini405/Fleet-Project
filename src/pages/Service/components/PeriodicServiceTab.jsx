@@ -5,6 +5,12 @@ import { Plus, Search, Calendar, Eye, Clock } from 'lucide-react';
 import RegisterPeriodicServiceModal from './RegisterPeriodicServiceModal';
 import Can from '../../../components/Can';
 
+const formatDate = (value) => {
+  if (!value) return '—';
+  const [year, month, day] = String(value).slice(0, 10).split('-');
+  return year && month && day ? `${day}-${month}-${year}` : '—';
+};
+
 export default function PeriodicServiceTab() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
@@ -113,7 +119,7 @@ export default function PeriodicServiceTab() {
                     className="hover:bg-teal-50/30 transition-colors group"
                   >
                     <td className="py-2 px-2 md:py-4 md:px-4">
-                      <span className="text-sm font-medium text-gray-600">{log.service_date}</span>
+                      <span className="text-sm font-medium text-gray-600">{formatDate(log.service_date)}</span>
                     </td>
                     <td className="py-2 px-2 md:py-4 md:px-4">
                       <span className="font-bold text-gray-800 tracking-tight text-sm">{log.vehicle_no || '—'}</span>

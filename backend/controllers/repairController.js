@@ -1,8 +1,10 @@
 const Repair = require('../models/repairModel');
 const lifecycle = require('../services/maintenanceLifecycleService');
+const db = require('../config/db');
 
 const buildRepairData = (source, totals) => ({
   vehicle_id: source.vehicle_id,
+  garage_id: source.garage_id || null,
   vehicle_no: source.vehicle_no || null,
   model: source.model || null,
   driver_name: source.driver_name || null,
@@ -64,10 +66,13 @@ const createRepair = async (req, res) => {
 
     // 🔥 FIX FILES
     if (req.files && req.files.length > 0) {
+      let categories = [];
+      try { categories = JSON.parse(data.file_categories || '[]'); } catch { categories = []; }
       repairData.files = JSON.stringify(
-        req.files.map(file => ({
+        req.files.map((file, index) => ({
           file_name: file.filename,
-          file_type: file.mimetype
+          file_type: file.mimetype,
+          document_type: categories[index] || 'Service Photo'
         }))
       );
     }
@@ -158,12 +163,22 @@ const getRepairById = async (req, res) => {
       parsedFiles = Array.isArray(data.files) ? data.files : JSON.parse(data.files || '[]');
     } catch { parsedFiles = []; }
 
+    const [settlements] = await db.query(
+      `SELECT id, payment_date, amount, payment_mode, reference_number, notes, receipt_files
+       FROM vendor_payments
+       WHERE vendor_id = ? AND vendor_category = 'garages'
+         AND notes LIKE ?
+       ORDER BY payment_date DESC, id DESC`,
+      [data.garage_id, `%__garage_bill:Repair Work #${id}%`]
+    );
+
     res.json({
       success: true,
       data: {
         ...data,
         parts: parsedParts,
-        files: parsedFiles
+        files: parsedFiles,
+        settlements
       }
     });
 
@@ -188,6 +203,7 @@ const updateRepair = async (req, res) => {
 
     const data = {
       vehicle_id:         body.vehicle_id,
+      garage_id:          body.garage_id || null,
       vehicle_no:         body.vehicle_no || null,
       model:              body.model || null,
       driver_name:        body.driver_name || null,
@@ -216,8 +232,14 @@ const updateRepair = async (req, res) => {
     };
 
     if (req.files && req.files.length > 0) {
+      let categories = [];
+      try { categories = JSON.parse(body.file_categories || '[]'); } catch { categories = []; }
       data.files = JSON.stringify(
-        req.files.map(file => ({ file_name: file.filename, file_type: file.mimetype }))
+        req.files.map((file, index) => ({
+          file_name: file.filename,
+          file_type: file.mimetype,
+          document_type: categories[index] || 'Service Photo'
+        }))
       );
     } else if (body.files) {
       data.files = body.files;

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ShieldCheck, Eye, Download, FileText, Pencil, Save, XCircle, UploadCloud, ChevronDown } from 'lucide-react';
 
 // ── Constants (mirrors AddWarrantyModal) ─────────────────────────────────────
-const CATEGORIES = ['Battery', 'Engine', 'Tyres', 'Brakes', 'Transmission', 'Electrical', 'AC System', 'Suspension', 'Fuel System', 'Other'];
+const CATEGORIES = ['Vehicle', 'Tyres', 'Battery'];
 
 const BRANDS_BY_CATEGORY = {
   Battery:      ['Amaron', 'Exide', 'Bosch'],
@@ -186,6 +186,7 @@ export default function ViewWarrantyModal({ isOpen, onClose, itemData, onUpdated
       brand:          d.brand          || '',
       model:          d.model          || '',
       serial_no:      d.serial_no      || '',
+      battery_id:     d.battery_id     || '',
       vehicle_id:     d.vehicle_id     || '',
       vehicle_no:     d.vehicle_no     || '',
       dealerShowroom: d.dealer_showroom || '',
@@ -248,6 +249,7 @@ export default function ViewWarrantyModal({ isOpen, onClose, itemData, onUpdated
       formData.append('brand',           fd.brand);
       formData.append('model',           fd.model);
       formData.append('serial_no',       fd.serial_no);
+      formData.append('battery_id',      fd.battery_id || '');
       formData.append('vehicle_id',      fd.vehicle_id);
       formData.append('vehicle_no',      fd.vehicle_no);
       formData.append('dealer_showroom',  fd.dealerShowroom);

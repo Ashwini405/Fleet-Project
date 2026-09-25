@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import AddItemModal      from './components/AddItemModal';
 import { useVendorLedger } from '../../context/VendorLedgerContext';
@@ -206,6 +207,8 @@ function Toast({ toast }) {
 
 /* ════════════════════════════════════════════════════════ */
 export default function PartsModule() {
+  const [searchParams] = useSearchParams();
+  const issueVehicleId = searchParams.get('vehicle_id');
 
   /* ── page-level tab ── */
   const [pageTab, setPageTab] = useState('Inventory');
@@ -1631,6 +1634,7 @@ export default function PartsModule() {
       <IssueItemModal
         isOpen={!!issueItem}
         item={issueItem}
+        initialVehicleId={issueVehicleId}
         onClose={() => setIssueItem(null)}
         onSuccess={(qty) => handleIssueSuccess(issueItem, qty)}
       />

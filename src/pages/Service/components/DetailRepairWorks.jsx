@@ -399,11 +399,41 @@ const DetailRepairWorks = () => {
         </div>
       </div>
 
+      {/* Payment settlements */}
+      <div className="mb-8 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <h3 className="font-semibold text-slate-800">Payment Settlements</h3>
+          <span className="text-xs font-medium text-slate-500">{data.settlements?.length || 0} payment(s)</span>
+        </div>
+        {data.settlements?.length ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-white text-xs text-slate-500 uppercase tracking-wide">
+                <tr><th className="px-5 py-3 text-left">Date</th><th className="px-5 py-3 text-left">Method</th><th className="px-5 py-3 text-left">Reference</th><th className="px-5 py-3 text-right">Amount</th><th className="px-5 py-3 text-right">Proof</th></tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {data.settlements.map(payment => {
+                  let proof = '';
+                  try { proof = JSON.parse(payment.receipt_files || '[]')[0] || ''; } catch { proof = ''; }
+                  return <tr key={payment.id}>
+                    <td className="px-5 py-3 text-slate-600">{payment.payment_date ? String(payment.payment_date).slice(0, 10).split('-').reverse().join('-') : '—'}</td>
+                    <td className="px-5 py-3 font-medium text-slate-700">{payment.payment_mode || '—'}</td>
+                    <td className="px-5 py-3 text-slate-600">{payment.reference_number || '—'}</td>
+                    <td className="px-5 py-3 text-right font-bold text-emerald-600">₹ {Number(payment.amount || 0).toLocaleString('en-IN')}</td>
+                    <td className="px-5 py-3 text-right">{proof ? <a href={`http://localhost:5001/uploads/${proof}`} target="_blank" rel="noreferrer" className="font-semibold text-indigo-600 hover:underline">View proof</a> : <span className="text-slate-400">—</span>}</td>
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="px-5 py-6 text-sm text-slate-400">No payments recorded for this repair.</p>}
+      </div>
+
       {/* Documents Section */}
       <div>
         <div className="flex items-center gap-2 mb-4">
           <FileText className="w-5 h-5 text-indigo-500" />
-          <h3 className="text-lg font-semibold text-slate-800">Attached Documents</h3>
+          <h3 className="text-lg font-semibold text-slate-800">Repair Bills & Proofs</h3>
         </div>
 
         {files && files.length > 0 ? (
@@ -411,6 +441,7 @@ const DetailRepairWorks = () => {
             {files.map((file, idx) => {
               const fileName = file.file_name || file.name;
               const fileType = file.file_type || file.type || '';
+              const documentType = file.document_type || 'Repair Proof';
               const isImage = fileType.includes('image') || fileName?.match(/\.(jpg|jpeg|png|gif)$/i);
               const fileUrl = `http://localhost:5001/uploads/${fileName}`;
               return (
@@ -436,7 +467,7 @@ const DetailRepairWorks = () => {
                     <p className="text-sm font-medium text-slate-800 truncate" title={fileName}>
                       {fileName}
                     </p>
-                    <p className="text-xs text-slate-500 mt-0.5">{fileType || 'document'}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{documentType} · {fileType || 'document'}</p>
                     {isImage && (
                       <div className="mt-3 rounded-lg overflow-hidden border border-slate-100">
                         <img src={fileUrl} alt={fileName} className="h-28 w-full object-cover" />
@@ -450,7 +481,7 @@ const DetailRepairWorks = () => {
         ) : (
           <div className="text-center py-12 bg-slate-50 rounded-2xl border border-slate-200">
             <FileText className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-            <p className="text-sm text-slate-500">No documents attached to this repair.</p>
+            <p className="text-sm text-slate-500">No repair bill or proof attached.</p>
           </div>
         )}
       </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { FiX, FiCheckCircle } from 'react-icons/fi';
 import axios from 'axios';
-import { PAYMENT_METHODS, MODAL_ANIM } from './constants';
+import { PAYMENT_METHODS, MODAL_ANIM, fmtDate } from './constants';
 
 function computePreview(poList, paymentAmount, selectedKeys) {
   const amt = Number(paymentAmount);
@@ -34,7 +34,7 @@ function poStatusLabel(po) {
   return 'Partially Paid';
 }
 
-export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, vendorName, vendorCategory, outstanding, poList }) {
+export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, vendorName, vendorCategory, outstanding, poList, billOptions = [] }) {
   const today = new Date().toISOString().split('T')[0];
   const EMPTY = { date: today, amount: '', method: 'Bank Transfer', ref: '', remarks: '' };
   const [form, setForm]     = useState(EMPTY);
@@ -43,6 +43,7 @@ export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, ve
   const [loading, setLoading] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [billProof, setBillProof] = useState(null);
+  const [selectedBillId, setSelectedBillId] = useState('');
 
   if (!isOpen) return null;
 
@@ -57,6 +58,7 @@ export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, ve
     const e = {};
     if (!form.date)              e.date   = 'Date is required';
     if (!form.amount || totalAmt <= 0) e.amount = 'Enter a valid amount';
+    if (billOptions.length > 0 && !selectedBillId) e.bill = 'Select the service or repair bill being paid';
     return e;
   };
 
@@ -76,7 +78,11 @@ export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, ve
       const allocationNote = allocationIds.length
         ? `__fuel_allocation_ids:${allocationIds.join(',')}__`
         : '';
-      const notes = [allocationNote, form.remarks].filter(Boolean).join(' ');
+      const selectedBill = billOptions.find(bill => String(bill.id) === String(selectedBillId));
+      const billNote = selectedBill
+        ? `__garage_bill:${selectedBill.type} #${selectedBill.id} | ${selectedBill.truckId || 'No vehicle'} | ${selectedBill.desc}__`
+        : '';
+      const notes = [allocationNote, billNote, form.remarks].filter(Boolean).join(' ');
 
       const payload = new FormData();
       Object.entries({
@@ -102,6 +108,7 @@ export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, ve
         setToast(false);
         setForm(EMPTY);
         setBillProof(null);
+        setSelectedBillId('');
         setErrors({});
         onClose();
       }, 1400);
@@ -159,6 +166,26 @@ export default function RecordPaymentModal({ isOpen, onClose, onSave, vendor, ve
             </div>
 
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
+              {billOptions.length > 0 && (
+                <div>
+                  <label className={lCls}>Paying For <span className="text-red-400">*</span></label>
+                  <select value={selectedBillId} onChange={e => {
+                    const billId = e.target.value;
+                    const bill = billOptions.find(item => String(item.id) === billId);
+                    setSelectedBillId(billId);
+                    if (bill) set('amount', String(bill.debit));
+                  }} className={iCls}>
+                    <option value="">Select service or repair bill</option>
+                    {billOptions.map(bill => (
+                      <option key={bill.id} value={bill.id}>
+                        {bill.type} · {fmtDate(bill.date)} · {bill.truckId || 'No vehicle'} · ₹{Number(bill.debit).toLocaleString('en-IN')}
+                      </option>
+                    ))}
+                  </select>
+                  {errors.bill && <p className="text-xs text-red-500 mt-1">{errors.bill}</p>}
+                  <p className="text-[10px] text-gray-400 mt-1">This identifies which garage bill this payment settles.</p>
+                </div>
+              )}
               {/* Date + Amount */}
               <div className="grid grid-cols-2 gap-4">
                 <div>

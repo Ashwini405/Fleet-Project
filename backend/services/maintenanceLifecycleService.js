@@ -55,6 +55,15 @@ async function setVehicleStatusForLifecycle(vehicleId) {
   await db.query('UPDATE vehicles SET vehicle_status = ? WHERE id = ?', [status, vehicleId]);
 }
 
+async function syncVehicleOperationalStatus(vehicleId) {
+  if (!vehicleId) return;
+  const [[vehicle]] = await db.query('SELECT vehicle_status FROM vehicles WHERE id = ?', [vehicleId]);
+  if (!vehicle || String(vehicle.vehicle_status).toLowerCase() === 'inactive') return;
+  const [[trip]] = await db.query("SELECT id FROM trips WHERE vehicle_id = ? AND trip_status IN ('Active', 'In Transit', 'Started', 'Planned') LIMIT 1", [vehicleId]);
+  if (trip) return db.query("UPDATE vehicles SET vehicle_status = 'Active' WHERE id = ?", [vehicleId]);
+  return setVehicleStatusForLifecycle(vehicleId);
+}
+
 async function markDefectInProgress(defectId, repairId = null) {
   if (!defectId) return;
   const payload = { status: 'In Progress' };
@@ -267,6 +276,7 @@ module.exports = {
   getDashboardAlerts,
   getVehicleHealth,
   getVehicleTimeline,
+  syncVehicleOperationalStatus,
   isCriticalDefect,
   markDefectInProgress,
   markDefectResolved,

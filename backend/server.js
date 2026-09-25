@@ -546,6 +546,12 @@ app.get('/', (req, res) => {
 // 🔥 ERROR HANDLER (GOOD PRACTICE)
 app.use((err, req, res, next) => {
   console.error("Global Error:", err);
+  if (err.name === 'MulterError' || err.message === 'Only images (jpg, png) and PDF files are allowed') {
+    return res.status(400).json({
+      success: false,
+      message: err.message || 'Invalid upload.'
+    });
+  }
   res.status(500).json({
     success: false,
     message: 'Internal Server Error'

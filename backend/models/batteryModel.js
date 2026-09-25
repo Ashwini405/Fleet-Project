@@ -2,6 +2,7 @@ const db = require('../config/db');
 
 // ── CREATE BATTERY (inventory) ────────────────────────────────────────────────
 const createBattery = async (data) => {
+  const conn = await db.getConnection();
   const warrantyExpiry = data.warranty_expiry ||
     (data.purchase_date && data.warranty_period_months
       ? (() => {
@@ -11,27 +12,66 @@ const createBattery = async (data) => {
         })()
       : null);
 
-  const [result] = await db.query(
-    `INSERT INTO batteries
-     (serial_number, barcode, brand, model, capacity_ah, voltage, battery_type,
-      purchase_date, warranty_period_months, warranty_expiry, vendor, purchase_cost,
-      status, location, compatible_vehicle_types, notes)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      data.serial_number, data.barcode || null, data.brand, data.model,
-      data.capacity_ah || null, data.voltage || null, data.battery_type || 'Dry',
-      data.purchase_date || null, data.warranty_period_months || null,
-      warrantyExpiry, data.vendor || null, data.purchase_cost || 0,
-      data.status || 'In Stock', data.location || 'Warehouse',
-      data.compatible_vehicle_types || null, data.notes || null
-    ]
-  );
-  return result;
+  try {
+    await conn.beginTransaction();
+    const [result] = await conn.query(
+      `INSERT INTO batteries
+       (serial_number, barcode, brand, model, capacity_ah, voltage, battery_type,
+        purchase_date, warranty_period_months, warranty_expiry, vendor, purchase_cost,
+        status, location, compatible_vehicle_types, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        data.serial_number, data.barcode || null, data.brand, data.model,
+        data.capacity_ah || null, data.voltage || null, data.battery_type || 'Dry',
+        data.purchase_date || null, data.warranty_period_months || null,
+        warrantyExpiry, data.vendor || null, data.purchase_cost || 0,
+        data.status || 'In Stock', data.location || 'Warehouse',
+        data.compatible_vehicle_types || null, data.notes || null
+      ]
+    );
+
+    if (data.vendor && Number(data.purchase_cost || 0) > 0) {
+      const [poResult] = await conn.query(
+        `INSERT INTO inventory_purchase_orders
+          (po_number, vendor, item_name, quantity, category, total_amount, status, status_id, items, requested_by, requested_date)
+         VALUES (NULL, ?, ?, 1, 'Batteries', ?, 'Received', 4, ?, 'Battery Inventory', ?)` ,
+        [
+          data.vendor,
+          `${data.brand || 'Battery'} ${data.model || ''}`.trim(),
+          Number(data.purchase_cost),
+          JSON.stringify([{
+            partName: `${data.brand || 'Battery'} ${data.model || ''}`.trim(),
+            qty: 1,
+            unitPrice: Number(data.purchase_cost),
+            battery_serial: data.serial_number,
+          }]),
+          data.purchase_date || new Date().toISOString().slice(0, 10),
+        ]
+      );
+      await conn.query(
+        `UPDATE inventory_purchase_orders SET po_number = ? WHERE id = ?`,
+        [`BAT-${String(poResult.insertId).padStart(6, '0')}`, poResult.insertId]
+      );
+    }
+
+    await conn.commit();
+    return result;
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 };
 
 // ── GET ALL BATTERIES ─────────────────────────────────────────────────────────
 const getAllBatteries = async () => {
-  const [rows] = await db.query(`SELECT * FROM batteries ORDER BY created_at DESC`);
+  const [rows] = await db.query(`
+    SELECT b.*, v.vehicle_no
+    FROM batteries b
+    LEFT JOIN vehicles v ON v.id = b.vehicle_id
+    ORDER BY b.created_at DESC
+  `);
   return rows;
 };
 
@@ -45,7 +85,12 @@ const getAvailableBatteries = async () => {
 
 // ── GET BATTERY BY ID ─────────────────────────────────────────────────────────
 const getBatteryById = async (id) => {
-  const [rows] = await db.query(`SELECT * FROM batteries WHERE id = ?`, [id]);
+  const [rows] = await db.query(`
+    SELECT b.*, v.vehicle_no
+    FROM batteries b
+    LEFT JOIN vehicles v ON v.id = b.vehicle_id
+    WHERE b.id = ?
+  `, [id]);
   return rows[0];
 };
 
@@ -110,12 +155,16 @@ const replaceBattery = async (data) => {
 
     // Get active installation
     const [[installation]] = await conn.query(
-      `SELECT bi.*, b.serial_number FROM battery_installations bi
+      `SELECT bi.*, b.serial_number, v.vehicle_no FROM battery_installations bi
        JOIN batteries b ON b.id = bi.battery_id
+       LEFT JOIN vehicles v ON v.id = bi.vehicle_id
        WHERE bi.vehicle_id = ? AND bi.removed_date IS NULL`,
       [data.vehicle_id]
     );
     if (!installation) throw new Error('No active battery found on this vehicle');
+
+    const decision = data.old_battery_decision || 'Scrap';
+    const isWarrantyClaim = decision === 'Warranty Claim';
 
     const removalDate = data.removal_date || new Date().toISOString().split('T')[0];
     const runningKm = Math.max(0, (data.removal_odometer || 0) - (installation.install_odometer || 0));
@@ -124,21 +173,21 @@ const replaceBattery = async (data) => {
     await conn.query(
       `UPDATE battery_installations
        SET removed_date = ?, removal_odometer = ?, failure_reason = ?,
-           warranty_claim = ?, old_battery_decision = ?, running_km = ?
+          warranty_claim = ?, old_battery_decision = ?, running_km = ?
        WHERE id = ?`,
       [removalDate, data.removal_odometer || 0, data.failure_reason || null,
-       data.warranty_claim ? 1 : 0, data.old_battery_decision || 'Scrap',
+      isWarrantyClaim ? 1 : 0, decision,
        runningKm, installation.id]
     );
 
     // Update old battery status
-    const oldStatus = data.warranty_claim ? 'Warranty Claim'
-      : data.old_battery_decision === 'Scrap' ? 'Scrap'
-      : data.old_battery_decision === 'Return Vendor' ? 'Return Vendor'
-      : data.old_battery_decision === 'Store' ? 'Store'
+    const oldStatus = decision === 'Warranty Claim' ? 'Warranty Claim'
+      : decision === 'Scrap' ? 'Scrap'
+      : decision === 'Return Vendor' ? 'Return Vendor'
+      : decision === 'Store' ? 'Store'
       : 'Failed';
-    const oldLocation = data.old_battery_decision === 'Store' ? 'Store'
-      : data.old_battery_decision === 'Return Vendor' ? 'Vendor'
+    const oldLocation = decision === 'Store' ? 'Store'
+      : decision === 'Return Vendor' || decision === 'Warranty Claim' ? 'Vendor'
       : 'Workshop';
     await conn.query(
       `UPDATE batteries SET status = ?, location = ?, vehicle_id = NULL WHERE id = ?`,
@@ -152,8 +201,60 @@ const replaceBattery = async (data) => {
        VALUES (?, ?, 'Removed', ?, ?, ?, ?, ?, ?)`,
       [installation.battery_id, data.vehicle_id, removalDate,
        data.removal_odometer || 0, data.failure_reason || null,
-       data.warranty_claim ? 1 : 0, runningKm, data.notes || null]
+      isWarrantyClaim ? 1 : 0, runningKm, data.notes || null]
     );
+
+    if (isWarrantyClaim) {
+      const [[warranty]] = await conn.query(
+        `SELECT * FROM warranties
+          WHERE battery_id = ? AND category = 'Battery'
+          ORDER BY id DESC LIMIT 1`,
+        [installation.battery_id]
+      );
+      if (!warranty) {
+        throw new Error('No warranty record is linked to this battery. Create the battery warranty before choosing Warranty Claim.');
+      }
+
+      const [[existingClaim]] = await conn.query(
+        `SELECT id FROM warranty_claims
+          WHERE warranty_id = ?
+            AND COALESCE(claim_status, 'Submitted') NOT IN ('Rejected', 'Resolved')
+          LIMIT 1`,
+        [warranty.id]
+      );
+      if (!existingClaim) {
+        await conn.query(
+          `INSERT INTO warranty_claims
+            (claim_number, warranty_id, warranty_number, item_title, category, brand, model,
+             serial_no, vehicle_id, vehicle_no, warranty_type, warranty_period,
+             warranty_start_date, warranty_end_date, warranty_status, claim_available,
+             vendor_name, claim_available_amount, claim_date, issue_type, issue_description,
+             claim_status, created_by)
+           VALUES (?, ?, ?, ?, 'Battery', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, 'Submitted', 'Battery Replacement')`,
+          [
+            `CL-BAT-${Date.now()}`,
+            warranty.id,
+            warranty.warranty_number,
+            warranty.item_title || `${installation.serial_number} Battery`,
+            warranty.brand,
+            warranty.model,
+            warranty.serial_no || installation.serial_number,
+            data.vehicle_id,
+            installation.vehicle_no,
+            warranty.warranty_type,
+            warranty.warranty_period,
+            warranty.start_date,
+            warranty.end_date,
+            warranty.warranty_status,
+            warranty.claim_available,
+            warranty.vendor_name,
+            removalDate,
+            'Battery Replacement',
+            data.failure_reason || 'Battery sent for warranty claim',
+          ]
+        );
+      }
+    }
 
     // Install new battery if provided
     if (data.new_battery_id) {

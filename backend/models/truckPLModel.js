@@ -678,7 +678,7 @@ const getBattery = async (vehicleId, startDate = null, endDate = null) => {
   const manualDateFilter = (startDate && endDate) ? " AND expense_date BETWEEN ? AND ?" : "";
 
   const [rows] = await db.query(
-    `SELECT purchase_date, brand, model, purchase_cost, status
+    `SELECT purchase_date, serial_number, brand, model, purchase_cost, status
      FROM batteries
      WHERE vehicle_id = ? ${dateFilter}
      ORDER BY purchase_date DESC`,
@@ -695,7 +695,7 @@ const getBattery = async (vehicleId, startDate = null, endDate = null) => {
   const records = rows.map(row => ({
     date: row.purchase_date,
     type: row.status,
-    description: `${row.brand} ${row.model}`,
+    description: `${row.serial_number || 'No serial'} · ${row.brand || ''} ${row.model || ''}`.trim(),
     amount: Number(row.purchase_cost)
   }));
   manualRows.forEach(row => records.push({

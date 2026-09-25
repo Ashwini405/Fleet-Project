@@ -6,10 +6,11 @@ const Service = {
   createService: async (serviceData) => {
     const [result] = await db.query(
       `INSERT INTO vehicle_services 
-      (vehicle_id, service_date, odometer, interval_km, next_due, service_type, mechanic, labour_cost, total_cost, status, work_description, completed_date)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (vehicle_id, garage_id, service_date, odometer, interval_km, next_due, service_type, mechanic, labour_cost, total_cost, status, work_description, completed_date)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)` ,
       [
         serviceData.vehicle_id,
+        serviceData.garage_id,
         serviceData.service_date,
         serviceData.odometer,
         serviceData.interval_km,
@@ -67,12 +68,12 @@ getAll: async () => {
       v.vehicle_no,
 
       -- 🔥 GET ONE VENDOR FROM PARTS
-      (
+      COALESCE(s.mechanic, (
         SELECT sp.vendor 
         FROM service_parts sp 
         WHERE sp.service_id = s.id 
         LIMIT 1
-      ) AS vendor
+      )) AS vendor
 
     FROM vehicle_services s
     JOIN vehicles v ON s.vehicle_id = v.id
@@ -90,12 +91,12 @@ getAll: async () => {
       v.vehicle_no,
 
       -- 🔥 SAME LOGIC AS getAll
-      (
+      COALESCE(s.mechanic, (
         SELECT sp.vendor 
         FROM service_parts sp 
         WHERE sp.service_id = s.id 
         LIMIT 1
-      ) AS vendor
+      )) AS vendor
 
     FROM vehicle_services s
     JOIN vehicles v ON s.vehicle_id = v.id
@@ -114,12 +115,12 @@ getById: async (id) => {
       s.*,
       v.vehicle_no,
 
-      (
+      COALESCE(s.mechanic, (
         SELECT sp.vendor 
         FROM service_parts sp 
         WHERE sp.service_id = s.id 
         LIMIT 1
-      ) AS vendor
+      )) AS vendor
 
     FROM vehicle_services s
     JOIN vehicles v ON s.vehicle_id = v.id

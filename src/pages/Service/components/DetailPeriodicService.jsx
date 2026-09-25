@@ -6,6 +6,12 @@ import {
 } from 'lucide-react';
 import RegisterPeriodicServiceModal from './RegisterPeriodicServiceModal';
 
+const formatDate = (value) => {
+  if (!value) return '—';
+  const [year, month, day] = String(value).slice(0, 10).split('-');
+  return year && month && day ? `${day}-${month}-${year}` : '—';
+};
+
 const DetailPeriodicService = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -123,7 +129,7 @@ const DetailPeriodicService = () => {
         <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-200 p-5 shadow-sm">
           <MapPin className="w-5 h-5 text-cyan-500 mb-3" />
           <p className="text-xs text-slate-500 uppercase tracking-wide">Garage / Vendor</p>
-          <p className="text-lg font-bold text-slate-900 mt-1">{data.vendor || '—'}</p>
+          <p className="text-lg font-bold text-slate-900 mt-1">{data.vendor || data.mechanic || '—'}</p>
         </div>
 
         <div className="bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-200 p-5 shadow-sm">
@@ -169,7 +175,7 @@ const DetailPeriodicService = () => {
                 <div className="flex-1">
                   <p className="text-xs text-slate-500 uppercase tracking-wide">Service Date</p>
                   <p className="text-sm font-medium text-slate-800">
-                    {data.service_date ? new Date(data.service_date).toLocaleDateString('en-IN') : '—'}
+                    {formatDate(data.service_date)}
                   </p>
                 </div>
               </div>
@@ -178,7 +184,7 @@ const DetailPeriodicService = () => {
                 <div className="flex-1">
                   <p className="text-xs text-slate-500 uppercase tracking-wide">Completed Date</p>
                   <p className="text-sm font-medium text-slate-800">
-                    {data.completed_date ? new Date(data.completed_date).toLocaleDateString('en-IN') : 'Not yet'}
+                    {data.completed_date ? formatDate(data.completed_date) : 'Not yet'}
                   </p>
                 </div>
               </div>
@@ -290,7 +296,7 @@ const DetailPeriodicService = () => {
         <div>
           <div className="flex items-center gap-2 mb-4">
             <File className="w-5 h-5 text-indigo-500" />
-            <h3 className="text-lg font-semibold text-slate-800">Attached Documents</h3>
+            <h3 className="text-lg font-semibold text-slate-800">Service Bills & Proofs</h3>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {data.files.map((file, i) => {
@@ -315,7 +321,7 @@ const DetailPeriodicService = () => {
                     <p className="text-sm font-medium text-slate-800 truncate" title={file.file_name}>
                       {file.file_name}
                     </p>
-                    <p className="text-xs text-slate-500 mt-0.5">{file.file_type || 'document'}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Service proof / bill · {file.file_type || 'document'}</p>
                     {isImage && (
                       <div className="mt-3 rounded-lg overflow-hidden border border-slate-100">
                         <img src={fileUrl} alt={file.file_name} className="h-28 w-full object-cover" />
@@ -333,7 +339,7 @@ const DetailPeriodicService = () => {
       {(!data.files || data.files.length === 0) && (
         <div className="mt-8 text-center py-8 bg-slate-50 rounded-2xl border border-slate-200">
           <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-          <p className="text-sm text-slate-500">No documents attached to this service.</p>
+          <p className="text-sm text-slate-500">No service bill or proof attached.</p>
         </div>
       )}
 

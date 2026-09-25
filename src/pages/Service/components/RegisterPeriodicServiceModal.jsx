@@ -104,13 +104,13 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
       setServiceDate(editData.service_date ? editData.service_date.split('T')[0] : new Date().toISOString().split('T')[0]);
       setOdometer(String(editData.odometer || ''));
       setIntervalKm(String(editData.interval_km || ''));
-      setGarage(editData.mechanic || editData.garage || editData.vendor || '');
+      setGarage(editData.garage_id || editData.garage || editData.mechanic || editData.vendor || '');
       setWorkDescription(editData.work_description || '');
       setStatus(editData.status || 'Reported');
       setLabourCost(String(editData.labour_cost || ''));
       setParts(Array.isArray(editData.parts) ? editData.parts.map(p => ({ name: p.part_name || p.name, qty: Number(p.quantity ?? p.qty), cost: Number(p.cost), vendor: p.vendor || '' })) : []);
       // Find the truck
-      const truck = trucks.find(t => t.vehicle_no === editData.vehicle_no);
+      const truck = trucks.find(t => String(t.id) === String(editData.vehicle_id) || t.vehicle_no === editData.vehicle_no);
       if (truck) setSelectedTruck(truck);
     } else {
       // Reset for new entry
@@ -119,7 +119,7 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
       setStatus('Reported'); setLabourCost(''); setParts([]); setFiles([]); setErrors({});
       setSelectedTruck(null);
     }
-  }, [isOpen, editData]);
+  }, [isOpen, editData, trucks]);
 
   // Auto-fill interval KM based on service type
   useEffect(() => {
@@ -151,6 +151,14 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
   const partsTotal = parts.reduce((s, p) => s + (Number(p.qty) * Number(p.cost) || 0), 0);
   const grandTotal = partsTotal + (Number(labourCost) || 0);
   const canComplete = grandTotal > 0;
+  const hasBillOrProof = files.length > 0 || (editData?.files?.length || 0) > 0;
+
+  useEffect(() => {
+    if (!isOpen || !editData || garages.length === 0) return;
+    const savedGarage = editData.garage_id || editData.garage;
+    const matchedGarage = garages.find(g => String(g.id) === String(savedGarage) || g.garage_name === editData.mechanic || g.garage_name === editData.vendor);
+    if (matchedGarage) setGarage(String(matchedGarage.id));
+  }, [isOpen, editData, garages]);
 
   const validate = () => {
     const e = {};
@@ -163,8 +171,23 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
       if (!garage) e.garage = 'Select garage';
     }
     if (serviceType === 'General Check' && !isReported && !workDescription.trim()) e.workDescription = 'Work description required';
+    if (isCompleted && !canComplete) e.cost = 'Add labour cost or parts before completing the service';
+    if (isCompleted && !hasBillOrProof) e.files = 'Bill or proof is mandatory to complete the service';
     setErrors(e);
     return Object.keys(e).length === 0;
+  };
+
+  const handleStatusChange = (nextStatus) => {
+    if (nextStatus === 'Completed' && (!hasBillOrProof || !canComplete)) {
+      setErrors(previous => ({
+        ...previous,
+        files: !hasBillOrProof ? 'Bill or proof is mandatory to complete the service' : undefined,
+        cost: !canComplete ? 'Add labour cost or parts before completing the service' : undefined,
+      }));
+      return;
+    }
+    setErrors(previous => ({ ...previous, files: undefined }));
+    setStatus(nextStatus);
   };
 
   const handleSave = async () => {
@@ -409,10 +432,10 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
                 <div className="flex gap-2">
                   {STATUS_STEPS.map((step, i) => {
                     const curIdx = STATUS_STEPS.indexOf(status);
-                    const disabled = i > curIdx + 1 || (step === 'Completed' && !canComplete);
+                    const disabled = i > curIdx + 1;
                     return (
                       <button key={step} type="button" disabled={disabled}
-                        onClick={() => !disabled && setStatus(step)}
+                        onClick={() => !disabled && handleStatusChange(step)}
                         className={`${statusCls(step, status === step)} disabled:opacity-40 disabled:cursor-not-allowed`}>
                         {step}
                       </button>
@@ -420,6 +443,8 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
                   })}
                 </div>
                 {isInProgress && !canComplete && <p className="text-xs text-red-500 mt-1">⚠ Add cost or parts to complete</p>}
+                {errors.files && <p className="text-xs text-red-500 mt-1">⚠ {errors.files}</p>}
+                {errors.cost && <p className="text-xs text-red-500 mt-1">⚠ {errors.cost}</p>}
               </div>
 
               {/* Labour Cost */}
@@ -552,7 +577,7 @@ export default function RegisterPeriodicServiceModal({ isOpen, onClose, editData
                   <Upload className="w-5 h-5 text-gray-400" />
                   <p className="text-xs text-gray-500">Click to upload images or PDF</p>
                   <input type="file" multiple accept="image/*,.pdf" className="hidden"
-                    onChange={e => setFiles(f => [...f, ...Array.from(e.target.files)])} />
+                    onChange={e => { setFiles(f => [...f, ...Array.from(e.target.files)]); setErrors(previous => ({ ...previous, files: undefined })); }} />
                 </label>
               )}
               {files.map((f, i) => (
