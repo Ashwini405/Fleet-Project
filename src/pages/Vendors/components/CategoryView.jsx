@@ -1,28 +1,47 @@
 import React, { useState } from 'react';
-import { FiSearch, FiPlus, FiBriefcase, FiPhone, FiMapPin, FiHome, FiChevronRight, FiEdit2, FiUser } from 'react-icons/fi';
+import axios from 'axios';
+import { FiSearch, FiPlus, FiBriefcase, FiPhone, FiMapPin, FiHome, FiChevronRight, FiEdit2, FiUser, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 import AddAccountModal from './AddAccountModal';
 import AddShowroomModal from './AddShowroomModal';
 import AddGarageModal from './AddGarageModal';
 import EditShowroomModal from './EditShowroomModal';
+import EditGarageModal from './EditGarageModal';
 
 const isShowroom = (cat) => cat === 'showrooms';
 
 export default function CategoryView({ category, categoryName, vendors: allVendors = [], loading = false, onVendorClick, onRefresh }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('All');
   const [isAddModalOpen, setAddModalOpen] = useState(false);
   const [editVendor, setEditVendor] = useState(null);
+  const [editGarage, setEditGarage] = useState(null);
 
   // Filter vendors based on search term and payment terms, using database field names
-  const vendors = allVendors
-    .filter(v => !searchTerm || (
-      v.garage_name ||
-      v.showroom_name ||
-      v.vendor_name ||
-      v.name ||
-      ''
-    ).toLowerCase().includes(searchTerm.toLowerCase()))
+  const statusFilteredVendors = allVendors.filter(v => statusFilter === 'All' || (v.status || 'Active') === statusFilter);
+  const visibleVendors = statusFilteredVendors
+    .filter(v => !searchTerm || (v.garage_name || v.showroom_name || v.vendor_name || v.name || '').toLowerCase().includes(searchTerm.toLowerCase()))
     .filter(v => paymentFilter === 'all' || (v.payment_terms || 'credit') === paymentFilter);
+
+  const updateGarage = async (vendor, status = vendor.status) => {
+    await axios.put(`http://localhost:5001/api/vendors/${vendor.id}`, {
+      category: 'garages',
+      garage_name: vendor.garage_name,
+      mobile_number: vendor.mobile_number,
+      email: vendor.email,
+      address_location: vendor.address_location,
+      gst_number: vendor.gst_number,
+      payment_terms: vendor.payment_terms || 'credit',
+      status,
+      opening_balance: (vendor.payment_terms || 'credit') === 'cash' ? 0 : (Number(vendor.opening_balance) || 0),
+      bank_name: vendor.bank_name || null,
+      custom_bank_name: vendor.custom_bank_name || null,
+      account_number_or_upi: vendor.account_number_or_upi || null,
+      ifsc_code: vendor.ifsc_code || null,
+      upi_id: vendor.upi_id || null,
+    });
+    onRefresh?.();
+  };
 
   const balanceLabel = isShowroom(category) ? 'Pending Warranty Amount' : 'Ledger Balance';
   const balanceTip   = isShowroom(category)
@@ -71,7 +90,7 @@ export default function CategoryView({ category, categoryName, vendors: allVendo
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {vendors.map(vendor => (
+        {visibleVendors.map(vendor => (
           <div
             key={vendor.id}
             onClick={() => onVendorClick(vendor)}
@@ -83,11 +102,11 @@ export default function CategoryView({ category, categoryName, vendors: allVendo
                   <FiBriefcase size={20} />
                 </div>
                 <div className="flex items-center gap-2">
-                  {isShowroom(category) && (
+                  {(isShowroom(category) || category === 'garages') && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); setEditVendor(vendor); }}
+                      onClick={(e) => { e.stopPropagation(); category === 'garages' ? setEditGarage(vendor) : setEditVendor(vendor); }}
                       className="p-1.5 rounded-lg text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors"
-                      title="Edit Showroom"
+                      title={`Edit ${category === 'garages' ? 'Garage' : 'Showroom'}`}
                     >
                       <FiEdit2 size={15} />
                     </button>
@@ -159,6 +178,15 @@ export default function CategoryView({ category, categoryName, vendors: allVendo
                       </div>
                     </div>
                   </div>
+
+                  {category === 'garages' && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {['All', 'Active', 'Inactive'].map(filter => {
+                        const count = filter === 'All' ? allVendors.length : allVendors.filter(v => (v.status || 'Active') === filter).length;
+                        return <button key={filter} onClick={() => setStatusFilter(filter)} className={`px-4 py-2 rounded-xl text-xs font-bold border transition-colors ${statusFilter === filter ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'}`}>{filter} <span className="ml-1 opacity-70">({count})</span></button>;
+                      })}
+                    </div>
+                  )}
                   {(vendor.total_warranty_claims ?? 0) > 0 && (
                     <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
                       <div>
@@ -204,6 +232,14 @@ export default function CategoryView({ category, categoryName, vendors: allVendo
                 </div>
               )}
             </div>
+            {category === 'garages' && (
+              <div className="flex items-center justify-between px-5 pb-4">
+                <button onClick={(e) => { e.stopPropagation(); updateGarage(vendor, vendor.status === 'Active' ? 'Inactive' : 'Active'); }} className="flex items-center gap-1.5 text-[11px] font-bold text-gray-500 hover:text-blue-600">
+                  {vendor.status === 'Active' ? <FiToggleRight size={18} className="text-green-500" /> : <FiToggleLeft size={18} />}
+                  Mark {vendor.status === 'Active' ? 'Inactive' : 'Active'}
+                </button>
+              </div>
+            )}
           </div>
         ))}
 
@@ -212,7 +248,7 @@ export default function CategoryView({ category, categoryName, vendors: allVendo
             Loading...
           </div>
         )}
-        {!loading && vendors.length === 0 && (
+        {!loading && visibleVendors.length === 0 && (
           <div className="col-span-full py-12 text-center text-gray-500 bg-white rounded-2xl border border-gray-100 border-dashed">
             No vendors found in this category.
           </div>
@@ -229,6 +265,7 @@ export default function CategoryView({ category, categoryName, vendors: allVendo
         <AddAccountModal isOpen={isAddModalOpen} onClose={() => { setAddModalOpen(false); onRefresh?.(); }} categoryName={categoryName} category={category} />
       )}
       <EditShowroomModal isOpen={!!editVendor} onClose={() => { setEditVendor(null); onRefresh?.(); }} vendor={editVendor} />
+      <EditGarageModal isOpen={!!editGarage} onClose={() => { setEditGarage(null); onRefresh?.(); }} vendor={editGarage} />
     </div>
   );
 }

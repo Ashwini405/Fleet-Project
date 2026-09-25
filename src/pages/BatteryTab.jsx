@@ -33,9 +33,15 @@ function fmt(date) {
   return new Date(date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+function fileUrl(value) {
+  if (!value) return '';
+  return `http://localhost:5001/${String(value).replace(/^["'\[\]]+|["'\[\]]+$/g, '').replace(/\\/g, '/')}`;
+}
+
 export default function BatteryTab({ vehicle }) {
   const [activeBattery, setActiveBattery] = useState(null);
   const [history, setHistory] = useState([]);
+  const [batteryWarranty, setBatteryWarranty] = useState(null);
   const [availableBatteries, setAvailableBatteries] = useState([]);
   const [showInstall, setShowInstall] = useState(false);
   const [showReplace, setShowReplace] = useState(false);
@@ -46,12 +52,22 @@ export default function BatteryTab({ vehicle }) {
 
   const load = useCallback(async () => {
     if (!vehicle?.id) return;
-    const [a, h] = await Promise.all([
+    const [a, h, w] = await Promise.all([
       fetch(`${API}/vehicle/${vehicle.id}/active`).then(r => r.json()),
       fetch(`${API}/vehicle/${vehicle.id}/history`).then(r => r.json()),
+      fetch('http://localhost:5001/api/warranties').then(r => r.json()),
     ]);
-    if (a.success) setActiveBattery(a.data);
+    const battery = a.success ? a.data : null;
+    if (a.success) setActiveBattery(battery);
     if (h.success) setHistory(h.data);
+    if (w.success) {
+      const linked = (w.data || []).find(item => (
+        battery && String(item.battery_id) === String(battery.id)
+      ) || (
+        battery && item.category === 'Battery' && item.serial_no === battery.serial_number
+      ));
+      setBatteryWarranty(linked || null);
+    }
   }, [vehicle]);
 
   useEffect(() => { load(); }, [load]);
@@ -168,6 +184,28 @@ export default function BatteryTab({ vehicle }) {
         </div>
       )}
 
+      {activeBattery && (
+        <div className="border border-emerald-100 rounded-xl p-5 bg-emerald-50/40">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wider">Battery Warranty</h3>
+            {batteryWarranty && <span className="text-xs font-bold text-emerald-700">{batteryWarranty.warranty_number}</span>}
+          </div>
+          {batteryWarranty ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div><p className="text-[10px] font-bold text-slate-400 uppercase">Period</p><p className="text-sm font-semibold text-slate-800">{fmt(batteryWarranty.start_date)} - {fmt(batteryWarranty.end_date)}</p></div>
+              <div><p className="text-[10px] font-bold text-slate-400 uppercase">Vendor</p><p className="text-sm font-semibold text-slate-800">{batteryWarranty.vendor_name || activeBattery.vendor || '—'}</p></div>
+              <div><p className="text-[10px] font-bold text-slate-400 uppercase">Status</p><p className="text-sm font-semibold text-emerald-700">{batteryWarranty.warranty_status || 'Active'}</p></div>
+              <div className="flex items-end gap-2">
+                {batteryWarranty.warranty_card && <a className="text-xs font-bold text-emerald-700 hover:underline" href={fileUrl(batteryWarranty.warranty_card)} target="_blank" rel="noreferrer">Warranty Card</a>}
+                {batteryWarranty.invoice_file && <a className="text-xs font-bold text-slate-600 hover:underline" href={fileUrl(batteryWarranty.invoice_file)} target="_blank" rel="noreferrer">Invoice</a>}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">No warranty record linked to this battery yet.</p>
+          )}
+        </div>
+      )}
+
       {/* Battery History */}
       {history.length > 0 && (
         <div>
@@ -275,10 +313,7 @@ export default function BatteryTab({ vehicle }) {
                   {['Scrap','Warranty Claim','Return Vendor','Store'].map(o => <option key={o}>{o}</option>)}
                 </select>
               </div>
-              <div className="flex items-center gap-3 pt-6">
-                <input type="checkbox" id="wc" checked={replaceForm.warranty_claim} onChange={e => setReplaceForm({...replaceForm, warranty_claim: e.target.checked})} className="w-4 h-4 accent-indigo-600" />
-                <label htmlFor="wc" className="text-sm font-medium text-slate-700">Warranty Claim?</label>
-              </div>
+              <p className="text-xs text-slate-500 pt-6">Select Warranty Claim above to send the removed battery to the vendor.</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">Replacement Battery (from Inventory)</label>

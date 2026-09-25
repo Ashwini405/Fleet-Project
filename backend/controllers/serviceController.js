@@ -165,6 +165,9 @@ exports.createService = async (req, res) => {
 
     if (!body.vehicle_id) return res.status(400).json({ success: false, message: 'Vehicle required' });
     if (!body.service_type) return res.status(400).json({ success: false, message: 'Service type required' });
+    if (body.status === 'Completed' && (!req.files || req.files.length === 0)) {
+      return res.status(400).json({ success: false, message: 'Bill or proof is mandatory to complete the service' });
+    }
 
     // Auto-calculate interval and next_due
     const intervalCfg = SERVICE_INTERVALS[body.service_type];
@@ -174,6 +177,7 @@ exports.createService = async (req, res) => {
 
     const serviceId = await Service.createService({
       vehicle_id:       body.vehicle_id,
+      garage_id:        body.garage_id || null,
       service_date:     body.service_date,
       odometer:         odometer || null,
       interval_km:      intervalKm || null,
@@ -280,8 +284,19 @@ exports.updateService = async (req, res) => {
     const odometer = Number(body.odometer) || 0;
     const nextDue = intervalKm ? odometer + intervalKm : null;
 
+    if (body.status === 'Completed' && (!req.files || req.files.length === 0)) {
+      const [[fileCount]] = await db.query(
+        'SELECT COUNT(*) AS count FROM service_files WHERE service_id = ?',
+        [id]
+      );
+      if (Number(fileCount.count) === 0) {
+        return res.status(400).json({ success: false, message: 'Bill or proof is mandatory to complete the service' });
+      }
+    }
+
     await Service.update(id, {
       vehicle_id:       body.vehicle_id,
+      garage_id:        body.garage_id || null,
       service_date:     body.service_date,
       odometer:         odometer || null,
       interval_km:      intervalKm || null,

@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Wrench, Settings2, Clock } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import PeriodicServiceTab from './components/PeriodicServiceTab';
 import RepairWorksTab from './components/RepairWorksTab';
 import ServiceHistoryTab from './components/ServiceHistoryTab';
 import RemindersTab from './components/RemindersTab';
-import PartsModule from '../Parts/index.jsx';
 
 export default function ServiceModule() {
+  const [searchParams] = useSearchParams();
   const [topModule, setTopModule] = useState('SERVICE');
-  const [activeTab, setActiveTab] = useState('periodic');
+  const [activeTab, setActiveTab] = useState(() => searchParams.get('tab') === 'history' ? 'history' : 'periodic');
 
   const tabs = [
     { id: 'periodic', label: 'PERIODIC SERVICE', icon: <Settings2 className="w-4 h-4" /> },
@@ -34,12 +35,6 @@ export default function ServiceModule() {
                      className={`flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all ${topModule === 'SERVICE' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
                    >
                      <Wrench className="w-3.5 h-3.5" /> <span className="hidden sm:inline">SERVICE</span>
-                   </button>
-                   <button 
-                     onClick={() => setTopModule('PARTS')}
-                     className={`flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 rounded-lg text-xs font-bold transition-all ${topModule === 'PARTS' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800'}`}
-                   >
-                     <Settings2 className="w-3.5 h-3.5" /> <span className="hidden sm:inline">PARTS</span>
                    </button>
                    <button 
                      onClick={() => setTopModule('REMINDERS')}
@@ -92,12 +87,6 @@ export default function ServiceModule() {
                 {activeTab === 'periodic' && <PeriodicServiceTab />}
                 {activeTab === 'repair' && <RepairWorksTab />}
                 {activeTab === 'history' && <ServiceHistoryTab />}
-              </motion.div>
-            )}
-
-            {topModule === 'PARTS' && (
-              <motion.div key="parts" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="h-full">
-                <PartsModule />
               </motion.div>
             )}
 

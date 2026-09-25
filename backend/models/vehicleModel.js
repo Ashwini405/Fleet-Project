@@ -31,7 +31,13 @@ const Vehicle = {
            s.full_name AS supervisor_name,
            d.full_name AS driver_name,
            d.mobile AS driver_contact,
-          st.station_name AS source_plant,
+           st.station_name AS source_plant,
+           CASE
+             WHEN EXISTS (SELECT 1 FROM trips t WHERE t.vehicle_id = v.id AND t.trip_status IN ('Active', 'In Transit', 'Started', 'Planned')) THEN 'On Trip'
+             WHEN EXISTS (SELECT 1 FROM repair_services r WHERE r.vehicle_id = v.id AND r.status IN ('Reported', 'Under Repair', 'In Progress')) THEN 'Under Repair'
+             WHEN LOWER(COALESCE(v.vehicle_status, 'active')) = 'inactive' THEN 'Inactive'
+             ELSE 'Active'
+           END AS vehicle_status,
           COALESCE(fa.fastag_id, v.fastag_id) AS fastag_id,
           fa.id AS fastag_account_id,
           fa.bank_issuer AS fastag_bank_issuer,

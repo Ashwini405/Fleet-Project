@@ -22,9 +22,17 @@ export default function AddGarageModal({ isOpen, onClose }) {
 
   if (!isOpen) return null;
 
+  const isCash = form.paymentTerms === 'cash';
+
   const set = (key, val) => {
     setForm(p => ({ ...p, [key]: val }));
     if (errors[key]) setErrors(p => ({ ...p, [key]: null }));
+  };
+
+  const handlePaymentTermsChange = (paymentTerms) => {
+    setForm(previous => paymentTerms === 'cash'
+      ? { ...previous, paymentTerms, openingBalance: '0', bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '' }
+      : { ...previous, paymentTerms });
   };
 
   const validate = () => {
@@ -55,14 +63,14 @@ export default function AddGarageModal({ isOpen, onClose }) {
         email: form.email,
         address_location: form.address,
         gst_number: form.gst,
-        opening_balance: form.openingBalance,
+        opening_balance: isCash ? 0 : form.openingBalance,
         status: form.status,
         payment_terms: form.paymentTerms,
-        bank_name: form.bankName,
-        custom_bank_name: form.customBank,
-        account_number_or_upi: form.accountNo,
-        ifsc_code: form.ifsc,
-        upi_id: form.upi
+        bank_name: isCash ? null : form.bankName,
+        custom_bank_name: isCash ? null : form.customBank,
+        account_number_or_upi: isCash ? null : form.accountNo,
+        ifsc_code: isCash ? null : form.ifsc,
+        upi_id: isCash ? null : form.upi
       };
 
       const response = await axios.post("http://localhost:5001/api/vendors", payload);
@@ -154,7 +162,7 @@ export default function AddGarageModal({ isOpen, onClose }) {
                     <label className={labelCls}>Payment Terms</label>
                     <div className="flex gap-2">
                       {['credit', 'cash'].map(pt => (
-                        <button key={pt} type="button" onClick={() => set('paymentTerms', pt)}
+                        <button key={pt} type="button" onClick={() => handlePaymentTermsChange(pt)}
                           className={`flex-1 py-3 rounded-xl text-sm font-bold capitalize border transition-colors ${
                             form.paymentTerms === pt
                               ? 'bg-blue-600 text-white border-blue-600'
@@ -164,13 +172,14 @@ export default function AddGarageModal({ isOpen, onClose }) {
                         </button>
                       ))}
                     </div>
+                    {isCash && <p className="text-[11px] text-violet-600 font-semibold mt-1.5">Cash garage - bank and financial details are not required.</p>}
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Bank Details */}
-            <div className="pt-2 border-t border-gray-100">
+            {!isCash && <div className="pt-2 border-t border-gray-100">
               <p className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
                 <FiHome size={12} /> Bank Details (Optional)
               </p>
@@ -208,7 +217,7 @@ export default function AddGarageModal({ isOpen, onClose }) {
                   </div>
                 </div>
               </div>
-            </div>
+            </div>}
 
             {/* Opening Balance */}
             <div className="pt-2 border-t border-gray-100">

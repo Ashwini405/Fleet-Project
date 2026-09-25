@@ -133,8 +133,9 @@ export default function TruckPLDetail() {
           />
           <MaintenanceSection
             data={d.maintenance}
-            total={d.totals.totalMaint}
+            total={d.totals.totalMaintenance}
             prevTotal={0}
+            vehicleId={d.info.id}
           />
           <TyreSection
             data={d.tyres}
@@ -146,6 +147,7 @@ export default function TruckPLDetail() {
             data={d.battery}
             total={d.totals.totalBattery}
             prevTotal={0}
+            vehicleId={d.info.id}
           />
           <DriverSettlementSection
             data={d.driverSettlement}

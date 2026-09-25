@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiChevronDown, FiChevronUp, FiExternalLink, FiDatabase } from 'react-icons/fi';
 
-const INR = (n) => '₹' + Number(n).toLocaleString('en-IN');
+const INR = (n) => '₹' + (Number.isFinite(Number(n)) ? Number(n) : 0).toLocaleString('en-IN');
 
 function formatReportDate(value) {
   if (!value) return '—';
@@ -326,13 +326,13 @@ export function FastagSection({ data, total, prevTotal, vehicleId }) {
 }
 
 // ── 3. Maintenance Section ────────────────────────────────────────────────────
-export function MaintenanceSection({ data, total, prevTotal }) {
+export function MaintenanceSection({ data, total, prevTotal, vehicleId }) {
   return (
     <PLSection
       title="Maintenance Expenses" subtitle="Service · Repairs · Periodic"
       total={total} totalLabel="Total Maintenance Cost" accent="amber" prevTotal={prevTotal}
-      source="Service & Maintenance Module" records={`${data.services || 0} Service Records`}
-      viewLabel="View Service History →" viewPath="/service"
+      source="Service & Maintenance Module" records={`${data.records?.length ?? data.services ?? 0} Service Records`}
+      viewLabel="View Service History →" viewPath={`/service?tab=history&vehicle_id=${vehicleId}`}
     >
       <PLTable
         cols={[
@@ -410,13 +410,13 @@ export function TyreSection({ data, total, prevTotal, vehicleNumber }) {
 }
 
 // ── 5. Battery Section ────────────────────────────────────────────────────────
-export function BatterySection({ data, total, prevTotal }) {
+export function BatterySection({ data, total, prevTotal, vehicleId }) {
   return (
     <PLSection
       title="Battery Expenses" subtitle="Purchase · Replacement · Repair"
       total={total} totalLabel="Total Battery Cost" accent="blue" prevTotal={prevTotal}
       source="Battery Management" records={`${data.transactions || 0} Transactions`}
-      viewLabel="View Battery History →" viewPath="/vehicles"
+      viewLabel="View Battery Details →" viewPath={`/vehicles/${vehicleId}?tab=battery`}
     >
       <PLTable
         cols={[

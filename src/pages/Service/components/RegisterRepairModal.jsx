@@ -56,6 +56,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [odometer, setOdometer] = useState('');
   const [garage, setGarage] = useState('');
+  const [useManualGarage, setUseManualGarage] = useState(false);
+  const [manualGarage, setManualGarage] = useState('');
   const [repairStartTime, setRepairStartTime] = useState('');
   const [repairEndTime, setRepairEndTime] = useState('');
   const [status, setStatus] = useState('Reported');
@@ -120,6 +122,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       setDate(logData.service_date ? logData.service_date.split('T')[0] : new Date().toISOString().split('T')[0]);
       setOdometer(logData.odometer || '');
       setGarage(logData.garage_id?.toString() || logData.garage || '');
+      setUseManualGarage(!logData.garage_id && Boolean(logData.garage));
+      setManualGarage(!logData.garage_id ? (logData.garage || '') : '');
       setRepairStartTime(logData.repair_start_time ? logData.repair_start_time.slice(0, 5) : '');
       setRepairEndTime(logData.repair_end_time ? logData.repair_end_time.slice(0, 5) : '');
       setStatus(logData.status || 'Reported');
@@ -151,6 +155,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       setDate(new Date().toISOString().split('T')[0]);
       setOdometer('');
       setGarage('');
+      setUseManualGarage(false);
+      setManualGarage('');
       setRepairStartTime('');
       setRepairEndTime('');
       setStatus('Reported');
@@ -207,7 +213,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     if (!isReported && !isCompleted && !odometer) nextErrors.odometer = 'Odometer reading is required';
     if (!isReported && !isCompleted && hasSelectedTruck && odometer && Number(odometer) < previousOdometer)
       nextErrors.odometer = `Odometer cannot be less than previous (${previousOdometer.toLocaleString()} KM)`;
-    if (isUnderRepair && !garage) nextErrors.garage = 'Select service provider to continue repair';
+    if (isUnderRepair && !(useManualGarage ? manualGarage.trim() : garage)) nextErrors.garage = 'Select or enter service provider to continue repair';
     if (isUnderRepair && !repairStartTime) nextErrors.repairStartTime = 'Repair start time is required';
     if (isUnderRepair && repairStartTime && repairEndTime) {
       const [sh, sm] = repairStartTime.split(':').map(Number);
@@ -246,7 +252,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   // ─── Parts management ────────────────────────────────────────────────────
   const addPart = () => {
     const errs = {};
-    if (!newPart.name.trim()) errs.name = 'Select a part from inventory';
+    if (!newPart.name.trim()) errs.name = 'Enter or select a part';
     if (!newPart.costPerUnit || Number(newPart.costPerUnit) <= 0) errs.costPerUnit = 'Cost per unit is required';
     if (!newPart.qty || Number(newPart.qty) < 1) errs.qty = 'Qty must be at least 1';
     if (newPart.availableStock !== null && Number(newPart.qty) > newPart.availableStock)
@@ -254,7 +260,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     if (Object.keys(errs).length) { setPartErrors(errs); return; }
     const costPerUnit = Number(newPart.costPerUnit);
     const qty = Number(newPart.qty);
-    const duplicate = parts.find(p => p.inventoryId && p.inventoryId === newPart.inventoryId);
+    const duplicate = newPart.inventoryId && parts.find(p => p.inventoryId && p.inventoryId === newPart.inventoryId);
     if (duplicate) {
       const newQty = duplicate.qty + qty;
       if (newPart.availableStock !== null && newQty > newPart.availableStock) {
@@ -273,10 +279,11 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
   const removePart = id => setParts(parts.filter(part => part.id !== id));
 
   // ─── File handling (unchanged) ─────────────────────────────────────────
-  const handleFiles = filesList => {
+  const handleFiles = (filesList, documentType = 'Service Photo') => {
     const valid = Array.from(filesList).filter(file => ['image/jpeg', 'image/png', 'application/pdf', 'image/jpg'].includes(file.type));
     const mapped = valid.map(file => ({
       file,
+      document_type: documentType,
       preview: file.type.includes('image') ? URL.createObjectURL(file) : null,
       id: Date.now() + Math.random(),
     }));
@@ -348,7 +355,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     if (!isReported && hasSelectedTruck && odometer && Number(odometer) < previousOdometer) {
       return `Odometer must be at least ${previousOdometer.toLocaleString()} KM`;
     }
-    if (isUnderRepair && !garage) return 'Select garage / mechanic';
+    if (isUnderRepair && !(useManualGarage ? manualGarage.trim() : garage)) return 'Select or enter garage / mechanic';
     if (isUnderRepair && !repairStartTime) return 'Enter repair start time';
     if (isCompleted && !repairNotes.trim()) return 'Enter repair notes';
     if (isCompleted && grandTotal <= 0) return 'Add labour or parts cost';
@@ -364,6 +371,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
     previousOdometer,
     isUnderRepair,
     garage,
+    useManualGarage,
+    manualGarage,
     repairStartTime,
     isCompleted,
     repairNotes,
@@ -398,8 +407,8 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
 
       service_date: date ? date.split('T')[0] : null,
       odometer: odometer || null,
-      garage_id: garage || null,
-      garage_name: selectedGarage?.garage_name || selectedGarage?.name || '',
+      garage_id: useManualGarage ? null : (garage || null),
+      garage_name: useManualGarage ? manualGarage.trim() : (selectedGarage?.garage_name || selectedGarage?.name || ''),
 
       repair_start_time: repairStartTime || null,
       repair_end_time: repairEndTime || null,
@@ -416,7 +425,6 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       total_cost: totalBill + (breakdownType === 'Tyre' ? Number(tyreWorkflow.total_tyre_cost || 0) : 0),
 
       parts: JSON.stringify(parts),
-      files: JSON.stringify(files.map(f => ({ name: f.file?.name || f.name || f.file_name, type: f.file?.type || f.type || f.file_type, size: f.file?.size || f.size }))),
     };
 
     console.log('Payload:', payload);
@@ -428,11 +436,18 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
         : 'http://localhost:5001/api/repair';
       const method = isEdit ? 'PUT' : 'POST';
 
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const formData = new FormData();
+      Object.entries(payload).forEach(([key, value]) => formData.append(key, value == null ? '' : value));
+      const existingFiles = files.filter(file => !file.file).map(file => ({
+        file_name: file.file_name || file.name,
+        file_type: file.file_type || file.type,
+      })).filter(file => file.file_name);
+      if (existingFiles.length) formData.append('files', JSON.stringify(existingFiles));
+      const newFiles = files.filter(file => file.file);
+      newFiles.forEach(file => formData.append('files', file.file));
+      formData.append('file_categories', JSON.stringify(newFiles.map(file => file.document_type || 'Service Photo')));
+
+      const res = await fetch(url, { method, body: formData });
       const data = await res.json();
       if (!res.ok) {
         alert(data.message || 'Error saving repair');
@@ -803,20 +818,25 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                   </div>
                   <div>
                     <label className={LABEL_CLS}>Garage / Mechanic {isUnderRepair && <span className="text-red-500">*</span>}</label>
-                    <select
+                    {!useManualGarage ? <select
                       disabled={disableRepairDetails}
                       value={garage}
                       onChange={e => {
-                        setGarage(e.target.value);
+                        if (e.target.value === '__manual__') {
+                          setUseManualGarage(true);
+                          setGarage('');
+                        } else setGarage(e.target.value);
                         setErrors(prev => ({ ...prev, garage: undefined }));
                       }}
                       className={`${FIELD_CLS} ${errors.garage ? 'border-red-500 ring-1 ring-red-100' : ''}`}
                     >
                       <option value="">Select Service Provider</option>
-                      {garages.map(g => (
-                        <option key={g.id} value={g.id}>{g.garage_name}{g.isLabour ? ' (Labour)' : ''}</option>
-                      ))}
-                    </select>
+                      {garages.map(g => <option key={g.id} value={g.id}>{g.garage_name}{g.isLabour ? ' (Labour)' : ''}</option>)}
+                      <option value="__manual__">New vendor / enter manually</option>
+                    </select> : <div className="flex gap-2">
+                      <input disabled={disableRepairDetails} value={manualGarage} onChange={e => { setManualGarage(e.target.value); setErrors(prev => ({ ...prev, garage: undefined })); }} placeholder="Enter vendor / garage name" className={`${FIELD_CLS} ${errors.garage ? 'border-red-500' : ''}`} />
+                      <button type="button" disabled={disableRepairDetails} onClick={() => { setUseManualGarage(false); setManualGarage(''); }} className="px-3 rounded-lg border border-gray-200 text-xs font-bold text-gray-600">List</button>
+                    </div>}
                     {errors.garage && <p className="text-xs text-red-600 mt-1">{errors.garage}</p>}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
@@ -917,7 +937,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                       <div className="relative">
                         <input
                           type="text"
-                          placeholder="Search inventory part..."
+                          placeholder="Search inventory part or type a new part..."
                           disabled={isReported}
                           value={partSearch}
                           onChange={e => { setPartSearch(e.target.value); setShowPartDropdown(true); setNewPart(p => ({ ...p, inventoryId: null, name: e.target.value, availableStock: null })); setPartErrors(p => ({ ...p, name: undefined })); }}
@@ -925,8 +945,22 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                           onBlur={() => setTimeout(() => setShowPartDropdown(false), 150)}
                           className={`${FIELD_CLS} ${partErrors.name ? 'border-red-500' : ''}`}
                         />
-                        {showPartDropdown && filteredInventory.length > 0 && (
+                        {showPartDropdown && (filteredInventory.length > 0 || partSearch.trim()) && (
                           <div className="absolute z-20 top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg max-h-48 overflow-y-auto mt-1">
+                            {partSearch.trim() && (
+                              <button
+                                type="button"
+                                onMouseDown={() => {
+                                  setNewPart(previous => ({ ...previous, inventoryId: null, name: partSearch.trim(), availableStock: null }));
+                                  setShowPartDropdown(false);
+                                  setPartErrors(previous => ({ ...previous, name: undefined }));
+                                }}
+                                className="w-full text-left px-3 py-2.5 bg-blue-50 hover:bg-blue-100 border-b border-blue-100 text-sm"
+                              >
+                                <span className="font-bold text-blue-700">+ Use “{partSearch.trim()}” as new part</span>
+                                <span className="block text-[10px] text-blue-500 mt-0.5">Not in inventory? Add it manually with cost and quantity.</span>
+                              </button>
+                            )}
                             {filteredInventory.map(item => (
                               <button
                                 key={item.id}
@@ -948,6 +982,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                           </div>
                         )}
                         {partErrors.name && <p className="text-[10px] text-red-500 mt-0.5">{partErrors.name}</p>}
+                        {partSearch && !newPart.inventoryId && <p className="text-[10px] text-blue-600 mt-0.5">New part name entered. Add cost and quantity below.</p>}
                       </div>
 
                       {/* Stock info badge */}
@@ -1098,7 +1133,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                           multiple
                           accept="image/*,.pdf"
                           className="hidden"
-                          onChange={e => handleFiles(e.target.files)}
+                          onChange={e => handleFiles(e.target.files, 'Service Photo')}
                         />
                       </label>
                     </div>
@@ -1135,6 +1170,18 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                         </div>
                       );
                       })}
+                    </div>
+                  )}
+                  {!disableFiles && (
+                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <label className="flex items-center justify-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 text-xs font-bold text-emerald-700 cursor-pointer hover:bg-emerald-100">
+                        <Upload className="w-4 h-4" /> Add Service Photo
+                        <input type="file" multiple accept="image/*" className="hidden" onChange={e => handleFiles(e.target.files, 'Service Photo')} />
+                      </label>
+                      <label className="flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-3 text-xs font-bold text-blue-700 cursor-pointer hover:bg-blue-100">
+                        <FileText className="w-4 h-4" /> Add Bill / Invoice
+                        <input type="file" multiple accept="image/*,.pdf" className="hidden" onChange={e => handleFiles(e.target.files, 'Bill / Invoice')} />
+                      </label>
                     </div>
                   )}
                 </div>

@@ -3,6 +3,7 @@ import BatteryTab from './BatteryTab';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { FiArrowLeft, FiEdit2, FiMapPin, FiUser, FiActivity, FiSearch, FiPlus, FiX, FiUploadCloud, FiEye, FiDownload, FiTrash2 } from 'react-icons/fi';
 import { axleLayouts, posLabel, AXLE_TYPE_STYLES } from './Tyres/data/axleLayouts';
+import RegisterPeriodicServiceModal from './Service/components/RegisterPeriodicServiceModal';
 
 // ── Health helpers ────────────────────────────────────────────────────────────
 const TREAD_COLOR = (pct) => {
@@ -436,7 +437,7 @@ function TyresTab({ vehicle, navigate }) {
   );
 }
 
-const tabs = ['Overview', 'Service History', 'Timeline', 'Tyres', 'Documents', 'Battery Details', 'Truck Inventory'];
+const tabs = ['Overview', 'Service History', 'Tyres', 'Documents', 'Battery Details', 'Truck Inventory'];
 
 export default function VehicleDetails({ vehicles: propVehicles }) {
   const { id } = useParams();
@@ -448,8 +449,8 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
   const [fetchingVehicle, setFetchingVehicle] = useState(false);
   const [serviceHistory, setServiceHistory] = useState([]);
   const [inventoryData, setInventoryData] = useState([]);
+  const [activeBatterySummary, setActiveBatterySummary] = useState(null);
   const [healthScore, setHealthScore] = useState(null);
-  const [maintenanceTimeline, setMaintenanceTimeline] = useState([]);
 
   useEffect(() => {
     const fetchVehicle = async () => {
@@ -473,13 +474,18 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
   useEffect(() => {
     if (!vehicle?.id) return;
 
-    fetch(`http://localhost:5001/api/services/vehicle/${vehicle.id}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setServiceHistory(data.data || []);
-        }
-      });
+    Promise.all([
+      fetch(`http://localhost:5001/api/services/vehicle/${vehicle.id}`).then(res => res.json()),
+      fetch(`http://localhost:5001/api/repair/vehicle/${vehicle.id}`).then(res => res.json()),
+    ]).then(([services, repairs]) => {
+      const periodic = services.success ? (services.data || []) : [];
+      const repairRows = repairs.success ? (repairs.data || []).map(repair => ({
+        ...repair,
+        service_type: 'Repair Work',
+        vendor: repair.garage || repair.mechanic,
+      })) : [];
+      setServiceHistory([...periodic, ...repairRows].sort((a, b) => new Date(b.service_date) - new Date(a.service_date)));
+    });
 
     fetch(`http://localhost:5001/api/vehicles/${vehicle.id}/health`)
       .then(res => res.json())
@@ -488,12 +494,11 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
       })
       .catch(err => console.error('Vehicle health fetch failed:', err));
 
-    fetch(`http://localhost:5001/api/vehicles/${vehicle.id}/maintenance-timeline`)
+    fetch(`http://localhost:5001/api/batteries/vehicle/${vehicle.id}/active`)
       .then(res => res.json())
-      .then(data => {
-        if (data.success) setMaintenanceTimeline(data.data || []);
-      })
-      .catch(err => console.error('Vehicle timeline fetch failed:', err));
+      .then(data => setActiveBatterySummary(data.success ? data.data : null))
+      .catch(err => console.error('Vehicle battery fetch failed:', err));
+
   }, [vehicle]);
 
   const [emiPayments, setEmiPayments] = useState([]);
@@ -553,7 +558,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
     loadTruckInventory();
   }, [vehicle]);
 
-  const [activeTab, setActiveTab] = useState('Overview');
+  const [activeTab, setActiveTab] = useState(() => new URLSearchParams(location.search).get('tab') === 'battery' ? 'Battery Details' : 'Overview');
   const [isAddServiceModalOpen, setIsAddServiceModalOpen] = useState(false);
 
   const [serviceForm, setServiceForm] = useState({
@@ -770,6 +775,10 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
               ? 'bg-green-100 text-green-700 border-green-200'
               : (vehicle.vehicle_status || '').toLowerCase() === 'inactive'
                 ? 'bg-red-100 text-red-700 border-red-200'
+                : (vehicle.vehicle_status || '').toLowerCase() === 'on trip'
+                  ? 'bg-blue-100 text-blue-700 border-blue-200'
+                  : (vehicle.vehicle_status || '').toLowerCase() === 'under repair'
+                    ? 'bg-red-100 text-red-700 border-red-200'
                 : 'bg-yellow-100 text-yellow-700 border-yellow-200'
               }`}
             >
@@ -777,6 +786,10 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                 ? 'bg-green-500'
                 : (vehicle.vehicle_status || '').toLowerCase() === 'inactive'
                   ? 'bg-red-500'
+                  : (vehicle.vehicle_status || '').toLowerCase() === 'on trip'
+                    ? 'bg-blue-500'
+                    : (vehicle.vehicle_status || '').toLowerCase() === 'under repair'
+                      ? 'bg-red-500'
                   : 'bg-yellow-500'
                 }`}
               ></span>
@@ -973,6 +986,25 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
             </div>
 
             {/* Technical Specifications */}
+            <div className="col-span-1 border border-blue-100 rounded-xl p-5 bg-blue-50/40">
+              <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-blue-100">
+                Assigned Battery
+              </h3>
+              {activeBatterySummary ? (
+                <div className="grid grid-cols-2 gap-y-4 gap-x-4">
+                  <InfoItem label="Serial Number" value={activeBatterySummary.serial_number} />
+                  <InfoItem label="Brand / Model" value={`${activeBatterySummary.brand || '—'} ${activeBatterySummary.model || ''}`.trim()} />
+                  <InfoItem label="Vendor" value={activeBatterySummary.vendor} />
+                  <InfoItem label="Purchase Cost" value={activeBatterySummary.purchase_cost ? `₹${Number(activeBatterySummary.purchase_cost).toLocaleString('en-IN')}` : '—'} />
+                  <InfoItem label="Installed On" value={formatDate(activeBatterySummary.install_date)} />
+                  <InfoItem label="Warranty Until" value={formatDate(activeBatterySummary.warranty_expiry)} />
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500">No battery assigned to this vehicle.</p>
+              )}
+            </div>
+
+            {/* Technical Specifications */}
             <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
               <h3 className="text-base font-semibold text-slate-800 mb-4 pb-3 border-b border-slate-200">
                 Technical Specifications
@@ -1046,50 +1078,6 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
               </div>
             </div>
 
-          </div>
-        )}
-
-        {activeTab === 'Timeline' && (
-          <div className="animate-in fade-in duration-200">
-            <div className="mb-6">
-              <h2 className="text-lg font-bold text-slate-900">Unified Maintenance Timeline</h2>
-              <p className="text-sm text-slate-500">Inspections, defects, repairs, periodic services, and tyre changes sorted by latest date.</p>
-            </div>
-            <div className="space-y-3">
-              {maintenanceTimeline.map((event, index) => (
-                <div key={`${event.event_type}-${event.reference_id}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-indigo-700">
-                          {event.event_type}
-                        </span>
-                        {event.status && (
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-widest text-slate-600">
-                            {event.status}
-                          </span>
-                        )}
-                        {event.reference_id && (
-                          <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                            {event.reference_id}
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-2 text-sm font-black text-slate-900">{event.title || 'Maintenance event'}</p>
-                      {event.description && <p className="mt-1 text-xs text-slate-500">{event.description}</p>}
-                    </div>
-                    <p className="text-xs font-bold text-slate-400">
-                      {event.event_time ? new Date(event.event_time).toLocaleString() : 'No date'}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {maintenanceTimeline.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-slate-200 p-10 text-center text-sm font-semibold text-slate-400">
-                  No maintenance events recorded yet.
-                </div>
-              )}
-            </div>
           </div>
         )}
 
@@ -1258,11 +1246,11 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-slate-800 tracking-tight">Truck Inventory</h2>
               <button
-                onClick={openAddInventoryModal}
+                onClick={() => navigate(`/parts?vehicle_id=${vehicle.id}`)}
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center shadow-sm sticky top-4"
               >
                 <FiPlus className="w-5 h-5 mr-1.5" />
-                Add Item
+                Issue Part
               </button>
             </div>
 
@@ -1338,6 +1326,22 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
 
       {/* Add Service Record Modal */}
       {isAddServiceModalOpen && (
+        <RegisterPeriodicServiceModal
+          isOpen={isAddServiceModalOpen}
+          editData={{
+            vehicle_id: vehicle.id,
+            vehicle_no: vehicle.vehicle_no,
+            odometer: vehicle.current_odometer || vehicle.initial_odometer || '',
+          }}
+          onClose={() => {
+            setIsAddServiceModalOpen(false);
+            fetch(`http://localhost:5001/api/services/vehicle/${vehicle.id}`).then(res => res.json()).then(data => {
+              if (data.success) setServiceHistory(data.data || []);
+            });
+          }}
+        />
+      )}
+      {false && isAddServiceModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-200">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setIsAddServiceModalOpen(false)}></div>
           <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">

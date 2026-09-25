@@ -1322,51 +1322,79 @@ exports.createPurchaseOrder = async (req, res) => {
 // ======================================================
 
 exports.receivePurchaseOrder = async (req, res) => {
+  const conn = await db.getConnection();
   try {
     const { id } = req.params;
+    await conn.beginTransaction();
 
-    const [rows] = await db.query(
+    const [rows] = await conn.query(
       `SELECT * FROM inventory_purchase_orders WHERE id = ?`, [id]
     );
-    if (!rows.length) return res.status(404).json({ success: false, message: 'PO not found.' });
+    if (!rows.length) {
+      await conn.rollback();
+      return res.status(404).json({ success: false, message: 'PO not found.' });
+    }
 
     const po = rows[0];
-
-    await db.query(
-      `UPDATE inventory_purchase_orders SET status = 'Received', status_id = 4 WHERE id = ?`, [id]
-    );
+    if (Number(po.status_id) === 4 || po.status === 'Received') {
+      await conn.rollback();
+      return res.status(400).json({ success: false, message: 'Purchase order is already received.' });
+    }
 
     const items  = typeof po.items === 'string' ? JSON.parse(po.items || '[]') : po.items || [];
     const item   = items[0] || {};
     let   partId = item.part_id || item.partId || null;
     const qty    = Number(item.qty ?? item.quantity ?? 0);
     const itemName = item.partName || item.name || item.item_name || '';
+    const category = String(po.category || '').trim().toLowerCase();
 
-    if (qty > 0) {
+    if (category === 'batteries' || category === 'battery') {
+      const receivedDate = new Date().toISOString().slice(0, 10);
+      const unitPrice = Number(item.unitPrice ?? item.unit_price ?? (Number(po.total_amount || 0) / Math.max(qty, 1)));
+      const batteryCount = Math.max(0, qty);
+
+      for (let index = 0; index < batteryCount; index += 1) {
+        const serial = `PO-${po.po_number}-${String(index + 1).padStart(3, '0')}`;
+        await conn.query(
+          `INSERT INTO batteries
+            (serial_number, brand, model, purchase_date, vendor, purchase_cost, status, location, notes)
+           VALUES (?, ?, ?, ?, ?, ?, 'In Stock', 'Warehouse', ?)`,
+          [
+            serial,
+            item.brand || 'Unknown',
+            item.model || itemName || 'Truck Battery',
+            receivedDate,
+            po.vendor || null,
+            unitPrice,
+            `Received from ${po.po_number}`,
+          ]
+        );
+      }
+    } else if (qty > 0) {
       // If no part_id, check if a part with this name already exists, else create it
       if (!partId && itemName) {
-        const [existing] = await db.query(
-          `SELECT id FROM inventory_parts WHERE LOWER(part_name) = LOWER(?) LIMIT 1`,
+        const [existing] = await conn.query(
+          `SELECT id FROM inventory_parts WHERE LOWER(TRIM(part_name)) = LOWER(TRIM(?)) LIMIT 1`,
           [itemName]
         );
         if (existing.length) {
           partId = existing[0].id;
         } else {
-          const [inserted] = await db.query(
+          const [inserted] = await conn.query(
             `INSERT INTO inventory_parts (part_name, category, current_stock, opening_stock, preferred_vendor, created_by)
-             VALUES (?, 'Others', 0, 0, ?, 'PO Auto')`,
-            [itemName, po.vendor || '']
+             VALUES (?, ?, 0, 0, ?, 'PO Auto')`,
+            [itemName, po.category || 'Others', po.vendor || '']
           );
           partId = inserted.insertId;
         }
       }
 
       if (partId) {
-        await db.query(
+        await conn.query(
           `UPDATE inventory_parts SET current_stock = current_stock + ?, updated_at = NOW() WHERE id = ?`,
           [qty, partId]
         );
-        await db.query(
+        await conn.query(
           `INSERT INTO inventory_stock_movements (part_id, movement_type, quantity, vendor, movement_date)
            VALUES (?, 'Stock In', ?, ?, NOW())`,
           [partId, qty, po.vendor || '']
@@ -1374,10 +1402,17 @@ exports.receivePurchaseOrder = async (req, res) => {
       }
     }
 
+    await conn.query(
+      `UPDATE inventory_purchase_orders SET status = 'Received', status_id = 4 WHERE id = ?`, [id]
+    );
+    await conn.commit();
     res.json({ success: true, message: 'Purchase order received and stock updated.' });
   } catch (error) {
+    await conn.rollback();
     console.error('RECEIVE PO ERROR:', error);
     res.status(500).json({ success: false, message: 'Server Error' });
+  } finally {
+    conn.release();
   }
 };
 

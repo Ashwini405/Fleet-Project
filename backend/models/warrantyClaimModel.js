@@ -6,6 +6,7 @@ const db = require('../config/db');
 // ======================================================
 
 const createWarrantyClaim = async (data) => {
+  const conn = await db.getConnection();
 
   data = Object.fromEntries(
     Object.entries(data).map(([key, value]) => [
@@ -14,7 +15,15 @@ const createWarrantyClaim = async (data) => {
     ])
   );
 
-  const [result] = await db.query(
+  try {
+    await conn.beginTransaction();
+
+    const [[warranty]] = await conn.query(
+      `SELECT battery_id FROM warranties WHERE id = ? FOR UPDATE`,
+      [data.warranty_id]
+    );
+
+    const [result] = await conn.query(
 
     `
 
@@ -222,9 +231,25 @@ const createWarrantyClaim = async (data) => {
 
     ]
 
-  );
+    );
 
-  return result;
+    if (warranty?.battery_id) {
+      await conn.query(
+        `UPDATE batteries
+            SET status = 'Warranty Claim', location = 'Vendor'
+          WHERE id = ?`,
+        [warranty.battery_id]
+      );
+    }
+
+    await conn.commit();
+    return result;
+  } catch (error) {
+    await conn.rollback();
+    throw error;
+  } finally {
+    conn.release();
+  }
 };
 
 

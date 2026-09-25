@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, UploadCloud, ShieldCheck, ChevronDown, CheckCircle2 } from 'lucide-react';
 
-const CATEGORIES = ['Vehicle', 'Battery', 'Engine', 'Tyres', 'Brakes', 'Transmission', 'Electrical', 'AC System', 'Suspension', 'Fuel System', 'Other'];
+const CATEGORIES = ['Vehicle', 'Tyres', 'Battery'];
 
 const BRANDS_BY_CATEGORY = {
    Battery: ['Amaron', 'Exide', 'Bosch'],
@@ -76,7 +76,7 @@ const UploadBox = ({ label, required, onChange, fileName }) => (
       </p>
       <p className="text-[10px] text-slate-400 mt-0.5">JPG, PNG, PDF · Max 5MB</p>
       {fileName && <p className="mt-1.5 text-[11px] font-semibold text-green-700 truncate">{fileName}</p>}
-      <input type="file" hidden onChange={onChange} />
+      <input type="file" accept="image/jpeg,image/png,application/pdf" hidden onChange={onChange} />
    </label>
 );
 
@@ -97,20 +97,39 @@ const DEFAULT_VENDOR_SOURCE = { endpoint: 'parts-vendors', nameField: 'vendor_na
 export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
    const [vehicles, setVehicles] = useState([]);
    const [tyres, setTyres] = useState([]);
+   const [batteries, setBatteries] = useState([]);
    const [categoryVendors, setCategoryVendors] = useState([]);
    const [purchaseShowroom, setPurchaseShowroom] = useState('');
    const [files, setFiles] = useState({ warrantyCard: null, invoiceFile: null });
    const [successNumber, setSuccessNumber] = useState('');
    const [fd, setFd] = useState({
       category: '', brand: '', model: '', serialNo: '',
-      vehicle_id: '', vehicle_no: '', odometer: '', tyreId: '',
+      vehicle_id: '', vehicle_no: '', odometer: '', tyreId: '', batteryId: '',
       startDate: '', endDate: '', warrantyPeriod: '',
-      description: '', dealerShowroom: '',
+      description: '', dealerShowroom: '', purchaseDate: '', purchaseCost: '',
    });
 
    const set = (f, v) => setFd(p => ({ ...p, [f]: v }));
 
+   const handleUpload = (field, event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const allowed = ['image/jpeg', 'image/png', 'application/pdf'];
+      if (!allowed.includes(file.type)) {
+         alert('Please upload a JPG, PNG, or PDF file.');
+         event.target.value = '';
+         return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+         alert('File size must be 5 MB or less.');
+         event.target.value = '';
+         return;
+      }
+      setFiles(previous => ({ ...previous, [field]: file }));
+   };
+
    const isTyreCategory = fd.category === 'Tyres';
+   const isBatteryCategory = fd.category === 'Battery';
    const isVehicleCategory = fd.category === 'Vehicle';
 
    const handleCategoryChange = (e) => {
@@ -120,7 +139,8 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
       // no longer applies once the category changes.
       setFd(p => ({
          ...p, category: cat, brand: '', model: '', dealerShowroom: '',
-         vehicle_id: '', vehicle_no: '', odometer: '', tyreId: '',
+         vehicle_id: '', vehicle_no: '', odometer: '', tyreId: '', batteryId: '',
+         startDate: '', endDate: '', warrantyPeriod: '', purchaseDate: '', purchaseCost: '',
       }));
    };
 
@@ -134,6 +154,10 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
          .then(r => r.json())
          .then(data => { if (data.success) setTyres(data.data || []); })
          .catch(err => console.error('FETCH TYRES ERROR:', err));
+      fetch('http://localhost:5001/api/batteries')
+         .then(r => r.json())
+         .then(data => { if (data.success) setBatteries(data.data || []); })
+         .catch(err => console.error('FETCH BATTERIES ERROR:', err));
    }, [isOpen]);
 
    // Vendor list depends on the selected category — Vehicle -> Showrooms,
@@ -187,7 +211,29 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
       }));
    };
 
-   const isValid = fd.category && (isTyreCategory ? fd.tyreId : fd.vehicle_id) && fd.brand && fd.model && fd.startDate && fd.endDate && files.warrantyCard && files.invoiceFile;
+   const handleBatteryChange = (e) => {
+      const selected = batteries.find(b => String(b.id) === String(e.target.value));
+      const purchaseDate = selected?.purchase_date ? String(selected.purchase_date).slice(0, 10) : '';
+      const expiry = selected?.warranty_expiry ? String(selected.warranty_expiry).slice(0, 10) : '';
+      setFd(p => ({
+         ...p,
+         batteryId: selected?.id || '',
+         vehicle_id: selected?.vehicle_id || '',
+         vehicle_no: selected?.vehicle_no || '',
+         odometer: selected?.initial_odometer || '',
+         serialNo: selected?.serial_number || '',
+         brand: selected?.brand || '',
+         model: selected?.model || '',
+         dealerShowroom: selected?.vendor || '',
+         purchaseDate,
+         purchaseCost: selected?.purchase_cost || '',
+         startDate: purchaseDate,
+         endDate: expiry,
+         warrantyPeriod: selected?.warranty_period_months ? `${selected.warranty_period_months} Months` : '',
+      }));
+   };
+
+   const isValid = fd.category && (isTyreCategory ? fd.tyreId : isBatteryCategory ? fd.batteryId : fd.vehicle_id) && fd.brand && fd.model && fd.startDate && fd.endDate && files.warrantyCard && files.invoiceFile;
 
    const handleSubmit = async () => {
       try {
@@ -197,10 +243,12 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
          formData.append('category', fd.category);
          formData.append('brand', fd.brand);
          formData.append('model', fd.model);
+         formData.append('battery_id', fd.batteryId || '');
          formData.append(
             'dealer_showroom',
             fd.dealerShowroom
          );
+         formData.append('vendor_name', fd.dealerShowroom);
          formData.append('serial_no', fd.serialNo);
          formData.append('vehicle_id', fd.vehicle_id);
          formData.append('vehicle_no', fd.vehicle_no);
@@ -208,6 +256,8 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
          formData.append('start_date', fd.startDate);
          formData.append('end_date', fd.endDate);
          formData.append('warranty_period', fd.warrantyPeriod);
+         formData.append('purchase_date', fd.purchaseDate || '');
+         formData.append('purchase_cost', fd.purchaseCost || '');
          formData.append('description', fd.description);
          formData.append('created_by', 'Admin');
          if (files.warrantyCard) formData.append('warranty_card', files.warrantyCard);
@@ -277,6 +327,15 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
                                  </option>
                               ))}
                            </Sel>
+                        ) : isBatteryCategory ? (
+                           <Sel label="Select Battery" required value={fd.batteryId} onChange={handleBatteryChange}>
+                              <option value="">Select Battery</option>
+                              {batteries.map(b => (
+                                 <option key={b.id} value={b.id}>
+                                    {b.serial_number} · {b.brand} {b.model} · {b.vendor || 'No vendor'}
+                                 </option>
+                              ))}
+                           </Sel>
                         ) : (
                            <Sel label="Truck / Vehicle" required value={fd.vehicle_id} onChange={handleVehicleChange}>
                               <option value="">Select Vehicle</option>
@@ -285,9 +344,11 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
                         )}
                         {isTyreCategory
                            ? fd.tyreId && <ReadField label="Fitted On Vehicle" value={fd.vehicle_no || 'In Stock (not fitted)'} />
-                           : fd.vehicle_id && <ReadField label="Purchased From (Showroom)" value={purchaseShowroom} />
+                           : isBatteryCategory
+                              ? fd.batteryId && <ReadField label="Assigned Vehicle" value={fd.vehicle_no || 'In Stock (not assigned)'} />
+                              : fd.vehicle_id && <ReadField label="Purchased From (Showroom)" value={purchaseShowroom} />
                         }
-                        {!isVehicleCategory && (isTyreCategory ? fd.tyreId : fd.vehicle_id) && (
+                        {!isVehicleCategory && !isBatteryCategory && (isTyreCategory ? fd.tyreId : fd.vehicle_id) && (
                            <Sel label={vendorSource.label} value={fd.dealerShowroom} onChange={e => set('dealerShowroom', e.target.value)} disabled={!fd.category}>
                               <option value="">{fd.category ? `Select ${vendorSource.label.toLowerCase()}` : 'Select category first'}</option>
                               {categoryVendors.map(v => (
@@ -295,7 +356,7 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
                               ))}
                            </Sel>
                         )}
-                        {isVehicleCategory ? (
+                        {isVehicleCategory || isBatteryCategory ? (
                            <ReadField label="Brand" value={fd.brand} />
                         ) : (
                            <Sel label="Brand" required value={fd.brand} onChange={e => set('brand', e.target.value)} disabled={!fd.category}>
@@ -303,7 +364,7 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
                               {(BRANDS_BY_CATEGORY[fd.category] || []).map(b => <option key={b}>{b}</option>)}
                            </Sel>
                         )}
-                        {isVehicleCategory ? (
+                        {isVehicleCategory || isBatteryCategory ? (
                            <ReadField label="Model" value={fd.model} />
                         ) : (
                            <Sel label="Model" required value={fd.model} onChange={e => set('model', e.target.value)} disabled={!fd.category}>
@@ -311,7 +372,11 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
                               {(MODELS_BY_CATEGORY[fd.category] || []).map(m => <option key={m}>{m}</option>)}
                            </Sel>
                         )}
-                        <Inp label="Serial Number" value={fd.serialNo} onChange={e => set('serialNo', e.target.value)} placeholder="e.g. SN1234567890" />
+                        {isBatteryCategory ? (
+                           <ReadField label="Serial Number" value={fd.serialNo} />
+                        ) : (
+                           <Inp label="Serial Number" value={fd.serialNo} onChange={e => set('serialNo', e.target.value)} placeholder="e.g. SN1234567890" />
+                        )}
                      </div>
                   </div>
 
@@ -334,13 +399,13 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
                            label="Warranty Card"
                            required
                            fileName={files.warrantyCard?.name}
-                           onChange={e => setFiles(p => ({ ...p, warrantyCard: e.target.files[0] }))}
+                           onChange={e => handleUpload('warrantyCard', e)}
                         />
                         <UploadBox
                            label="Invoice / Bill"
                            required
                            fileName={files.invoiceFile?.name}
-                           onChange={e => setFiles(p => ({ ...p, invoiceFile: e.target.files[0] }))}
+                           onChange={e => handleUpload('invoiceFile', e)}
                         />
                      </div>
                   </div>

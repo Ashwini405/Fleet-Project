@@ -52,7 +52,12 @@ v.axle_positions,
         fa.low_balance_threshold AS fastag_low_balance_threshold,
         fa.status AS fastag_status,
 
-        v.vehicle_status,
+        CASE
+          WHEN EXISTS (SELECT 1 FROM trips t WHERE t.vehicle_id = v.id AND t.trip_status IN ('Active', 'In Transit', 'Started', 'Planned')) THEN 'On Trip'
+          WHEN EXISTS (SELECT 1 FROM repair_services r WHERE r.vehicle_id = v.id AND r.status IN ('Reported', 'Under Repair', 'In Progress')) THEN 'Under Repair'
+          WHEN LOWER(COALESCE(v.vehicle_status, 'active')) = 'inactive' THEN 'Inactive'
+          ELSE 'Active'
+        END AS vehicle_status,
         v.assigned_driver,
 
         d.id AS driver_id,

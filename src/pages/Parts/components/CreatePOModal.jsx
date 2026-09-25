@@ -11,6 +11,9 @@ const DEFAULT_CATEGORY_COLOR = 'bg-indigo-50 text-indigo-700 border-indigo-200';
 
 // Items per category — matching inventory
 const ITEMS_BY_CATEGORY = {
+  Batteries: [
+    { id: 'battery-stock', name: 'Truck Battery', unit: 'pcs', price: 0 },
+  ],
   Spares: [
     { id: 'i1',  name: 'Brake Pads',     unit: 'pcs',    price: 560  },
     { id: 'i2',  name: 'Clutch Plate',   unit: 'pcs',    price: 2200 },
@@ -131,8 +134,10 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy,
   // The application has two vendor groups; inventory categories remain independent.
   const vendorsForCategory = form.category === 'Lubricants' ? oilVendors : partsVendors;
 
-  const inventoryItemsForCategory = inventory
-    .filter(item => (item.category || '').toLowerCase() === (form.category || '').toLowerCase())
+  const inventoryItemsForCategory = form.category === 'Batteries' ? [] : inventory
+    .filter(item => (
+      (item.category || '').trim().toLowerCase() === (form.category || '').trim().toLowerCase()
+    ))
     .map((item, index) => ({
       id: String(item.id || `inventory-${index}`),
       name: item.part_name || item.name || '',
@@ -194,12 +199,12 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy,
       const data = await res.json().catch(() => null);
       if (!res.ok) throw new Error(data?.message || 'Server error');
       onSuccess?.();
-    } catch {
-      onSuccess?.(localPO);
-    } finally {
-      setLoading(false);
       setForm(EMPTY);
       setErrors({});
+    } catch (error) {
+      setErrors({ submit: error.message || 'Could not create purchase order.' });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -222,6 +227,7 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy,
         </div>
 
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 px-6 py-5 space-y-4">
+          <Err msg={errors.submit} />
 
           {/* 1. Category */}
           <div>

@@ -21,11 +21,17 @@ import { VendorInfoPanel, RecordPaymentModal } from './shared';
 import { PAGE_SIZE, MODAL_ANIM, fmtDate } from './shared/constants';
 
 const CATEGORY_LABEL = 'PARTS & SPARES';
-const FILTERS = ['Parts Records', 'Payments', 'Returns'];
+const FILTERS = ['Parts Records', 'Payments', 'Returns', 'Claims'];
 const filterMatch = {
   'Parts Records': ['Purchase', 'Adjustment Credit'],
   Payments: ['Payment'],
   Returns: ['Vendor Return'],
+  Claims: ['Warranty Claim'],
+};
+
+const warrantyFileUrl = (value) => {
+  if (!value) return '';
+  return `http://localhost:5001/${String(value).replace(/^['"[\]]+|['"[\]]+$/g, '').replace(/\\/g, '/')}`;
 };
 
 function toCSV(rows, cols) {
@@ -51,8 +57,9 @@ function printTbl(title, cols, rows) {
 
 export default function PartsLedger({ vendor, onBack }) {
   const isCash = (vendor.payment_terms || 'credit') === 'cash';
-  const visibleFilters = isCash ? ['Parts Records', 'Returns'] : FILTERS;
+  const visibleFilters = isCash ? FILTERS.filter(filter => filter !== 'Payments') : FILTERS;
   const [rawOrders, setRawOrders] = useState([]);
+  const [rawClaims, setRawClaims] = useState([]);
   const [rawReturns, setRawReturns] = useState([]);
   const [rawPayments, setRawPayments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +79,7 @@ export default function PartsLedger({ vendor, onBack }) {
       const data = response.data?.data;
 
       setRawOrders(data?.orders || []);
+      setRawClaims(data?.claims || []);
       setRawReturns(data?.returns || []);
       setRawPayments(data?.payments || []);
     } catch (error) {
@@ -226,6 +234,26 @@ export default function PartsLedger({ vendor, onBack }) {
       };
     });
 
+    const claimTxns = rawClaims.map(claim => ({
+      id: `claim-${claim.id}`,
+      dbId: claim.id,
+      date: claim.claim_date,
+      type: 'Warranty Claim',
+      ref: claim.claim_number || `CL-${claim.id}`,
+      desc: `${claim.brand || ''} ${claim.model || ''} · ${claim.serial_number || claim.serial_no || ''}`.trim(),
+      claimIssue: claim.issue_description || claim.issue_type || 'Warranty claim',
+      claimAmount: Number(claim.claim_available_amount || 0),
+      claimReceived: Number(claim.claim_received_amount || 0),
+      claimStatus: claim.claim_status || 'Submitted',
+      warrantyCard: claim.warranty_card,
+      invoiceFile: claim.invoice_file,
+      debit: 0,
+      credit: 0,
+      paidAmount: 0,
+      remainingDue: 0,
+      poRef: '',
+    }));
+
     // 4. Update status labels for Purchase Orders
     purchaseTxns.forEach(po => {
       if (isCash) {
@@ -240,11 +268,11 @@ export default function PartsLedger({ vendor, onBack }) {
     });
 
     // 5. Combine all transactions and calculate running balance
-    const allTxns = [...purchaseTxns, ...returnTxns, ...paymentTxns].sort((a, b) => {
+    const allTxns = [...purchaseTxns, ...returnTxns, ...paymentTxns, ...claimTxns].sort((a, b) => {
       const dateDiff = new Date(a.date) - new Date(b.date);
       if (dateDiff !== 0) return dateDiff;
       if (a.poRef && b.poRef && a.poRef !== b.poRef) return a.poRef.localeCompare(b.poRef);
-      const typeOrder = { Purchase: 1, 'Vendor Return': 2, Payment: 3 };
+      const typeOrder = { Purchase: 1, 'Vendor Return': 2, Payment: 3, 'Warranty Claim': 4 };
       return (typeOrder[a.type] || 4) - (typeOrder[b.type] || 4);
     });
 
@@ -255,6 +283,9 @@ export default function PartsLedger({ vendor, onBack }) {
         ...t,
         runningBalance: isCash ? 0 : running,
       };
+    }).sort((a, b) => {
+      const dateDiff = new Date(b.date) - new Date(a.date);
+      return dateDiff || String(b.ref || '').localeCompare(String(a.ref || ''));
     });
 
     const debitSum = purchaseTxns.reduce((s, t) => s + (t.debit || 0), 0);
@@ -282,7 +313,7 @@ export default function PartsLedger({ vendor, onBack }) {
       totalCredit: totalCred,
       netOutstanding: outstanding,
     };
-  }, [rawOrders, rawReturns, rawPayments, isCash]);
+  }, [rawOrders, rawClaims, rawReturns, rawPayments, isCash]);
 
   const filtered = useMemo(() => txnsWithBalance.filter(t => {
     if (!filterMatch[activeFilter]?.includes(t.type)) return false;
@@ -514,6 +545,17 @@ export default function PartsLedger({ vendor, onBack }) {
                     <th className="py-3 px-4 text-right">Balance Due</th>
                     <th className="py-3 px-4 text-center">Action</th>
                   </tr>
+                ) : activeFilter === 'Claims' ? (
+                  <tr className="border-b border-gray-100 text-gray-400 text-[10px] font-bold uppercase tracking-wider bg-gray-50/60">
+                    <th className="py-3 px-4">Claim Date</th>
+                    <th className="py-3 px-4">Type</th>
+                    <th className="py-3 px-4">Claim Reference</th>
+                    <th className="py-3 px-4">Battery / Issue</th>
+                    <th className="py-3 px-4 text-right">Claim Amount</th>
+                    <th className="py-3 px-4 text-right">Received</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Documents</th>
+                  </tr>
                 ) : activeFilter === 'Returns' ? (
                   <tr className="border-b border-gray-100 text-gray-400 text-[10px] font-bold uppercase tracking-wider bg-gray-50/60">
                     <th className="py-3 px-4">Return Date</th>
@@ -541,6 +583,24 @@ export default function PartsLedger({ vendor, onBack }) {
 
               <tbody className="divide-y divide-gray-50">
                 {paginated.map(txn => {
+                  if (activeFilter === 'Claims') {
+                    return (
+                      <tr key={txn.id} className="hover:bg-red-50/30 transition-colors">
+                        <td className="py-3 px-4 whitespace-nowrap"><span className="text-xs font-bold text-gray-700">{fmtDate(txn.date)}</span></td>
+                        <td className="py-3 px-4"><span className="inline-flex text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200">Warranty Claim</span></td>
+                        <td className="py-3 px-4"><span className="text-[11px] font-bold text-gray-700 bg-gray-100 px-2 py-1 rounded">{txn.ref}</span></td>
+                        <td className="py-3 px-4"><p className="text-xs font-bold text-gray-800">{txn.desc}</p><p className="text-[10px] text-gray-500 mt-0.5">{txn.claimIssue}</p></td>
+                        <td className="py-3 px-4 text-right text-xs font-bold text-red-600">₹{txn.claimAmount.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4 text-right text-xs font-bold text-green-600">₹{txn.claimReceived.toLocaleString('en-IN')}</td>
+                        <td className="py-3 px-4"><span className="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">{txn.claimStatus}</span></td>
+                        <td className="py-3 px-4 text-xs font-bold whitespace-nowrap">
+                          {txn.warrantyCard && <a href={warrantyFileUrl(txn.warrantyCard)} target="_blank" rel="noreferrer" className="text-red-700 hover:underline mr-3">Warranty Card</a>}
+                          {txn.invoiceFile && <a href={warrantyFileUrl(txn.invoiceFile)} target="_blank" rel="noreferrer" className="text-slate-600 hover:underline">Invoice</a>}
+                        </td>
+                      </tr>
+                    );
+                  }
+
                   if (activeFilter === 'Parts Records') {
                     return (
                       <tr key={txn.id} className="hover:bg-amber-50/30 transition-colors">

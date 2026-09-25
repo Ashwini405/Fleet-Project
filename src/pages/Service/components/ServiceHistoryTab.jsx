@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { History, Eye, Settings2, Wrench } from 'lucide-react';
 
 export default function ServiceHistoryTab() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterTruck, setFilterTruck] = useState("all");
   const [filterType, setFilterType] = useState("all");
@@ -29,9 +30,15 @@ export default function ServiceHistoryTab() {
 
     fetch('http://localhost:5001/api/vehicles')
       .then(res => res.json())
-      .then(data => setVehicles(data.data || []))
+      .then(data => {
+        const loadedVehicles = data.data || [];
+        setVehicles(loadedVehicles);
+        const vehicleId = searchParams.get('vehicle_id');
+        const selectedVehicle = loadedVehicles.find(vehicle => String(vehicle.id) === vehicleId);
+        if (selectedVehicle) setFilterTruck(selectedVehicle.vehicle_no);
+      })
       .catch(err => console.error('Error fetching vehicles:', err));
-  }, []);
+  }, [searchParams]);
 
   // Combine and sort both types of logs
   const combinedHistory = [
@@ -40,7 +47,7 @@ export default function ServiceHistoryTab() {
       generalType: 'Periodic Service',
       icon: <Settings2 className="w-4 h-4 text-teal-600" />,
       date: l.service_date,
-      truckNo: l.vehicle_no,
+      truckNo: l.vehicle_no || l.live_vehicle_no,
       garage: l.vendor || l.mechanic || '—',
       totalCost: l.total_cost,
       interval: l.interval_km,
@@ -54,7 +61,7 @@ export default function ServiceHistoryTab() {
       generalType: 'Repair Work',
       icon: <Wrench className="w-4 h-4 text-orange-600" />,
       date: l.service_date,
-      truckNo: l.vehicle_no,
+      truckNo: l.live_vehicle_no || l.vehicle_no,
       garage: l.garage || '—',
       totalCost: l.total_cost,
       type: l.breakdown_type,

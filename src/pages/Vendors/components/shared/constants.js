@@ -42,7 +42,10 @@ export const MODAL_ANIM = `@keyframes modalSlideIn { from { opacity:0; transform
 
 export function fmtDate(d) {
   if (!d) return '—';
+  const raw = String(d);
+  const datePart = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (datePart) return `${datePart[3]}-${datePart[2]}-${datePart[1]}`;
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return '—';
-  return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  return dt.toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }).replace(/\//g, '-');
 }

@@ -62,6 +62,8 @@ export default function BatteryInventory({ showToast }) {
   const [showAdd, setShowAdd] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
   const [showReplace, setShowReplace] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [selectedBattery, setSelectedBattery] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [assignForm, setAssignForm] = useState({ battery_id: '', vehicle_id: '', install_date: '', install_odometer: '', technician: '' });
@@ -480,10 +482,7 @@ export default function BatteryInventory({ showToast }) {
             <F label="Failure Reason" value={replaceForm.failure_reason} onChange={v => setReplaceForm({ ...replaceForm, failure_reason: v })} placeholder="Dead cell, Sulphation..." />
             <div className="grid grid-cols-2 gap-3">
               <Sel label="Old Battery Decision" value={replaceForm.old_battery_decision} onChange={v => setReplaceForm({ ...replaceForm, old_battery_decision: v })} options={['Scrap', 'Warranty Claim', 'Return Vendor', 'Store']} />
-              <div className="flex items-center gap-2 pt-5">
-                <input type="checkbox" id="wc2" checked={replaceForm.warranty_claim} onChange={e => setReplaceForm({ ...replaceForm, warranty_claim: e.target.checked })} className="w-4 h-4 accent-violet-600" />
-                <label htmlFor="wc2" className="text-xs font-semibold text-slate-700">Warranty Claim?</label>
-              </div>
+              <p className="text-[10px] text-slate-500 pt-5">Select Warranty Claim above to send the removed battery to the vendor.</p>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Replacement Battery (from Stock)</label>

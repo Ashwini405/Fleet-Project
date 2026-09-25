@@ -21,6 +21,7 @@ const createWarranty = async (data) => {
       model,
       serial_no,
 
+      battery_id,
       vehicle_id,
       vehicle_no,
       dealer_showroom,
@@ -64,7 +65,7 @@ const createWarranty = async (data) => {
     VALUES (
 
       ?, ?, ?, ?, ?, ?,
-      ?, ?, ?, ?,
+      ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?,
       ?,
@@ -90,6 +91,7 @@ const createWarranty = async (data) => {
       data.model,
       data.serial_no,
 
+      data.battery_id || null,
       data.vehicle_id || null,
       data.vehicle_no,
       data.dealer_showroom,
@@ -198,6 +200,7 @@ const updateWarranty = async (id, data) => {
       brand          = ?,
       model          = ?,
       serial_no      = ?,
+      battery_id     = COALESCE(?, battery_id),
       vehicle_id      = ?,
       vehicle_no      = ?,
       dealer_showroom = ?,
@@ -216,6 +219,7 @@ const updateWarranty = async (id, data) => {
       data.brand,
       data.model,
       data.serial_no,
+      data.battery_id || null,
       data.vehicle_id || null,
       data.vehicle_no,
       data.dealer_showroom,

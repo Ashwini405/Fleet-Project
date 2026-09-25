@@ -138,8 +138,8 @@ export default function ClaimsTab({ onAdd, onView, refreshRef }) {
 
       {/* ── COLUMN LABELS ── */}
       <div className="hidden sm:grid items-center gap-4 px-5 py-2.5 bg-slate-50 border-b border-slate-100"
-        style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 1.5fr 1.2fr 1.2fr 36px' }}>
-        {['Claim / Warranty', 'Category', 'Vehicle', 'Complaint', 'Submit Date', 'Sent to Vendor', ''].map((h, i) => (
+        style={{ gridTemplateColumns: '1.8fr 1fr 1.2fr 1.3fr 1.5fr 1fr 1fr 1fr 36px' }}>
+        {['Claim / Warranty', 'Category', 'Vehicle', 'Complaint', 'Issue', 'Submit Date', 'Sent to Vendor', 'Status', ''].map((h, i) => (
           <span key={i} className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{h}</span>
         ))}
       </div>
@@ -159,7 +159,7 @@ export default function ClaimsTab({ onAdd, onView, refreshRef }) {
               transition={{ delay: idx * 0.03 }}
               onClick={() => onView?.(c)}
               className="grid grid-cols-1 sm:grid-cols-1 items-center gap-4 px-5 py-4 hover:bg-slate-50 transition-colors cursor-pointer"
-              style={{ gridTemplateColumns: '2fr 1.2fr 1.2fr 1.5fr 1.2fr 1.2fr 36px' }}
+              style={{ gridTemplateColumns: '1.8fr 1fr 1.2fr 1.3fr 1.5fr 1fr 1fr 1fr 36px' }}
             >
               {/* Col 1 — Claim # + Warranty # */}
               <div className="flex flex-col gap-1">
@@ -196,7 +196,14 @@ export default function ClaimsTab({ onAdd, onView, refreshRef }) {
                 </span>
               </div>
 
-              {/* Col 5 — Submit Date */}
+              {/* Col 5 — Issue */}
+              <div>
+                <span className="text-xs font-semibold text-slate-700 line-clamp-2">
+                  {c.issue_description || c.issue_type || '—'}
+                </span>
+              </div>
+
+              {/* Col 6 — Submit Date */}
               <div>
                 <Meta icon={Calendar}>
                   {(c.claim_date || c.submit_date)
@@ -205,7 +212,7 @@ export default function ClaimsTab({ onAdd, onView, refreshRef }) {
                 </Meta>
               </div>
 
-              {/* Col 6 — Date Sent to Vendor */}
+              {/* Col 7 — Date Sent to Vendor */}
               <div>
                 <Meta icon={Calendar}>
                   {c.date_sent_to_vendor
@@ -214,7 +221,18 @@ export default function ClaimsTab({ onAdd, onView, refreshRef }) {
                 </Meta>
               </div>
 
-              {/* Col 7 — View button */}
+              {/* Col 8 — Status */}
+              <div>
+                <span className={`inline-flex rounded-full border px-2 py-1 text-[10px] font-bold ${
+                  c.claim_status === 'Resolved' ? 'bg-green-50 text-green-700 border-green-200' :
+                  c.claim_status === 'Rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                  'bg-amber-50 text-amber-700 border-amber-200'
+                }`}>
+                  {c.claim_status || 'Submitted'}
+                </span>
+              </div>
+
+              {/* Col 9 — View button */}
               <div onClick={e => e.stopPropagation()}>
                 <button onClick={() => onView?.(c)}
                   className="w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:text-green-700 hover:border-green-300 hover:bg-green-50 transition-colors">

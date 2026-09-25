@@ -59,6 +59,8 @@ const createTrip = async (req, res) => {
 
     const newTrip = await Trip.create(tripData);
 
+    if (tripData.vehicle_id) await lifecycle.syncVehicleOperationalStatus(tripData.vehicle_id);
+
     // ── Deduct total advance from supervisor wallet ──────────────────────
     const totalAdvance =
       (Number(tripData.driver_advance)  || 0) +
@@ -217,6 +219,9 @@ const updateTrip = async (req, res) => {
     }
 
     await Trip.update(id, req.body);
+    const updated = await Trip.getById(id);
+    if (existing.vehicle_id) await lifecycle.syncVehicleOperationalStatus(existing.vehicle_id);
+    if (updated?.vehicle_id && updated.vehicle_id !== existing.vehicle_id) await lifecycle.syncVehicleOperationalStatus(updated.vehicle_id);
 
     res.status(200).json({
       success: true,
@@ -350,6 +355,7 @@ const updateTripStatus = async (req, res) => {
     await Trip.update(id, { trip_status: status });
 
     const trip = await Trip.getById(id);
+    if (trip?.vehicle_id) await lifecycle.syncVehicleOperationalStatus(trip.vehicle_id);
 
     // ── On Completed: push closing odometer to vehicle ───────────────────
     if (status === 'Completed' && trip?.vehicle_id && trip?.closing_km) {

@@ -8,7 +8,7 @@ const emptyForm = {
   odometer: '',
 };
 
-export default function IssueItemModal({ isOpen, item, onClose, onSuccess }) {
+export default function IssueItemModal({ isOpen, item, initialVehicleId, onClose, onSuccess }) {
   const [form, setForm] = useState(emptyForm);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [vehicles, setVehicles] = useState([]);
@@ -26,9 +26,9 @@ export default function IssueItemModal({ isOpen, item, onClose, onSuccess }) {
       setSearch('');
       setError('');
       setDropdownOpen(false);
-      fetchVehicles();
+      fetchVehicles(initialVehicleId);
     }
-  }, [isOpen]);
+  }, [isOpen, initialVehicleId]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -40,12 +40,15 @@ export default function IssueItemModal({ isOpen, item, onClose, onSuccess }) {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const fetchVehicles = async () => {
+  const fetchVehicles = async (vehicleId) => {
     setVehiclesLoading(true);
     try {
       const res = await fetch('http://localhost:5001/api/vehicles');
       const data = await res.json();
-      setVehicles(data.data || []);
+      const loadedVehicles = data.data || [];
+      setVehicles(loadedVehicles);
+      const selected = loadedVehicles.find(vehicle => String(vehicle.id) === String(vehicleId));
+      if (selected) setSelectedVehicle(selected);
     } catch {
       setVehicles([]);
     } finally {
