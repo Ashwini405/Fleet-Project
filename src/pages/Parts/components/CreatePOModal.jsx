@@ -3,15 +3,15 @@ import { X, Loader2, AlertCircle } from 'lucide-react';
 
 const today = () => new Date().toISOString().split('T')[0];
 
-// Two categories — mapped to vendor ledger category IDs
-const CATEGORIES = [
-  { id: 'Parts & Spares', vendorCat: 'parts',  color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
-  { id: 'Oils & Lubes',   vendorCat: 'oils',   color: 'bg-amber-50  text-amber-700  border-amber-200'  },
-];
+const DEFAULT_CATEGORIES = ['Spares', 'Batteries', 'Tubes', 'Lubricants', 'Electrical', 'Others'];
+const CATEGORY_COLORS = {
+  Lubricants: 'bg-amber-50 text-amber-700 border-amber-200',
+};
+const DEFAULT_CATEGORY_COLOR = 'bg-indigo-50 text-indigo-700 border-indigo-200';
 
 // Items per category — matching inventory
 const ITEMS_BY_CATEGORY = {
-  'Parts & Spares': [
+  Spares: [
     { id: 'i1',  name: 'Brake Pads',     unit: 'pcs',    price: 560  },
     { id: 'i2',  name: 'Clutch Plate',   unit: 'pcs',    price: 2200 },
     { id: 'i3',  name: 'Air Filter',     unit: 'pcs',    price: 180  },
@@ -19,7 +19,7 @@ const ITEMS_BY_CATEGORY = {
     { id: 'i5',  name: 'Fuel Filter',    unit: 'pcs',    price: 420  },
     { id: 'i6',  name: 'Headlight Bulb', unit: 'pcs',    price: 280  },
   ],
-  'Oils & Lubes': [
+  Lubricants: [
     { id: 'i7',  name: 'Engine Oil 15W40', unit: 'liters', price: 560 },
     { id: 'i8',  name: 'Gear Oil',         unit: 'liters', price: 380 },
     { id: 'i9',  name: 'Grease',           unit: 'kg',     price: 160 },
@@ -59,7 +59,7 @@ function Err({ msg }) {
   );
 }
 
-export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy }) {
+export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy, categories = DEFAULT_CATEGORIES, inventory = [] }) {
   // ── All hooks MUST be declared before any early return ──
   const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState({});
@@ -125,16 +125,24 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
     setErrors(e => ({ ...e, itemId: null }));
   };
 
-  const catMeta = CATEGORIES.find(c => c.id === form.category);
-  
-  // Vendors loaded from database based on selected category
-  const vendorsForCategory = form.category === 'Parts & Spares'
-    ? partsVendors
-    : form.category === 'Oils & Lubes'
-    ? oilVendors
-    : [];
+  const vendorGroup = form.category === 'Lubricants' ? 'Oils & Lubes' : 'Parts & Spares';
+  const categoryColor = CATEGORY_COLORS[form.category] || DEFAULT_CATEGORY_COLOR;
 
-  const itemsForCategory = ITEMS_BY_CATEGORY[form.category] || [];
+  // The application has two vendor groups; inventory categories remain independent.
+  const vendorsForCategory = form.category === 'Lubricants' ? oilVendors : partsVendors;
+
+  const inventoryItemsForCategory = inventory
+    .filter(item => (item.category || '').toLowerCase() === (form.category || '').toLowerCase())
+    .map((item, index) => ({
+      id: String(item.id || `inventory-${index}`),
+      name: item.part_name || item.name || '',
+      unit: item.unit || 'units',
+      price: Number(item.cost_price || item.costPrice || 0),
+    }))
+    .filter(item => item.name);
+  const itemsForCategory = inventoryItemsForCategory.length
+    ? inventoryItemsForCategory
+    : (ITEMS_BY_CATEGORY[form.category] || []);
 
   const total = (Number(form.quantity) || 0) * (Number(form.unit_price) || 0);
 
@@ -144,6 +152,7 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
     if (!form.vendorId)                              e.vendorId = 'Select a vendor';
     if (!form.itemId && !form.item_name.trim())      e.itemId   = 'Select or enter an item';
     if (!form.quantity || Number(form.quantity) <= 0) e.quantity = 'Enter a valid quantity';
+    if (!form.unit_price || Number(form.unit_price) <= 0) e.unit_price = 'Enter a unit price greater than 0';
     return e;
   };
 
@@ -218,15 +227,15 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
           <div>
             <Label text="Category" required />
             <div className="grid grid-cols-2 gap-3">
-              {CATEGORIES.map(cat => (
-                <button key={cat.id} type="button"
-                  onClick={() => handleCategoryChange(cat.id)}
+              {categories.map(category => (
+                <button key={category} type="button"
+                  onClick={() => handleCategoryChange(category)}
                   className={`px-3 py-3 rounded-xl border text-xs font-bold transition-all text-center
-                    ${form.category === cat.id
-                      ? `${cat.color} ring-2 ring-offset-1 ring-violet-400`
+                    ${form.category === category
+                      ? `${CATEGORY_COLORS[category] || DEFAULT_CATEGORY_COLOR} ring-2 ring-offset-1 ring-violet-400`
                       : 'border-slate-200 text-slate-500 hover:border-slate-300 bg-white'
                     }`}>
-                  {cat.id}
+                  {category}
                 </button>
               ))}
             </div>
@@ -238,9 +247,10 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
             <div>
               <Label text="Vendor" required />
               <div className="flex items-center gap-2 mb-1.5">
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${catMeta?.color}`}>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${categoryColor}`}>
                   {form.category}
                 </span>
+                  <span className="text-[10px] text-slate-400">Vendor group: {vendorGroup}</span>
                 <span className="text-[10px] text-slate-400">
                   {vendorsForCategory.length} vendor{vendorsForCategory.length !== 1 ? 's' : ''} available
                 </span>
@@ -264,8 +274,8 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
                 className={sCls(errors.itemId)}>
                 <option value="">— Select Item —</option>
                 {itemsForCategory.map(item => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} ({item.unit}) — ₹{item.price.toLocaleString()}
+                                <option key={item.id} value={item.id}>
+                    {item.name} ({item.unit}){item.price > 0 ? ` — ₹${item.price.toLocaleString()}` : ''}
                   </option>
                 ))}
               </select>
@@ -295,13 +305,14 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy 
                 <Err msg={errors.quantity} />
               </div>
               <div>
-                <Label text="Unit Price (₹)" />
+                <Label text="Unit Price (₹)" required />
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none">₹</span>
                   <input type="number" min="0" value={form.unit_price}
                     onChange={e => set('unit_price', e.target.value)}
-                    placeholder="0" className={iCls(false) + ' pl-7'} />
+                    placeholder="Enter price" className={iCls(errors.unit_price) + ' pl-7'} />
                 </div>
+                <Err msg={errors.unit_price} />
               </div>
             </div>
           )}

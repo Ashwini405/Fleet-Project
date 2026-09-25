@@ -197,7 +197,7 @@ export default function AddInventoryModal({
     const e = {};
     if (!form.name.trim()) e.name = 'Required';
     if (!form.brand.trim()) e.brand = 'Required';
-    if (form.costPrice < 0) e.costPrice = 'Must be positive';
+    if (!Number.isFinite(Number(form.costPrice)) || Number(form.costPrice) <= 0) e.costPrice = 'Enter a cost price greater than 0';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -603,7 +603,7 @@ export default function AddInventoryModal({
                         </AnimatePresence>
                       </div>
 
-                      <Field label="Cost Price (₹)" error={errors.costPrice}>
+                      <Field label="Cost Price (₹) *" error={errors.costPrice}>
                         <Input
                           type="number"
                           min="0"

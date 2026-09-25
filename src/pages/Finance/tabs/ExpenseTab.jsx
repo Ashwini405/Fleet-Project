@@ -64,27 +64,33 @@ const TONE = {
 };
 
 const CATEGORY_TONE = {
+  Trip: "blue",
   Fuel: "orange",
   Maintenance: "red",
   Tyres: "pink",
   Batteries: "purple",
   "Driver Salary": "blue",
+  "Driver Settlement": "blue",
+  "Staff Salary": "blue",
   "Food Allowance": "yellow",
-    Other: "neutral",
-    Toll: "gray",
-    Miscellaneous: "neutral",
+  Other: "neutral",
+  Toll: "gray",
+  Miscellaneous: "neutral",
 };
 
 const CATEGORY_ICON_MAP = {
+  Trip: Route,
   Fuel: Fuel,
   Maintenance: Wrench,
   Tyres: CircleDot,
   Batteries: BatteryCharging,
   "Driver Salary": UserRound,
+  "Driver Settlement": UserRound,
+  "Staff Salary": Landmark,
   "Food Allowance": Utensils,
-    Other: MoreHorizontal,
-    Toll: Route,
-    Miscellaneous: MoreHorizontal,
+  Other: MoreHorizontal,
+  Toll: Route,
+  Miscellaneous: MoreHorizontal,
 };
 
   const PAYMENT_METHODS = ["Cash", "Bank Transfer", "UPI", "Cheque", "Other"];
@@ -94,7 +100,8 @@ function normalizeCategory(category) {
     "Food/Allowance": "Food Allowance",
     Battery: "Batteries",
     Service: "Maintenance",
-     Other: "Other",
+    "Driver Salary": "Driver Settlement",
+    Other: "Other",
   };
   return map[category] || category;
 }
@@ -169,7 +176,19 @@ function ProofLinks({ files, label = "Proof" }) {
   );
 }
 
-export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTripId, initialVehicleId, viewOnlyTrip = false, prefetchedTripContext = null, prefetchedTripExpenses = [], prefetchedTripFuel = [] }) {
+export default function ExpenseTab({
+  selectedTruck,
+  dateFrom,
+  dateTo,
+  searchQuery = "",
+  categoryFilter = "All",
+  initialTripId,
+  initialVehicleId,
+  viewOnlyTrip = false,
+  prefetchedTripContext = null,
+  prefetchedTripExpenses = [],
+  prefetchedTripFuel = []
+}) {
   const navigate = useNavigate();
   const hasPrefetchedExpenses = prefetchedTripExpenses.length > 0;
   const hasPrefetchedFuel = prefetchedTripFuel.length > 0;
@@ -289,43 +308,143 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
   }, [initialTripId, hasPrefetchedExpenses, hasPrefetchedFuel]);
 
   useEffect(() => {
-    if (initialTripId) setView("trip-add");
+    if (!initialTripId) return;
+    setView("trip-add");
   }, [initialTripId]);
 
   // ── useMemo MUST be before any conditional returns ──
   const filtered = useMemo(() => {
     let list = [...expenseList];
-    if (selectedTruck && selectedTruck !== "All")
+
+    // Vehicle / General Filter
+    if (selectedTruck && selectedTruck !== "All") {
+      if (selectedTruck === "General") {
+        list = list.filter(e => !e.vehicle_id && !e.vehicle_number);
+      } else {
+        const selVeh = vehicles.find(v => String(v.id || v.vehicle_id) === String(selectedTruck));
+        const selVehNo = selVeh?.vehicle_no?.trim().toLowerCase() || "";
+        list = list.filter(e => {
+          const vId = String(e.vehicle_id || "");
+          const vNo = String(e.vehicle_number || "").trim().toLowerCase();
+          return (
+            vId === String(selectedTruck) ||
+            vNo === String(selectedTruck).trim().toLowerCase() ||
+            (selVehNo && vNo === selVehNo)
+          );
+        });
+      }
+    }
+
+    // Category Filter
+    if (categoryFilter && categoryFilter !== "All") {
+      const targetCat = normalizeCategory(categoryFilter).trim().toLowerCase();
+      list = list.filter(e => {
+        if (targetCat === "trip") {
+          return Boolean(
+            (e.trip_id !== null && e.trip_id !== undefined && String(e.trip_id).trim() !== "") ||
+            (e.trip_number && String(e.trip_number).trim() !== "") ||
+            (e.expense_category && String(e.expense_category).trim().toLowerCase() === "trip")
+          );
+        }
+        const cat = normalizeCategory(e.expense_category || "").trim().toLowerCase();
+        return cat === targetCat || (e.expense_category && String(e.expense_category).trim().toLowerCase() === String(categoryFilter).trim().toLowerCase());
+      });
+    }
+
+    // Date Filters (lexicographical YYYY-MM-DD)
+    if (dateFrom) {
+      list = list.filter(e => {
+        const d = String(e.expense_date || e.created_at || "").slice(0, 10);
+        return !d || d >= dateFrom;
+      });
+    }
+    if (dateTo) {
+      list = list.filter(e => {
+        const d = String(e.expense_date || e.created_at || "").slice(0, 10);
+        return !d || d <= dateTo;
+      });
+    }
+
+    // Real-time Search Query Filter
+    if (searchQuery && searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
       list = list.filter(e =>
-        String(e.vehicle_id || "") === String(selectedTruck) ||
-        String(e.vehicle_number || "").trim().toLowerCase() === String(selectedTruck).trim().toLowerCase()
+        (e.vendor_payee && String(e.vendor_payee).toLowerCase().includes(q)) ||
+        (e.expense_title && String(e.expense_title).toLowerCase().includes(q)) ||
+        (e.expense_number && String(e.expense_number).toLowerCase().includes(q)) ||
+        (e.expense_category && String(e.expense_category).toLowerCase().includes(q)) ||
+        (e.description && String(e.description).toLowerCase().includes(q)) ||
+        (e.notes && String(e.notes).toLowerCase().includes(q)) ||
+        (e.vehicle_number && String(e.vehicle_number).toLowerCase().includes(q)) ||
+        (e.station_name && String(e.station_name).toLowerCase().includes(q)) ||
+        (e.trip_number && String(e.trip_number).toLowerCase().includes(q)) ||
+        (e.payment_method && String(e.payment_method).toLowerCase().includes(q)) ||
+        (e.amount && String(e.amount).includes(q))
       );
-    if (dateFrom)
-      list = list.filter(e => String(e.expense_date || e.created_at || "").slice(0, 10) >= dateFrom);
-    if (dateTo)
-      list = list.filter(e => String(e.expense_date || e.created_at || "").slice(0, 10) <= dateTo);
-    return list.sort((a, b) => new Date(b.expense_date) - new Date(a.expense_date));
-  }, [expenseList, selectedTruck, dateFrom, dateTo]);
+    }
+
+    return list.sort((a, b) => {
+      const dateA = new Date(a.expense_date || a.created_at || 0).getTime() || 0;
+      const dateB = new Date(b.expense_date || b.created_at || 0).getTime() || 0;
+      return dateB - dateA;
+    });
+  }, [expenseList, selectedTruck, dateFrom, dateTo, searchQuery, categoryFilter, vehicles]);
 
   const filteredFuel = useMemo(() => {
     return fuelList.filter(fuel => {
-      if (selectedTruck && selectedTruck !== "All" && String(fuel.vehicle_id) !== String(selectedTruck)) return false;
+      if (selectedTruck === "General") return false;
+      if (selectedTruck && selectedTruck !== "All") {
+        const selVeh = vehicles.find(v => String(v.id || v.vehicle_id) === String(selectedTruck));
+        const selVehNo = selVeh?.vehicle_no?.trim().toLowerCase() || "";
+        const fVehId = String(fuel.vehicle_id || "");
+        const fVehNo = String(fuel.vehicle_no || "").trim().toLowerCase();
+        const matchesTruck = (
+          fVehId === String(selectedTruck) ||
+          fVehNo === String(selectedTruck).trim().toLowerCase() ||
+          (selVehNo && fVehNo === selVehNo)
+        );
+        if (!matchesTruck) return false;
+      }
+      if (categoryFilter && categoryFilter !== "All") {
+        const targetCat = normalizeCategory(categoryFilter).trim().toLowerCase();
+        if (targetCat === "trip") {
+          const hasTrip = fuel.trip_id !== null && fuel.trip_id !== undefined && String(fuel.trip_id).trim() !== "";
+          if (!hasTrip) return false;
+        } else if (targetCat !== "fuel") {
+          return false;
+        }
+      }
       const fuelDate = String(fuel.date || fuel.created_at || "").slice(0, 10);
       if (dateFrom && fuelDate < dateFrom) return false;
       if (dateTo && fuelDate > dateTo) return false;
+      if (searchQuery && searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const matches = (
+          (fuel.station_name && String(fuel.station_name).toLowerCase().includes(q)) ||
+          (fuel.vendor && String(fuel.vendor).toLowerCase().includes(q)) ||
+          (fuel.vehicle_no && String(fuel.vehicle_no).toLowerCase().includes(q)) ||
+          (fuel.receipt_no && String(fuel.receipt_no).toLowerCase().includes(q)) ||
+          String(fuel.total_cost || "").includes(q)
+        );
+        if (!matches) return false;
+      }
       return true;
     });
-  }, [fuelList, selectedTruck, dateFrom, dateTo]);
+  }, [fuelList, selectedTruck, dateFrom, dateTo, searchQuery, categoryFilter, vehicles]);
 
   const invalidFuel = filteredFuel.filter(fuel => Number(fuel.tank_capacity || 0) > 0 && Number(fuel.quantity || 0) > Number(fuel.tank_capacity));
   const validFuel = filteredFuel.filter(fuel => !invalidFuel.includes(fuel));
 
-  const unmatchedFuel = validFuel.filter(fuel => !filtered.some(expense =>
-    expense.expense_category === "Fuel" &&
-    String(expense.vehicle_id || "") === String(fuel.vehicle_id || "") &&
-    String(expense.expense_date || expense.created_at || "").slice(0, 10) === String(fuel.date || fuel.created_at || "").slice(0, 10) &&
-    Math.abs(Number(expense.amount || 0) - Number(fuel.total_cost || (Number(fuel.quantity || 0) * Number(fuel.rate || 0)))) < 0.01
-  ));
+  const isFuelCategoryActive = !categoryFilter || categoryFilter === "All" || normalizeCategory(categoryFilter) === "Fuel" || normalizeCategory(categoryFilter) === "Trip";
+
+  const unmatchedFuel = isFuelCategoryActive
+    ? validFuel.filter(fuel => !filtered.some(expense =>
+        normalizeCategory(expense.expense_category) === "Fuel" &&
+        String(expense.vehicle_id || "") === String(fuel.vehicle_id || "") &&
+        String(expense.expense_date || expense.created_at || "").slice(0, 10) === String(fuel.date || fuel.created_at || "").slice(0, 10) &&
+        Math.abs(Number(expense.amount || 0) - Number(fuel.total_cost || (Number(fuel.quantity || 0) * Number(fuel.rate || 0)))) < 0.01
+      ))
+    : [];
   const totalFuelExpense = unmatchedFuel.reduce((sum, fuel) => sum + Number(fuel.total_cost || (Number(fuel.quantity || 0) * Number(fuel.rate || 0))), 0);
   const totalExpenseAmount = filtered.reduce((sum, item) => sum + Number(item.amount || 0), 0) + totalFuelExpense;
   const tripFuelTotals = useMemo(() => validFuel.reduce((totals, fuel) => {
@@ -339,7 +458,7 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
     filtered.forEach(expense => {
       const hasTrip = expense.trip_id !== null && expense.trip_id !== undefined && expense.trip_id !== '';
       if (!hasTrip) {
-        groups.set(`expense-${expense.id}`, expense);
+        groups.set(`expense-${expense.id}-${expense.expense_number || Math.random()}`, expense);
         return;
       }
       const key = `trip-${normalizedTripKey(expense.trip_id)}`;
@@ -363,7 +482,11 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
         });
       }
     });
-    return [...groups.values()].sort((a, b) => new Date(b.date || b.expense_date) - new Date(a.date || a.expense_date));
+    return [...groups.values()].sort((a, b) => {
+      const dateA = new Date(a.date || a.expense_date || a.created_at || 0).getTime() || 0;
+      const dateB = new Date(b.date || b.expense_date || b.created_at || 0).getTime() || 0;
+      return dateB - dateA;
+    });
   }, [filtered, unmatchedFuel]);
 
   const openExpenseDetails = async (expense) => {
@@ -810,8 +933,14 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
                 className="flex flex-col md:grid md:grid-cols-[2fr_1.3fr_1.5fr_1fr_auto] gap-3 md:gap-4 items-start md:items-center px-5 py-4 hover:bg-gray-50/70 transition-colors"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-bold text-gray-800 truncate">{txn.vehicle_number || "—"}</p>
-                  <p className="text-xs text-gray-400 truncate">{txn._isTripGroup ? `${txn.items.length} expense${txn.items.length === 1 ? '' : 's'} · Trip ${txn.trip_number}` : "Other vehicle expense"}</p>
+                  <p className="text-sm font-bold text-gray-800 truncate">
+                    {txn.vehicle_number || (txn.station_name ? `🏢 ${txn.station_name}` : (txn.salary_type ? `👥 ${txn.salary_type} Payroll` : "🏢 General / Office"))}
+                  </p>
+                  <p className="text-xs text-gray-500 truncate">
+                    {txn._isTripGroup
+                      ? `${txn.items.length} expense${txn.items.length === 1 ? '' : 's'} · Trip ${txn.trip_number}`
+                      : (txn.expense_title || (txn.vendor_payee ? `Payee: ${txn.vendor_payee}` : (txn.description || "General operational expense")))}
+                  </p>
                 </div>
 
                 <div>
@@ -820,7 +949,9 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
 
                 <div className="min-w-0">
                   <p className="text-sm text-gray-700 font-medium">{formatDateTime(txn.date || txn.expense_date || txn.created_at)}</p>
-                  <p className="text-xs text-gray-400 truncate">{txn._isTripGroup ? "Combined trip expenses" : (txn.description || txn.notes || txn.vendor_payee || "No description")}</p>
+                  <p className="text-xs text-gray-400 truncate">
+                    {txn._isTripGroup ? "Combined trip expenses" : (txn.description || txn.notes || txn.vendor_payee || (txn.expense_number ? `#${txn.expense_number}` : "No description"))}
+                  </p>
                 </div>
 
                 <p className="text-base font-extrabold text-red-500 md:text-right">
@@ -899,12 +1030,16 @@ export default function ExpenseTab({ selectedTruck, dateFrom, dateTo, initialTri
               </>
             ) : (
               <>
+                {viewTxn.expense_title && <DetailRow label="Title" value={viewTxn.expense_title} />}
+                <DetailRow label="Expense #" value={viewTxn.expense_number || `#${viewTxn.id}`} />
                 <DetailRow label="Date" value={formatDateTime(viewTxn.expense_date || viewTxn.created_at)} />
                 <DetailRow label="Category" value={viewTxn.expense_category || "—"} />
-                <DetailRow label="Vehicle" value={viewTxn.vehicle_number || "—"} />
+                <DetailRow label="Vehicle" value={viewTxn.vehicle_number || "— (General / Staff / Office)"} />
+                {viewTxn.station_name && <DetailRow label="Station / Plant" value={viewTxn.station_name} />}
                 <DetailRow label="Payment Method" value={viewTxn.payment_method || "—"} />
-                <DetailRow label="Vendor/Payee" value={viewTxn.vendor_payee || "—"} />
-                <DetailRow label="Description" value={`"${viewTxn.description || "—"}"`} />
+                <DetailRow label="Payment Status" value={viewTxn.payment_status || "Paid"} />
+                <DetailRow label="Payee / Vendor" value={viewTxn.vendor_payee || viewTxn.driver_name || viewTxn.supervisor_name || "—"} />
+                <DetailRow label="Description" value={viewTxn.description || viewTxn.notes || "—"} />
               </>
             )}
 

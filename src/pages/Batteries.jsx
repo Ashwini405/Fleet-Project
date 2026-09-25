@@ -54,6 +54,22 @@ export default function Batteries() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [vendorsList, setVendorsList] = useState([]);
+  const [vendorMode, setVendorMode] = useState('select'); // 'select' | 'custom'
+  const [customVendor, setCustomVendor] = useState('');
+  const [saveAsNewVendor, setSaveAsNewVendor] = useState(false);
+
+  const loadVendors = async () => {
+    try {
+      const res = await fetch('http://localhost:5001/api/parts-vendors');
+      const data = await res.json();
+      if (data.data) {
+        setVendorsList(data.data);
+      }
+    } catch (e) {
+      console.error('Failed to load vendors', e);
+    }
+  };
 
   const load = useCallback(async () => {
     const [b, s] = await Promise.all([
@@ -64,7 +80,20 @@ export default function Batteries() {
     if (s.success) setStats(s.data);
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    loadVendors();
+  }, [load]);
+
+  const openAddModal = () => {
+    loadVendors();
+    setForm(EMPTY_FORM);
+    setVendorMode('select');
+    setCustomVendor('');
+    setSaveAsNewVendor(false);
+    setError('');
+    setShowAdd(true);
+  };
 
   const filtered = batteries.filter(b => {
     const matchSearch = !search ||
@@ -80,15 +109,42 @@ export default function Batteries() {
     if (!form.serial_number || !form.brand || !form.model) {
       setError('Serial number, brand and model are required'); return;
     }
+
+    let finalVendor = form.vendor;
+    if (vendorMode === 'custom') {
+      if (!customVendor.trim()) {
+        setError('Please enter custom vendor name or choose an existing vendor');
+        return;
+      }
+      finalVendor = customVendor.trim();
+
+      if (saveAsNewVendor) {
+        try {
+          await fetch('http://localhost:5001/api/parts-vendors', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              vendor_name: finalVendor,
+              payment_terms: 'cash',
+              status: 'Active',
+            }),
+          });
+          loadVendors();
+        } catch (err) {
+          console.error('Could not auto-save custom vendor', err);
+        }
+      }
+    }
+
     setSaving(true); setError('');
     try {
       const res = await fetch(API, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
+        body: JSON.stringify({ ...form, vendor: finalVendor })
       });
       const data = await res.json();
       if (!data.success) { setError(data.message); return; }
-      setShowAdd(false); setForm(EMPTY_FORM); load();
+      setShowAdd(false); setForm(EMPTY_FORM); setCustomVendor(''); load(); loadVendors();
     } catch { setError('Server error'); }
     finally { setSaving(false); }
   };
@@ -101,7 +157,7 @@ export default function Batteries() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Battery Inventory</h1>
           <p className="text-sm text-slate-500 mt-0.5">Central battery stock · Maintenance → Parts & Inventory → Batteries</p>
         </div>
-        <button onClick={() => { setShowAdd(true); setError(''); setForm(EMPTY_FORM); }}
+        <button onClick={openAddModal}
           className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium shadow-sm transition-colors">
           <FiPlus className="w-4 h-4" /> Add Battery
         </button>
@@ -234,7 +290,84 @@ export default function Batteries() {
                 <Field label="Location" name="location" value={form.location} onChange={e => setForm({...form, location: e.target.value})} placeholder="e.g. Warehouse or Workshop" />
                 <Field label="Purchase Date" name="purchase_date" type="date" value={form.purchase_date} onChange={e => setForm({...form, purchase_date: e.target.value})} />
                 <Field label="Warranty Period (Months)" name="warranty_period_months" type="number" value={form.warranty_period_months} onChange={e => setForm({...form, warranty_period_months: e.target.value})} placeholder="e.g. 24" />
-                <Field label="Vendor" name="vendor" value={form.vendor} onChange={e => setForm({...form, vendor: e.target.value})} placeholder="e.g. Auto Parts Hub" />
+                
+                {/* Dynamic Vendor Dropdown & Custom Vendor */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-sm font-medium text-slate-700">Vendor / Supplier</label>
+                    {vendorMode === 'select' ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVendorMode('custom');
+                          setCustomVendor('');
+                        }}
+                        className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline"
+                      >
+                        + Add Custom
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVendorMode('select');
+                          setForm(f => ({ ...f, vendor: '' }));
+                        }}
+                        className="text-xs font-medium text-slate-500 hover:text-slate-800 underline"
+                      >
+                        ← Choose from list
+                      </button>
+                    )}
+                  </div>
+
+                  {vendorMode === 'select' ? (
+                    <select
+                      value={form.vendor}
+                      onChange={e => {
+                        if (e.target.value === '__custom__') {
+                          setVendorMode('custom');
+                          setCustomVendor('');
+                        } else {
+                          setForm(f => ({ ...f, vendor: e.target.value }));
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      <option value="">-- Select Battery Vendor --</option>
+                      {vendorsList.map(v => (
+                        <option key={v.id || v.vendor_name} value={v.vendor_name}>
+                          {v.vendor_name}
+                        </option>
+                      ))}
+                      <option value="__custom__" className="font-bold text-indigo-600">
+                        ➕ + Add Custom / New Vendor
+                      </option>
+                    </select>
+                  ) : (
+                    <div className="space-y-2 p-2.5 bg-indigo-50/50 border border-indigo-100 rounded-lg">
+                      <input
+                        type="text"
+                        value={customVendor}
+                        onChange={e => setCustomVendor(e.target.value)}
+                        placeholder="e.g. Exide Power Zone / Balaji Batteries"
+                        className="w-full px-3 py-1.5 bg-white border border-indigo-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        autoFocus
+                      />
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={saveAsNewVendor}
+                          onChange={e => setSaveAsNewVendor(e.target.checked)}
+                          className="w-3.5 h-3.5 accent-indigo-600 rounded"
+                        />
+                        <span className="text-xs text-slate-600 font-medium">
+                          Save as reusable vendor in Parts &amp; Vendors
+                        </span>
+                      </label>
+                    </div>
+                  )}
+                </div>
+
                 <Field label="Purchase Cost (₹)" name="purchase_cost" type="number" value={form.purchase_cost} onChange={e => setForm({...form, purchase_cost: e.target.value})} placeholder="e.g. 8500" />
               </div>
               <Field label="Compatible Vehicle Types" name="compatible_vehicle_types" value={form.compatible_vehicle_types} onChange={e => setForm({...form, compatible_vehicle_types: e.target.value})} placeholder="e.g. Truck, Bus, Tipper" />

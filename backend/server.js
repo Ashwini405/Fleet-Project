@@ -92,6 +92,8 @@ const rtaPaymentRoutes =
 require("./routes/rtaPaymentRoutes");
 const driverSettlementRoutes =
 require("./routes/driverSettlementRoutes");
+const staffSalaryRoutes = require("./routes/staffSalaryRoutes");
+
 
 const truckPLRoutes = require("./routes/truckPLRoutes");
 const reportsRoutes = require("./routes/reportsRoutes");
@@ -107,6 +109,16 @@ const roleRoutes = require("./routes/roleRoutes");
 const backupRestoreRoutes = require("./routes/backupRestoreRoutes");
 const authRoutes = require("./routes/authRoutes");
 
+// Truck assignments must support the same dynamic categories as warehouse inventory.
+db.query(`
+  ALTER TABLE truck_inventory
+  MODIFY COLUMN category VARCHAR(150) NOT NULL DEFAULT 'Others'
+`).then(() => console.log('truck_inventory category schema ready'))
+  .catch(e => {
+    if (e.code !== 'ER_NO_SUCH_TABLE') {
+      console.error('truck_inventory schema update error:', e.message);
+    }
+  });
 
 // Auto-create tyre_notifications table
 db.query(`
@@ -164,6 +176,167 @@ db.query(`
   // Start cron AFTER table is confirmed ready
   startWarrantyExpiryChecker();
 }).catch(e => console.error('warranty_notifications table error:', e.message));
+
+// Ensure employees and supervisors table columns exist
+const ensureStaffColumns = async () => {
+  try {
+    const employeeCols = [
+      "ALTER TABLE employees ADD COLUMN id_card_number VARCHAR(100) DEFAULT NULL",
+      "ALTER TABLE employees ADD COLUMN address TEXT DEFAULT NULL",
+      "ALTER TABLE employees ADD COLUMN station_id INT DEFAULT NULL",
+      "ALTER TABLE employees ADD COLUMN wallet_balance DECIMAL(12,2) DEFAULT 0.00",
+      "ALTER TABLE employees ADD COLUMN bank_name VARCHAR(150) DEFAULT NULL",
+      "ALTER TABLE employees ADD COLUMN account_number VARCHAR(100) DEFAULT NULL",
+      "ALTER TABLE employees ADD COLUMN ifsc_code VARCHAR(50) DEFAULT NULL",
+      "ALTER TABLE employees ADD COLUMN notes TEXT DEFAULT NULL",
+      "ALTER TABLE employees ADD COLUMN profile_photo VARCHAR(255) DEFAULT NULL",
+      "ALTER TABLE employees ADD COLUMN id_document VARCHAR(255) DEFAULT NULL",
+      "ALTER TABLE employees ADD COLUMN bank_document VARCHAR(255) DEFAULT NULL",
+    ];
+
+    for (const q of employeeCols) {
+      try {
+        await db.query(q);
+      } catch (err) {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+          // ignore already existing columns
+        }
+      }
+    }
+
+    const supervisorCols = [
+      "ALTER TABLE supervisors ADD COLUMN supervisor_code VARCHAR(30) DEFAULT NULL",
+      "ALTER TABLE supervisors ADD COLUMN email VARCHAR(150) DEFAULT NULL",
+      "ALTER TABLE supervisors ADD COLUMN wallet_balance DECIMAL(12,2) DEFAULT 0.00",
+      "ALTER TABLE supervisors ADD COLUMN notes TEXT DEFAULT NULL",
+      "ALTER TABLE supervisors ADD COLUMN profile_photo VARCHAR(255) DEFAULT NULL",
+      "ALTER TABLE supervisors ADD COLUMN id_document VARCHAR(255) DEFAULT NULL",
+      "ALTER TABLE supervisors ADD COLUMN bank_document VARCHAR(255) DEFAULT NULL",
+    ];
+
+    for (const q of supervisorCols) {
+      try {
+        await db.query(q);
+      } catch (err) {
+        if (err.code !== 'ER_DUP_FIELDNAME') {
+          // ignore already existing columns
+        }
+      }
+    }
+
+    console.log('Employees and Supervisors schema check completed successfully.');
+  } catch (err) {
+    console.error('Staff schema migration error:', err.message);
+  }
+};
+ensureStaffColumns();
+
+// Auto-sync existing paid Driver Settlements and Staff Salaries to expense_entries
+const syncPayrollToExpenseLedger = async () => {
+  try {
+    // 1. Sync Paid Driver Settlements
+    const [paidSettlements] = await db.query("SELECT * FROM driver_settlements WHERE status = 'Paid'");
+    for (const s of paidSettlements) {
+      const expNum = s.settlement_no || `STL-${String(s.id).padStart(4, '0')}`;
+      const [existing] = await db.query(
+        "SELECT id FROM expense_entries WHERE expense_number = ? OR (vendor_payee = ? AND salary_month = ? AND expense_category = 'Driver Settlement')",
+        [expNum, s.driver_name, s.statement_month]
+      );
+      if (existing.length === 0) {
+        await db.query(`
+          INSERT INTO expense_entries (
+            expense_number,
+            expense_category,
+            expense_title,
+            vehicle_id,
+            vehicle_number,
+            driver_id,
+            driver_name,
+            station_name,
+            expense_date,
+            amount,
+            payment_method,
+            payment_status,
+            vendor_payee,
+            description,
+            salary_month,
+            salary_type,
+            salary_payment_mode,
+            entry_status,
+            created_by
+          ) VALUES (?, 'Driver Settlement', ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Paid', ?, ?, ?, 'Driver', ?, 'Approved', 'Driver Payroll')
+        `, [
+          expNum,
+          `Driver Settlement for ${s.driver_name || 'Driver'} (${s.statement_month || ''})`,
+          s.vehicle_id || null,
+          s.vehicle_no || null,
+          s.driver_id || null,
+          s.driver_name || null,
+          s.plant_name || 'Main Plant',
+          s.payment_date || s.approved_date || s.created_at,
+          s.net_payable,
+          s.payment_method || 'Bank Transfer',
+          s.driver_name || 'Driver',
+          `Settlement #${s.settlement_no || s.id}, Vehicle: ${s.vehicle_no}, Month: ${s.statement_month}.`,
+          s.statement_month,
+          s.payment_method || 'Bank Transfer'
+        ]);
+      }
+    }
+
+    // 2. Sync Paid Staff Salaries
+    try {
+      const [paidStaff] = await db.query("SELECT * FROM staff_salaries WHERE status = 'Paid'");
+      for (const st of paidStaff) {
+        const expNum = st.salary_slip_no || `SAL-${String(st.id).padStart(4, '0')}`;
+        const [existing] = await db.query(
+          "SELECT id FROM expense_entries WHERE expense_number = ? OR (vendor_payee = ? AND salary_month = ? AND expense_category = 'Staff Salary')",
+          [expNum, st.staff_name, st.salary_month]
+        );
+        if (existing.length === 0) {
+          await db.query(`
+            INSERT INTO expense_entries (
+              expense_number,
+              expense_category,
+              expense_title,
+              station_name,
+              expense_date,
+              amount,
+              payment_method,
+              payment_status,
+              vendor_payee,
+              description,
+              salary_month,
+              salary_type,
+              salary_payment_mode,
+              entry_status,
+              created_by
+            ) VALUES (?, 'Staff Salary', ?, ?, ?, ?, ?, 'Paid', ?, ?, ?, ?, ?, 'Approved', 'Staff Payroll')
+          `, [
+            expNum,
+            `Salary for ${st.staff_name || 'Staff'} (${st.staff_type || 'Employee'} - ${st.salary_month || ''})`,
+            st.plant_name || st.department_or_station || 'Main Station',
+            st.payment_date || st.created_at || new Date(),
+            st.net_payable,
+            st.payment_mode || 'Bank Transfer',
+            st.staff_name || 'Staff Member',
+            `Slip: ${expNum}, Mode: ${st.payment_mode || 'Bank Transfer'}, Ref: ${st.payment_reference || 'N/A'}`,
+            st.salary_month,
+            st.staff_type || 'Employee',
+            st.payment_mode || 'Bank Transfer'
+          ]);
+        }
+      }
+    } catch (staffErr) {
+      // staff_salaries table check
+    }
+
+    console.log('Payroll sync to expense_entries completed.');
+  } catch (err) {
+    console.error('Payroll ledger sync error:', err.message);
+  }
+};
+syncPayrollToExpenseLedger();
 
 
 // 🔥 MIDDLEWARE
@@ -334,6 +507,11 @@ app.use(
   "/api/driver-settlements",
   driverSettlementRoutes
 );
+app.use(
+  "/api/staff-salaries",
+  staffSalaryRoutes
+);
+
 
 app.use("/api/truck-pl", truckPLRoutes);
 app.use("/api/reports", reportsRoutes);

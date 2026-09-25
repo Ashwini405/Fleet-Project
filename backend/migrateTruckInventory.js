@@ -14,10 +14,15 @@ async function migrate() {
         quantity INT NOT NULL DEFAULT 1,
         assigned_date DATE DEFAULT NULL,
         \`condition\` ENUM('Good','Average','Poor') NOT NULL DEFAULT 'Good',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        category VARCHAR(150) NOT NULL DEFAULT 'Others',
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_vehicle (vehicle_id)
       )
+    `);
+
+    await conn.query(`
+      ALTER TABLE truck_inventory
+      MODIFY COLUMN category VARCHAR(150) NOT NULL DEFAULT 'Others'
     `);
 
     console.log('✅ truck_inventory table created successfully');

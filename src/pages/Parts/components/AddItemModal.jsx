@@ -1,20 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 
-const CATEGORIES = ['Spares', 'Tubes', 'Lubricants', 'Others'];
-const empty = {
-  category: 'Spares',
-  item_name: '',
-  brand: '',
-  serial_number: '',
-  quantity: '',
-  date_of_entry: new Date().toISOString().split('T')[0],
-};
+const DEFAULT_CATEGORIES = ['Spares', 'Batteries', 'Tubes', 'Lubricants', 'Electrical', 'Others'];
 
-export default function AddItemModal({ isOpen, onClose, onSuccess }) {
+export default function AddItemModal({ isOpen, onClose, onSuccess, defaultCategory = 'Spares', categories = DEFAULT_CATEGORIES }) {
+  const normalizeCategory = (value) => {
+    const trimmed = (value || '').trim();
+    if (!trimmed) return 'Spares';
+    return trimmed;
+  };
+
+  const empty = {
+    category: normalizeCategory(defaultCategory),
+    item_name: '',
+    brand: '',
+    serial_number: '',
+    quantity: '',
+    cost_price: '',
+    date_of_entry: new Date().toISOString().split('T')[0],
+  };
+
   const [form, setForm] = useState(empty);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (isOpen) {
+      const category = categories.includes(defaultCategory) ? defaultCategory : (categories[0] || 'Spares');
+      setForm({ ...empty, category });
+      setError('');
+    }
+  }, [isOpen, defaultCategory, categories]);
 
   if (!isOpen) return null;
 
@@ -23,7 +39,9 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.item_name.trim()) return setError('Item name is required.');
+    if (!form.category.trim()) return setError('Select a category. Choose Others if you are unsure.');
     if (!form.quantity || Number(form.quantity) <= 0) return setError('Enter a valid quantity.');
+    if (!form.cost_price || Number(form.cost_price) <= 0) return setError('Cost price must be greater than 0.');
     setError('');
     setLoading(true);
     try {
@@ -34,6 +52,8 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }) {
       body.append('sku', form.serial_number.trim());
       body.append('current_stock', form.quantity);
       body.append('opening_stock', form.quantity);
+      body.append('cost_price', form.cost_price);
+      body.append('inventory_value', Number(form.quantity) * Number(form.cost_price));
       body.append('expiry_date', form.date_of_entry);
       const res = await fetch('http://localhost:5001/api/inventory', { method: 'POST', body });
       const data = await res.json();
@@ -67,10 +87,17 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }) {
 
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1">Item Category</label>
-            <select value={form.category} onChange={e => set('category', e.target.value)}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white">
-              {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-            </select>
+            <input
+              list="inventory-category-list"
+              value={form.category}
+              onChange={e => set('category', e.target.value)}
+              placeholder="Select or type new category"
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500 bg-white"
+            />
+            <datalist id="inventory-category-list">
+              {categories.map(c => <option key={c} value={c} />)}
+            </datalist>
+            <p className="text-[10px] text-slate-400 mt-1">Not sure where it belongs? Choose <span className="font-semibold">Others</span>. You can edit the category later.</p>
           </div>
 
           <div>
@@ -90,13 +117,23 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1">Serial Number</label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">SKU / Serial Number</label>
             <input value={form.serial_number} onChange={e => set('serial_number', e.target.value)}
               placeholder="e.g. SN-00123"
               className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
+            <p className="text-[10px] text-slate-400 mt-1">Must be unique. Leave blank if this item has no SKU.</p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">
+                Cost Price (per unit) <span className="text-red-500">*</span>
+              </label>
+              <input type="number" min="0.01" step="0.01" value={form.cost_price}
+                onChange={e => set('cost_price', e.target.value)}
+                placeholder="e.g. 560"
+                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
+            </div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">
                 Quantity <span className="text-red-500">*</span>
@@ -105,11 +142,21 @@ export default function AddItemModal({ isOpen, onClose, onSuccess }) {
                 placeholder="0"
                 className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Date of Entry</label>
-              <input type="date" value={form.date_of_entry} onChange={e => set('date_of_entry', e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
+          </div>
+
+          {Number(form.quantity) > 0 && Number(form.cost_price) > 0 && (
+            <div className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5">
+              <span className="text-xs font-semibold text-emerald-700">Total Inventory Value</span>
+              <span className="text-sm font-black text-emerald-700">
+                ₹{(Number(form.quantity) * Number(form.cost_price)).toLocaleString('en-IN')}
+              </span>
             </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">Date of Entry</label>
+            <input type="date" value={form.date_of_entry} onChange={e => set('date_of_entry', e.target.value)}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-500" />
           </div>
 
           <div className="flex gap-3 pt-1">

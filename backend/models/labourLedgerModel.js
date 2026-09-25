@@ -47,6 +47,27 @@ const getVendorLedger = async (vendorId) => {
       });
     });
 
+    const [paymentRows] = await db.query(
+      `SELECT * FROM vendor_payments
+        WHERE vendor_id = ? AND (vendor_category IN ('labour', 'labour_vendors') OR vendor_category IS NULL)
+        ORDER BY payment_date ASC, id ASC`,
+      [vendorId]
+    );
+
+    paymentRows.forEach(row => {
+      transactions.push({
+        id: `PAY-${row.id}`,
+        date: row.payment_date,
+        type: 'Payment',
+        ref: row.reference_number || `PAY-${row.id}`,
+        desc: `${row.payment_mode || 'Bank'} Payment${row.notes ? ' — ' + row.notes : ''}`,
+        debit: 0,
+        credit: Number(row.amount || 0),
+        receipt_files: row.receipt_files,
+        status: 'Completed',
+      });
+    });
+
     transactions.sort(
       (a, b) => new Date(a.date) - new Date(b.date)
     );

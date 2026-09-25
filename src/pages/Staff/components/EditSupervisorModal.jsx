@@ -19,7 +19,11 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
     notes: ''
   });
   const [saving, setSaving] = useState(false);
-  const [profilePhoto, setProfilePhoto] = useState(null);
+  const [files, setFiles] = useState({
+    profile_photo: null,
+    id_document: null,
+    bank_document: null
+  });
 
   // Fetch stations from backend — only once the modal is actually opened
   useEffect(() => {
@@ -51,7 +55,11 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
         ifsc_code: staff.ifsc_code || '',
         notes: staff.notes || ''
       });
-      setProfilePhoto(null);
+      setFiles({
+        profile_photo: null,
+        id_document: null,
+        bank_document: null
+      });
     }
   }, [staff]);
 
@@ -61,14 +69,24 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleFileChange = (e, field) => {
+    if (e.target.files && e.target.files[0]) {
+      setFiles(prev => ({ ...prev, [field]: e.target.files[0] }));
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setSaving(true);
 
       const body = new FormData();
-      Object.entries(formData).forEach(([key, value]) => body.append(key, value));
-      if (profilePhoto) body.append('profile_photo', profilePhoto);
+      Object.entries(formData).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) body.append(key, value);
+      });
+      if (files.profile_photo) body.append('profile_photo', files.profile_photo);
+      if (files.id_document) body.append('id_document', files.id_document);
+      if (files.bank_document) body.append('bank_document', files.bank_document);
 
       const response = await fetch(`http://localhost:5001/api/supervisors/${staff.id}`, {
         method: 'PUT',
@@ -126,7 +144,7 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                 type="button"
                 className={`flex-1 flex items-center justify-center gap-2 py-4 text-sm font-bold border-b-2 transition-colors ${
                   activeTab === tab.id
-                  ? 'border-blue-600 text-blue-600'
+                  ? 'border-amber-600 text-amber-700 bg-amber-50/20'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
                 }`}>
                 {tab.icon} {tab.label}
@@ -145,7 +163,7 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                       name="full_name"
                       value={formData.full_name}
                       onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition-all"
                       required
                     />
                   </div>
@@ -156,7 +174,7 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                       name="mobile"
                       value={formData.mobile}
                       onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition-all"
                       required
                     />
                   </div>
@@ -167,7 +185,7 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                       name="id_card_number"
                       value={formData.id_card_number}
                       onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition-all"
                     />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
@@ -176,7 +194,7 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                       name="status"
                       value={formData.status}
                       onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all text-gray-700"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition-all text-gray-700"
                     >
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
@@ -189,7 +207,7 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                       rows="2"
                       value={formData.address}
                       onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all resize-none"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition-all resize-none"
                     ></textarea>
                   </div>
                   <div className="col-span-2">
@@ -200,7 +218,7 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                       placeholder="Any additional notes about this supervisor..."
                       value={formData.notes}
                       onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all resize-none"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition-all resize-none"
                     ></textarea>
                   </div>
                   <div className="col-span-2 sm:col-span-1">
@@ -211,7 +229,7 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                       value={formData.wallet_balance}
                       onChange={handleChange}
                       placeholder="e.g. 10000"
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition-all"
                     />
                     <p className="text-[10px] text-gray-400 mt-1">Current cash balance of this supervisor</p>
                   </div>
@@ -226,7 +244,7 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                       name="station_id"
                       value={formData.station_id}
                       onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition-all"
                     >
                       <option value="">-- Select Station --</option>
                       {stations.map(st => (
@@ -248,17 +266,17 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                       name="bank_name"
                       value={formData.bank_name}
                       onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition-all"
                     />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Account Number</label>
                     <input
-                      type="password"
+                      type="text"
                       name="account_number"
                       value={formData.account_number}
                       onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition-all font-mono"
                     />
                   </div>
                   <div className="col-span-2 sm:col-span-1">
@@ -268,7 +286,7 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                       name="ifsc_code"
                       value={formData.ifsc_code}
                       onChange={handleChange}
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm transition-all uppercase"
+                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition-all uppercase font-mono"
                     />
                   </div>
                 </motion.div>
@@ -276,25 +294,74 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
 
               {activeTab === 'uploads' && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                  <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 border-dashed rounded-xl">
+                  {/* Photo */}
+                  <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-xl">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
+                      <div className="w-10 h-10 bg-amber-50 rounded-lg flex items-center justify-center text-amber-600">
                         <FileUp className="w-5 h-5" />
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-gray-800">Profile Photo</p>
                         <p className="text-[11px] text-gray-500">
-                          {profilePhoto?.name || (staff.profile_photo ? 'Photo uploaded' : 'PNG or JPG (Max. 5MB)')}
+                          {files.profile_photo?.name || (staff.profile_photo ? 'Photo currently uploaded' : 'PNG or JPG (Max. 5MB)')}
                         </p>
                       </div>
                     </div>
-                    <label className="cursor-pointer px-4 py-2 bg-white border border-gray-200 hover:border-blue-500 hover:text-blue-600 rounded-lg text-sm font-bold text-gray-600 transition-colors shadow-sm">
-                      {profilePhoto || staff.profile_photo ? 'Change' : 'Select Photo'}
+                    <label className="cursor-pointer px-4 py-2 bg-white border border-gray-200 hover:border-amber-500 hover:text-amber-700 rounded-lg text-sm font-bold text-gray-600 transition-colors shadow-sm">
+                      {files.profile_photo || staff.profile_photo ? 'Change Photo' : 'Select Photo'}
                       <input
                         type="file"
                         className="hidden"
-                        accept=".jpg,.jpeg,.png"
-                        onChange={(event) => setProfilePhoto(event.target.files[0] || null)}
+                        accept="image/*"
+                        onChange={(e) => handleFileChange(e, 'profile_photo')}
+                      />
+                    </label>
+                  </div>
+
+                  {/* ID Document */}
+                  <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
+                        <FileUp className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">ID Document (Aadhar / PAN)</p>
+                        <p className="text-[11px] text-gray-500">
+                          {files.id_document?.name || (staff.id_document ? 'Document currently uploaded' : 'PDF or Image (Max. 5MB)')}
+                        </p>
+                      </div>
+                    </div>
+                    <label className="cursor-pointer px-4 py-2 bg-white border border-gray-200 hover:border-blue-500 hover:text-blue-700 rounded-lg text-sm font-bold text-gray-600 transition-colors shadow-sm">
+                      {files.id_document || staff.id_document ? 'Change Document' : 'Select Document'}
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*,application/pdf"
+                        onChange={(e) => handleFileChange(e, 'id_document')}
+                      />
+                    </label>
+                  </div>
+
+                  {/* Bank Document */}
+                  <div className="flex items-center justify-between p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600">
+                        <FileUp className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">Bank Document (Passbook / Cheque)</p>
+                        <p className="text-[11px] text-gray-500">
+                          {files.bank_document?.name || (staff.bank_document ? 'Document currently uploaded' : 'PDF or Image (Max. 5MB)')}
+                        </p>
+                      </div>
+                    </div>
+                    <label className="cursor-pointer px-4 py-2 bg-white border border-gray-200 hover:border-emerald-500 hover:text-emerald-700 rounded-lg text-sm font-bold text-gray-600 transition-colors shadow-sm">
+                      {files.bank_document || staff.bank_document ? 'Change Document' : 'Select Document'}
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept="image/*,application/pdf"
+                        onChange={(e) => handleFileChange(e, 'bank_document')}
                       />
                     </label>
                   </div>

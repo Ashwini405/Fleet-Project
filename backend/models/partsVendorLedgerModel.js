@@ -1,5 +1,5 @@
 const db =
-require("../config/db");
+  require("../config/db");
 
 const PartsVendorLedger = {
 
@@ -37,9 +37,32 @@ const PartsVendorLedger = {
         [vendor.vendor_name]
       );
 
+    const [returns] = await db.query(
+      `SELECT r.*, p.part_name, p.category
+         FROM part_returns r
+         LEFT JOIN inventory_parts p ON p.id = r.part_id
+         WHERE LOWER(TRIM(COALESCE(r.vendor_name, ''))) = LOWER(TRIM(?))
+            OR r.po_number IN (
+              SELECT po_number FROM inventory_purchase_orders
+              WHERE LOWER(TRIM(vendor)) = LOWER(TRIM(?))
+            )
+         ORDER BY r.id DESC`,
+      [vendor.vendor_name, vendor.vendor_name]
+    );
+
+    const [payments] = await db.query(
+      `SELECT *
+         FROM vendor_payments
+        WHERE vendor_id = ? AND (vendor_category IN ('parts', 'parts_vendor', 'parts_vendors') OR vendor_category IS NULL)
+        ORDER BY payment_date ASC, id ASC`,
+      [vendorId]
+    );
+
     return {
       vendor,
-      orders
+      orders,
+      returns,
+      payments
     };
 
   }
@@ -47,4 +70,4 @@ const PartsVendorLedger = {
 };
 
 module.exports =
-PartsVendorLedger;
+  PartsVendorLedger;

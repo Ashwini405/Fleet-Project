@@ -1,16 +1,10 @@
 import React, { useState } from 'react';
 import { FiX, FiCheckCircle, FiPhone, FiMail, FiMapPin, FiHome, FiUser, FiCreditCard, FiTrendingUp, FiTrendingDown, FiShoppingBag, FiClock } from 'react-icons/fi';
-import { PAYMENT_METHODS, MODAL_ANIM, TYPE_STYLES, STATUS_STYLES } from './constants';
+import { PAYMENT_METHODS, MODAL_ANIM, TYPE_STYLES, STATUS_STYLES, fmtDate } from './constants';
 import RecordPaymentModal from './RecordPaymentModal';
 import TransactionModal from './TransactionModal';
 
-// ── Date formatting ────────────────────────────────────────────────────────
-export function fmtDate(d) {
-  if (!d) return '—';
-  const dt = new Date(d);
-  if (isNaN(dt.getTime())) return '—';
-  return dt.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
-}
+export { fmtDate };
 
 // ── TypeBadge ──────────────────────────────────────────────────────────────
 export function TypeBadge({ type }) {
@@ -63,27 +57,27 @@ export function VendorInfoPanel({ vendor, categoryLabel }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {vendor.mobile_number && (
               <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                <FiPhone className="text-gray-400 shrink-0" size={12}/> {vendor.mobile_number}
+                <FiPhone className="text-gray-400 shrink-0" size={12} /> {vendor.mobile_number}
               </div>
             )}
             {vendor.email && (
               <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                <FiMail className="text-gray-400 shrink-0" size={12}/> {vendor.email}
+                <FiMail className="text-gray-400 shrink-0" size={12} /> {vendor.email}
               </div>
             )}
             {vendor.address_location && (
               <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                <FiMapPin className="text-gray-400 shrink-0" size={12}/> {vendor.address_location}
+                <FiMapPin className="text-gray-400 shrink-0" size={12} /> {vendor.address_location}
               </div>
             )}
             {vendor.gst_number && (
               <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                <FiCreditCard className="text-gray-400 shrink-0" size={12}/> GST: {vendor.gst_number}
+                <FiCreditCard className="text-gray-400 shrink-0" size={12} /> GST: {vendor.gst_number}
               </div>
             )}
             {vendor.contact_person && (
               <div className="flex items-center gap-2 text-xs text-gray-500 font-medium">
-                <FiUser className="text-gray-400 shrink-0" size={12}/> {vendor.contact_person}
+                <FiUser className="text-gray-400 shrink-0" size={12} /> {vendor.contact_person}
                 {vendor.designation && ` · ${vendor.designation}`}
               </div>
             )}
@@ -91,7 +85,7 @@ export function VendorInfoPanel({ vendor, categoryLabel }) {
         </div>
         <div className="flex items-start gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100 sm:min-w-[200px]">
           <div className="w-9 h-9 bg-white rounded-lg flex items-center justify-center text-gray-400 shadow-sm border border-gray-100 shrink-0">
-            <FiHome size={15}/>
+            <FiHome size={15} />
           </div>
           <div>
             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Bank Details</div>
@@ -110,9 +104,9 @@ export function VendorInfoPanel({ vendor, categoryLabel }) {
 export function CollectReceiptModal({ isOpen, onClose, onSave, vendorName, receivable }) {
   const today = new Date().toISOString().split('T')[0];
   const EMPTY = { date: today, amount: '', method: 'Cash', ref: '', remarks: '' };
-  const [form, setForm]     = useState(EMPTY);
+  const [form, setForm] = useState(EMPTY);
   const [errors, setErrors] = useState({});
-  const [toast, setToast]   = useState(false);
+  const [toast, setToast] = useState(false);
 
   if (!isOpen) return null;
 
@@ -121,7 +115,7 @@ export function CollectReceiptModal({ isOpen, onClose, onSave, vendorName, recei
 
   const validate = () => {
     const e = {};
-    if (!form.date)          e.date   = 'Date is required';
+    if (!form.date) e.date = 'Date is required';
     if (!form.amount || totalAmt <= 0) e.amount = 'Enter a valid amount';
     return e;
   };
@@ -135,9 +129,9 @@ export function CollectReceiptModal({ isOpen, onClose, onSave, vendorName, recei
     setTimeout(() => { setToast(false); setForm(EMPTY); setErrors({}); onClose(); }, 1400);
   };
 
-  const iCls  = 'w-full p-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm';
+  const iCls = 'w-full p-3 bg-white border border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 text-sm';
   const iECls = 'w-full p-3 bg-white border border-red-300 rounded-xl focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-300 text-sm';
-  const lCls  = 'block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1';
+  const lCls = 'block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1';
   const loCls = 'block text-xs font-bold text-gray-400 uppercase tracking-widest mb-1';
 
   return (
@@ -163,9 +157,8 @@ export function CollectReceiptModal({ isOpen, onClose, onSave, vendorName, recei
             <div className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 flex items-center justify-between">
               <span>{vendorName}</span>
               {receivable != null && (
-                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                  receivable <= 0 ? 'bg-gray-100 text-gray-500' : 'bg-emerald-100 text-emerald-700'
-                }`}>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${receivable <= 0 ? 'bg-gray-100 text-gray-500' : 'bg-emerald-100 text-emerald-700'
+                  }`}>
                   {receivable <= 0 ? 'Collected' : `₹${receivable.toLocaleString()} Pending`}
                 </span>
               )}
@@ -226,27 +219,50 @@ export function SummaryCards({ totalDebit, totalCredit, lastDate, isCash = false
   const outstanding = isCash ? 0 : totalDebit - totalCredit;
   // If net credit > debit, this is a receivable vendor (e.g. scrap buyer)
   const isReceivable = !isCash && outstanding < 0;
-  const outColor = isCash ? 'text-violet-600' : outstanding === 0 ? 'text-gray-400' : isReceivable ? 'text-emerald-600' : outstanding > 20000 ? 'text-red-600' : outstanding > 5000 ? 'text-yellow-600' : 'text-green-600';
-  const outBg    = isCash ? 'bg-violet-50'    : outstanding === 0 ? 'bg-gray-50'    : isReceivable ? 'bg-emerald-50'   : outstanding > 20000 ? 'bg-red-50'    : outstanding > 5000 ? 'bg-yellow-50'    : 'bg-green-50';
-  const outSub   = isCash ? 'Settled (Cash Vendor)' : outstanding === 0 ? 'Fully Settled' : isReceivable ? 'Receivable (Pending Collection)' : 'Payable';
+  const outColor = isCash ? 'text-violet-600' : outstanding === 0 ? 'text-gray-700' : isReceivable ? 'text-green-600' : 'text-red-600';
+  const outBg = isCash ? 'bg-violet-50' : outstanding === 0 ? 'bg-gray-50' : isReceivable ? 'bg-green-50' : 'bg-red-50';
+  const outLabel = isCash ? 'Payment Term' : isReceivable ? 'Advance / Credit Balance' : 'Net Outstanding Balance';
+  const outSub = isCash
+    ? 'Cash (Paid on Delivery)'
+    : outstanding === 0
+      ? 'All Accounts Settled'
+      : isReceivable
+        ? 'Vendor owes you credit'
+        : 'Payable (You owe vendor)';
 
-  // Cash vendors never get a separate "Payment" ledger entry — every
-  // purchase is paid in full at the time it's made, so totalCredit stays 0
-  // even though the vendor has genuinely been paid totalDebit in full.
   const cards = [
-    { label: 'Outstanding Balance', value: outstanding === 0 ? '₹0' : `₹${Math.abs(outstanding).toLocaleString()}`, sub: outSub, icon: <FiTrendingUp size={18}/>, color: outColor, bg: outBg },
-    { label: isReceivable ? 'Total Sales' : 'Total Expenses', value: `₹${totalDebit.toLocaleString()}`,  sub: isReceivable ? 'Cumulative sales' : 'Cumulative expenses',    icon: <FiShoppingBag size={18}/>, color: 'text-red-500',   bg: 'bg-red-50'   },
-    { label: isReceivable ? 'Total Collected' : 'Total Payments', value: `₹${(isCash ? totalDebit : totalCredit).toLocaleString()}`, sub: isCash ? 'Paid at purchase (cash vendor)' : 'Cumulative credits', icon: <FiTrendingDown size={18}/>, color: 'text-green-600', bg: 'bg-green-50' },
-    { label: 'Last Transaction',    value: fmtDate(lastDate),                    sub: 'Most recent activity', icon: <FiClock size={18}/>,        color: 'text-blue-600',  bg: 'bg-blue-50'  },
+    {
+      label: outLabel,
+      value: `₹${Math.abs(outstanding).toLocaleString('en-IN')}`,
+      sub: outSub,
+      icon: <FiTrendingUp size={18} />,
+      color: outColor,
+      bg: outBg,
+      badge: isCash ? (
+        <span className="text-[10px] font-bold text-violet-700 bg-violet-50 border border-violet-200 px-2 py-0.5 rounded-full">Cash</span>
+      ) : outstanding > 0 ? (
+        <span className="text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">Payable</span>
+      ) : outstanding < 0 ? (
+        <span className="text-[10px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">Advance Credit</span>
+      ) : (
+        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">Settled (₹0)</span>
+      ),
+    },
+    { label: isReceivable ? 'Total Sales' : 'Total Purchases (Billed)', value: `₹${totalDebit.toLocaleString('en-IN')}`, sub: isReceivable ? 'Cumulative sales' : 'Total value of purchases', icon: <FiShoppingBag size={18} />, color: 'text-slate-800', bg: 'bg-slate-100' },
+    { label: isReceivable ? 'Total Collected' : isCash ? 'Amount Paid' : 'Payments & Credits', value: `₹${(isCash ? totalDebit : totalCredit).toLocaleString('en-IN')}`, sub: isCash ? 'Paid immediately' : 'Paid against payable', icon: <FiTrendingDown size={18} />, color: 'text-green-600', bg: 'bg-green-50' },
+    { label: 'Last Transaction', value: fmtDate(lastDate), sub: 'Most recent activity', icon: <FiClock size={18} />, color: 'text-blue-600', bg: 'bg-blue-50' },
   ];
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
       {cards.map(c => (
         <div key={c.label} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-          <div className={`w-9 h-9 ${c.bg} rounded-xl flex items-center justify-center ${c.color} mb-3`}>{c.icon}</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className={`w-8 h-8 ${c.bg} rounded-xl flex items-center justify-center ${c.color}`}>{c.icon}</div>
+            {c.badge}
+          </div>
           <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">{c.label}</div>
-          <div className={`text-lg font-black ${c.color}`}>{c.value}</div>
+          <div className={`text-xl font-black ${c.color}`}>{c.value}</div>
           <div className="text-[10px] text-gray-400 font-medium mt-0.5">{c.sub}</div>
         </div>
       ))}

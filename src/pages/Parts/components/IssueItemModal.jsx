@@ -79,10 +79,12 @@ export default function IssueItemModal({ isOpen, item, onClose, onSuccess }) {
         body: JSON.stringify({
           partId: item.id,
           qty,
+          vehicleId: selectedVehicle.id,
           vehicleNumber: selectedVehicle.vehicle_no,
           odometer: Number(form.odometer) || 0,
           costPerUnit: Number(form.price_per_unit) || 0,
           date: form.issue_date,
+          condition: 'Good',
         }),
       });
       const data = await res.json();

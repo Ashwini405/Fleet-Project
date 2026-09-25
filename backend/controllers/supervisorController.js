@@ -33,7 +33,9 @@ exports.updateSupervisor = async (req, res) => {
   try {
     const data = {
       ...req.body,
-      profile_photo: req.files?.profile_photo?.[0]?.filename
+      profile_photo: req.files?.profile_photo?.[0]?.filename || null,
+      id_document:   req.files?.id_document?.[0]?.filename   || null,
+      bank_document: req.files?.bank_document?.[0]?.filename || null,
     };
     await Supervisor.update(req.params.id, data);
     res.json({ success: true });

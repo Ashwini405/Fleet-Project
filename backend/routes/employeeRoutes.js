@@ -1,83 +1,46 @@
 const express = require("express");
-
 const router = express.Router();
-
 const EmployeeController = require("../controllers/employeeController");
-const { protect } = require("../middleware/permissionMiddleware");
-const { verifyToken } = require("../middleware/authMiddleware");
+const upload = require("../config/multer");
+
+const employeeUpload = upload.fields([
+  { name: 'profile_photo', maxCount: 1 },
+  { name: 'id_document',   maxCount: 1 },
+  { name: 'bank_document', maxCount: 1 },
+]);
 
 // ==========================================================
 // Employee Master
 // ==========================================================
 
 // Get All Employees
-router.get(
-    "/",
-    ...protect("Staff Management", "view"),
-    EmployeeController.getAllEmployees
-);
+router.get("/", EmployeeController.getAllEmployees);
 
 // Search Employees
-router.get(
-    "/search",
-    ...protect("Staff Management", "view"),
-    EmployeeController.searchEmployees
-);
+router.get("/search", EmployeeController.searchEmployees);
 
-// Employee Dropdown (accessible to anyone with a valid token — needed by User Management)
-router.get(
-    "/dropdown",
-    verifyToken,
-    EmployeeController.getEmployeeDropdown
-);
+// Employee Dropdown
+router.get("/dropdown", EmployeeController.getEmployeeDropdown);
 
 // Department Dropdown
-router.get(
-    "/departments",
-    ...protect("Staff Management", "view"),
-    EmployeeController.getDepartmentList
-);
+router.get("/departments", EmployeeController.getDepartmentList);
 
 // Plant Dropdown
-router.get(
-    "/plants",
-    ...protect("Staff Management", "view"),
-    EmployeeController.getPlantList
-);
+router.get("/plants", EmployeeController.getPlantList);
 
 // Get Employee By ID
-router.get(
-    "/:id",
-    ...protect("Staff Management", "view"),
-    EmployeeController.getEmployeeById
-);
+router.get("/:id", EmployeeController.getEmployeeById);
 
-// Create Employee
-router.post(
-    "/",
-    ...protect("Staff Management", "create"),
-    EmployeeController.createEmployee
-);
+// Create Employee (supports multipart form-data)
+router.post("/", employeeUpload, EmployeeController.createEmployee);
 
-// Update Employee
-router.put(
-    "/:id",
-    ...protect("Staff Management", "edit"),
-    EmployeeController.updateEmployee
-);
+// Update Employee (supports multipart form-data)
+router.put("/:id", employeeUpload, EmployeeController.updateEmployee);
 
 // Update Employee Status
-router.patch(
-    "/:id/status",
-    ...protect("Staff Management", "edit"),
-    EmployeeController.updateEmployeeStatus
-);
+router.patch("/:id/status", EmployeeController.updateEmployeeStatus);
 
 // Delete Employee
-router.delete(
-    "/:id",
-    ...protect("Staff Management", "delete"),
-    EmployeeController.deleteEmployee
-);
+router.delete("/:id", EmployeeController.deleteEmployee);
 
-module.exports = router;
+module.exports = router;
