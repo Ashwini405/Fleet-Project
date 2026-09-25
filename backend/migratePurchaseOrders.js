@@ -1,6 +1,9 @@
 const db = require('./config/db');
 
 const COLUMNS = [
+  { name: 'item_name',        def: 'VARCHAR(255) NULL' },
+  { name: 'quantity',         def: 'INT NULL' },
+  { name: 'category',         def: "VARCHAR(150) NULL DEFAULT 'Others'" },
   { name: 'status_id',        def: 'TINYINT NOT NULL DEFAULT 0' },
   { name: 'approver_name',    def: 'VARCHAR(100) NULL' },
   { name: 'approval_comment', def: 'TEXT NULL' },
@@ -45,6 +48,15 @@ async function migrate() {
       END
     `);
     console.log('✅ status_id back-filled from status column');
+
+    const [orders] = await db.query(`SELECT id, po_number FROM inventory_purchase_orders ORDER BY id ASC`);
+    for (const order of orders) {
+      const serialNumber = `PO-${String(order.id).padStart(6, '0')}`;
+      if (order.po_number === serialNumber) continue;
+      await db.query(`UPDATE part_returns SET po_number = ? WHERE po_number = ?`, [serialNumber, order.po_number]);
+      await db.query(`UPDATE inventory_purchase_orders SET po_number = ? WHERE id = ?`, [serialNumber, order.id]);
+    }
+    console.log('✅ PO numbers normalized to sequential serials');
     console.log('\n🎉 Migration complete!');
   } catch (err) {
     console.error('❌ Migration failed:', err.message);

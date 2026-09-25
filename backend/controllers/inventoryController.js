@@ -22,6 +22,13 @@ exports.createPart = async (req, res) => {
       });
     }
 
+    if (Number(data.cost_price || 0) <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cost price must be greater than 0'
+      });
+    }
+
     // ✅ IMAGE
     let partImage = null;
 
@@ -56,7 +63,7 @@ exports.createPart = async (req, res) => {
         data.sku,
 
       category:
-        data.category,
+        data.category?.trim() || 'Others',
 
       description:
         data.description,
@@ -156,8 +163,14 @@ exports.createPart = async (req, res) => {
       error
     );
 
-    res.status(500).json({
+    if (error.code === 'ER_DUP_ENTRY' && error.sqlMessage?.includes('inventory_parts.sku')) {
+      return res.status(409).json({
+        success: false,
+        message: 'This SKU / serial number already exists. Enter a unique value or leave it blank.'
+      });
+    }
 
+    res.status(500).json({
       success: false,
       message: 'Server Error'
     });
@@ -528,13 +541,15 @@ exports.stockOutPart = async (req, res) => {
 
       partId,
       qty,
+      vehicleId,
       vehicleNumber,
       odometer,
       serviceId,
       date,
       serviceType,
       costPerUnit,
-      vendor
+      vendor,
+      condition
 
     } = req.body;
 
@@ -559,6 +574,15 @@ exports.stockOutPart = async (req, res) => {
 
       [partId]
     );
+
+    let resolvedVehicleId = vehicleId || null;
+    if (!resolvedVehicleId && vehicleNumber) {
+      const [vehicleRows] = await db.query(
+        `SELECT id FROM vehicles WHERE vehicle_no = ? LIMIT 1`,
+        [vehicleNumber]
+      );
+      resolvedVehicleId = vehicleRows[0]?.id || null;
+    }
 
     if (parts.length === 0) {
 
@@ -628,6 +652,39 @@ exports.stockOutPart = async (req, res) => {
       ]
     );
 
+
+    if (resolvedVehicleId) {
+      const [existingTruckRows] = await db.query(
+        `SELECT * FROM truck_inventory WHERE vehicle_id = ? AND part_name = ? LIMIT 1`,
+        [resolvedVehicleId, part.part_name]
+      );
+
+      if (existingTruckRows.length > 0) {
+        const existingItem = existingTruckRows[0];
+        await db.query(
+          `UPDATE truck_inventory
+           SET quantity = quantity + ?,
+               assigned_date = COALESCE(assigned_date, ?),
+               \`condition\` = COALESCE(?, \`condition\`),
+               updated_at = NOW()
+           WHERE id = ?`,
+          [issueQty, date || new Date().toISOString().slice(0, 10), condition || existingItem.condition || 'Good', existingItem.id]
+        );
+      } else {
+        await db.query(
+          `INSERT INTO truck_inventory (vehicle_id, part_name, category, quantity, assigned_date, \`condition\`, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+          [
+            resolvedVehicleId,
+            part.part_name,
+            part.category || 'Spares',
+            issueQty,
+            date || new Date().toISOString().slice(0, 10),
+            condition || 'Good',
+          ]
+        );
+      }
+    }
 
     // ✅ INSERT ISSUE HISTORY
     await db.query(
@@ -915,6 +972,66 @@ exports.createPartReturn = async (req, res) => {
   }
 };
 
+// Return received stock to its vendor and record the vendor credit.
+exports.createVendorReturn = async (req, res) => {
+  const connection = await db.getConnection();
+  try {
+    const {
+      part_id, vendor_name, po_number, quantity_returned,
+      return_date, return_reason, notes, created_by,
+    } = req.body;
+    const quantity = Number(quantity_returned);
+
+    if (!part_id || !vendor_name || !quantity || quantity <= 0 || !return_date) {
+      return res.status(400).json({ success: false, message: 'Part, vendor, quantity and return date are required.' });
+    }
+
+    await connection.beginTransaction();
+    const [parts] = await connection.query('SELECT * FROM inventory_parts WHERE id = ? FOR UPDATE', [part_id]);
+    if (!parts.length) throw new Error('Inventory part not found.');
+    const part = parts[0];
+    const currentStock = Number(part.current_stock || 0);
+    if (quantity > currentStock) throw new Error(`Return quantity cannot exceed current stock (${currentStock}).`);
+
+    let unitCost = Number(part.cost_price || 0);
+    if (unitCost <= 0 && po_number) {
+      const [poRows] = await connection.query(
+        `SELECT total_amount, quantity, items FROM inventory_purchase_orders WHERE po_number = ? LIMIT 1`,
+        [po_number]
+      );
+      const purchase = poRows[0];
+      const poItems = purchase && typeof purchase.items === 'string' ? JSON.parse(purchase.items || '[]') : purchase?.items || [];
+      unitCost = Number(poItems[0]?.unitPrice || poItems[0]?.unit_price || 0);
+      if (unitCost <= 0 && purchase?.quantity) unitCost = Number(purchase.total_amount || 0) / Number(purchase.quantity);
+      if (unitCost > 0) {
+        await connection.query(
+          `UPDATE inventory_parts SET cost_price = ?, updated_at = NOW() WHERE id = ?`,
+          [unitCost, part_id]
+        );
+      }
+    }
+    const creditAmount = quantity * unitCost;
+    await connection.query(
+      `UPDATE inventory_parts SET current_stock = ?, inventory_value = ?, updated_at = NOW() WHERE id = ?`,
+      [currentStock - quantity, (currentStock - quantity) * unitCost, part_id]
+    );
+    const [result] = await connection.query(
+      `INSERT INTO part_returns
+        (part_id, quantity_returned, return_date, condition_on_return, restocked, notes, created_by, vendor_name, po_number, return_reason, credit_amount, return_status)
+       VALUES (?, ?, ?, 'Damaged', 0, ?, ?, ?, ?, ?, ?, 'Pending Pickup')`,
+      [part_id, quantity, return_date, notes || null, created_by || 'Admin', vendor_name, po_number || null, return_reason || 'Other', creditAmount]
+    );
+    await connection.commit();
+    res.status(201).json({ success: true, message: 'Vendor return recorded and stock updated.', data: { id: result.insertId, credit_amount: creditAmount } });
+  } catch (error) {
+    await connection.rollback();
+    console.error('CREATE VENDOR RETURN ERROR:', error);
+    res.status(400).json({ success: false, message: error.message || 'Failed to record vendor return.' });
+  } finally {
+    connection.release();
+  }
+};
+
 // ======================================================
 // ✅ GET PART RETURNS (filterable ledger)
 // ======================================================
@@ -950,7 +1067,11 @@ exports.getPartReturns = async (req, res) => {
       `SELECT
         r.*,
         p.part_name,
-        p.category
+        p.category,
+        COALESCE(r.vendor_name, '') AS vendor_name,
+        COALESCE(r.po_number, '') AS po_number,
+        COALESCE(r.return_reason, r.notes, 'Other') AS return_reason,
+        COALESCE(r.return_status, 'Pending Pickup') AS return_status
       FROM part_returns r
       LEFT JOIN inventory_parts p ON r.part_id = p.id
       ${whereClause}
@@ -1026,6 +1147,9 @@ exports.getPurchaseOrders = async (req, res) => {
         id:              po.id,
         po_number:       po.po_number || `PO-${po.id}`,
         vendor:          po.vendor    || '',
+        category:        po.category  || '',
+        item_name:       po.item_name || items[0]?.partName || '',
+        quantity:        Number(po.quantity || items[0]?.qty || 0),
         status_id,
         status_label,
         total_amount:    Number(po.total_amount || 0),
@@ -1162,23 +1286,27 @@ exports.orderPurchaseOrder = async (req, res) => {
 
 exports.createPurchaseOrder = async (req, res) => {
   try {
-    const { vendor, part_id, item_name, quantity, expected_delivery, notes, requested_by, requested_date } = req.body;
+    const { vendor, part_id, item_name, quantity, unit_price, total_amount, category, expected_delivery, notes, requested_by, requested_date } = req.body;
 
-    if (!vendor || !item_name || !quantity) {
+    if (!vendor || !item_name || !quantity || Number(unit_price || 0) <= 0) {
       return res.status(400).json({ success: false, message: 'Vendor, item and quantity are required.' });
     }
 
     const requestDate = requested_date || new Date().toISOString().slice(0, 10);
     const datePart    = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    const po_number   = `PO-${datePart}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const items = [{ part_id: part_id || null, partName: item_name, qty: Number(quantity), unitPrice: Number(unit_price), notes: notes || '' }];
 
-    const items = [{ part_id: part_id || null, partName: item_name, qty: Number(quantity), notes: notes || '' }];
-
-    await db.query(
+    const [insertResult] = await db.query(
       `INSERT INTO inventory_purchase_orders
-         (po_number, vendor, total_amount, expected_delivery, status, status_id, items, requested_by, requested_date)
-       VALUES (?, ?, 0.00, ?, 'Pending Approval', 0, ?, ?, ?)`,
-      [po_number, vendor, expected_delivery || null, JSON.stringify(items), requested_by || 'Supervisor', requestDate]
+         (po_number, vendor, item_name, quantity, category, total_amount, expected_delivery, status, status_id, items, requested_by, requested_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'Pending Approval', 0, ?, ?, ?)`,
+      [null, vendor, item_name, Number(quantity), category || 'Others', Number(total_amount || (Number(quantity) * Number(unit_price || 0))), expected_delivery || null, JSON.stringify(items), requested_by || 'Supervisor', requestDate]
+    );
+
+    const po_number = `PO-${String(insertResult.insertId).padStart(6, '0')}`;
+    await db.query(
+      `UPDATE inventory_purchase_orders SET po_number = ? WHERE id = ?`,
+      [po_number, insertResult.insertId]
     );
 
     res.status(201).json({ success: true, message: 'Purchase order created.', po_number });
@@ -1560,5 +1688,24 @@ exports.getInventoryByVehicle = async (req, res) => {
       message: 'Server Error'
 
     });
+  }
+};
+
+exports.updateVendorReturnStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    const allowed = ['Pending Pickup', 'Collected', 'Completed'];
+    if (!allowed.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid return status.' });
+    }
+    const [result] = await db.query(
+      `UPDATE part_returns SET return_status = ? WHERE id = ?`,
+      [status, req.params.id]
+    );
+    if (!result.affectedRows) return res.status(404).json({ success: false, message: 'Return record not found.' });
+    res.json({ success: true, message: `Return status updated to ${status}.` });
+  } catch (error) {
+    console.error('UPDATE VENDOR RETURN STATUS ERROR:', error);
+    res.status(500).json({ success: false, message: 'Failed to update return status.' });
   }
 };

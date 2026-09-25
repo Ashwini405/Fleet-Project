@@ -3,23 +3,86 @@ import { TrendingUp, TrendingDown, Wallet, Eye, MapPin, Clock, CreditCard, Truck
 import Card  from "../components/Card";
 import Modal from "../components/Modal";
 
-function applyFilters(incList, expList, selectedTruck, dateFrom, dateTo) {
+function applyFilters(incList, expList, selectedTruck, dateFrom, dateTo, searchQuery, categoryFilter, vehicles = []) {
   let inc = [...incList];
   let exp = [...expList];
 
-  if (selectedTruck !== "All") {
-    inc = inc.filter(i => String(i.vehicle_id) === String(selectedTruck));
-    exp = exp.filter(e => String(e.vehicle_id) === String(selectedTruck));
+  const parseDateOnly = (val) => {
+    if (!val) return "";
+    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) return val.slice(0, 10);
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().slice(0, 10);
+  };
+
+  if (selectedTruck && selectedTruck !== "All") {
+    if (selectedTruck === "General") {
+      inc = inc.filter(i => !i.vehicle_id && !i.vehicle_number);
+      exp = exp.filter(e => !e.vehicle_id && !e.vehicle_number);
+    } else {
+      const selVeh = vehicles.find(v => String(v.id || v.vehicle_id) === String(selectedTruck));
+      const selVehNo = selVeh?.vehicle_no?.trim().toLowerCase() || "";
+      const matchesTruck = (item) => {
+        const vId = String(item.vehicle_id || "");
+        const vNo = String(item.vehicle_number || "").trim().toLowerCase();
+        return (
+          vId === String(selectedTruck) ||
+          vNo === String(selectedTruck).trim().toLowerCase() ||
+          (selVehNo && vNo === selVehNo)
+        );
+      };
+      inc = inc.filter(matchesTruck);
+      exp = exp.filter(matchesTruck);
+    }
+  }
+
+  if (categoryFilter && categoryFilter !== "All") {
+    inc = []; // Categories apply to expenses
+    exp = exp.filter(e => String(e.expense_category || "").trim().toLowerCase() === String(categoryFilter).trim().toLowerCase());
   }
 
   if (dateFrom) {
-    inc = inc.filter(i => new Date(i.payment_received_date) >= new Date(dateFrom));
-    exp = exp.filter(e => new Date(e.expense_date) >= new Date(dateFrom));
+    inc = inc.filter(i => {
+      const d = parseDateOnly(i.payment_received_date || i.created_at);
+      return !d || d >= dateFrom;
+    });
+    exp = exp.filter(e => {
+      const d = parseDateOnly(e.expense_date || e.created_at);
+      return !d || d >= dateFrom;
+    });
   }
 
   if (dateTo) {
-    inc = inc.filter(i => new Date(i.payment_received_date) <= new Date(dateTo));
-    exp = exp.filter(e => new Date(e.expense_date) <= new Date(dateTo));
+    inc = inc.filter(i => {
+      const d = parseDateOnly(i.payment_received_date || i.created_at);
+      return !d || d <= dateTo;
+    });
+    exp = exp.filter(e => {
+      const d = parseDateOnly(e.expense_date || e.created_at);
+      return !d || d <= dateTo;
+    });
+  }
+
+  if (searchQuery && searchQuery.trim()) {
+    const q = searchQuery.trim().toLowerCase();
+    inc = inc.filter(i =>
+      (i.customer_name && String(i.customer_name).toLowerCase().includes(q)) ||
+      (i.income_title && String(i.income_title).toLowerCase().includes(q)) ||
+      (i.vehicle_number && String(i.vehicle_number).toLowerCase().includes(q)) ||
+      (i.trip_number && String(i.trip_number).toLowerCase().includes(q)) ||
+      (i.notes && String(i.notes).toLowerCase().includes(q)) ||
+      String(i.amount || "").includes(q)
+    );
+    exp = exp.filter(e =>
+      (e.vendor_payee && String(e.vendor_payee).toLowerCase().includes(q)) ||
+      (e.expense_title && String(e.expense_title).toLowerCase().includes(q)) ||
+      (e.expense_number && String(e.expense_number).toLowerCase().includes(q)) ||
+      (e.expense_category && String(e.expense_category).toLowerCase().includes(q)) ||
+      (e.description && String(e.description).toLowerCase().includes(q)) ||
+      (e.vehicle_number && String(e.vehicle_number).toLowerCase().includes(q)) ||
+      (e.station_name && String(e.station_name).toLowerCase().includes(q)) ||
+      String(e.amount || "").includes(q)
+    );
   }
 
   return { inc, exp };
@@ -49,7 +112,7 @@ function formatDateTime(value) {
   });
 }
 
-export default function OverviewTab({ selectedTruck, dateFrom, dateTo }) {
+export default function OverviewTab({ selectedTruck, dateFrom, dateTo, searchQuery = "", categoryFilter = "All", vehicles = [] }) {
   const [viewTxn, setViewTxn] = useState(null);
   const [incomeList, setIncomeList] = useState([]);
   const [expenseList, setExpenseList] = useState([]);
@@ -91,8 +154,8 @@ export default function OverviewTab({ selectedTruck, dateFrom, dateTo }) {
   }, []);
 
   const { inc, exp } = useMemo(
-    () => applyFilters(incomeList, expenseList, selectedTruck, dateFrom, dateTo),
-    [incomeList, expenseList, selectedTruck, dateFrom, dateTo]
+    () => applyFilters(incomeList, expenseList, selectedTruck, dateFrom, dateTo, searchQuery, categoryFilter, vehicles),
+    [incomeList, expenseList, selectedTruck, dateFrom, dateTo, searchQuery, categoryFilter, vehicles]
   );
 
   const totalIncome = inc.reduce((s, i) => s + Number(i.amount || 0), 0);

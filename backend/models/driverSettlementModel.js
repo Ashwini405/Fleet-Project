@@ -294,13 +294,14 @@ const rejectSettlement = async (
   );
 };
 
-// =====================================
-// Mark Settlement Paid
-// =====================================
 const markSettlementPaid = async (
   id,
   paymentData
 ) => {
+  const paymentMode = paymentData.payment_mode || paymentData.payment_method || 'Bank Transfer';
+  const paymentRef = paymentData.payment_ref || paymentData.payment_reference || '';
+  const paymentDate = paymentData.payment_date || new Date().toISOString().slice(0, 10);
+  const paymentNotes = paymentData.payment_notes || '';
 
   await db.query(
     `
@@ -314,23 +315,76 @@ const markSettlementPaid = async (
     WHERE id = ?
     `,
     [
-      paymentData.payment_mode || paymentData.payment_method || null,
-      paymentData.payment_ref || paymentData.payment_reference || null,
-      paymentData.payment_date || null,
-      paymentData.payment_notes || null,
+      paymentMode,
+      paymentRef,
+      paymentDate,
+      paymentNotes,
       id
     ]
   );
 
-  // The driver advance deducted in this settlement has now actually been
-  // recovered from the driver's pay — clear any outstanding "Other" advances.
+  // Fetch settlement details
   const [rows] = await db.query(
-    `SELECT driver_id FROM driver_settlements WHERE id = ?`,
+    `SELECT * FROM driver_settlements WHERE id = ?`,
     [id]
   );
 
   if (rows[0]) {
-    await driverAdvanceModel.markRecovered(rows[0].driver_id, id);
+    const s = rows[0];
+    if (s.driver_id) {
+      try {
+        await driverAdvanceModel.markRecovered(s.driver_id, id);
+      } catch (advErr) {
+        console.error('Error clearing driver advance:', advErr.message);
+      }
+    }
+
+    // Record into company expense_entries
+    try {
+      const expNum = `EXP-DRV-${s.id}-${Date.now().toString().slice(-4)}`;
+      await db.query(`
+        INSERT INTO expense_entries (
+          expense_number,
+          expense_category,
+          expense_title,
+          vehicle_id,
+          vehicle_number,
+          driver_id,
+          driver_name,
+          station_name,
+          expense_date,
+          amount,
+          payment_method,
+          payment_status,
+          vendor_payee,
+          description,
+          salary_month,
+          salary_type,
+          salary_payment_mode,
+          entry_status,
+          created_by
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Driver', ?, 'Approved', 'Driver Payroll')
+      `, [
+        expNum,
+        'Driver Settlement',
+        `Driver Settlement for ${s.driver_name || 'Driver'} (${s.statement_month || ''})`,
+        s.vehicle_id || null,
+        s.vehicle_no || null,
+        s.driver_id || null,
+        s.driver_name || null,
+        s.plant_name || 'Main Plant',
+        paymentDate,
+        s.net_payable,
+        paymentMode,
+        'Paid',
+        s.driver_name || 'Driver',
+        `Settlement #${s.settlement_no}, Vehicle: ${s.vehicle_no}, Month: ${s.statement_month}. Ref: ${paymentRef || 'N/A'}. ${paymentNotes || ''}`,
+        s.statement_month,
+        paymentMode
+      ]);
+    } catch (expErr) {
+      console.error('Error logging driver settlement into expense_entries:', expErr.message);
+    }
   }
 };
 

@@ -15,11 +15,24 @@ const EMPTY = {
   bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '',
 };
 
-export default function AddPartsVendorModal({ isOpen, onClose }) {
+export default function AddPartsVendorModal({ isOpen, onClose, vendor = null }) {
   const [form, setForm]     = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [toast, setToast]   = useState(false);
   const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen && vendor) {
+      setForm({
+        name: vendor.vendor_name || '', mobile: vendor.mobile_number || '', email: vendor.email || '',
+        address: vendor.address_location || '', gst: vendor.gst_number || '',
+        openingBalance: vendor.opening_balance || '0', status: vendor.status || 'Active',
+        paymentTerms: vendor.payment_terms || 'credit', bankName: vendor.bank_name || '',
+        customBank: vendor.custom_bank_name || '', accountNo: vendor.account_number || '',
+        ifsc: vendor.ifsc_code || '', upi: vendor.upi_id || '',
+      });
+    } else if (isOpen) setForm(EMPTY);
+  }, [isOpen, vendor]);
 
   if (!isOpen) return null;
 
@@ -43,13 +56,13 @@ export default function AddPartsVendorModal({ isOpen, onClose }) {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     try {
       setLoading(true);
-      await axios.post('http://localhost:5001/api/parts-vendors', {
+      const payload = {
         vendor_name: form.name,
         mobile_number: form.mobile,
         email: form.email,
         address_location: form.address,
         gst_number: form.gst,
-        opening_balance: form.openingBalance,
+        opening_balance: form.paymentTerms === 'cash' ? 0 : form.openingBalance,
         status: form.status,
         payment_terms: form.paymentTerms,
         bank_name: form.bankName === 'Others' ? form.customBank : form.bankName,
@@ -57,7 +70,9 @@ export default function AddPartsVendorModal({ isOpen, onClose }) {
         account_number: form.accountNo,
         ifsc_code: form.ifsc,
         upi_id: form.upi,
-      });
+      };
+      if (vendor) await axios.put(`http://localhost:5001/api/parts-vendors/${vendor.id}`, payload);
+      else await axios.post('http://localhost:5001/api/parts-vendors', payload);
       setToast(true);
       setTimeout(() => { setToast(false); setForm(EMPTY); setErrors({}); onClose(); }, 1500);
     } catch (err) {
@@ -75,8 +90,8 @@ export default function AddPartsVendorModal({ isOpen, onClose }) {
 
         <div className="flex justify-between items-center p-5 bg-gray-900">
           <div>
-            <h3 className="text-sm font-bold text-white tracking-wide">Add Parts & Spares Vendor</h3>
-            <p className="text-[11px] text-indigo-400 mt-0.5">Parts & Spares Accounts · New Vendor</p>
+            <h3 className="text-sm font-bold text-white tracking-wide">{vendor ? 'Edit' : 'Add'} Parts & Spares Vendor</h3>
+            <p className="text-[11px] text-indigo-400 mt-0.5">Parts & Spares Accounts · {vendor ? 'Edit Vendor' : 'New Vendor'}</p>
           </div>
           <button onClick={handleClose} className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"><FiX size={18} /></button>
         </div>
@@ -100,12 +115,12 @@ export default function AddPartsVendorModal({ isOpen, onClose }) {
                   {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
+                  {form.paymentTerms !== 'cash' && <div>
                     <label className={labelCls}>Mobile Number <span className="text-red-400">*</span></label>
                     <input type="tel" value={form.mobile} onChange={e => set('mobile', e.target.value)}
                       placeholder="e.g. 9876543210" maxLength={10} className={errors.mobile ? inputErrCls : inputCls} />
                     {errors.mobile && <p className="text-xs text-red-500 mt-1">{errors.mobile}</p>}
-                  </div>
+                  </div>}
                   <div>
                     <label className={labelOptCls}>Email Address</label>
                     <input type="email" value={form.email} onChange={e => set('email', e.target.value)}
@@ -118,17 +133,19 @@ export default function AddPartsVendorModal({ isOpen, onClose }) {
                   <input type="text" value={form.address} onChange={e => set('address', e.target.value)}
                     placeholder="e.g. Auto Nagar, Hyderabad" className={inputCls} />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className={`grid grid-cols-1 ${form.paymentTerms === 'cash' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-4`}>
                   <div>
                     <label className={labelOptCls}>GST Number</label>
                     <input type="text" value={form.gst} onChange={e => set('gst', e.target.value)}
                       placeholder="e.g. 36AABCU9603R1ZX" className={inputCls} />
                   </div>
-                  <div>
-                    <label className={labelOptCls}>Opening Balance (₹)</label>
-                    <input type="number" value={form.openingBalance} onChange={e => set('openingBalance', e.target.value)}
-                      min="0" placeholder="0" className={inputCls} />
-                  </div>
+                  {form.paymentTerms !== 'cash' && (
+                    <div>
+                      <label className={labelOptCls}>Opening Balance (₹)</label>
+                      <input type="number" value={form.openingBalance} onChange={e => set('openingBalance', e.target.value)}
+                        min="0" placeholder="0" className={inputCls} />
+                    </div>
+                  )}
                   <div>
                     <label className={labelCls}>Status</label>
                     <select value={form.status} onChange={e => set('status', e.target.value)} className={inputCls + ' text-gray-700'}>
@@ -155,7 +172,7 @@ export default function AddPartsVendorModal({ isOpen, onClose }) {
               </div>
             </div>
 
-            <div className="pt-2 border-t border-gray-100">
+            {form.paymentTerms !== 'cash' && <div className="pt-2 border-t border-gray-100">
               <p className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
                 <FiHome size={12} /> Bank Details (Optional)
               </p>
@@ -193,12 +210,12 @@ export default function AddPartsVendorModal({ isOpen, onClose }) {
                   </div>
                 </div>
               </div>
-            </div>
+            </div>}
 
             <div className="pt-2">
               <button type="submit" disabled={loading}
                 className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                {loading ? 'Creating...' : 'Add Parts & Spares Vendor'}
+                {loading ? 'Saving...' : vendor ? 'Save Changes' : 'Add Parts & Spares Vendor'}
               </button>
             </div>
 

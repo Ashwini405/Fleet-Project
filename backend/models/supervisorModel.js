@@ -55,7 +55,9 @@ const Supervisor = {
       `UPDATE supervisors SET
         full_name=?, mobile=?, id_card_number=?, status=?, address=?, station_id=?,
         wallet_balance=?, bank_name=?, account_number=?, ifsc_code=?, notes=?,
-        profile_photo=COALESCE(?, profile_photo)
+        profile_photo=COALESCE(?, profile_photo),
+        id_document=COALESCE(?, id_document),
+        bank_document=COALESCE(?, bank_document)
        WHERE id=?`,
       [
         data.full_name,
@@ -70,6 +72,8 @@ const Supervisor = {
         data.ifsc_code,
         data.notes || null,
         data.profile_photo || null,
+        data.id_document || null,
+        data.bank_document || null,
         id
       ]
     );

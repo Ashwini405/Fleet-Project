@@ -66,8 +66,22 @@ export default function BatteryInventory({ showToast }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [assignForm, setAssignForm] = useState({ battery_id: '', vehicle_id: '', install_date: '', install_odometer: '', technician: '' });
   const [replaceForm, setReplaceForm] = useState({ vehicle_id: '', removal_date: '', removal_odometer: '', failure_reason: '', warranty_claim: false, old_battery_decision: 'Scrap', new_battery_id: '', technician: '' });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [vendorsList, setVendorsList] = useState([]);
+  const [vendorMode, setVendorMode] = useState('select'); // 'select' | 'custom'
+  const [customVendor, setCustomVendor] = useState('');
+  const [saveAsNewVendor, setSaveAsNewVendor] = useState(false);
+
+  const loadVendors = async () => {
+    try {
+      const res = await fetch('http://localhost:5001/api/parts-vendors');
+      const data = await res.json();
+      if (data.data) {
+        setVendorsList(data.data);
+      }
+    } catch (e) {
+      console.error('Failed to load vendors', e);
+    }
+  };
 
   const load = useCallback(async () => {
     const [b, s] = await Promise.all([
@@ -87,7 +101,20 @@ export default function BatteryInventory({ showToast }) {
     if (v.success) setVehicles(v.data);
   };
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    loadVendors();
+  }, [load]);
+
+  const openAddModal = () => {
+    loadVendors();
+    setForm(EMPTY_FORM);
+    setVendorMode('select');
+    setCustomVendor('');
+    setSaveAsNewVendor(false);
+    setError('');
+    setShowAdd(true);
+  };
 
   const filtered = batteries.filter(b => {
     const q = search.toLowerCase();
@@ -101,17 +128,62 @@ export default function BatteryInventory({ showToast }) {
   });
 
   const handleAdd = async () => {
-    if (!form.serial_number || !form.brand || !form.model) { setError('Serial number, brand and model are required'); return; }
-    setSaving(true); setError('');
+    if (!form.serial_number || !form.brand || !form.model) {
+      setError('Serial number, brand and model are required');
+      return;
+    }
+
+    let finalVendor = form.vendor;
+    if (vendorMode === 'custom') {
+      if (!customVendor.trim()) {
+        setError('Please enter custom vendor name or select an existing vendor');
+        return;
+      }
+      finalVendor = customVendor.trim();
+
+      // If user toggled save as new vendor, create in parts_vendors master
+      if (saveAsNewVendor) {
+        try {
+          await fetch('http://localhost:5001/api/parts-vendors', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              vendor_name: finalVendor,
+              payment_terms: 'cash',
+              status: 'Active',
+            }),
+          });
+          loadVendors();
+        } catch (err) {
+          console.error('Could not auto-save custom vendor', err);
+        }
+      }
+    }
+
+    setSaving(true);
+    setError('');
     try {
-      const res = await fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, vendor: finalVendor }),
+      });
       const data = await res.json();
-      if (!data.success) { setError(data.message); return; }
-      setShowAdd(false); setForm(EMPTY_FORM);
+      if (!data.success) {
+        setError(data.message);
+        return;
+      }
+      setShowAdd(false);
+      setForm(EMPTY_FORM);
+      setCustomVendor('');
       showToast?.('Battery added to inventory.');
       load();
-    } catch { setError('Server error'); }
-    finally { setSaving(false); }
+      loadVendors();
+    } catch {
+      setError('Server error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAssign = async () => {
@@ -193,7 +265,7 @@ export default function BatteryInventory({ showToast }) {
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
             <Zap className="w-3.5 h-3.5" /> Assign
           </button>
-          <button onClick={() => { setShowAdd(true); setError(''); setForm(EMPTY_FORM); }}
+          <button onClick={openAddModal}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-bold shadow-sm transition">
             <Plus className="w-3.5 h-3.5" /> Add Battery
           </button>
@@ -216,7 +288,7 @@ export default function BatteryInventory({ showToast }) {
                 <tr><td colSpan={10} className="py-14 text-center">
                   <Battery className="w-8 h-8 text-slate-200 mx-auto mb-2" />
                   <p className="text-sm text-slate-400 font-medium">No batteries found</p>
-                  <button onClick={() => { setShowAdd(true); setError(''); setForm(EMPTY_FORM); }}
+                  <button onClick={openAddModal}
                     className="mt-2 text-xs font-semibold text-violet-600 hover:underline">+ Add first battery</button>
                 </td></tr>
               ) : filtered.map(b => (
@@ -270,7 +342,84 @@ export default function BatteryInventory({ showToast }) {
             <F label="Location" value={form.location} onChange={v => setForm({ ...form, location: v })} placeholder="e.g. Warehouse or Workshop" />
             <F label="Purchase Date" type="date" value={form.purchase_date} onChange={v => setForm({ ...form, purchase_date: v })} />
             <F label="Warranty (Months)" type="number" value={form.warranty_period_months} onChange={v => setForm({ ...form, warranty_period_months: v })} placeholder="24" />
-            <F label="Vendor" value={form.vendor} onChange={v => setForm({ ...form, vendor: v })} placeholder="Auto Parts Hub" />
+            
+            {/* Dynamic Vendor Dropdown & Custom Vendor */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-slate-600">Vendor / Supplier</label>
+                {vendorMode === 'select' ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVendorMode('custom');
+                      setCustomVendor('');
+                    }}
+                    className="text-[10px] font-bold text-violet-600 hover:text-violet-800 hover:underline"
+                  >
+                    + Custom
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setVendorMode('select');
+                      setForm(f => ({ ...f, vendor: '' }));
+                    }}
+                    className="text-[10px] font-medium text-slate-500 hover:text-slate-800 underline"
+                  >
+                    ← List
+                  </button>
+                )}
+              </div>
+
+              {vendorMode === 'select' ? (
+                <select
+                  value={form.vendor}
+                  onChange={e => {
+                    if (e.target.value === '__custom__') {
+                      setVendorMode('custom');
+                      setCustomVendor('');
+                    } else {
+                      setForm(f => ({ ...f, vendor: e.target.value }));
+                    }
+                  }}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
+                >
+                  <option value="">-- Select Battery Vendor --</option>
+                  {vendorsList.map(v => (
+                    <option key={v.id || v.vendor_name} value={v.vendor_name}>
+                      {v.vendor_name}
+                    </option>
+                  ))}
+                  <option value="__custom__" className="font-bold text-violet-700">
+                    ➕ + Add Custom / New Vendor
+                  </option>
+                </select>
+              ) : (
+                <div className="space-y-1.5 p-2 bg-violet-50/60 border border-violet-100 rounded-xl">
+                  <input
+                    type="text"
+                    value={customVendor}
+                    onChange={e => setCustomVendor(e.target.value)}
+                    placeholder="e.g. Exide Power Zone"
+                    className="w-full px-2.5 py-1.5 bg-white border border-violet-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    autoFocus
+                  />
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={saveAsNewVendor}
+                      onChange={e => setSaveAsNewVendor(e.target.checked)}
+                      className="w-3 h-3 accent-violet-600 rounded"
+                    />
+                    <span className="text-[10px] text-slate-600 font-medium">
+                      Save as reusable vendor
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
+
             <F label="Purchase Cost (₹)" type="number" value={form.purchase_cost} onChange={v => setForm({ ...form, purchase_cost: v })} placeholder="8500" />
             <F label="Barcode / QR" value={form.barcode} onChange={v => setForm({ ...form, barcode: v })} placeholder="Optional" />
           </div>

@@ -27,6 +27,8 @@ export default function Finance() {
   const [selectedTruck, setSelectedTruck] = useState(urlVehicleId || "All");
   const [dateFrom,      setDateFrom]      = useState("");
   const [dateTo,        setDateTo]        = useState("");
+  const [searchQuery,   setSearchQuery]   = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("All");
   const [vehicles,      setVehicles]      = useState([]);
 
   React.useEffect(() => {
@@ -42,7 +44,35 @@ export default function Finance() {
     fetchVehicles();
   }, []);
 
-  const sharedProps = { selectedTruck, dateFrom, dateTo };
+  const EXPENSE_CATEGORIES = [
+    "Trip",
+    "Fuel",
+    "Maintenance",
+    "Tyres",
+    "Batteries",
+    "Staff Salary",
+    "Driver Settlement",
+    "Food Allowance",
+    "Toll",
+    "Miscellaneous",
+    "Other"
+  ];
+
+  const sharedProps = {
+    selectedTruck,
+    setSelectedTruck,
+    dateFrom,
+    setDateFrom,
+    dateTo,
+    setDateTo,
+    searchQuery,
+    setSearchQuery,
+    categoryFilter,
+    setCategoryFilter,
+    vehicles,
+    categories: EXPENSE_CATEGORIES
+  };
+
   // trip_id  → auto-open add form with pre-fill
   // view_trip → open list only (no form)
   const tripProps = {
@@ -103,7 +133,10 @@ export default function Finance() {
         selectedTruck={selectedTruck} setSelectedTruck={setSelectedTruck}
         dateFrom={dateFrom}           setDateFrom={setDateFrom}
         dateTo={dateTo}               setDateTo={setDateTo}
+        searchQuery={searchQuery}     setSearchQuery={setSearchQuery}
+        categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter}
         vehicles={vehicles}
+        categories={EXPENSE_CATEGORIES}
       />
 
       {/* ── Tab content ── */}

@@ -103,184 +103,90 @@ class EmployeeController {
     // ==========================================================
 
     static async createEmployee(req, res) {
-
         try {
+            const data = {
+                ...req.body,
+                employee_name: req.body.employee_name || req.body.full_name || req.body.name,
+                phone: req.body.phone || req.body.mobile,
+                profile_photo: req.files?.profile_photo?.[0]?.filename || null,
+                id_document:   req.files?.id_document?.[0]?.filename   || null,
+                bank_document: req.files?.bank_document?.[0]?.filename || null,
+            };
 
-            const {
-
-                employee_id,
-                employee_name,
-                department,
-                plant,
-                email,
-                phone,
-                status
-
-            } = req.body;
-
-            if (!employee_id || !employee_name || !department || !plant || !email) {
-
+            if (!data.employee_name) {
                 return res.status(400).json({
-
                     success: false,
-
-                    message: "Required fields are missing."
-
+                    message: "Employee name is required."
                 });
-
             }
 
-            const employeeExists =
-                await EmployeeModel.employeeIdExists(employee_id);
-
-            if (employeeExists) {
-
-                return res.status(400).json({
-
-                    success: false,
-
-                    message: "Employee ID already exists."
-
-                });
-
-            }
-
-            const emailExists =
-                await EmployeeModel.emailExists(email);
-
-            if (emailExists) {
-
-                return res.status(400).json({
-
-                    success: false,
-
-                    message: "Email already exists."
-
-                });
-
-            }
-
-            const employeeId =
-                await EmployeeModel.createEmployee({
-
-                    employee_id,
-                    employee_name,
-                    department,
-                    plant,
-                    email,
-                    phone,
-                    status
-
-                });
+            const employeeId = await EmployeeModel.createEmployee(data);
 
             return res.status(201).json({
-
                 success: true,
-
                 message: "Employee created successfully.",
-
                 employeeId
-
             });
-
         }
-
         catch (error) {
-
             console.error("CREATE EMPLOYEE ERROR :", error);
-
             return res.status(500).json({
-
                 success: false,
-
-                message: "Unable to create employee.",
-
+                message: error.message || "Unable to create employee.",
                 error: error.message
-
             });
-
         }
-
     }
+
         // ==========================================================
     // Update Employee
     // ==========================================================
 
     static async updateEmployee(req, res) {
-
         try {
-
             const { id } = req.params;
-
-            const {
-
-                employee_name,
-                department,
-                plant,
-                email,
-                phone,
-                status
-
-            } = req.body;
-
-            const employee =
-                await EmployeeModel.getEmployeeById(id);
-
+            const employee = await EmployeeModel.getEmployeeById(id);
             if (!employee) {
-
                 return res.status(404).json({
-
                     success: false,
-
                     message: "Employee not found."
-
                 });
-
             }
 
-            await EmployeeModel.updateEmployee(
+            const data = {
+                employee_name: req.body.employee_name || req.body.full_name || req.body.name,
+                department: req.body.department,
+                plant: req.body.plant,
+                email: req.body.email,
+                phone: req.body.phone || req.body.mobile,
+                status: req.body.status,
+                id_card_number: req.body.id_card_number,
+                address: req.body.address,
+                station_id: req.body.station_id || null,
+                bank_name: req.body.bank_name,
+                account_number: req.body.account_number,
+                ifsc_code: req.body.ifsc_code,
+                notes: req.body.notes,
+                profile_photo: req.files?.profile_photo?.[0]?.filename || null,
+                id_document: req.files?.id_document?.[0]?.filename || null,
+                bank_document: req.files?.bank_document?.[0]?.filename || null,
+            };
 
-                id,
-
-                {
-
-                    employee_name,
-                    department,
-                    plant,
-                    email,
-                    phone,
-                    status
-
-                }
-
-            );
+            await EmployeeModel.updateEmployee(id, data);
 
             return res.status(200).json({
-
                 success: true,
-
                 message: "Employee updated successfully."
-
             });
-
         }
-
         catch (error) {
-
             console.error("UPDATE EMPLOYEE ERROR :", error);
-
             return res.status(500).json({
-
                 success: false,
-
-                message: "Unable to update employee.",
-
+                message: error.message || "Unable to update employee.",
                 error: error.message
-
             });
-
         }
-
     }
 
     // ==========================================================

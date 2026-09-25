@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FiSearch, FiPlus, FiBriefcase, FiPhone, FiMapPin, FiHome, FiChevronRight } from 'react-icons/fi';
+import { FiSearch, FiPlus, FiBriefcase, FiPhone, FiMapPin, FiHome, FiChevronRight, FiEdit2, FiToggleLeft, FiToggleRight } from 'react-icons/fi';
 import axios from 'axios';
 import AddOilsVendorModal from '../components/AddOilsVendorModal';
 import OilsLedger from '../components/OilsLedger';
@@ -10,6 +10,7 @@ export default function OilsPage() {
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [editVendor, setEditVendor] = useState(null);
 
   // Fetch oil vendors from database
   const fetchOilVendors = async () => {
@@ -101,15 +102,14 @@ export default function OilsPage() {
         {filteredVendors.map(vendor => (
           <div
             key={vendor.id}
-            onClick={() => setSelectedVendor(vendor)}
-            className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 cursor-pointer hover:shadow-md hover:border-amber-200 transition-all group flex flex-col justify-between"
+            className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 hover:shadow-md hover:border-amber-200 transition-all group flex flex-col justify-between"
           >
-            <div>
+            <div onClick={() => setSelectedVendor(vendor)} className="cursor-pointer">
               <div className="flex justify-between items-start mb-4">
                 <div className="w-10 h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center border border-amber-100">
                   <FiBriefcase size={20} />
                 </div>
-                <FiChevronRight className="text-gray-300 group-hover:text-amber-500 transition-colors" size={20} />
+                <div className="flex items-center gap-2"><button onClick={(e) => { e.stopPropagation(); setEditVendor(vendor); }} className="text-gray-400 hover:text-amber-600" title="Edit vendor"><FiEdit2 size={16} /></button><FiChevronRight className="text-gray-300 group-hover:text-amber-500 transition-colors" size={20} /></div>
               </div>
               <div className="flex items-center justify-between mb-1">
                 <h3 className="font-bold text-gray-800 text-lg">{vendor.vendor_name}</h3>
@@ -133,10 +133,13 @@ export default function OilsPage() {
                   <FiHome className="text-gray-400 shrink-0" /> {vendor.bank_name || 'Not provided'}
                 </div>
               </div>
+              <button onClick={async (e) => { e.stopPropagation(); await axios.put(`http://localhost:5001/api/oil-vendors/${vendor.id}`, { ...vendor, status: vendor.status === 'Inactive' ? 'Active' : 'Inactive' }); fetchOilVendors(); }} className="text-gray-400 hover:text-amber-600" title="Toggle active status">
+                {vendor.status === 'Inactive' ? <FiToggleLeft size={24} /> : <FiToggleRight size={24} />}
+              </button>
             </div>
             <div className="border-t border-gray-100 pt-4 flex justify-between items-end">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ledger Balance</span>
-              {!vendor.opening_balance || Number(vendor.opening_balance) === 0 ? (
+              {vendor.payment_terms === 'cash' || !vendor.opening_balance || Number(vendor.opening_balance) === 0 ? (
                 <div className="flex flex-col items-end">
                   <span className="font-bold text-lg text-gray-400">₹0</span>
                   <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">Settled</span>
@@ -168,6 +171,7 @@ export default function OilsPage() {
           fetchOilVendors();
         }}
       />
+      <AddOilsVendorModal isOpen={!!editVendor} vendor={editVendor} onClose={() => { setEditVendor(null); fetchOilVendors(); }} />
     </div>
   );
 }

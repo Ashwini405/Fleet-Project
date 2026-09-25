@@ -1,104 +1,80 @@
-// import React from 'react';
-// import { AnimatePresence, motion } from 'framer-motion';
-// import { X, MapPin, Phone, Briefcase, CalendarCheck } from 'lucide-react';
-
-// export default function ViewSupervisorModal({ isOpen, onClose, staff }) {
-//   if (!isOpen || !staff) return null;
-
-//   return (
-//     <AnimatePresence>
-//       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-//         <motion.div
-//           initial={{ opacity: 0, scale: 0.95, y: 10 }}
-//           animate={{ opacity: 1, scale: 1, y: 0 }}
-//           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-//           className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden"
-//         >
-//           <div className="flex items-start justify-between p-5 border-b border-gray-100">
-//             <div>
-//               <h2 className="text-xl font-bold text-gray-900">Supervisor Details</h2>
-//               <p className="text-sm text-gray-500 mt-1">Review all assigned supervisor information</p>
-//             </div>
-//             <button onClick={onClose} className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors">
-//               <X className="w-5 h-5" />
-//             </button>
-//           </div>
-
-//           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 p-6">
-//             <div className="space-y-4">
-//               <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-//                 <div className="flex items-center gap-4">
-//                   <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white grid place-items-center text-xl font-bold">
-//                     {staff.name.split(' ').map((n) => n[0]).join('')}
-//                   </div>
-//                   <div>
-//                     <h3 className="font-bold text-gray-900">{staff.name}</h3>
-//                     <p className="text-sm text-gray-500">Supervisor ID • {staff.id}</p>
-//                   </div>
-//                 </div>
-//               </div>
-
-//               <div className="space-y-3">
-//                 <div className="p-5 bg-white rounded-3xl border border-gray-100">
-//                   <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">Contact</p>
-//                   <div className="flex items-center gap-2 text-sm text-slate-600">
-//                     <Phone className="w-4 h-4 text-slate-400" />
-//                     <span>{staff.contact}</span>
-//                   </div>
-//                   <div className="flex items-center gap-2 text-sm text-slate-600 mt-3">
-//                     <MapPin className="w-4 h-4 text-slate-400" />
-//                     <span>{staff.allotment}</span>
-//                   </div>
-//                 </div>
-
-//                 <div className="p-5 bg-white rounded-3xl border border-gray-100">
-//                   <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">Role</p>
-//                   <div className="flex items-center gap-2 text-sm text-slate-600">
-//                     <Briefcase className="w-4 h-4 text-slate-400" />
-//                     <span>Supervisor</span>
-//                   </div>
-//                   <div className="mt-3 text-sm text-slate-600">
-//                     <p className="font-semibold text-slate-800">Current Status</p>
-//                     <p>{staff.status}</p>
-//                   </div>
-//                 </div>
-//               </div>
-//             </div>
-
-//             <div className="space-y-4">
-//               <div className="p-5 bg-white rounded-3xl border border-gray-100">
-//                 <div className="flex items-center justify-between">
-//                   <div>
-//                     <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">Assigned Since</p>
-//                     <p className="text-sm font-bold text-slate-900">{staff.assignedSince || 'N/A'}</p>
-//                   </div>
-//                   <CalendarCheck className="w-5 h-5 text-blue-600" />
-//                 </div>
-//               </div>
-//               <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-//                 <h4 className="text-sm font-bold text-slate-900 mb-3">Notes</h4>
-//                 <p className="text-sm text-slate-600">{staff.notes || 'No additional notes available.'}</p>
-//               </div>
-//             </div>
-//           </div>
-//         </motion.div>
-//       </div>
-//     </AnimatePresence>
-//   );
-// }
-
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, MapPin, Phone, Briefcase, CalendarCheck, Trash2, Edit } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  X, MapPin, Phone, Briefcase, CalendarCheck, Trash2, Edit, 
+  DollarSign, FileText, Printer, Plus, Building2, CreditCard, CheckCircle, Clock,
+  FileUp, Download, Eye, ExternalLink, Image as ImageIcon
+} from 'lucide-react';
+import axios from 'axios';
+import { StaffSalaryPayslipModal } from '../../StaffSalaryModals';
 
 const UPLOADS_BASE_URL = 'http://localhost:5001/uploads/';
 
-export default function ViewSupervisorModal({ isOpen, onClose, staff, onSuccess, onEdit }) {
+export default function ViewSupervisorModal({ isOpen, onClose, staff, onSuccess, onEdit, initialTab = 'overview' }) {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'uploads' | 'settlements'
+  const [settlements, setSettlements] = useState([]);
+  const [loadingSettlements, setLoadingSettlements] = useState(false);
+  const [selectedPayslipData, setSelectedPayslipData] = useState(null);
+  const [isPayslipOpen, setIsPayslipOpen] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab || 'overview');
+      if (staff) {
+        fetchSupervisorSettlements();
+      }
+    }
+  }, [isOpen, staff, initialTab]);
+
+  const fetchSupervisorSettlements = async () => {
+    if (!staff) return;
+    setLoadingSettlements(true);
+    try {
+      const supervisorId = staff.id || staff.staff_id;
+      const res = await axios.get(`http://localhost:5001/api/staff-salaries/history?staff_type=Supervisor&staff_id=${supervisorId}`);
+      if (res.data?.success) {
+        setSettlements(res.data.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching supervisor settlements:', err);
+    } finally {
+      setLoadingSettlements(false);
+    }
+  };
+
   if (!isOpen || !staff) return null;
 
+  const staffName = staff.full_name || staff.staff_name || 'Supervisor';
+  const staffCode = staff.supervisor_code || staff.staff_code || `SUP-${staff.id}`;
+  const stationName = staff.station_name || staff.department_or_station || 'Unassigned';
+  const supervisorId = staff.id || staff.staff_id;
+  const profilePhoto = staff.profile_photo;
+  const idDocument = staff.id_document;
+  const bankDocument = staff.bank_document;
+
+  const uploadedCount = [profilePhoto, idDocument, bankDocument].filter(Boolean).length;
+
+  const totalPaid = settlements
+    .filter(s => s.status === 'Paid')
+    .reduce((sum, s) => sum + (Number(s.net_payable) || 0), 0);
+
+  const totalPending = settlements.filter(s => s.status === 'Submitted').length;
+
+  const isFileAnImage = (filename) => {
+    if (!filename) return false;
+    return /\.(jpg|jpeg|png|webp|gif|svg)$/i.test(filename);
+  };
+
+  const isFileAPdf = (filename) => {
+    if (!filename) return false;
+    return /\.pdf$/i.test(filename);
+  };
+
   const handleDelete = async () => {
-    if (!window.confirm(`Remove supervisor "${staff.full_name}"?`)) return;
+    if (!window.confirm(`Remove supervisor "${staffName}"?`)) return;
 
     try {
       const res = await fetch(`http://localhost:5001/api/supervisors/${staff.id}`, {
@@ -118,164 +94,729 @@ export default function ViewSupervisorModal({ isOpen, onClose, staff, onSuccess,
     }
   };
 
+  const handleOpenPayslip = (settlement) => {
+    setSelectedPayslipData({
+      ...settlement,
+      staff_name: settlement.staff_name || staffName,
+      staff_code: settlement.staff_code || staffCode,
+      staff_type: 'Supervisor',
+      designation: 'Site Supervisor',
+      department_or_station: settlement.department_or_station || stationName,
+      plant_name: settlement.plant_name || stationName,
+    });
+    setIsPayslipOpen(true);
+  };
+
+  const handlePrepareSalary = () => {
+    onClose();
+    const sId = supervisorId || staff.id || staff.staff_id;
+    const sCode = staffCode || staff.supervisor_code || '';
+    navigate(`/payments?section=staff&staffType=Supervisor&staffId=${sId}&staffCode=${encodeURIComponent(sCode)}`);
+  };
+
+  const handleOpenPreview = (title, filename) => {
+    if (!filename) return;
+    const url = `${UPLOADS_BASE_URL}${filename}`;
+    const isImg = isFileAnImage(filename);
+    const isPdf = isFileAPdf(filename);
+    setPreviewDoc({ title, url, filename, isImage: isImg, isPdf });
+  };
+
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden"
+          className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh] border border-gray-100"
         >
-          <div className="flex items-start justify-between p-5 border-b border-gray-100">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Supervisor Details</h2>
-              <p className="text-sm text-gray-500 mt-1">Review all assigned supervisor information</p>
+          {/* Header */}
+          <div className="flex items-start justify-between p-5 border-b border-gray-100 bg-slate-50 shrink-0">
+            <div className="flex items-center gap-3">
+              {profilePhoto ? (
+                <img
+                  src={`${UPLOADS_BASE_URL}${profilePhoto}`}
+                  alt={staffName}
+                  className="w-10 h-10 rounded-full object-cover border-2 border-amber-300 shadow-sm cursor-pointer hover:scale-105 transition-transform"
+                  onClick={() => handleOpenPreview(`${staffName} - Profile Photo`, profilePhoto)}
+                  title="Click to zoom photo"
+                  onError={(e) => {
+                    e.target.style.display = 'none';
+                    if (e.target.nextElementSibling) e.target.nextElementSibling.style.display = 'flex';
+                  }}
+                />
+              ) : null}
+              <div
+                className={`w-10 h-10 rounded-full bg-amber-600 text-white flex items-center justify-center text-sm font-bold shadow-sm ${profilePhoto ? 'hidden' : 'flex'}`}
+              >
+                {staffName.split(' ').map((n) => n[0]).join('') || 'S'}
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800">
+                    Supervisor Profile
+                  </span>
+                  <h2 className="text-lg font-bold text-gray-900 leading-none">{staffName}</h2>
+                </div>
+                <p className="text-xs text-gray-500 mt-1 font-mono">
+                  Supervisor ID: <span className="font-bold text-slate-700">{staffCode}</span> &bull; Station: {stationName}
+                </p>
+              </div>
             </div>
-            <button onClick={onClose} className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 transition-colors">
-              <X className="w-5 h-5" />
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  onClose();
+                  onEdit?.(staff);
+                }}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-800 bg-amber-50 hover:bg-amber-100 rounded-xl border border-amber-200 transition-colors shadow-sm"
+              >
+                <Edit className="w-3.5 h-3.5" /> Edit
+              </button>
+              <button onClick={onClose} className="p-1.5 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-200 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Navigation Sub-Tabs */}
+          <div className="flex border-b border-gray-200 bg-white px-6 shrink-0 gap-2 sm:gap-6 text-xs font-bold overflow-x-auto">
+            <button
+              onClick={() => setActiveTab('overview')}
+              className={`py-3.5 border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${
+                activeTab === 'overview'
+                  ? 'border-indigo-600 text-indigo-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <Briefcase className="w-4 h-4" /> Personal & Station Overview
+            </button>
+
+            <button
+              onClick={() => setActiveTab('uploads')}
+              className={`py-3.5 border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${
+                activeTab === 'uploads'
+                  ? 'border-indigo-600 text-indigo-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <FileUp className="w-4 h-4" /> Uploaded Documents & ID
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${
+                uploadedCount > 0 ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {uploadedCount} / 3
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('settlements')}
+              className={`py-3.5 border-b-2 flex items-center gap-2 transition-colors whitespace-nowrap ${
+                activeTab === 'settlements'
+                  ? 'border-indigo-600 text-indigo-700'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <DollarSign className="w-4 h-4" /> Salary Settlements & Payslips
+              {settlements.length > 0 && (
+                <span className="bg-amber-100 text-amber-800 rounded-full px-2 py-0.5 text-[10px] font-black">
+                  {settlements.length}
+                </span>
+              )}
             </button>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 p-6">
-            <div className="space-y-4">
-              <div className="bg-slate-50 p-5 rounded-3xl border border-slate-100">
-                <div className="flex items-center gap-4">
-                  {staff.profile_photo ? (
-                    <img
-                      src={`${UPLOADS_BASE_URL}${staff.profile_photo}`}
-                      alt={`${staff.full_name || 'Supervisor'} profile`}
-                      className="w-14 h-14 rounded-2xl object-cover"
-                    />
-                  ) : (
-                    <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white grid place-items-center text-xl font-bold">
-                      {(staff.full_name || '').split(' ').map((n) => n[0]).join('')}
+          {/* Tab Content */}
+          <div className="flex-1 overflow-y-auto p-6">
+            
+            {/* 1. OVERVIEW TAB */}
+            {activeTab === 'overview' && (
+              <div className="space-y-5">
+                <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    {profilePhoto ? (
+                      <div 
+                        onClick={() => handleOpenPreview(`${staffName} - Profile Photo`, profilePhoto)}
+                        className="relative group/avatar cursor-pointer shrink-0"
+                        title="Click to preview full photo"
+                      >
+                        <img
+                          src={`${UPLOADS_BASE_URL}${profilePhoto}`}
+                          alt={staffName}
+                          className="w-16 h-16 rounded-2xl object-cover shadow-md border-2 border-amber-300 ring-2 ring-amber-50 group-hover/avatar:opacity-90 transition-all"
+                        />
+                        <div className="absolute inset-0 bg-black/40 rounded-2xl opacity-0 group-hover/avatar:opacity-100 flex items-center justify-center transition-opacity text-white text-[10px] font-bold">
+                          <Eye className="w-4 h-4" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-16 h-16 rounded-2xl bg-amber-600 text-white flex items-center justify-center text-2xl font-bold shadow-md shrink-0">
+                        {staffName.split(' ').map((n) => n[0]).join('') || 'S'}
+                      </div>
+                    )}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-gray-900 text-base">{staffName}</h3>
+                        <span className="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          {staff.status === 'active' ? 'Active' : 'Inactive'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 font-medium mt-0.5">Supervisor &bull; ID: <span className="font-mono font-bold text-slate-700">{staffCode}</span></p>
+                      <button
+                        onClick={() => setActiveTab('uploads')}
+                        className="mt-1 text-xs text-amber-800 hover:text-amber-950 font-bold underline flex items-center gap-1"
+                      >
+                        <FileUp className="w-3.5 h-3.5" /> {uploadedCount} Uploaded Document{uploadedCount === 1 ? '' : 's'}
+                      </button>
                     </div>
-                  )}
+                  </div>
+
+                  <button
+                    onClick={handlePrepareSalary}
+                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
+                  >
+                    <Plus className="w-4 h-4" /> Prepare Salary Settlement
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div className="p-4 bg-white rounded-2xl border border-gray-200 space-y-3 shadow-sm">
+                    <p className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">Contact Information</p>
+                    <div className="flex items-center gap-2.5 text-slate-700">
+                      <Phone className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span className="font-semibold">{staff.mobile || '—'}</span>
+                    </div>
+                    <div className="flex items-center gap-2.5 text-slate-700">
+                      <MapPin className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>{stationName}</span>
+                    </div>
+                    {staff.id_card_number && (
+                      <p className="text-slate-500 font-mono text-[11px] pt-1">ID Card: {staff.id_card_number}</p>
+                    )}
+                  </div>
+
+                  <div className="p-4 bg-white rounded-2xl border border-gray-200 space-y-3 shadow-sm">
+                    <p className="font-bold text-slate-400 uppercase tracking-widest text-[10px]">Station & Wallet</p>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Wallet Balance:</span>
+                      <span className="font-bold text-emerald-700 text-sm">₹ {Number(staff.wallet_balance || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Bank Name:</span>
+                      <span className="font-semibold text-slate-800">{staff.bank_name || '—'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-500">Account No:</span>
+                      <span className="font-mono text-slate-800">{staff.account_number ? `••••${staff.account_number.slice(-4)}` : '—'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Payroll Snapshot */}
+                <div className="p-4 bg-amber-50/60 rounded-2xl border border-amber-200 flex items-center justify-between shadow-sm">
                   <div>
-                    <h3 className="font-bold text-gray-900">{staff.full_name}</h3>
-                    <p className="text-sm text-gray-500">Supervisor ID • {staff.supervisor_code || '—'}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="p-5 bg-white rounded-3xl border border-gray-100">
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">Contact</p>
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Phone className="w-4 h-4 text-slate-400" />
-                    <span>{staff.mobile}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-slate-600 mt-3">
-                    <MapPin className="w-4 h-4 text-slate-400" />
-                    <span>{staff.station_name || 'Unassigned'}</span>
-                  </div>
-                  {staff.id_card_number && (
-                    <p className="text-xs text-slate-400 font-medium mt-3">
-                      ID Card: <span className="text-slate-600 font-semibold">{staff.id_card_number}</span>
+                    <p className="text-[11px] font-bold uppercase text-amber-900 tracking-wider">Payroll & Settlements</p>
+                    <p className="text-xs text-amber-800 mt-0.5">
+                      {settlements.length} settlement records found &bull; Total Disbursed: <span className="font-black text-emerald-800">₹ {totalPaid.toLocaleString()}</span>
                     </p>
-                  )}
-                </div>
-
-                <div className="p-5 bg-white rounded-3xl border border-gray-100">
-                  <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">Role</p>
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <Briefcase className="w-4 h-4 text-slate-400" />
-                    <span>Supervisor</span>
                   </div>
-                  <div className="mt-3 text-sm text-slate-600">
-                    <p className="font-semibold text-slate-800">Current Status</p>
-                    <p>{staff.status === 'active' ? 'Active' : 'Inactive'}</p>
-                  </div>
+                  <button
+                    onClick={() => setActiveTab('settlements')}
+                    className="text-xs font-bold text-amber-800 hover:text-amber-950 bg-white px-3.5 py-1.5 rounded-xl border border-amber-300 shadow-sm transition-all"
+                  >
+                    View All Settlements &rarr;
+                  </button>
                 </div>
               </div>
-            </div>
+            )}
 
-            <div className="space-y-4">
-              <div className="p-5 bg-white rounded-3xl border border-gray-100">
-                <div className="flex items-center justify-between">
+            {/* 2. UPLOADS TAB */}
+            {activeTab === 'uploads' && (
+              <div className="space-y-5">
+                <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200">
                   <div>
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">Assigned Since</p>
-                    <p className="text-sm font-bold text-slate-900">
-                      {staff.created_at
-                        ? new Date(staff.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-                        : '—'}
+                    <h3 className="text-sm font-bold text-slate-800">Supervisor Documents & Uploads</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      View, preview full-screen, or download all uploaded ID proofs and official documents.
                     </p>
                   </div>
-                  <CalendarCheck className="w-5 h-5 text-blue-600" />
+                  <button
+                    onClick={() => {
+                      onClose();
+                      onEdit?.(staff);
+                    }}
+                    className="flex items-center gap-1.5 px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shrink-0"
+                  >
+                    <FileUp className="w-3.5 h-3.5" /> Upload / Update Files
+                  </button>
                 </div>
-              </div>
 
-              {/* Wallet Balance */}
-              <div className={`p-5 rounded-3xl border ${
-                (staff.wallet_balance ?? 0) < 1000
-                  ? 'bg-red-50 border-red-200'
-                  : 'bg-green-50 border-green-200'
-              }`}>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-2">Wallet Balance</p>
-                <p className={`text-2xl font-black ${
-                  (staff.wallet_balance ?? 0) < 1000 ? 'text-red-600' : 'text-green-700'
-                }`}>
-                  ₹{Number(staff.wallet_balance ?? 0).toLocaleString('en-IN')}
-                </p>
-                {(staff.wallet_balance ?? 0) < 1000 && (
-                  <p className="text-xs text-red-500 font-semibold mt-1">⚠️ Low balance — top up needed</p>
-                )}
-              </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  
+                  {/* Photo */}
+                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col justify-between">
+                    <div>
+                      <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <ImageIcon className="w-4 h-4 text-amber-600" />
+                          <span className="font-bold text-xs text-slate-800">Profile / ID Photo</span>
+                        </div>
+                        {profilePhoto ? (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            Available
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                            Missing
+                          </span>
+                        )}
+                      </div>
 
-              {/* Documents */}
-              <div className="p-5 bg-white rounded-3xl border border-gray-100">
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-400 mb-3">Documents</p>
-                <div className="space-y-2">
-                  {[
-                    { label: 'Profile Photo',           file: staff.profile_photo },
-                    { label: 'ID Card (Aadhar/Pan)',    file: staff.id_document },
-                    { label: 'Bank Passbook / Cheque',  file: staff.bank_document },
-                  ].map(doc => (
-                    <div key={doc.label} className="flex items-center justify-between">
-                      <span className="text-xs text-slate-600 font-medium">{doc.label}</span>
-                      {doc.file ? (
-                        <a
-                          href={`${UPLOADS_BASE_URL}${doc.file}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-bold text-blue-600 hover:text-blue-800"
-                        >
-                          View
-                        </a>
+                      <div className="p-4 flex flex-col items-center justify-center">
+                        {profilePhoto ? (
+                          <div 
+                            onClick={() => handleOpenPreview(`${staffName} - Profile Photo`, profilePhoto)}
+                            className="relative group cursor-pointer w-32 h-32 rounded-2xl overflow-hidden border-2 border-amber-100 shadow-md my-2"
+                          >
+                            <img
+                              src={`${UPLOADS_BASE_URL}${profilePhoto}`}
+                              alt={staffName}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
+                              <Eye className="w-4 h-4" /> View Full
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-32 h-32 rounded-2xl bg-slate-100 border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 my-2">
+                            <ImageIcon className="w-8 h-8 mb-1" />
+                            <span className="text-[11px] font-medium">No Photo</span>
+                          </div>
+                        )}
+                        <p className="text-[11px] text-slate-500 font-mono text-center truncate max-w-full px-2 mt-1">
+                          {profilePhoto || 'No file uploaded'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 border-t border-slate-100 flex gap-2">
+                      {profilePhoto ? (
+                        <>
+                          <button
+                            onClick={() => handleOpenPreview(`${staffName} - Profile Photo`, profilePhoto)}
+                            className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-bold rounded-xl border border-amber-200 transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> Preview
+                          </button>
+                          <a
+                            href={`${UPLOADS_BASE_URL}${profilePhoto}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                            className="inline-flex items-center justify-center p-1.5 bg-white text-slate-700 hover:bg-slate-100 text-xs font-bold rounded-xl border border-slate-200 transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </a>
+                        </>
                       ) : (
-                        <span className="text-[10px] text-slate-400">Not uploaded</span>
+                        <button
+                          onClick={() => {
+                            onClose();
+                            onEdit?.(staff);
+                          }}
+                          className="w-full py-1.5 bg-white text-amber-800 hover:bg-amber-50 text-xs font-bold rounded-xl border border-amber-200 transition-colors"
+                        >
+                          + Upload Photo
+                        </button>
                       )}
                     </div>
-                  ))}
+                  </div>
+
+                  {/* ID Document */}
+                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col justify-between">
+                    <div>
+                      <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <FileText className="w-4 h-4 text-blue-600" />
+                          <span className="font-bold text-xs text-slate-800">ID Document</span>
+                        </div>
+                        {idDocument ? (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            Available
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                            Missing
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="p-4 flex flex-col items-center justify-center">
+                        {idDocument ? (
+                          <div 
+                            onClick={() => handleOpenPreview(`${staffName} - ID Document`, idDocument)}
+                            className="relative group cursor-pointer w-32 h-32 rounded-2xl overflow-hidden border-2 border-blue-100 shadow-md my-2 flex items-center justify-center bg-blue-50/50"
+                          >
+                            {isFileAnImage(idDocument) ? (
+                              <img
+                                src={`${UPLOADS_BASE_URL}${idDocument}`}
+                                alt="ID Document"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center text-blue-600 p-2">
+                                <FileText className="w-10 h-10 mb-1" />
+                                <span className="text-[10px] font-bold uppercase">PDF Document</span>
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
+                              <Eye className="w-4 h-4" /> View
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-32 h-32 rounded-2xl bg-slate-100 border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 my-2">
+                            <FileText className="w-8 h-8 mb-1" />
+                            <span className="text-[11px] font-medium">No ID Document</span>
+                          </div>
+                        )}
+                        <p className="text-[11px] text-slate-500 font-mono text-center truncate max-w-full px-2 mt-1">
+                          {idDocument || 'Aadhar/PAN not uploaded'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 border-t border-slate-100 flex gap-2">
+                      {idDocument ? (
+                        <>
+                          <button
+                            onClick={() => handleOpenPreview(`${staffName} - ID Document`, idDocument)}
+                            className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 text-xs font-bold rounded-xl border border-blue-200 transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> Preview
+                          </button>
+                          <a
+                            href={`${UPLOADS_BASE_URL}${idDocument}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                            className="inline-flex items-center justify-center p-1.5 bg-white text-slate-700 hover:bg-slate-100 text-xs font-bold rounded-xl border border-slate-200 transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </a>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            onClose();
+                            onEdit?.(staff);
+                          }}
+                          className="w-full py-1.5 bg-white text-blue-600 hover:bg-blue-50 text-xs font-bold rounded-xl border border-blue-200 transition-colors"
+                        >
+                          + Upload ID Proof
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Bank Document */}
+                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm flex flex-col justify-between">
+                    <div>
+                      <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-emerald-600" />
+                          <span className="font-bold text-xs text-slate-800">Bank Document</span>
+                        </div>
+                        {bankDocument ? (
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            Available
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+                            Missing
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="p-4 flex flex-col items-center justify-center">
+                        {bankDocument ? (
+                          <div 
+                            onClick={() => handleOpenPreview(`${staffName} - Bank Document`, bankDocument)}
+                            className="relative group cursor-pointer w-32 h-32 rounded-2xl overflow-hidden border-2 border-emerald-100 shadow-md my-2 flex items-center justify-center bg-emerald-50/50"
+                          >
+                            {isFileAnImage(bankDocument) ? (
+                              <img
+                                src={`${UPLOADS_BASE_URL}${bankDocument}`}
+                                alt="Bank Document"
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              />
+                            ) : (
+                              <div className="flex flex-col items-center text-emerald-600 p-2">
+                                <CreditCard className="w-10 h-10 mb-1" />
+                                <span className="text-[10px] font-bold uppercase">Passbook / Cheque</span>
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-bold gap-1">
+                              <Eye className="w-4 h-4" /> View
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="w-32 h-32 rounded-2xl bg-slate-100 border border-dashed border-slate-300 flex flex-col items-center justify-center text-slate-400 my-2">
+                            <CreditCard className="w-8 h-8 mb-1" />
+                            <span className="text-[11px] font-medium">No Bank Document</span>
+                          </div>
+                        )}
+                        <p className="text-[11px] text-slate-500 font-mono text-center truncate max-w-full px-2 mt-1">
+                          {bankDocument || 'Passbook not uploaded'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-slate-50 border-t border-slate-100 flex gap-2">
+                      {bankDocument ? (
+                        <>
+                          <button
+                            onClick={() => handleOpenPreview(`${staffName} - Bank Document`, bankDocument)}
+                            className="flex-1 inline-flex items-center justify-center gap-1 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold rounded-xl border border-emerald-200 transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> Preview
+                          </button>
+                          <a
+                            href={`${UPLOADS_BASE_URL}${bankDocument}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            download
+                            className="inline-flex items-center justify-center p-1.5 bg-white text-slate-700 hover:bg-slate-100 text-xs font-bold rounded-xl border border-slate-200 transition-colors"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </a>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            onClose();
+                            onEdit?.(staff);
+                          }}
+                          className="w-full py-1.5 bg-white text-emerald-600 hover:bg-emerald-50 text-xs font-bold rounded-xl border border-emerald-200 transition-colors"
+                        >
+                          + Upload Passbook
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               </div>
+            )}
 
-              <div className="p-5 bg-slate-50 rounded-3xl border border-slate-100">
-                <h4 className="text-sm font-bold text-slate-900 mb-3">Notes</h4>
-                <p className="text-sm text-slate-600">{staff.notes || 'No additional notes available.'}</p>
+            {/* 3. SETTLEMENTS TAB */}
+            {activeTab === 'settlements' && (
+              <div className="space-y-5">
+                
+                {/* Top Actions & KPI Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Total Disbursed (Paid)</p>
+                    <p className="text-lg font-black text-emerald-600 mt-0.5">₹ {totalPaid.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Pending Approvals</p>
+                    <p className="text-lg font-black text-amber-600 mt-0.5">{totalPending} Slips</p>
+                  </div>
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Action</p>
+                      <p className="text-xs font-semibold text-slate-700">New Month Slip</p>
+                    </div>
+                    <button
+                      onClick={handlePrepareSalary}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-bold hover:bg-indigo-700 shadow-sm"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Prepare
+                    </button>
+                  </div>
+                </div>
+
+                {/* Settlements Table */}
+                {loadingSettlements ? (
+                  <div className="p-8 text-center text-xs text-slate-500">Loading supervisor salary records...</div>
+                ) : settlements.length === 0 ? (
+                  <div className="bg-slate-50 rounded-2xl border border-dashed border-slate-300 p-8 text-center">
+                    <FileText className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                    <h4 className="text-xs font-bold text-slate-700">No Salary Settlements Yet</h4>
+                    <p className="text-[11px] text-slate-400 mt-1">This supervisor has not been processed for any monthly salary slip yet.</p>
+                    <button
+                      onClick={handlePrepareSalary}
+                      className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 shadow-sm"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Prepare First Settlement
+                    </button>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200 text-[10px]">
+                          <tr>
+                            <th className="py-3 px-3.5">Slip # / Month</th>
+                            <th className="py-3 px-3.5">Attendance</th>
+                            <th className="py-3 px-3.5 text-right">Gross Earnings</th>
+                            <th className="py-3 px-3.5 text-right">Deductions</th>
+                            <th className="py-3 px-3.5 text-right">Net Payable</th>
+                            <th className="py-3 px-3.5 text-center">Status</th>
+                            <th className="py-3 px-3.5 text-center">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 font-medium">
+                          {settlements.map((item) => (
+                            <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-3 px-3.5">
+                                <span className="font-mono font-bold text-indigo-700 block">{item.salary_slip_no}</span>
+                                <span className="text-[11px] text-slate-400">{item.salary_month}</span>
+                              </td>
+                              <td className="py-3 px-3.5 text-slate-600">
+                                <span className="font-bold text-slate-800">{item.present_days || 30}</span> / {item.working_days || 30} Days
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-bold text-slate-800">
+                                ₹ {(Number(item.total_earnings) || 0).toLocaleString()}
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-bold text-rose-500">
+                                ₹ {(Number(item.total_deductions) || 0).toLocaleString()}
+                              </td>
+                              <td className="py-3 px-3.5 text-right font-black text-slate-900 text-sm">
+                                ₹ {(Number(item.net_payable) || 0).toLocaleString()}
+                              </td>
+                              <td className="py-3 px-3.5 text-center">
+                                {{
+                                  Draft:     <span className="bg-blue-50 text-blue-600 border border-blue-200 text-[10px] px-2 py-0.5 rounded-full font-bold">Draft</span>,
+                                  Submitted: <span className="bg-yellow-50 text-yellow-700 border border-yellow-200 text-[10px] px-2 py-0.5 rounded-full font-bold">Pending Approval</span>,
+                                  Approved:  <span className="bg-green-50 text-green-700 border border-green-200 text-[10px] px-2 py-0.5 rounded-full font-bold">Approved</span>,
+                                  Paid:      <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] px-2.5 py-0.5 rounded-full font-bold">Paid</span>,
+                                  Rejected:  <span className="bg-rose-50 text-rose-700 border border-rose-200 text-[10px] px-2 py-0.5 rounded-full font-bold">Rejected</span>,
+                                }[item.status]}
+                              </td>
+                              <td className="py-3 px-3.5 text-center">
+                                <button
+                                  onClick={() => handleOpenPayslip(item)}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-200"
+                                  title="View Printable Payslip"
+                                >
+                                  <Printer className="w-3.5 h-3.5" /> Payslip
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
               </div>
-            </div>
+            )}
+
           </div>
 
-          <div className="p-5 border-t border-gray-100 flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => onEdit?.(staff)}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-blue-600 bg-blue-50 border border-blue-100 hover:bg-blue-100 rounded-xl transition-colors"
-            >
-              <Edit className="w-4 h-4" /> Edit
-            </button>
+          {/* Footer Actions */}
+          <div className="p-4 border-t border-gray-100 bg-slate-50 flex items-center justify-between shrink-0">
             <button
               type="button"
               onClick={handleDelete}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-xl transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl border border-red-200 transition-colors"
             >
-              <Trash2 className="w-4 h-4" /> Remove Supervisor
+              <Trash2 className="w-3.5 h-3.5" /> Remove Supervisor
             </button>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onEdit?.(staff);
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-xl transition-colors"
+              >
+                <Edit className="w-3.5 h-3.5" /> Edit Supervisor & Uploads
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors shadow-sm"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>
+
+      {/* Document Lightbox / Preview Modal */}
+      {previewDoc && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between p-4 border-b border-gray-100 bg-slate-900 text-white">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-amber-400" />
+                <h4 className="text-sm font-bold truncate max-w-md">{previewDoc.title}</h4>
+              </div>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewDoc.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  download
+                  className="flex items-center gap-1 px-3 py-1 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg transition-colors"
+                >
+                  <Download className="w-3.5 h-3.5" /> Download
+                </a>
+                <button
+                  onClick={() => setPreviewDoc(null)}
+                  className="p-1 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-4 bg-slate-950 flex items-center justify-center min-h-[350px]">
+              {previewDoc.isImage ? (
+                <img
+                  src={previewDoc.url}
+                  alt={previewDoc.title}
+                  className="max-h-[70vh] max-w-full object-contain rounded-lg shadow-lg"
+                />
+              ) : previewDoc.isPdf ? (
+                <iframe
+                  src={previewDoc.url}
+                  title={previewDoc.title}
+                  className="w-full h-[70vh] rounded-lg bg-white border-0"
+                />
+              ) : (
+                <div className="text-center p-8 text-white">
+                  <FileText className="w-16 h-16 text-amber-400 mx-auto mb-3" />
+                  <p className="text-sm font-bold">Document File</p>
+                  <p className="text-xs text-slate-400 mt-1">{previewDoc.filename}</p>
+                  <a
+                    href={previewDoc.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold"
+                  >
+                    <ExternalLink className="w-4 h-4" /> Open File in New Tab
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Printable Payslip Modal */}
+      {isPayslipOpen && (
+        <StaffSalaryPayslipModal
+          voucherData={selectedPayslipData}
+          onClose={() => setIsPayslipOpen(false)}
+        />
+      )}
     </AnimatePresence>
   );
 }

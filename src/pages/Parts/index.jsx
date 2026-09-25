@@ -114,9 +114,9 @@ import {
   Search, Pencil, Trash2, ShoppingCart, CheckCircle2, X,
 } from 'lucide-react';
 
-const CATEGORIES  = ['Spares', 'Batteries', 'Tubes', 'Lubricants', 'Electrical', 'Others'];
-const PAGE_TABS   = ['Inventory', 'Purchase Orders', 'Returns'];
-const API         = 'http://localhost:5001/api';
+const DEFAULT_CATEGORIES = ['Spares', 'Batteries', 'Tubes', 'Lubricants', 'Electrical', 'Others'];
+const PAGE_TABS = ['Inventory', 'Purchase Orders', 'Returns'];
+const API = 'http://localhost:5001/api';
 
 /* ── helpers ── */
 function qtyColor(qty) {
@@ -172,7 +172,7 @@ function getReturnBadge(status) {
   return RETURN_STATUS[status]?.className || RETURN_STATUS.pending.className;
 }
 
-function advanceReturnStatus(status) {
+function nextReturnStatus(status) {
   if (status === 'pending') return 'collected';
   if (status === 'collected') return 'completed';
   return 'completed';
@@ -221,6 +221,14 @@ export default function PartsModule() {
   const [history, setHistory]               = useState([]);
   const [invLoading, setInvLoading]         = useState(true);
   const [histLoading, setHistLoading]       = useState(true);
+
+  const allCategories = useMemo(() => {
+    const fromInventory = (inventory || [])
+      .map(i => (i.category || '').trim())
+      .filter(Boolean);
+
+    return [...new Set([...DEFAULT_CATEGORIES, ...fromInventory])];
+  }, [inventory]);
 
   /* ── part returns (restock ledger) state ── */
   const [partReturns, setPartReturns]           = useState([]);
@@ -308,7 +316,28 @@ export default function PartsModule() {
     try {
       const res  = await fetch(`${API}/inventory/returns`);
       const data = await res.json();
-      setPartReturns(data.data || []);
+      const records = data.data || [];
+      setPartReturns(records);
+      setReturns(records.map(record => ({
+        id: record.id,
+        number: record.po_number || `RETURN-${record.id}`,
+        vendor: record.vendor_name || '—',
+        itemName: record.part_name || '—',
+        quantity: Number(record.quantity_returned || 0),
+        date: record.return_date,
+        reason: record.return_reason || record.notes || 'Other',
+        remarks: record.notes || '',
+        status: record.return_status === 'Collected'
+          ? 'collected'
+          : record.return_status === 'Completed'
+            ? 'completed'
+            : 'pending',
+        poRef: record.po_number || '—',
+        creditAmount: Number(record.credit_amount || 0),
+        costPerUnit: Number(record.credit_amount || 0) / Math.max(1, Number(record.quantity_returned || 1)),
+        createdBy: record.created_by || '—',
+        createdAt: record.created_at,
+      })));
     } catch { showToast('Failed to load part returns.', 'error'); }
     finally  { setPartReturnsLoading(false); }
   }, []);
@@ -396,13 +425,13 @@ export default function PartsModule() {
   /* ── derived ── */
   const categoryCounts = useMemo(() => {
     const c = {};
-    CATEGORIES.forEach(cat => {
+    allCategories.forEach(cat => {
       c[cat] = inventory.filter(i =>
         (i.category || '').toLowerCase() === cat.toLowerCase()
       ).length;
     });
     return c;
-  }, [inventory]);
+  }, [inventory, allCategories]);
 
   const filteredItems = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -483,7 +512,18 @@ export default function PartsModule() {
     );
   };
 
-  const handleConfirmReturn = () => {
+  const getReturnPricing = (item, po) => {
+    const inventoryCost = Number(item.costPrice || item.cost_price || 0);
+    const poItem = (po?.items || []).find(poi =>
+      (poi.partName || poi.name || '').toLowerCase() === (item.part_name || item.name || '').toLowerCase()
+    ) || po?.items?.[0];
+    const poUnitCost = Number(poItem?.unitPrice || poItem?.unit_price || poItem?.cost || 0);
+    const poTotal = Number(po?.total_amount || po?.totalAmount || 0);
+    const poQuantity = Number(po?.quantity || poItem?.qty || poItem?.quantity || 0);
+    return inventoryCost > 0 ? inventoryCost : poUnitCost > 0 ? poUnitCost : poQuantity > 0 ? poTotal / poQuantity : 0;
+  };
+
+  const handleConfirmReturn = async () => {
     if (!returnModalItem) return;
     const qty = Number(returnForm.quantity || 0);
     const currentStock = Number(returnModalItem.current_stock || 0);
@@ -498,99 +538,65 @@ export default function PartsModule() {
 
     setReturnActionLoading(true);
     const itemName = returnModalItem.part_name || returnModalItem.name || 'Unknown Item';
-    const vendorName = returnModalItem.preferredVendor || returnModalItem.preferred_vendor || returnModalItem.vendor || 'Unknown Vendor';
     const po = findMatchingReturnPO(returnModalItem);
-    const returnNumber = buildReturnNumber(returns.length + 1, returnForm.date);
-
-    // ── duplicate prevention ──
-    if (processedReturnRefs.has(returnNumber)) {
-      showToast('Return reference already exists. Duplicate prevented.', 'error');
+    const vendorName = po?.vendor || returnModalItem.preferredVendor || returnModalItem.preferred_vendor || returnModalItem.vendor || '';
+    const poNumber = po?.po_number || po?.poNumber || '';
+    const unitCost = getReturnPricing(returnModalItem, po);
+    if (!vendorName) {
+      setReturnErrors({ quantity: 'No vendor is linked to this received purchase.' });
       setReturnActionLoading(false);
       return;
     }
-    const unitCost = Number(returnModalItem.costPrice || returnModalItem.cost_price || 0);
-    const creditAmount = qty * unitCost;
 
-    const now = new Date().toISOString();
-    const newReturn = {
-      id: returnNumber,
-      number: returnNumber,
-      vendor: vendorName,
-      itemName,
-      quantity: qty,
-      date: returnForm.date,
-      reason: returnForm.reason,
-      remarks: returnForm.remarks,
-      status: 'pending',
-      poRef: po?.po_number || po?.poNumber || '—',
-      costPerUnit: unitCost,
-      creditAmount,
-      createdBy: currentUser.name,
-      createdAt: now,
-      updatedBy: currentUser.name,
-      updatedAt: now,
-    };
-
-    setInventory(prev => prev.map(i =>
-      i.id === returnModalItem.id
-        ? { ...i, current_stock: Math.max(0, currentStock - qty) }
-        : i
-    ));
-
-    setReturns(prev => [newReturn, ...prev]);
-
-    if (po) {
-      setPoList(prev => prev.map(matchedPO => {
-        if (matchedPO.id !== po.id) return matchedPO;
-        const returnEntry = {
-          returnNumber,
-          quantity: qty,
-          reason: returnForm.reason,
-          date: returnForm.date,
-          status: 'Pending Pickup',
-        };
-        return {
-          ...matchedPO,
-          returnHistory: [returnEntry, ...(matchedPO.returnHistory || [])],
-          returnedQty: (matchedPO.returnedQty || 0) + qty,
-        };
-      }));
-    }
-
-    const vendorId = findVendorIdByName(vendorName);
-    if (vendorId) {
-      addVendorTransaction({
-        vendorId,
-        id: `TXN-${Date.now()}`,
-        date: returnForm.date,
-        truckId: '',
-        type: 'Return Adjustment',
-        ref: returnNumber,
-        desc: `Vendor Return - ${itemName}`,
-        debit: 0,
-        credit: creditAmount,
-        vendor: vendorName,
-        itemName,
-        quantity: qty,
-        reason: returnForm.reason,
-        poRef: newReturn.poRef,
-        category: po?.category || '',
+    try {
+      const res = await fetch(`${API}/inventory/vendor-returns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          part_id: returnModalItem.id,
+          vendor_name: vendorName,
+          po_number: poNumber || null,
+          quantity_returned: qty,
+          return_date: returnForm.date,
+          return_reason: returnForm.reason,
+          notes: returnForm.remarks,
+          created_by: currentUser.name,
+        }),
       });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to record vendor return.');
+      setReturnModalItem(null);
+      setReturnErrors({});
+      await Promise.all([fetchInventory(), fetchPartReturns(), fetchHistory()]);
+      showToast(`Vendor return recorded for ${itemName}.`);
+    } catch (error) {
+      setReturnErrors({ quantity: error.message });
+    } finally {
+      setReturnActionLoading(false);
     }
-
-    setProcessedReturnRefs(prev => new Set([...prev, returnNumber]));
-    setReturnModalItem(null);
-    setReturnErrors({});
-    setReturnActionLoading(false);
-    showToast('Return recorded and inventory adjusted.');
   };
 
-  const handleAdvanceReturnStatus = (recordId) => {
-    const now = new Date().toISOString();
-    setReturns(prev => prev.map(r =>
-      r.id === recordId ? { ...r, status: advanceReturnStatus(r.status), updatedBy: currentUser.name, updatedAt: now } : r
-    ));
-    showToast('Return status updated.');
+  const handleReturnStatusChange = async (recordId) => {
+    const record = returns.find(r => r.id === recordId);
+    if (!record) return;
+    const nextStatus = record.status === 'pending'
+      ? 'Collected'
+      : record.status === 'collected'
+        ? 'Completed'
+        : 'Completed';
+    try {
+      const res = await fetch(`${API}/inventory/vendor-returns/${recordId}/status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Failed to update return status.');
+      await fetchPartReturns();
+      showToast(`Return status updated to ${nextStatus}.`);
+    } catch (error) {
+      showToast(error.message, 'error');
+    }
   };
 
   const openReturnDetails = (record) => {
@@ -871,7 +877,7 @@ export default function PartsModule() {
             {/* Category tabs + Search */}
             <div className="px-5 pt-4 pb-3 flex flex-col sm:flex-row sm:items-center gap-3">
               <div className="flex gap-1 overflow-x-auto pb-0.5 sm:pb-0 shrink-0">
-                {CATEGORIES.map(cat => (
+                {allCategories.map(cat => (
                   <button key={cat} onClick={() => { setActiveCategory(cat); setSearch(''); }}
                     className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition
                       ${activeCategory === cat ? 'bg-violet-600 text-white shadow-sm' : 'text-slate-500 hover:bg-slate-100'}`}>
@@ -940,6 +946,9 @@ export default function PartsModule() {
                       const qty  = Number(item.current_stock || 0);
                       const minS = Number(item.min_stock || item.minStock || 0);
                       const isLow = qty > 0 && minS > 0 && qty <= minS;
+                      const vendorLinkedPO = findMatchingReturnPO(item);
+                      const hasReturnAccess = Boolean(vendorLinkedPO && (vendorLinkedPO.vendor || vendorLinkedPO.vendor_name || vendorLinkedPO.preferredVendor || item.preferred_vendor || item.preferredVendor));
+
                       return (
                         <tr key={item.id} className="border-b border-slate-50 hover:bg-slate-50/70 transition">
                           <td className="px-5 py-3.5">
@@ -963,7 +972,7 @@ export default function PartsModule() {
                                 className="rounded-xl bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100 active:scale-95 transition disabled:opacity-35 disabled:cursor-not-allowed">
                                 Issue
                               </button>
-                              {qty > 0 && receivedPOItems.has((item.part_name || item.name || '').toLowerCase()) && (
+                              {qty > 0 && hasReturnAccess && (
                                 <button onClick={() => openReturnModal(item)}
                                   className="rounded-xl bg-amber-50 px-3 py-1.5 text-xs font-bold text-amber-700 hover:bg-amber-100 active:scale-95 transition">
                                   Return
@@ -1076,7 +1085,7 @@ export default function PartsModule() {
               <h2 className="text-sm font-bold text-slate-800">Vendor Return History</h2>
               <div className="ml-auto flex items-center gap-2 flex-wrap">
                 {/* status filter pills */}
-                {[['all','All'],['pending','Pending'],['collected','Collected'],['completed','Completed']].map(([v,l]) => (
+                {[['all','All'],['pending','Pending Pickup'],['collected','Collected'],['completed','Completed']].map(([v,l]) => (
                   <button key={v} onClick={() => setReturnStatusFilter(v)}
                     className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold border transition ${
                       returnStatusFilter === v ? 'bg-slate-700 text-white border-slate-700' : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
@@ -1104,14 +1113,15 @@ export default function PartsModule() {
                     <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Item</th>
                     <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Qty</th>
                     <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Reason</th>
-                    <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Status</th>
+                    <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Return Credit</th>
+                    <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Pickup Status</th>
                     <th className="text-left text-xs font-semibold text-slate-400 px-5 py-3">Ref PO</th>
                     <th className="text-right text-xs font-semibold text-slate-400 px-5 py-3">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredReturns.length === 0 ? (
-                    <tr><td colSpan={9} className="py-16 text-center">
+                    <tr><td colSpan={10} className="py-16 text-center">
                       <ShoppingCart className="h-9 w-9 text-slate-200 mx-auto mb-3" />
                       <p className="text-sm font-medium text-slate-400">No returns found</p>
                       <p className="text-xs text-slate-400 mt-1">{returnSearch || returnStatusFilter !== 'all' ? 'Try clearing your filters.' : 'Use the Return button on inventory rows to log a vendor return.'}</p>
@@ -1125,6 +1135,7 @@ export default function PartsModule() {
                         <td className="px-5 py-3.5 text-slate-700">{record.itemName}</td>
                         <td className="px-5 py-3.5 text-slate-600">{record.quantity}</td>
                         <td className="px-5 py-3.5 text-slate-600">{record.reason}</td>
+                        <td className="px-5 py-3.5 font-bold text-emerald-600">₹{Number(record.creditAmount || 0).toLocaleString()}</td>
                         <td className="px-5 py-3.5">
                           <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold ${getReturnBadge(record.status)}`}>
                             {getReturnStatusText(record.status)}
@@ -1134,9 +1145,9 @@ export default function PartsModule() {
                         <td className="px-5 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-2">
                             {record.status !== 'completed' && (
-                              <button onClick={() => handleAdvanceReturnStatus(record.id)}
+                              <button onClick={() => handleReturnStatusChange(record.id)}
                                 className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-200 transition">
-                                Advance
+                                {record.status === 'pending' ? 'Mark Collected' : 'Mark Completed'}
                               </button>
                             )}
                             <button onClick={() => openReturnDetails(record)}
@@ -1337,8 +1348,14 @@ export default function PartsModule() {
                                   </button>
                                 )}
 
-                                {/* sid=2: Rejected */}
-                                {sid === 2 && (
+                                {/* sid=2: Rejected — reviewers can reconsider the same PO */}
+                                {sid === 2 && canReviewPO && (
+                                  <button onClick={() => openCommentModal(po, 'approve')} disabled={isActing}
+                                    className="rounded-xl bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition disabled:opacity-50">
+                                    Approve Again
+                                  </button>
+                                )}
+                                {sid === 2 && !canReviewPO && (
                                   <span className="text-xs text-red-500 font-semibold italic">Rejected</span>
                                 )}
 
@@ -1461,7 +1478,10 @@ export default function PartsModule() {
                 {[[
                   'Item Name', returnModalItem.part_name || returnModalItem.name || '—'
                 ],[
-                  'Vendor', returnModalItem.preferredVendor || returnModalItem.preferred_vendor || returnModalItem.vendor || '—'
+                  'Vendor', (() => {
+                    const po = findMatchingReturnPO(returnModalItem);
+                    return po?.vendor || returnModalItem.preferredVendor || returnModalItem.preferred_vendor || returnModalItem.vendor || '—';
+                  })()
                 ],[
                   'PO Number', (() => { const po = findMatchingReturnPO(returnModalItem); return po?.po_number || po?.poNumber || '—'; })()
                 ],[
@@ -1520,16 +1540,17 @@ export default function PartsModule() {
 
               {/* Credit preview */}
               {Number(returnForm.quantity) > 0 && (() => {
-                const unitCost = Number(returnModalItem.costPrice || returnModalItem.cost_price || 0);
+                const po = findMatchingReturnPO(returnModalItem);
+                const unitCost = getReturnPricing(returnModalItem, po);
                 const credit = Number(returnForm.quantity) * unitCost;
                 return credit > 0 ? (
                   <div className="flex items-center justify-between bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-3">
-                    <span className="text-xs font-semibold text-emerald-700">Ledger Credit</span>
+                    <span className="text-xs font-semibold text-emerald-700">Return Credit</span>
                     <span className="text-sm font-black text-emerald-700">₹{credit.toLocaleString()} Credit</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
-                    <span className="text-xs text-amber-700">ℹ️ No unit cost on record — ledger credit will be ₹0. Set cost price on the item to enable credit.</span>
+                    <span className="text-xs text-amber-700">ℹ️ No price found on this item or linked PO. Add a cost price before recording the return.</span>
                   </div>
                 );
               })()}
@@ -1598,6 +1619,8 @@ export default function PartsModule() {
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
         onSuccess={handleAddSuccess}
+        defaultCategory={activeCategory}
+        categories={allCategories}
       />
       <EditItemModal
         isOpen={!!editItem}
@@ -1622,6 +1645,8 @@ export default function PartsModule() {
         onClose={() => setIsCreatePOOpen(false)}
         onSuccess={handleCreatePOSuccess}
         requestedBy={currentUser.name}
+        categories={allCategories}
+        inventory={inventory}
       />
       <ReturnPartModal
         isOpen={!!returnPartRecord}

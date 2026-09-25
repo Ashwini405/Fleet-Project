@@ -34,6 +34,8 @@ router.get('/issue-history',      inventoryController.getIssueHistory);
 // Part returns (restock ledger)
 router.get('/returns',            inventoryController.getPartReturns);
 router.post('/returns',           inventoryController.createPartReturn);
+router.post('/vendor-returns',    inventoryController.createVendorReturn);
+router.put('/vendor-returns/:id/status', inventoryController.updateVendorReturnStatus);
 
 // Purchase orders
 router.get('/purchase-orders',                    inventoryController.getPurchaseOrders);
