@@ -29,6 +29,16 @@ router.get("/sidebar", verifyToken, AuthController.getSidebar);
 router.post("/change-password", verifyToken, AuthController.changePassword);
 
 // ==========================================================
+// My Account (User Self-Service)
+// ==========================================================
+
+router.get("/profile", verifyToken, AuthController.getProfile);
+router.put("/profile", verifyToken, AuthController.updateProfile);
+router.get("/login-history", verifyToken, AuthController.getMyLoginHistory);
+router.get("/sessions", verifyToken, AuthController.getMySessions);
+router.delete("/sessions/:id", verifyToken, AuthController.revokeMySession);
+
+// ==========================================================
 // Role Assignment (Admin only)
 // ==========================================================
 

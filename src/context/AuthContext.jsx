@@ -121,6 +121,14 @@ export function AuthProvider({ children }) {
         return () => window.removeEventListener('auth-refresh', handler);
     }, []);
 
+    const updateUser = useCallback((fields) => {
+        setUser((prev) => {
+            const next = { ...prev, ...fields };
+            localStorage.setItem("user", JSON.stringify(next));
+            return next;
+        });
+    }, []);
+
     const hasPermission = useCallback((moduleName, action = "view") => {
         const row = permissions.find((p) => p.module_name === moduleName);
         return !!(row && row[`can_${action}`]);
@@ -134,6 +142,7 @@ export function AuthProvider({ children }) {
         isAuthenticated: !!user,
         login,
         logout,
+        updateUser,
         hasPermission,
     };
 

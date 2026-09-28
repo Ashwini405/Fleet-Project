@@ -44,7 +44,6 @@ const TruckPLDetail         = lazy(() => import("./pages/TruckPL"));
 const Staff                 = lazy(() => import("./pages/Staff"));
 const DriverProfile         = lazy(() => import("./pages/Staff/DriverProfile"));
 const Settings              = lazy(() => import("./pages/Settings/index"));
-const Documents             = lazy(() => import("./pages/Documents/index"));
 const AuditLogs             = lazy(() => import("./pages/AuditLogs/index"));
 const Notifications         = lazy(() => import("./pages/Notifications"));
 const Administration        = lazy(() => import("./pages/Administration"));
@@ -137,7 +136,7 @@ function InnerApp() {
           <div className="flex-1 p-4 md:p-6">
             <Suspense fallback={<PageLoader />}>
                   <Routes>
-                    <Route path="/" element={<ProtectedRoute module="Dashboard"><Dashboard /></ProtectedRoute>} />
+                    <Route path="/" element={<ProtectedRoute module="Dashboard" redirectIfDenied><Dashboard /></ProtectedRoute>} />
                     <Route path="/vehicles" element={<ProtectedRoute module="Vehicle Master" action="view"><VehicleMaster vehicles={vehicles} setVehicles={setVehicles} /></ProtectedRoute>} />
                     <Route path="/vehicles/add" element={<ProtectedRoute module="Vehicle Master" action="create"><AddVehicle vehicles={vehicles} setVehicles={setVehicles} /></ProtectedRoute>} />
                     <Route path="/vehicles/bulk-upload" element={<ProtectedRoute module="Vehicle Master" action="create"><BulkUploadVehicles /></ProtectedRoute>} />
@@ -157,9 +156,9 @@ function InnerApp() {
                     <Route path="/service/repair/:id" element={<ProtectedRoute module="Maintenance" action="view"><DetailRepairWorks /></ProtectedRoute>} />
                     <Route path="/tyres" element={<ProtectedRoute module="Tyres" action="view"><Tyres /></ProtectedRoute>} />
                     <Route path="/parts" element={<ProtectedRoute module="Inventory" action="view"><Parts /></ProtectedRoute>} />
-                    <Route path="/inspection" element={<ProtectedRoute module="Maintenance" action="view"><Inspection /></ProtectedRoute>} />
-                    <Route path="/incidents" element={<ProtectedRoute module="Maintenance" action="view"><Incidents /></ProtectedRoute>} />
-                    <Route path="/warranties" element={<ProtectedRoute module="Maintenance" action="view"><Warranties /></ProtectedRoute>} />
+                    <Route path="/inspection" element={<ProtectedRoute module="Vehicle Inspection" action="view"><Inspection /></ProtectedRoute>} />
+                    <Route path="/incidents" element={<ProtectedRoute module="Incidents" action="view"><Incidents /></ProtectedRoute>} />
+                    <Route path="/warranties" element={<ProtectedRoute module="Warranties" action="view"><Warranties /></ProtectedRoute>} />
                     <Route path="/finance" element={<ProtectedRoute module="Income & Expense" action="view"><Finance /></ProtectedRoute>} />
                     <Route path="/vendors" element={<ProtectedRoute module="Vendor" action="view"><Vendors /></ProtectedRoute>} />
                     <Route path="/payments" element={<ProtectedRoute module="Operational Payments" action="view"><Payments /></ProtectedRoute>} />
@@ -170,8 +169,7 @@ function InnerApp() {
                     <Route path="/reports/trucks/:truckId" element={<ProtectedRoute module="Truck Profit & Loss" action="view"><TruckPLDetail /></ProtectedRoute>} />
                     <Route path="/staff" element={<ProtectedRoute module="Staff Management" action="view"><Staff /></ProtectedRoute>} />
                     <Route path="/staff/drivers/:id" element={<ProtectedRoute module="Staff Management" action="view"><DriverProfile /></ProtectedRoute>} />
-                    <Route path="/settings" element={<ProtectedRoute module="System Settings" action="view"><Settings /></ProtectedRoute>} />
-                    <Route path="/documents" element={<ProtectedRoute module="Document Vault" action="view"><Documents /></ProtectedRoute>} />
+                    <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
                     <Route path="/audit" element={<ProtectedRoute module="Audit Logs" action="view"><AuditLogs /></ProtectedRoute>} />
                     <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
                     <Route path="/administration" element={<ProtectedRoute module="Administration" action="view"><Administration /></ProtectedRoute>} />

@@ -346,7 +346,9 @@ const getFuel = async (req, res) => {
   }
 };
 
-// ✅ UPDATE TRIP STATUS — on Completed, update vehicle odometer
+// ✅ UPDATE TRIP STATUS
+// (The vehicle's current odometer is computed live from fuel entries and
+// trip readings in vehicleModel — nothing to store here.)
 const updateTripStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -356,14 +358,6 @@ const updateTripStatus = async (req, res) => {
 
     const trip = await Trip.getById(id);
     if (trip?.vehicle_id) await lifecycle.syncVehicleOperationalStatus(trip.vehicle_id);
-
-    // ── On Completed: push closing odometer to vehicle ───────────────────
-    if (status === 'Completed' && trip?.vehicle_id && trip?.closing_km) {
-      await db.query(
-        `UPDATE vehicles SET current_odometer = GREATEST(IFNULL(current_odometer,0), ?) WHERE id = ?`,
-        [trip.closing_km, trip.vehicle_id]
-      );
-    }
 
     // ── On Closed: settle supervisor wallet (refund unspent advance) ─────
     if (status === 'Closed' && trip?.supervisor_id) {

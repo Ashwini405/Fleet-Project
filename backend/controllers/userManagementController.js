@@ -358,6 +358,13 @@ class UserManagementController {
 
             const updated_by = req.user.username;
 
+            if (!username || !String(username).trim() || !email || !String(email).trim() || !role) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Username, Email and Role are required."
+                });
+            }
+
             // ---------------------------------------
 
             const user =
@@ -684,6 +691,13 @@ class UserManagementController {
 
             }
 
+            if (String(password).length < 8) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Password must be at least 8 characters."
+                });
+            }
+
             await UserManagementModel.resetPassword(
 
                 id,
@@ -976,5 +990,25 @@ class UserManagementController {
     }
 
 }
+
+UserManagementController.getAvailableStaff = async (req, res) => {
+    try {
+        const data = await UserManagementModel.getAvailableStaff();
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        console.error("GET AVAILABLE STAFF ERROR:", error);
+        res.status(500).json({ success: false, message: "Unable to fetch staff.", error: error.message });
+    }
+};
+
+UserManagementController.getPlants = async (req, res) => {
+    try {
+        const data = await UserManagementModel.getPlants();
+        res.status(200).json({ success: true, data });
+    } catch (error) {
+        console.error("GET PLANTS ERROR:", error);
+        res.status(500).json({ success: false, message: "Unable to fetch plants.", error: error.message });
+    }
+};
 
 module.exports = UserManagementController;

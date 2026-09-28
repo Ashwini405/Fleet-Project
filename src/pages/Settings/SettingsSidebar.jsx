@@ -1,12 +1,10 @@
 import React from "react";
-import { User, KeyRound, ShieldCheck, Bell, Monitor, History } from "lucide-react";
+import { User, KeyRound, Monitor, History } from "lucide-react";
 
 export default function SettingsSidebar({ activeTab, setActiveTab }) {
   const menuItems = [
     { id: 'profile',       label: 'Profile',                 icon: User        },
     { id: 'password',      label: 'Change Password',         icon: KeyRound    },
-    { id: 'security',      label: 'Security',                icon: ShieldCheck },
-    { id: 'notifications', label: 'Notification Preferences',icon: Bell        },
     { id: 'sessions',      label: 'Active Sessions',         icon: Monitor     },
     { id: 'history',       label: 'Login History',           icon: History     },
   ];

@@ -22,13 +22,14 @@ export default function Finance() {
   const urlViewTrip  = searchParams.get("view_trip");  // open list, highlight trip
   const urlProfitTripId = searchParams.get("profit_trip_id");
   const urlVehicleId = searchParams.get("vehicle_id");
+  const urlCategory  = searchParams.get("category");
 
   const [activeTab,     setActiveTab]     = useState(urlTab || "overview");
   const [selectedTruck, setSelectedTruck] = useState(urlVehicleId || "All");
   const [dateFrom,      setDateFrom]      = useState("");
   const [dateTo,        setDateTo]        = useState("");
   const [searchQuery,   setSearchQuery]   = useState("");
-  const [categoryFilter, setCategoryFilter] = useState("All");
+  const [categoryFilter, setCategoryFilter] = useState(urlCategory || "All");
   const [vehicles,      setVehicles]      = useState([]);
 
   React.useEffect(() => {
@@ -70,7 +71,10 @@ export default function Finance() {
     categoryFilter,
     setCategoryFilter,
     vehicles,
-    categories: EXPENSE_CATEGORIES
+    // keep a category opened from a link (?category=) selectable in the dropdown
+    categories: urlCategory && !EXPENSE_CATEGORIES.includes(urlCategory)
+      ? [...EXPENSE_CATEGORIES, urlCategory]
+      : EXPENSE_CATEGORIES
   };
 
   // trip_id  → auto-open add form with pre-fill
@@ -136,7 +140,7 @@ export default function Finance() {
         searchQuery={searchQuery}     setSearchQuery={setSearchQuery}
         categoryFilter={categoryFilter} setCategoryFilter={setCategoryFilter}
         vehicles={vehicles}
-        categories={EXPENSE_CATEGORIES}
+        categories={sharedProps.categories}
       />
 
       {/* ── Tab content ── */}

@@ -283,7 +283,9 @@ class RoleModel {
                 can_edit,
                 can_delete,
                 can_approve,
-                can_export
+                can_reject,
+                can_export,
+                can_print
             FROM role_permissions
             WHERE role_id = ?
             ORDER BY module_name ASC

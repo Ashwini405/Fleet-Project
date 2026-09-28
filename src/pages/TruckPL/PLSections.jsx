@@ -202,7 +202,7 @@ export function RevenueSection({ data, totals, prevTotal, vehicleId }) {
       total={totals.totalRevenue} totalLabel="Total Revenue" accent="green"
       defaultOpen={true} prevTotal={prevTotal}
       source="Trip Master" records={`${totalRecords} Records (${data.trips.length} Trips)`}
-      viewLabel="View Trips →" viewPath={`/trips?vehicle_id=${vehicleId}`}
+      viewLabel="View Trips →" viewPath={`/finance?tab=trucks&vehicle_id=${vehicleId}`}
     >
       <div className="space-y-5">
         <div>
@@ -617,13 +617,19 @@ export function EmiSection({ data, total, prevTotal, vehicleId }) {
 }
 
 // ── 8. Miscellaneous Section ──────────────────────────────────────────────────
-export function MiscExpenseSection({ data, total, prevTotal }) {
+export function MiscExpenseSection({ data, total, prevTotal, vehicleId }) {
+  // Open the Expense tab filtered to this vehicle; when every entry here shares
+  // one category (e.g. all "Miscellaneous"), filter by that category as well.
+  const categories = [...new Set((data.records || []).map(r => r.type).filter(Boolean))];
+  const params = new URLSearchParams({ tab: 'expense' });
+  if (vehicleId) params.set('vehicle_id', vehicleId);
+  if (categories.length === 1) params.set('category', categories[0]);
   return (
     <PLSection
       title="Miscellaneous Expenses" subtitle="Toll · Parking · Cleaning · Other"
       total={total} totalLabel="Total Misc Cost" accent="slate" prevTotal={prevTotal}
       source="Income & Expense" records={`${data.transactions || 0} Entries`}
-      viewLabel="View Expense Entries →" viewPath="/finance"
+      viewLabel="View Expense Entries →" viewPath={`/finance?${params.toString()}`}
     >
       <PLTable
         cols={[

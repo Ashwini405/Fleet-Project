@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Shield, Phone, Mail, Globe, MapPin, IndianRupee,
-  FileText, CheckCircle2, Palette, Truck, X, Check,
+  FileText, CheckCircle2, Truck, X, Check,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -196,53 +196,6 @@ export function ProfileViewTab({ data, docs }) {
           </InfoCard>
 
         </div>
-
-        {/* Branding / Report Preview */}
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-            <Palette className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-xs font-black text-slate-700 uppercase tracking-widest">Branding & Report Template</span>
-          </div>
-          <div className="p-5 space-y-4">
-            <div className="flex items-center gap-6 flex-wrap">
-              {[
-                { label: 'Primary Color',   val: data.primary_color   },
-                { label: 'Secondary Color', val: data.secondary_color },
-              ].map(c => (
-                <div key={c.label}>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">{c.label}</p>
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl border border-slate-200 shadow-sm shrink-0" style={{ backgroundColor: c.val || '#4F46E5' }} />
-                    <span className="text-sm font-mono font-bold text-slate-700">{c.val || '#4F46E5'}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Report preview mini */}
-            <div className="rounded-xl border overflow-hidden" style={{ borderColor: (data.primary_color || '#4F46E5') + '40' }}>
-              <div
-                className="px-5 py-3.5 flex items-center justify-between border-b-2"
-                style={{ 
-                  backgroundColor: (data.primary_color || '#4F46E5') + '12', 
-                  borderBottomColor: data.primary_color || '#4F46E5' 
-                }}
-              >
-                <div>
-                  <p className="text-sm font-black text-slate-800">{data.company_name}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5 font-medium">{data.report_header}</p>
-                </div>
-                <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: data.primary_color || '#4F46E5' }}>
-                  <Truck className="w-4 h-4 text-white" />
-                </div>
-              </div>
-              <div className="px-5 py-2.5 bg-slate-50">
-                <p className="text-[10px] text-slate-400 font-medium text-center">{data.report_footer}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
       </div>
     </div>
   );

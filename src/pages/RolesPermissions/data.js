@@ -1,32 +1,29 @@
-// Canonical module list — must match backend/migrateAuthRbac.js MODULES
-// and backend/config/sidebarConfig.js `module` fields exactly (labels are
-// sent to the backend as `module_name` when saving permissions).
+// Canonical module list — one row per page in the sidebar
+// (backend/config/sidebarConfig.js `module` fields). `label` is the
+// module_name stored in role_permissions and checked by ProtectedRoute /
+// protect(); `name` is what the matrix shows (the sidebar page name).
 export const MODULES = [
-  { key: 'dashboard',      label: 'Dashboard',              group: 'Core'           },
-  { key: 'vehicles',       label: 'Vehicle Master',         group: 'Operations'     },
-  { key: 'trips',          label: 'Trip Master',            group: 'Operations'     },
-  { key: 'fuel',           label: 'Fuel',                    group: 'Operations'     },
-  { key: 'maintenance',    label: 'Maintenance',            group: 'Maintenance'    },
-  { key: 'tyres',          label: 'Tyres',                   group: 'Maintenance'    },
-  { key: 'battery',        label: 'Battery',                 group: 'Maintenance'    },
-  { key: 'inventory',      label: 'Inventory',               group: 'Maintenance'    },
-  { key: 'purchaseOrders', label: 'Purchase Orders',         group: 'Maintenance'    },
-  { key: 'vendor',         label: 'Vendor',                  group: 'Finance'        },
-  { key: 'finance',        label: 'Income & Expense',       group: 'Finance'        },
-  { key: 'payments',       label: 'Operational Payments',   group: 'Finance'        },
-  { key: 'fastag',         label: 'Fastag',                  group: 'Finance'        },
-  { key: 'reports',        label: 'Reports',                 group: 'Finance'        },
-  { key: 'truckPL',        label: 'Truck Profit & Loss',    group: 'Finance'        },
-  { key: 'staff',          label: 'Staff Management',       group: 'HR'             },
-  { key: 'administration', label: 'Administration',         group: 'Admin'          },
-  { key: 'tenderData',     label: 'Tender Data',             group: 'Admin'          },
-  { key: 'companyProfile', label: 'Company Profile',         group: 'Admin'          },
-  { key: 'userManagement', label: 'User Management',        group: 'Admin'          },
-  { key: 'rolesPermissions', label: 'Roles & Permissions', group: 'Admin'          },
-  { key: 'audit',          label: 'Audit Logs',              group: 'Admin'          },
-  { key: 'documentVault',  label: 'Document Vault',           group: 'Admin'          },
-  { key: 'systemSettings', label: 'System Settings',        group: 'Admin'          },
-  { key: 'backupRestore',  label: 'Backup & Restore',       group: 'Admin'          },
+  { key: 'dashboard',        label: 'Dashboard',            name: 'Dashboard',              group: 'Core'                },
+  { key: 'vehicles',         label: 'Vehicle Master',       name: 'Vehicle Master',         group: 'Assets & Operations' },
+  { key: 'trips',            label: 'Trip Master',          name: 'Trip Master',            group: 'Assets & Operations' },
+  { key: 'fuel',             label: 'Fuel',                 name: 'Fuel Management',        group: 'Assets & Operations' },
+  { key: 'maintenance',      label: 'Maintenance',          name: 'Service & Maintenance',  group: 'Maintenance'         },
+  { key: 'tyres',            label: 'Tyres',                name: 'Tyres Management',       group: 'Maintenance'         },
+  { key: 'inventory',        label: 'Inventory',            name: 'Parts & Inventory',      group: 'Maintenance'         },
+  { key: 'inspection',       label: 'Vehicle Inspection',   name: 'Vehicle Inspection',     group: 'Maintenance'         },
+  { key: 'incidents',        label: 'Incidents',            name: 'Incidents',              group: 'Maintenance'         },
+  { key: 'warranties',       label: 'Warranties',           name: 'Warranties',             group: 'Maintenance'         },
+  { key: 'finance',          label: 'Income & Expense',     name: 'Income & Expense',       group: 'Finance & Staff'     },
+  { key: 'vendor',           label: 'Vendor',               name: 'Vendor Ledgers',         group: 'Finance & Staff'     },
+  { key: 'payments',         label: 'Operational Payments', name: 'Operational Payments',   group: 'Finance & Staff'     },
+  { key: 'fastag',           label: 'Fastag',               name: 'Fastag Management',      group: 'Finance & Staff'     },
+  { key: 'reports',          label: 'Reports',              name: 'Profit & Loss Reports',  group: 'Finance & Staff'     },
+  { key: 'truckPL',          label: 'Truck Profit & Loss',  name: 'Truck P&L (detail)',     group: 'Finance & Staff'     },
+  { key: 'staff',            label: 'Staff Management',     name: 'Staff Management',       group: 'Finance & Staff'     },
+  { key: 'administration',   label: 'Administration',       name: 'Administration',         group: 'Administration'      },
+  { key: 'companyProfile',   label: 'Company Profile',      name: 'Company Profile',        group: 'Administration'      },
+  { key: 'userManagement',   label: 'User Management',      name: 'User Management',        group: 'Administration'      },
+  { key: 'rolesPermissions', label: 'Roles & Permissions',  name: 'Roles & Permissions',    group: 'Administration'      },
 ];
 
 export const PERMS = ['view', 'create', 'edit', 'delete', 'approve', 'reject', 'export', 'print'];

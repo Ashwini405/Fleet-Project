@@ -4,6 +4,89 @@ const bcrypt = require("bcrypt");
 class UserManagementModel {
 
     // ==========================================================
+    // Staff Eligible For A Login
+    // ----------------------------------------------------------
+    // Active employees, supervisors and drivers from Staff
+    // Management that do not already have a user account.
+    // users.employee_id stores the staff code (EMP.., SUP-.., DRV-..).
+    // ==========================================================
+
+    static async getAvailableStaff() {
+
+        const [rows] = await pool.query(`
+            SELECT * FROM (
+                SELECT
+                    e.employee_id      AS id,
+                    e.employee_name    AS name,
+                    'Employee'         AS type,
+                    e.department       AS dept,
+                    COALESCE(s.station_name, e.plant) AS plant,
+                    e.email            AS email,
+                    e.phone            AS phone,
+                    NULL               AS suggested_role
+                FROM employees e
+                LEFT JOIN stations s ON s.id = e.station_id
+                WHERE LOWER(e.status) = 'active'
+
+                UNION ALL
+
+                SELECT
+                    sp.supervisor_code,
+                    sp.full_name,
+                    'Supervisor',
+                    'Supervisor',
+                    s.station_name,
+                    sp.email,
+                    sp.mobile,
+                    'Supervisor'
+                FROM supervisors sp
+                LEFT JOIN stations s ON s.id = sp.station_id
+                WHERE LOWER(sp.status) = 'active'
+
+                UNION ALL
+
+                SELECT
+                    CONCAT('DRV-', LPAD(d.id, 4, '0')),
+                    d.full_name,
+                    'Driver',
+                    'Driver',
+                    s.station_name,
+                    NULL,
+                    d.mobile,
+                    'Driver'
+                FROM drivers d
+                LEFT JOIN stations s ON s.id = d.station_id
+                WHERE LOWER(d.status) = 'active'
+            ) staff
+            WHERE staff.id IS NOT NULL
+            AND staff.id NOT IN (
+                SELECT employee_id FROM users
+                WHERE is_deleted = 0 AND employee_id IS NOT NULL
+            )
+            ORDER BY staff.type, staff.name
+        `);
+
+        return rows;
+
+    }
+
+    // ==========================================================
+    // Plants (Operational Stations)
+    // ==========================================================
+
+    static async getPlants() {
+
+        const [rows] = await pool.query(`
+            SELECT id, station_name AS name, station_code AS code, location
+            FROM stations
+            ORDER BY station_name
+        `);
+
+        return rows;
+
+    }
+
+    // ==========================================================
     // Generate Next User Code
     // ==========================================================
 
@@ -351,7 +434,6 @@ static async createDefaultPermissions(userId) {
             "User Management",
             "Roles & Permissions",
             "Audit Logs",
-            "Document Vault",
             "System Settings",
             "Backup & Restore"
 

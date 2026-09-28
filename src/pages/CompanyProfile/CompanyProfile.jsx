@@ -74,6 +74,19 @@ export default function CompanyProfile() {
     insurance_certificate: null,
   };
 
+  // DATE columns arrive as ISO timestamps; <input type="date"> needs YYYY-MM-DD.
+  const normalizeProfile = (profile) => {
+    const d = profile.established_date ? new Date(profile.established_date) : null;
+    const pad = (n) => String(n).padStart(2, '0');
+    return {
+      ...profile,
+      company_status: profile.company_status || 'Active',
+      established_date: d && !isNaN(d.getTime())
+        ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+        : '',
+    };
+  };
+
   const [data, setData] = useState(DEFAULT_PROFILE);
   const [docs, setDocs] = useState([]);
   const [companyId, setCompanyId] = useState(null);
@@ -145,7 +158,7 @@ export default function CompanyProfile() {
       const res = await api.get('/company-profile');
       const profileData = res.data.data || {};
 
-      setData(prev => ({ ...prev, ...profileData }));
+      setData(prev => ({ ...prev, ...normalizeProfile(profileData) }));
       setCompanyId(profileData.id || null);
       setDocs(buildDocsFromProfile(profileData));
 
@@ -300,7 +313,7 @@ export default function CompanyProfile() {
       const savedData = response.data.data;
 
       if (savedData) {
-          setData(prev => ({ ...prev, ...savedData }));
+          setData(prev => ({ ...prev, ...normalizeProfile(savedData) }));
           setCompanyId(savedData.id);
           setDocs(buildDocsFromProfile(savedData));
         }

@@ -26,6 +26,20 @@ router.get(
     UserManagementController.getAllUsers
 );
 
+// Staff (employees, supervisors, drivers) without a login yet
+router.get(
+    "/available-staff",
+    ...protect("User Management", "view"),
+    UserManagementController.getAvailableStaff
+);
+
+// Plants (Operational Stations)
+router.get(
+    "/plants",
+    ...protect("User Management", "view"),
+    UserManagementController.getPlants
+);
+
 // Get User By ID
 router.get(
     "/:id",

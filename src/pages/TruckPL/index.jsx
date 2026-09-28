@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { TruckPLHeader } from './TruckPLHeader';
 import { TruckKpiCards, ExpenseSummary, ProfitCalculationCard } from './PLWidgets';
@@ -17,24 +17,52 @@ function SectionLabel({ title }) {
   );
 }
 
+// "2026-09" -> "September 2026"
+function formatMonth(month, style = 'long') {
+  const [y, m] = month.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: style, year: 'numeric' });
+}
+
+function previousMonth(month) {
+  const [y, m] = month.split('-').map(Number);
+  const d = new Date(y, m - 2, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// % change of current vs previous; undefined hides the trend on the KPI card.
+function trendPct(current, previous) {
+  if (!previous) return undefined;
+  return Number((((current - previous) / Math.abs(previous)) * 100).toFixed(1));
+}
+
 export default function TruckPLDetail() {
   const { truckId } = useParams();
-  
+  const [searchParams, setSearchParams] = useSearchParams();
+  const month = /^\d{4}-\d{2}$/.test(searchParams.get('month') || '') ? searchParams.get('month') : '';
+
   // ── State ──
   const reportRef = useRef(null);
   const [d, setD] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [prevTotals, setPrevTotals] = useState(null);
 
-  // ── Fetch Truck P&L Data ──
+  const setMonth = (value) => {
+    const next = new URLSearchParams(searchParams);
+    if (value) next.set('month', value); else next.delete('month');
+    setSearchParams(next, { replace: true });
+  };
+
+  // ── Fetch Truck P&L Data (all time, or the selected month) ──
   useEffect(() => {
     const fetchTruckPL = async () => {
       setLoading(true);
       setError(null);
-      
+
       try {
         const res = await axios.get(
-          `http://localhost:5001/api/truck-pl/${truckId}`
+          `http://localhost:5001/api/truck-pl/${truckId}`,
+          { params: month ? { month } : {} }
         );
         setD(res.data.data);
       } catch (err) {
@@ -46,10 +74,21 @@ export default function TruckPLDetail() {
     };
 
     fetchTruckPL();
-  }, [truckId]);
+  }, [truckId, month]);
 
-  // ── Loading State ──
-  if (loading) {
+  // ── Fetch previous month totals for month-over-month KPI trends ──
+  useEffect(() => {
+    setPrevTotals(null);
+    if (!month) return;
+    let cancelled = false;
+    axios.get(`http://localhost:5001/api/truck-pl/${truckId}`, { params: { month: previousMonth(month) } })
+      .then(res => { if (!cancelled) setPrevTotals(res.data.data.totals); })
+      .catch(err => console.error("Truck PL previous month Error:", err));
+    return () => { cancelled = true; };
+  }, [truckId, month]);
+
+  // ── Loading State (first load only; month switches keep the page visible) ──
+  if (loading && !d) {
     return (
       <div className="flex flex-col items-center justify-center h-96">
         <div className="w-12 h-12 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
@@ -85,16 +124,37 @@ export default function TruckPLDetail() {
     );
   }
 
+  // ── Month-over-month trends (only when a single month is selected) ──
+  let trends = {};
+  if (month && prevTotals) {
+    const prev = prevTotals;
+    trends = {
+      revenue: trendPct(d.totals.totalRevenue, prev.totalRevenue),
+      expenses: trendPct(d.totals.totalExpenses, prev.totalExpenses),
+      profit: trendPct(d.totals.netProfit, prev.netProfit),
+      margin: prev.totalRevenue > 0 && d.totals.totalRevenue > 0
+        ? Number((d.totals.profitMargin - prev.profitMargin).toFixed(1))
+        : undefined,
+      label: `vs ${formatMonth(previousMonth(month), 'short')}`,
+    };
+  }
+
   // ── Render ──
   return (
-    <div id="truck-pl-report" ref={reportRef} className="print-area w-full max-w-[1400px] mx-auto pb-16 space-y-6">
+    <div id="truck-pl-report" ref={reportRef} className={`print-area w-full max-w-[1400px] mx-auto pb-16 space-y-6 transition-opacity ${loading ? 'opacity-60' : ''}`}>
 
       {/* ── Header ── */}
-      <TruckPLHeader info={d.info} period={d.period} reportRef={reportRef} />
+      <TruckPLHeader
+        info={d.info}
+        period={month ? formatMonth(month) : 'All recorded data'}
+        month={month}
+        onMonthChange={setMonth}
+        reportRef={reportRef}
+      />
 
       {/* ── KPI Cards ── */}
       <div>
-        <SectionLabel title="Key Performance Indicators" />
+        <SectionLabel title={month ? `Key Performance Indicators · ${formatMonth(month)}` : 'Key Performance Indicators · All Time'} />
         <TruckKpiCards
           kpis={{
             revenue: d.totals.totalRevenue,
@@ -106,12 +166,14 @@ export default function TruckPLDetail() {
             fuelCostPerKm: Number(d.revenue.totals.totalDistance || 0) > 0 ? d.totals.totalFuel / d.revenue.totals.totalDistance : 0,
             revenuePerKm: Number(d.revenue.totals.totalDistance || 0) > 0 ? d.totals.totalRevenue / d.revenue.totals.totalDistance : 0
           }}
+          trends={trends}
+          periodLabel={month ? formatMonth(month) : 'All recorded data'}
         />
       </div>
 
       {/* ── P&L Statement ── */}
       <div>
-        <SectionLabel title="Profit & Loss Statement" />
+        <SectionLabel title={month ? `Profit & Loss Statement · ${formatMonth(month)}` : 'Profit & Loss Statement · All Time'} />
         <div className="space-y-4">
           <RevenueSection
             data={d.revenue}
@@ -173,6 +235,7 @@ export default function TruckPLDetail() {
             data={d.misc}
             total={d.totals.totalMisc}
             prevTotal={0}
+            vehicleId={d.info.id}
           />
         </div>
       </div>
@@ -198,10 +261,7 @@ export default function TruckPLDetail() {
       {/* ── Report Footer ── */}
       <ReportFooter
         info={d.info}
-        period={{
-          from: "",
-          to: ""
-        }}
+        period={month ? formatMonth(month) : 'All recorded data'}
       />
 
     </div>

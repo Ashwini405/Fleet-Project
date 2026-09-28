@@ -28,6 +28,7 @@ const getVehicles = async (req, res) => {
 
         v.type,
         v.initial_odometer,
+        ${Vehicle.CURRENT_ODOMETER_SQL},
         v.dealer_showroom,
 
         v.make_brand,
