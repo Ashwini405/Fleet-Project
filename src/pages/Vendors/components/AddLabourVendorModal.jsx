@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FiX, FiHome, FiCheckCircle } from 'react-icons/fi';
 import axios from 'axios';
 
@@ -15,11 +15,38 @@ const EMPTY = {
   bankName: '', customBank: '', accountNo: '', ifsc: '', upi: '',
 };
 
-export default function AddLabourVendorModal({ isOpen, onClose }) {
+const fromVendor = (v) => {
+  const isKnownBank = BANK_OPTIONS.includes(v.bank_name);
+  return {
+    name: v.vendor_name || '',
+    mobile: v.mobile_number || '',
+    email: v.email || '',
+    address: v.address_location || '',
+    gst: v.gst_number || '',
+    openingBalance: String(v.opening_balance ?? '0'),
+    status: v.status || 'Active',
+    paymentTerms: v.payment_terms || 'credit',
+    bankName: v.bank_name ? (isKnownBank ? v.bank_name : 'Others') : '',
+    customBank: v.bank_name && !isKnownBank ? v.bank_name : (v.custom_bank_name || ''),
+    accountNo: v.account_number || '',
+    ifsc: v.ifsc_code || '',
+    upi: v.upi_id || '',
+  };
+};
+
+export default function AddLabourVendorModal({ isOpen, onClose, vendor = null, onSaved }) {
+  const isEdit = Boolean(vendor);
   const [form, setForm]     = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [toast, setToast]   = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setForm(vendor ? fromVendor(vendor) : EMPTY);
+      setErrors({});
+    }
+  }, [isOpen, vendor]);
 
   if (!isOpen) return null;
 
@@ -43,8 +70,8 @@ export default function AddLabourVendorModal({ isOpen, onClose }) {
     if (Object.keys(errs).length) { setErrors(errs); return; }
     try {
       setLoading(true);
-      await axios.post('http://localhost:5001/api/labour-vendors', {
-        vendor_name: form.name,
+      const payload = {
+        vendor_name: form.name.trim(),
         mobile_number: form.mobile,
         email: form.email,
         address_location: form.address,
@@ -57,12 +84,16 @@ export default function AddLabourVendorModal({ isOpen, onClose }) {
         account_number: form.accountNo,
         ifsc_code: form.ifsc,
         upi_id: form.upi,
-      });
+      };
+      const res = isEdit
+        ? await axios.put(`http://localhost:5001/api/labour-vendors/${vendor.id}`, payload)
+        : await axios.post('http://localhost:5001/api/labour-vendors', payload);
+      onSaved?.(isEdit ? { ...vendor, ...payload } : { id: res.data.insertId, ...payload });
       setToast(true);
-      setTimeout(() => { setToast(false); setForm(EMPTY); setErrors({}); onClose(); }, 1500);
+      setTimeout(() => { setToast(false); setForm(EMPTY); setErrors({}); onClose(); }, 1200);
     } catch (err) {
       console.error('LABOUR VENDOR SAVE ERROR:', err);
-      alert(err?.response?.data?.message || 'Failed to create vendor');
+      alert(err?.response?.data?.message || `Failed to ${isEdit ? 'update' : 'create'} vendor`);
     } finally {
       setLoading(false);
     }
@@ -76,15 +107,15 @@ export default function AddLabourVendorModal({ isOpen, onClose }) {
 
         <div className="flex justify-between items-center p-5 bg-gray-900">
           <div>
-            <h3 className="text-sm font-bold text-white tracking-wide">Add Labour Vendor</h3>
-            <p className="text-[11px] text-orange-400 mt-0.5">Labour Accounts · New Vendor</p>
+            <h3 className="text-sm font-bold text-white tracking-wide">{isEdit ? 'Edit Labour Vendor' : 'Add Labour Vendor'}</h3>
+            <p className="text-[11px] text-orange-400 mt-0.5">Labour Accounts · {isEdit ? vendor.vendor_name : 'New Vendor'}</p>
           </div>
           <button onClick={handleClose} className="p-1 rounded-full hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"><FiX size={18} /></button>
         </div>
 
         {toast && (
           <div className="flex items-center gap-2 px-5 py-3 bg-green-50 border-b border-green-100 text-green-700 text-sm font-semibold">
-            <FiCheckCircle size={16} /> Vendor created successfully
+            <FiCheckCircle size={16} /> Vendor {isEdit ? 'updated' : 'created'} successfully
           </div>
         )}
 
@@ -152,6 +183,13 @@ export default function AddLabourVendorModal({ isOpen, onClose }) {
                       </button>
                     ))}
                   </div>
+                  <p className="mt-2 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+                    {form.paymentTerms === 'credit' ? (
+                      <><span className="font-bold text-amber-700">Credit:</span> you pay this contractor later. Each labour charge adds to the amount you owe, and you use <span className="font-bold">Record Payment</span> when you pay them.</>
+                    ) : (
+                      <><span className="font-bold text-violet-700">Cash:</span> you pay this contractor on the spot when the work is done. Charges are only kept as a record — nothing is added to what you owe, so there is no Record Payment step.</>
+                    )}
+                  </p>
                 </div>
               </div>
             </div>
@@ -199,7 +237,7 @@ export default function AddLabourVendorModal({ isOpen, onClose }) {
             <div className="pt-2">
               <button type="submit" disabled={loading}
                 className="w-full py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-xl font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-                {loading ? 'Creating...' : 'Add Labour Vendor'}
+                {loading ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Labour Vendor'}
               </button>
             </div>
 

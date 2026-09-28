@@ -177,6 +177,37 @@ db.query(`
   startWarrantyExpiryChecker();
 }).catch(e => console.error('warranty_notifications table error:', e.message));
 
+// Labour contractor ledger: link repairs to labour vendors and allow direct labour charges
+const ensureLabourLedgerSchema = async () => {
+  try {
+    await db.query("ALTER TABLE repair_services ADD COLUMN labour_vendor_id INT NULL AFTER garage_id");
+  } catch (err) {
+    if (err.code !== 'ER_DUP_FIELDNAME') console.error('repair_services labour_vendor_id error:', err.message);
+  }
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS labour_charges (
+        id               INT AUTO_INCREMENT PRIMARY KEY,
+        vendor_id        INT           NOT NULL,
+        charge_date      DATE          NOT NULL,
+        vehicle_id       INT           NULL,
+        vehicle_no       VARCHAR(50)   NULL,
+        work_type        VARCHAR(100)  NOT NULL DEFAULT 'General Labour',
+        description      VARCHAR(500)  NULL,
+        workers          INT           NULL,
+        amount           DECIMAL(12,2) NOT NULL,
+        reference_number VARCHAR(100)  NULL,
+        created_at       TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_labour_charges_vendor (vendor_id)
+      )
+    `);
+    console.log('labour ledger schema ready');
+  } catch (err) {
+    console.error('labour_charges table error:', err.message);
+  }
+};
+ensureLabourLedgerSchema();
+
 // Ensure employees and supervisors table columns exist
 const ensureStaffColumns = async () => {
   try {

@@ -2,9 +2,18 @@ const Repair = require('../models/repairModel');
 const lifecycle = require('../services/maintenanceLifecycleService');
 const db = require('../config/db');
 
+// The repair form lists labour contractors alongside garages as "labour-<id>".
+// Split that into labour_vendor_id so garage_id stays a real garage vendor id.
+const resolveProvider = (rawId) => {
+  const value = String(rawId || '');
+  const labourMatch = value.match(/^labour-(\d+)$/);
+  if (labourMatch) return { garage_id: null, labour_vendor_id: Number(labourMatch[1]) };
+  return { garage_id: Number(value) || null, labour_vendor_id: null };
+};
+
 const buildRepairData = (source, totals) => ({
   vehicle_id: source.vehicle_id,
-  garage_id: source.garage_id || null,
+  ...resolveProvider(source.garage_id),
   vehicle_no: source.vehicle_no || null,
   model: source.model || null,
   driver_name: source.driver_name || null,
@@ -203,7 +212,7 @@ const updateRepair = async (req, res) => {
 
     const data = {
       vehicle_id:         body.vehicle_id,
-      garage_id:          body.garage_id || null,
+      ...resolveProvider(body.garage_id),
       vehicle_no:         body.vehicle_no || null,
       model:              body.model || null,
       driver_name:        body.driver_name || null,

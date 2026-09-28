@@ -121,9 +121,14 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
       setTruck(logData.vehicle_id?.toString() || '');
       setDate(logData.service_date ? logData.service_date.split('T')[0] : new Date().toISOString().split('T')[0]);
       setOdometer(logData.odometer || '');
-      setGarage(logData.garage_id?.toString() || logData.garage || '');
-      setUseManualGarage(!logData.garage_id && Boolean(logData.garage));
-      setManualGarage(!logData.garage_id ? (logData.garage || '') : '');
+      const hasLinkedProvider = Boolean(logData.garage_id || logData.labour_vendor_id);
+      setGarage(
+        logData.labour_vendor_id
+          ? `labour-${logData.labour_vendor_id}`
+          : logData.garage_id?.toString() || logData.garage || ''
+      );
+      setUseManualGarage(!hasLinkedProvider && Boolean(logData.garage));
+      setManualGarage(!hasLinkedProvider ? (logData.garage || '') : '');
       setRepairStartTime(logData.repair_start_time ? logData.repair_start_time.slice(0, 5) : '');
       setRepairEndTime(logData.repair_end_time ? logData.repair_end_time.slice(0, 5) : '');
       setStatus(logData.status || 'Reported');

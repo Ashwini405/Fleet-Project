@@ -1,10 +1,13 @@
 const LabourVendor = require("../models/labourVendorModel");
+const labourLedgerModel = require("../models/labourLedgerModel");
 const { logAudit } = require("../middleware/auditMiddleware");
 
 // GET ALL
 exports.getAllLabourVendors = async (req, res) => {
   try {
-    const data = await LabourVendor.getAll();
+    const vendors = await LabourVendor.getAll();
+    const outstanding = await labourLedgerModel.getOutstandingByVendor();
+    const data = vendors.map(v => ({ ...v, outstanding_balance: outstanding[v.id] || 0 }));
 
     res.status(200).json({
       success: true,
