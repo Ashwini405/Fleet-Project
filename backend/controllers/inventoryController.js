@@ -1347,6 +1347,17 @@ exports.receivePurchaseOrder = async (req, res) => {
     const qty    = Number(item.qty ?? item.quantity ?? 0);
     const itemName = item.partName || item.name || item.item_name || '';
     const category = String(po.category || '').trim().toLowerCase();
+    if (partId) {
+      const [matchedParts] = await conn.query(
+        `SELECT id FROM inventory_parts
+         WHERE id = ?
+           AND LOWER(TRIM(COALESCE(category, ''))) = LOWER(TRIM(?))
+           AND LOWER(TRIM(COALESCE(preferred_vendor, ''))) = LOWER(TRIM(?))
+         LIMIT 1`,
+        [partId, po.category || '', po.vendor || '']
+      );
+      partId = matchedParts[0]?.id || null;
+    }
 
     if (category === 'batteries' || category === 'battery') {
       const receivedDate = new Date().toISOString().slice(0, 10);
@@ -1374,8 +1385,12 @@ exports.receivePurchaseOrder = async (req, res) => {
       // If no part_id, check if a part with this name already exists, else create it
       if (!partId && itemName) {
         const [existing] = await conn.query(
-          `SELECT id FROM inventory_parts WHERE LOWER(TRIM(part_name)) = LOWER(TRIM(?)) LIMIT 1`,
-          [itemName]
+          `SELECT id FROM inventory_parts
+           WHERE LOWER(TRIM(part_name)) = LOWER(TRIM(?))
+             AND LOWER(TRIM(COALESCE(category, ''))) = LOWER(TRIM(?))
+             AND LOWER(TRIM(COALESCE(preferred_vendor, ''))) = LOWER(TRIM(?))
+           LIMIT 1`,
+          [itemName, po.category || '', po.vendor || '']
         );
         if (existing.length) {
           partId = existing[0].id;

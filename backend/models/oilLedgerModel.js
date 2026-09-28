@@ -32,6 +32,7 @@ const getVendorLedger = async (vendorId) => {
         vendor
       FROM inventory_purchase_orders
       WHERE LOWER(TRIM(vendor)) = LOWER(TRIM(?))
+        AND LOWER(TRIM(COALESCE(category, ''))) IN ('lubricants', 'oils & lubes', 'oil', 'oils')
       ORDER BY id DESC
       `,
       [vendor.vendor_name]
@@ -43,10 +44,13 @@ const getVendorLedger = async (vendorId) => {
               r.quantity_returned, r.credit_amount, r.vehicle_number, p.part_name, p.category
        FROM part_returns r
        LEFT JOIN inventory_parts p ON p.id = r.part_id
-       WHERE LOWER(TRIM(COALESCE(r.vendor_name, ''))) = LOWER(TRIM(?))
+       LEFT JOIN inventory_purchase_orders po ON po.po_number = r.po_number
+       WHERE (LOWER(TRIM(COALESCE(r.vendor_name, ''))) = LOWER(TRIM(?))
+          AND LOWER(TRIM(COALESCE(NULLIF(po.category, ''), p.category, ''))) IN ('lubricants', 'oils & lubes', 'oil', 'oils'))
           OR r.po_number IN (
             SELECT po_number FROM inventory_purchase_orders
             WHERE LOWER(TRIM(vendor)) = LOWER(TRIM(?))
+              AND LOWER(TRIM(COALESCE(category, ''))) IN ('lubricants', 'oils & lubes', 'oil', 'oils')
           )
        ORDER BY r.id DESC`,
       [vendor.vendor_name, vendor.vendor_name]

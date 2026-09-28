@@ -31,13 +31,14 @@ const InputGroup = ({ label, name, type = "text", placeholder, formData, handleC
   );
 };
 
-const SelectGroup = ({ label, name, options, formData, handleChange, error, placeholder }) => (
+const SelectGroup = ({ label, name, options, formData, handleChange, error, placeholder, disabled = false }) => (
   <div>
     <label className="block text-sm font-medium text-slate-700 mb-1.5">{label}</label>
     <select
       name={name}
       value={formData[name]}
       onChange={handleChange}
+      disabled={disabled}
       className={`w-full px-4 py-2.5 bg-slate-50 border rounded-lg text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-colors ${error ? 'border-red-300' : 'border-slate-200'}`}
     >
       <option value="">{placeholder || `Select ${label}`}</option>
@@ -212,6 +213,7 @@ export default function AddVehicle() {
 
   const [supervisors, setSupervisors] = useState([]);
   const [drivers, setDrivers] = useState([]);
+  const [assignedVehicles, setAssignedVehicles] = useState([]);
   const [stations, setStations] = useState([]);
   const [showrooms, setShowrooms] = useState([]);
 
@@ -252,6 +254,11 @@ export default function AddVehicle() {
       .then(data => { if (data.success) setDrivers((data.data || []).filter(d => (d.status || '').toLowerCase() === 'active')); })
       .catch(err => console.error('Error fetching drivers:', err));
 
+    fetch('http://localhost:5001/api/vehicles')
+      .then(res => res.json())
+      .then(data => { if (data.success) setAssignedVehicles(data.data || []); })
+      .catch(err => console.error('Error fetching vehicle assignments:', err));
+
     fetch('http://localhost:5001/api/stations')
       .then(res => res.json())
       .then(data => { if (data.success) setStations(data.data || []); })
@@ -262,6 +269,21 @@ export default function AddVehicle() {
       .then(data => { if (data.success) setShowrooms(data.data || []); })
       .catch(err => console.error('Error fetching showrooms:', err));
   }, []);
+
+  const supervisorsForPlant = supervisors.filter(
+    supervisor => String(supervisor.station_id) === String(formData.assignedPlant)
+  );
+  const vehicleByDriver = useMemo(() => new Map(
+    assignedVehicles
+      .filter(vehicle => vehicle.assigned_driver)
+      .map(vehicle => [String(vehicle.assigned_driver), vehicle])
+  ), [assignedVehicles]);
+  const driversForSupervisor = drivers.filter(driver => {
+    if (String(driver.station_id) !== String(formData.assignedPlant)) return false;
+    if (!driver.assigned_vehicle_id) return true;
+    const assignedVehicle = vehicleByDriver.get(String(driver.id));
+    return String(assignedVehicle?.supervisor_id) === String(formData.supervisor);
+  });
 
   const handleFileChange = useCallback((e) => {
     const { name, files: f } = e.target;
@@ -365,7 +387,12 @@ export default function AddVehicle() {
     }
 
     // Update state only after all validations pass
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({
+      ...prev,
+      [name]: value,
+      ...(name === 'assignedPlant' ? { supervisor: '', assignedDriver: '' } : {}),
+      ...(name === 'supervisor' ? { assignedDriver: '' } : {}),
+    }));
 
     // Clear error for this field (except chassis number handled separately)
     if (formErrors[name] && name !== "chassisNumber") {
@@ -640,12 +667,21 @@ export default function AddVehicle() {
               Operations Assignment
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <SelectGroup label="Assign Supervisor" name="supervisor" options={supervisors.map(s => ({ label: s.full_name, value: s.id }))} formData={formData} handleChange={handleChange} />
+              <SelectGroup label="Assigned Plant" name="assignedPlant" options={stations.map(st => ({ label: st.station_name, value: st.id }))} formData={formData} handleChange={handleChange} />
+              <SelectGroup
+                label="Assign Supervisor"
+                name="supervisor"
+                placeholder={formData.assignedPlant ? 'Select Supervisor' : 'Select plant first'}
+                options={supervisorsForPlant.map(s => ({ label: s.full_name, value: s.id }))}
+                formData={formData}
+                handleChange={handleChange}
+                disabled={!formData.assignedPlant}
+              />
               <SelectGroup
                 label="Assign Driver"
                 name="assignedDriver"
-                placeholder="-- Select Driver (Optional) --"
-                options={drivers.map(d => ({
+                placeholder={formData.supervisor ? '-- Select Driver (Optional) --' : 'Select supervisor first'}
+                options={driversForSupervisor.map(d => ({
                   label: d.assigned_vehicle_no
                     ? `${d.full_name} (${d.mobile || 'No Phone'}) — (Assigned to ${d.assigned_vehicle_no})`
                     : `${d.full_name} (${d.mobile || 'No Phone'}) — Available`,
@@ -653,8 +689,9 @@ export default function AddVehicle() {
                 }))}
                 formData={formData}
                 handleChange={handleChange}
+                disabled={!formData.supervisor}
               />
-              <SelectGroup label="Assigned Plant" name="assignedPlant" options={stations.map(st => ({ label: st.station_name, value: st.id }))} formData={formData} handleChange={handleChange} />
+              
               <InputGroup label="Default Route (Optional)" name="defaultRoute" placeholder="e.g. Hyderabad → Pune" formData={formData} handleChange={handleChange} />
             </div>
           </section>

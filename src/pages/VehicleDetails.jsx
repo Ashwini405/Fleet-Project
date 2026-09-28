@@ -521,8 +521,13 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
     });
     const data = await res.json();
     if (data.success) {
-      setEmiPayments(prev => [{ paid_date: emiPaidDate }, ...prev]);
       setEmiModalOpen(false);
+      const completedAllEmis = emiPayments.length + 1 >= Number(vehicle.loan_tenure);
+      if (completedAllEmis) {
+        navigate(`/vehicles/edit/${vehicle.id}`);
+      } else {
+        setEmiPayments(prev => [{ paid_date: emiPaidDate }, ...prev]);
+      }
     }
   };
 
@@ -887,7 +892,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
             <div className="col-span-1 border border-slate-100 rounded-xl p-5 bg-slate-50/50">
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
                 <h3 className="text-base font-semibold text-slate-800">Finance Details</h3>
-                {vehicle.loan_tenure && (
+                {vehicle.loan_tenure && emiPayments.length < Number(vehicle.loan_tenure) && (
                   <button
                     onClick={() => setEmiModalOpen(true)}
                     className="px-3 py-1 text-xs font-medium bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"

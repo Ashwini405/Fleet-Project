@@ -16,7 +16,7 @@ router.post('/', upload.array('files'), createRepair);
 router.get('/', getAllRepairs);
 router.get('/vehicle/:vehicleId', getRepairsByVehicle);
 router.get('/:id', getRepairById);
-router.put('/:id', updateRepair);
+router.put('/:id', upload.array('files'), updateRepair);
 router.delete('/:id', deleteRepair);
 
 module.exports = router;
