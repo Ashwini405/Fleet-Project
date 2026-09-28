@@ -183,7 +183,7 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
          ...p,
          vehicle_id: selected?.id || '',
          vehicle_no: selected?.vehicle_no || '',
-         odometer: selected?.initial_odometer || '',
+         odometer: selected?.current_odometer ?? selected?.initial_odometer ?? '',
          // Vehicle category: the item *is* the vehicle, so its brand/model
          // and purchase showroom come straight from the vehicle record —
          // no need to ask the user to re-enter what's already on file.
@@ -220,7 +220,7 @@ export default function AddWarrantyModal({ isOpen, onClose, onSubmit }) {
          batteryId: selected?.id || '',
          vehicle_id: selected?.vehicle_id || '',
          vehicle_no: selected?.vehicle_no || '',
-         odometer: selected?.initial_odometer || '',
+         odometer: selected?.current_odometer ?? selected?.initial_odometer ?? '',
          serialNo: selected?.serial_number || '',
          brand: selected?.brand || '',
          model: selected?.model || '',

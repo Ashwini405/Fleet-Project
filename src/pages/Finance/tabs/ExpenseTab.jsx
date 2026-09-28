@@ -148,6 +148,18 @@ function formatDateTime(value) {
 
 const normalizedTripKey = (value) => String(value || "").replace(/^TRIP-/i, "");
 
+// Calendar day (YYYY-MM-DD) in local time, so date filters match the dates shown.
+// DB timestamps arrive as UTC ISO strings (e.g. 2026-09-24T18:30:00Z = 25 Sep IST).
+const localDateKey = (value) => {
+  if (!value) return "";
+  const text = String(value);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const d = new Date(text);
+  if (Number.isNaN(d.getTime())) return text.slice(0, 10);
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
 const FILE_BASE = "http://localhost:5001/uploads/";
 const parseFiles = (value) => {
   if (Array.isArray(value)) return value;
@@ -354,13 +366,13 @@ export default function ExpenseTab({
     // Date Filters (lexicographical YYYY-MM-DD)
     if (dateFrom) {
       list = list.filter(e => {
-        const d = String(e.expense_date || e.created_at || "").slice(0, 10);
+        const d = localDateKey(e.expense_date || e.created_at);
         return !d || d >= dateFrom;
       });
     }
     if (dateTo) {
       list = list.filter(e => {
-        const d = String(e.expense_date || e.created_at || "").slice(0, 10);
+        const d = localDateKey(e.expense_date || e.created_at);
         return !d || d <= dateTo;
       });
     }
@@ -414,7 +426,7 @@ export default function ExpenseTab({
           return false;
         }
       }
-      const fuelDate = String(fuel.date || fuel.created_at || "").slice(0, 10);
+      const fuelDate = localDateKey(fuel.date || fuel.created_at);
       if (dateFrom && fuelDate < dateFrom) return false;
       if (dateTo && fuelDate > dateTo) return false;
       if (searchQuery && searchQuery.trim()) {
@@ -455,10 +467,13 @@ export default function ExpenseTab({
 
   const groupedExpenses = useMemo(() => {
     const groups = new Map();
-    filtered.forEach(expense => {
+    // Rows come from several tables (expenses, salaries, settlements) whose ids
+    // overlap, so each row gets its own unique React key (_rowKey).
+    filtered.forEach((expense, idx) => {
       const hasTrip = expense.trip_id !== null && expense.trip_id !== undefined && expense.trip_id !== '';
       if (!hasTrip) {
-        groups.set(`expense-${expense.id}-${expense.expense_number || Math.random()}`, expense);
+        const rowKey = `expense-${expense.expense_category || ''}-${expense.id}-${expense.expense_number || ''}-${idx}`;
+        groups.set(rowKey, { ...expense, _rowKey: rowKey });
         return;
       }
       const key = `trip-${normalizedTripKey(expense.trip_id)}`;
@@ -473,6 +488,7 @@ export default function ExpenseTab({
         groups.set(key, {
           ...expense,
           id: key,
+          _rowKey: key,
           expense_category: 'Trip',
           trip_number: expense.trip_number || expense.trip_id,
           amount: Number(expense.amount || 0),
@@ -929,7 +945,7 @@ export default function ExpenseTab({
           <div className="divide-y divide-gray-50 max-h-[620px] overflow-y-auto">
             {groupedExpenses.map((txn) => (
               <div
-                key={txn.id}
+                key={txn._rowKey}
                 className="flex flex-col md:grid md:grid-cols-[2fr_1.3fr_1.5fr_1fr_auto] gap-3 md:gap-4 items-start md:items-center px-5 py-4 hover:bg-gray-50/70 transition-colors"
               >
                 <div className="min-w-0">

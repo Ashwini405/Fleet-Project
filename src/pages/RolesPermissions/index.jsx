@@ -4,7 +4,7 @@ import {
   ChevronLeft, ChevronRight, CheckCircle2, Edit2, Copy,
   Trash2, Power, AlertTriangle, Settings,
 } from 'lucide-react';
-import { countGranted, emptyPerms, fullPerms } from './data';
+import { countGranted, emptyPerms, fullPerms, MODULES } from './data';
 import { StatusBadge, RoleAvatar, ConfirmModal } from './components';
 import RoleDrawer from './RoleDrawer';
 import RoleFormModal from './RoleFormModal';
@@ -193,7 +193,7 @@ export default function RolesPermissions() {
       }
     } catch (error) {
       console.error('Error saving role:', error);
-      showToast('Unable to save role. Please try again.');
+      showToast(error.response?.data?.message || 'Unable to save role. Please try again.');
     }
   };
 
@@ -298,7 +298,7 @@ export default function RolesPermissions() {
     { label: 'Active Roles', value: activeRoles, sub: `${totalRoles - activeRoles} inactive`, color: 'bg-green-50 text-green-600', icon: CheckCircle2 },
     { label: 'Users Assigned', value: totalUsers, sub: 'Across all roles', color: 'bg-blue-50 text-blue-600', icon: Users },
     { label: 'Custom Roles', value: customRoles, sub: 'Admin-defined roles', color: 'bg-purple-50 text-purple-600', icon: Settings },
-    { label: 'Modules Controlled', value: 18, sub: 'ERP modules under RBAC', color: 'bg-amber-50 text-amber-600', icon: Lock },
+    { label: 'Modules Controlled', value: MODULES.length, sub: 'ERP modules under RBAC', color: 'bg-amber-50 text-amber-600', icon: Lock },
     { label: 'Permission Rules', value: `${totalPerms}+`, sub: 'Total grants across roles', color: 'bg-slate-100 text-slate-600', icon: CheckCircle2 },
   ];
 

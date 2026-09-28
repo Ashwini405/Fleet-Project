@@ -11,9 +11,12 @@ function KpiCard({
   label, value, trend, trendLabel, icon: Icon,
   iconBg, iconColor, valueColor,
   accent,           // left-border color class e.g. 'border-green-400'
-  highlight = false // makes Net Profit card slightly larger
+  highlight = false, // makes Net Profit card slightly larger
+  invertTrend = false, // for costs: going up is bad (red)
+  trendUnit = '%',
 }) {
   const trendUp   = trend > 0;
+  const trendGood = invertTrend ? !trendUp : trendUp;
   const trendZero = trend === 0 || trend === undefined;
 
   return (
@@ -43,10 +46,10 @@ function KpiCard({
       {/* Trend / sub-label */}
       {!trendZero ? (
         <div className={`flex items-center gap-1 text-[11px] font-semibold ${
-          trendUp ? 'text-emerald-600' : 'text-red-500'
+          trendGood ? 'text-emerald-600' : 'text-red-500'
         }`}>
           <span>{trendUp ? '↑' : '↓'}</span>
-          <span>{Math.abs(trend)}% {trendLabel || 'vs Last Period'}</span>
+          <span>{Math.abs(trend)}{trendUnit} {trendLabel || 'vs Last Period'}</span>
         </div>
       ) : trendLabel ? (
         <p className="text-[11px] font-medium text-slate-400">{trendLabel}</p>
@@ -55,7 +58,7 @@ function KpiCard({
   );
 }
 
-export function TruckKpiCards({ kpis }) {
+export function TruckKpiCards({ kpis, trends = {}, periodLabel }) {
   // FIX: Use optional chaining with defaults
   const isProfit = (kpis.profit ?? 0) >= 0;
 
@@ -67,7 +70,8 @@ export function TruckKpiCards({ kpis }) {
         <KpiCard
           label="Total Revenue"
           value={INR(kpis.revenue ?? 0)}
-          trend={12}
+          trend={trends.revenue}
+          trendLabel={trends.label}
           icon={FiTrendingUp}
           iconBg="bg-green-100"
           iconColor="text-green-600"
@@ -77,7 +81,9 @@ export function TruckKpiCards({ kpis }) {
         <KpiCard
           label="Total Expenses"
           value={INR(kpis.expenses ?? 0)}
-          trend={-5}
+          trend={trends.expenses}
+          trendLabel={trends.label}
+          invertTrend
           icon={FiTrendingDown}
           iconBg="bg-red-100"
           iconColor="text-red-500"
@@ -85,9 +91,10 @@ export function TruckKpiCards({ kpis }) {
           accent="border-red-400"
         />
         <KpiCard
-          label="Net Profit"
-          value={INR(Math.abs(kpis.profit ?? 0))}
-          trend={isProfit ? 8 : -8}
+          label={isProfit ? 'Net Profit' : 'Net Loss'}
+          value={`${isProfit ? '' : '− '}${INR(Math.abs(kpis.profit ?? 0))}`}
+          trend={trends.profit}
+          trendLabel={trends.label}
           icon={FiDollarSign}
           iconBg={isProfit ? 'bg-emerald-100' : 'bg-rose-100'}
           iconColor={isProfit ? 'text-emerald-600' : 'text-rose-600'}
@@ -98,7 +105,9 @@ export function TruckKpiCards({ kpis }) {
         <KpiCard
           label="Profit Margin"
           value={`${Number(kpis.margin ?? 0).toFixed(2)}%`}
-          trend={(kpis.margin ?? 0) >= 0 ? 3 : -3}
+          trend={trends.margin}
+          trendLabel={trends.margin !== undefined ? `pts ${trends.label}` : undefined}
+          trendUnit=""
           icon={FiPercent}
           iconBg="bg-blue-100"
           iconColor="text-blue-600"
@@ -112,7 +121,7 @@ export function TruckKpiCards({ kpis }) {
         <KpiCard
           label="Completed Trips"
           value={kpis.trips ?? 0}
-          trendLabel="This statement period"
+          trendLabel={periodLabel || 'This statement period'}
           icon={FiTruck}
           iconBg="bg-purple-100"
           iconColor="text-purple-600"

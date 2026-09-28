@@ -1,5 +1,18 @@
 const db = require("../config/db");
 
+// Accepts "YYYY-MM-DD", an ISO timestamp (as a DATE column round-trips
+// through JSON) or a Date, and returns "YYYY-MM-DD" in server-local time.
+const toSqlDate = (value) => {
+  if (!value || value === "null" || value === "undefined") return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+};
+
 // ==============================================
 // Generate Company Code
 // ==============================================
@@ -122,7 +135,7 @@ const createCompanyProfile = async (data) => {
     data.company_status,
 
     data.website,
-    data.established_date,
+    toSqlDate(data.established_date),
 
     data.office_phone,
     data.mobile_number,
@@ -293,7 +306,7 @@ const updateCompanyProfile = async (id, data) => {
     data.company_status,
 
     data.website,
-    data.established_date,
+    toSqlDate(data.established_date),
 
     data.office_phone,
     data.mobile_number,

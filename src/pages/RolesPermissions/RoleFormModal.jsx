@@ -8,9 +8,9 @@ export default function RoleFormModal({ mode, initialRole, allRoles, onClose, on
   const [name,        setName]        = useState(initialRole?.name        ?? '');
   const [description, setDescription] = useState(initialRole?.description ?? '');
   const [status,      setStatus]      = useState(initialRole?.status      ?? 'Active');
-  const [cloneFrom,   setCloneFrom]   = useState('');
   const [permissions, setPermissions] = useState(emptyPerms());
   const [errors,      setErrors]      = useState({});
+  const [saving,      setSaving]      = useState(false);
   const [loadingPerms, setLoadingPerms] = useState(mode === 'edit');
 
   // Load existing permissions when editing
@@ -43,25 +43,6 @@ export default function RoleFormModal({ mode, initialRole, allRoles, onClose, on
     }
   }, [mode, initialRole?.id]);
 
-  // Fallback preset roles to show in the "Clone from Role" dropdown
-  const FALLBACK_ROLES = [
-    { id: 'preset_manager', name: 'Manager', permissions: null },
-    { id: 'preset_supervisor', name: 'Supervisor', permissions: null },
-    { id: 'preset_ops', name: 'Operations Manager', permissions: null },
-    { id: 'preset_finance', name: 'Finance Manager', permissions: null }
-  ];
-
-  const handleCloneChange = (id) => {
-    setCloneFrom(id);
-    if (id) {
-      const src = (allRoles || []).find(r => r.id === id) || FALLBACK_ROLES.find(r => r.id === id);
-      if (src && src.permissions) setPermissions(structuredClone(src.permissions));
-      else setPermissions(emptyPerms());
-    } else {
-      setPermissions(emptyPerms());
-    }
-  };
-
   const validate = () => {
     const e = {};
     
@@ -88,8 +69,8 @@ export default function RoleFormModal({ mode, initialRole, allRoles, onClose, on
     return Object.keys(e).length === 0;
   };
 
-  const handleSave = () => {
-    if (!validate()) return;
+  const handleSave = async () => {
+    if (saving || !validate()) return;
     
     // ── Updated to match backend schema ──
     // Convert permissions object ({ key: {view,create,...} })
@@ -109,7 +90,9 @@ export default function RoleFormModal({ mode, initialRole, allRoles, onClose, on
       };
     });
 
-    onSave({
+    setSaving(true);
+    try {
+    await onSave({
       role_name: name.trim(),
       description,
       department: "",
@@ -122,6 +105,9 @@ export default function RoleFormModal({ mode, initialRole, allRoles, onClose, on
       created_by: "Admin",
       updated_by: "Admin"
     });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -148,7 +134,7 @@ export default function RoleFormModal({ mode, initialRole, allRoles, onClose, on
           {/* Basic fields */}
           <div className="px-6 py-5 border-b border-slate-100">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2 lg:col-span-3">
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
                   Role Name <span className="text-red-500">*</span>
                 </label>
@@ -168,17 +154,6 @@ export default function RoleFormModal({ mode, initialRole, allRoles, onClose, on
                   <option value="Inactive">Inactive</option>
                 </select>
               </div>
-              {mode === 'add' && (
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Clone from Role</label>
-                  <select value={cloneFrom} onChange={e => handleCloneChange(e.target.value)} className="input bg-white cursor-pointer">
-                    <option value="">— Start blank —</option>
-                    {(allRoles && allRoles.length ? allRoles : FALLBACK_ROLES).map(r => (
-                      <option key={r.id} value={r.id}>{r.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
               <div className="sm:col-span-2 lg:col-span-4">
                 <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">Description</label>
                 <input 
@@ -233,13 +208,14 @@ export default function RoleFormModal({ mode, initialRole, allRoles, onClose, on
 
           {/* Footer */}
           <div className="px-6 py-4 flex justify-end gap-2">
-            <button onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors">
+            <button onClick={onClose} disabled={saving}
+              className="px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50">
               Cancel
             </button>
-            <button onClick={handleSave}
-              className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors">
-              {mode === 'add' ? 'Create Role' : 'Save Changes'}
+            <button onClick={handleSave} disabled={saving}
+              className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-1.5">
+              {saving && <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              {saving ? 'Saving...' : mode === 'add' ? 'Create Role' : 'Save Changes'}
             </button>
           </div>
         </div>

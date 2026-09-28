@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Eye, Key, Lock, Unlock, Mail, Trash2,
+  Eye, Key, Lock, Unlock, Trash2,
   MoreVertical, LogIn, CheckCircle2, XCircle, Shield,
   Users,
 } from 'lucide-react';
@@ -100,7 +100,6 @@ export function ActionMenu({ user, onView, onToggleStatus, onDelete, onResetPwd 
     user.status === 'Active'
       ? { icon: Lock,   label: 'Disable Login',  onClick: () => { onToggleStatus('Disabled'); setOpen(false); } }
       : { icon: Unlock, label: 'Enable Login',   onClick: () => { onToggleStatus('Active');   setOpen(false); } },
-    { icon: Mail,  label: 'Send Welcome Email',  onClick: () => setOpen(false) },
     { icon: Trash2,label: 'Delete User',         onClick: () => { onDelete(); setOpen(false); }, danger: true },
   ];
 

@@ -1,64 +1,46 @@
+const db = require('../config/db');
 const RoleModel = require('../models/roleModel');
-const UserManagementModel = require('../models/userManagementModel');
 const { verifyToken } = require('./authMiddleware');
 
 const ACTIONS = ['view', 'create', 'edit', 'delete', 'approve', 'reject', 'export', 'print'];
 
 // ==========================================================
-// Merge user_permissions (override) with role_permissions
-// (default). Fails closed: no matching row => not allowed.
+// Permissions come from the user's ROLE only (Roles &
+// Permissions page). Per-user overrides in user_permissions are
+// ignored so that editing a role always takes effect for every
+// user in it. The role is read from the users table on every
+// call, so a role change applies without waiting for a new token.
+// Fails closed: no role / no matching row => not allowed.
 // ==========================================================
-async function getMergedPermissions(userId, roleId) {
-    // If roleId is missing, try to resolve it from the user's role name
-    if (!roleId && userId) {
-        const [userRow] = await require('../config/db').query(
-            `SELECT role_id, role FROM users WHERE id = ?`, [userId]
-        );
-        if (userRow.length) {
-            roleId = userRow[0].role_id;
-            if (!roleId && userRow[0].role) {
-                const role = await RoleModel.getRoleByName(userRow[0].role);
-                roleId = role?.id || null;
-            }
-        }
+async function resolveRoleId(userId, fallbackRoleId) {
+    if (!userId) return fallbackRoleId || null;
+
+    const [userRow] = await db.query(
+        `SELECT role_id, role FROM users WHERE id = ? AND is_deleted = 0`, [userId]
+    );
+    if (!userRow.length) return null;
+
+    if (userRow[0].role_id) return userRow[0].role_id;
+    if (userRow[0].role) {
+        const role = await RoleModel.getRoleByName(userRow[0].role);
+        return role?.id || null;
     }
+    return null;
+}
 
-    const [userRows, roleRows] = await Promise.all([
-        userId ? UserManagementModel.getUserPermissions(userId) : Promise.resolve([]),
-        roleId ? RoleModel.getRolePermissions(roleId) : Promise.resolve([]),
-    ]);
-
-    const merged = new Map();
-    for (const row of roleRows) merged.set(row.module_name, row);
-    for (const row of userRows) merged.set(row.module_name, row); // user override wins
-
-    return Array.from(merged.values());
+async function getMergedPermissions(userId, roleId) {
+    const resolvedRoleId = await resolveRoleId(userId, roleId);
+    if (!resolvedRoleId) return [];
+    return RoleModel.getRolePermissions(resolvedRoleId);
 }
 
 async function resolvePermission(userId, roleId, moduleName, action) {
     if (!ACTIONS.includes(action)) return false;
 
-    // Resolve roleId from role name if missing
-    if (!roleId && userId) {
-        const [userRow] = await require('../config/db').query(
-            `SELECT role_id, role FROM users WHERE id = ?`, [userId]
-        );
-        if (userRow.length) {
-            roleId = userRow[0].role_id;
-            if (!roleId && userRow[0].role) {
-                const role = await RoleModel.getRoleByName(userRow[0].role);
-                roleId = role?.id || null;
-            }
-        }
-    }
+    const resolvedRoleId = await resolveRoleId(userId, roleId);
+    if (!resolvedRoleId) return false;
 
-    const userRows = userId ? await UserManagementModel.getUserPermissions(userId) : [];
-    const userRow = userRows.find((r) => r.module_name === moduleName);
-    if (userRow) return !!userRow[`can_${action}`];
-
-    if (!roleId) return false;
-
-    const roleRows = await RoleModel.getRolePermissions(roleId);
+    const roleRows = await RoleModel.getRolePermissions(resolvedRoleId);
     const roleRow = roleRows.find((r) => r.module_name === moduleName);
     return roleRow ? !!roleRow[`can_${action}`] : false;
 }

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   Settings, RefreshCw, Download, Users, MapPin,
   ShieldCheck, Bell, Database, Server, ChevronRight,
-  Building2, Activity, Archive, Key, Calendar,
+  Building2, Activity, Key, Calendar,
   CalendarDays, Clock, Code2, Truck, CreditCard,
   Wrench, UserPlus, IndianRupee, Shield,
 } from 'lucide-react';
@@ -77,37 +77,13 @@ const quickAccess = [
     title: 'Roles & Permissions',
     desc: 'Manage system permissions',
     icon: ShieldCheck,
-    href: '/settings',
-  },
-  {
-    title: 'Running Plants',
-    desc: 'Manage operational locations',
-    icon: MapPin,
-    href: '/settings',
-  },
-  {
-    title: 'System Settings',
-    desc: 'Global configuration',
-    icon: Settings,
-    href: '/settings',
+    href: '/roles-permissions',
   },
   {
     title: 'Notifications',
     desc: 'Notification templates',
     icon: Bell,
     href: '/notifications',
-  },
-  {
-    title: 'Audit Logs',
-    desc: 'View system activity',
-    icon: Activity,
-    href: '/audit',
-  },
-  {
-    title: 'Backup & Restore',
-    desc: 'Backup management',
-    icon: Archive,
-    href: '/backup-restore',
   },
 ];
 
@@ -279,7 +255,7 @@ export default function Administration() {
       {/* ── Quick Access ─────────────────────────────────────────────────────── */}
       <div>
         <SectionLabel title="Quick Access" sub="Jump to key administration modules" />
-        <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {quickAccess.map(card => (
             <a
               key={card.title}

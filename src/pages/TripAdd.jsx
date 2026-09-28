@@ -65,7 +65,7 @@ const formReducer = (state, action) => {
         fuelType: v.fuel_type || '',
         tankCapacity: v.gvw || 0,
         mileage: v.mileage || 0,
-        lastOdometer: v.initial_odometer || 0,
+        lastOdometer: v.current_odometer ?? v.initial_odometer ?? 0,
         vehicleId: v.id,
         driverId: v.assigned_driver || '',
         stationId: v.station_id || '',
@@ -134,7 +134,7 @@ export default function TripAdd() {
           vehicle: {
             id: v.id, driver_name: v.driver_name, driver_contact: v.driver_contact,
             supervisor_name: v.supervisor_name, supervisor_id: v.supervisor_id,
-            source_plant: v.source_plant, initial_odometer: v.initial_odometer,
+            source_plant: v.source_plant, initial_odometer: v.initial_odometer, current_odometer: v.current_odometer,
             fuel_type: v.fuel_type, gvw: v.gvw, mileage: v.mileage,
             assigned_driver: v.assigned_driver, station_id: v.station_id,
             vehicle_status: v.vehicle_status,

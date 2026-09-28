@@ -123,6 +123,71 @@ class AuthModel {
 
     }
 
+    static async getLoginHistory(userId, limit = 50) {
+
+        const [rows] = await pool.query(`
+            SELECT id, login_time, ip_address, browser, login_type, status, remarks
+            FROM user_login_history
+            WHERE user_id = ?
+            ORDER BY login_time DESC
+            LIMIT ?
+        `, [userId, limit]);
+
+        return rows;
+
+    }
+
+    // ==========================================================
+    // My Account (Self-Service)
+    // ==========================================================
+
+    static async updateOwnProfile(userId, { employee_name, email, phone }) {
+
+        await pool.query(`
+            UPDATE users
+            SET employee_name = ?, email = ?, phone = ?, updated_by = username
+            WHERE id = ?
+        `, [employee_name, email, phone || null, userId]);
+
+    }
+
+    static async updateOwnPassword(userId, hashedPassword) {
+
+        await pool.query(`
+            UPDATE users
+            SET password = ?, force_password_reset = 0
+            WHERE id = ?
+        `, [hashedPassword, userId]);
+
+    }
+
+    static async getActiveSessions(userId) {
+
+        const [rows] = await pool.query(`
+            SELECT id, token_hash, created_by_ip, user_agent, created_at, expires_at
+            FROM refresh_tokens
+            WHERE user_id = ?
+            AND revoked_at IS NULL
+            AND expires_at > NOW()
+            ORDER BY created_at DESC
+        `, [userId]);
+
+        return rows;
+
+    }
+
+    static async revokeUserSession(sessionId, userId) {
+
+        const [result] = await pool.query(`
+            UPDATE refresh_tokens
+            SET revoked_at = NOW()
+            WHERE id = ? AND user_id = ? AND revoked_at IS NULL
+        `, [sessionId, userId]);
+
+        return result.affectedRows;
+
+    }
+
 }
 
 module.exports = AuthModel;

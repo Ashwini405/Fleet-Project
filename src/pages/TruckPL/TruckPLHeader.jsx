@@ -4,7 +4,7 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { FiArrowLeft, FiPrinter, FiDownload, FiTruck, FiMapPin, FiUser, FiCalendar } from 'react-icons/fi';
 
-export function TruckPLHeader({ info, period, reportRef }) {
+export function TruckPLHeader({ info, period, month, onMonthChange, reportRef }) {
   const navigate = useNavigate();
 
   const statusStyle = {
@@ -51,7 +51,7 @@ export function TruckPLHeader({ info, period, reportRef }) {
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
 
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`${info?.vehicle_no || 'truck'}-ProfitLoss.pdf`);
+      pdf.save(`${info?.vehicle_no || 'truck'}-ProfitLoss${month ? `-${month}` : ''}.pdf`);
     } catch (error) {
       console.error('Export PDF failed:', error);
       alert('Unable to export PDF. Please try Print or try again.');
@@ -81,6 +81,28 @@ export function TruckPLHeader({ info, period, reportRef }) {
 
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
+          {onMonthChange && (
+            <div className="flex items-center rounded-lg border border-white/20 bg-white/10 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => onMonthChange('')}
+                className={`px-3 py-2 text-xs font-bold transition-colors ${!month ? 'bg-white text-slate-900' : 'text-white hover:bg-white/20'}`}
+              >
+                All Time
+              </button>
+              <label className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold cursor-pointer ${month ? 'bg-white text-slate-900' : 'text-white'}`}>
+                <FiCalendar className="w-3.5 h-3.5" />
+                <input
+                  type="month"
+                  value={month || ''}
+                  max={new Date().toISOString().slice(0, 7)}
+                  onChange={(e) => onMonthChange(e.target.value)}
+                  aria-label="Select month"
+                  className={`bg-transparent text-xs font-bold focus:outline-none ${month ? 'text-slate-900' : 'text-white scheme-dark'}`}
+                />
+              </label>
+            </div>
+          )}
           <button
             type="button"
             onClick={() => window.print()}

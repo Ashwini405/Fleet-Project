@@ -5,11 +5,9 @@ import {
 } from 'lucide-react';
 
 import {
-  ROLES,
-  PLANTS,
-  DEPARTMENTS,
   avatarColor,
   initials,
+  formatDateTime,
 } from './userManagementData';
 
 import {
@@ -18,8 +16,10 @@ import {
 } from './UserManagementHelpers';
 
 import Can from '../../components/Can';
+import api from '../../services/api';
 import AddUserDrawer    from './AddUserDrawer';
 import UserDetailDrawer from './UserDetailDrawer';
+import ResetPasswordModal from './ResetPasswordModal';
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
@@ -27,11 +27,10 @@ export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [search, setSearch]             = useState('');
   const [filterRole, setFilterRole]     = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
-  const [filterPlant, setFilterPlant]   = useState('');
-  const [filterDept, setFilterDept]     = useState('');
+  const [roleOptions, setRoleOptions]   = useState([]);
   const [addOpen, setAddOpen]           = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [resetUser, setResetUser]       = useState(null);
   const [saved, setSaved]               = useState(false);
   const [loading, setLoading]           = useState(true);
   const [dashboard, setDashboard]       = useState({
@@ -50,6 +49,9 @@ export default function UserManagement() {
   useEffect(() => {
     fetchUsers();
     fetchDashboard();
+    api.get('/roles')
+      .then(({ data }) => { if (data.success) setRoleOptions(data.data.map(r => r.role_name)); })
+      .catch(err => console.error('Error fetching roles:', err));
   }, []);
 
   const fetchUsers = async () => {
@@ -71,9 +73,7 @@ export default function UserManagement() {
           plant: user.plant,
           role: user.role,
           status: user.status,
-          lastLogin: user.last_login
-            ? new Date(user.last_login).toLocaleString()
-            : "Never",
+          lastLogin: user.last_login || null,
           allowMobile: user.allow_mobile,
           allowWeb: user.allow_web,
           forceReset: user.force_password_reset,
@@ -117,10 +117,7 @@ export default function UserManagement() {
       || u.email.toLowerCase().includes(q)
       || u.empId.toLowerCase().includes(q);
     const matchRole   = !filterRole   || u.role   === filterRole;
-    const matchStatus = !filterStatus || u.status === filterStatus;
-    const matchPlant  = !filterPlant  || u.plant  === filterPlant;
-    const matchDept   = !filterDept   || u.dept   === filterDept;
-    return matchSearch && matchRole && matchStatus && matchPlant && matchDept;
+    return matchSearch && matchRole;
   });
 
   // ── Handlers ─────────────────────────────────────────────────────────────
@@ -186,7 +183,7 @@ export default function UserManagement() {
   const handleExport = () => {
     const rows = [
       ['ID', 'Employee', 'Username', 'Email', 'Department', 'Role', 'Plant', 'Status', 'Last Login'],
-      ...users.map(u => [u.id, u.empName, u.username, u.email, u.dept, u.role, u.plant, u.status, u.lastLogin]),
+      ...users.map(u => [u.id, u.empName, u.username, u.email, u.dept, u.role, u.plant, u.status, u.lastLogin ? formatDateTime(u.lastLogin) : 'Never']),
     ];
     const csv  = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -197,9 +194,9 @@ export default function UserManagement() {
   };
 
   const clearFilters = () => {
-    setFilterRole(''); setFilterStatus(''); setFilterPlant(''); setFilterDept(''); setSearch('');
+    setFilterRole(''); setSearch('');
   };
-  const hasFilters = search || filterRole || filterStatus || filterPlant || filterDept;
+  const hasFilters = search || filterRole;
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -272,23 +269,14 @@ export default function UserManagement() {
           </div>
           {/* Filter dropdowns */}
           <div className="flex flex-wrap gap-2">
-            {[
-              { label: 'Role',       value: filterRole,   set: setFilterRole,   opts: ROLES       },
-              { label: 'Status',     value: filterStatus, set: setFilterStatus, opts: ['Active', 'Disabled', 'Locked'] },
-              { label: 'Plant',      value: filterPlant,  set: setFilterPlant,  opts: PLANTS      },
-              { label: 'Department', value: filterDept,   set: setFilterDept,   opts: DEPARTMENTS },
-            ].map(f => (
-              <div key={f.label} className="relative">
-                <select
-                  value={f.value}
-                  onChange={e => f.set(e.target.value)}
-                  className={`input bg-white cursor-pointer pr-8 text-xs ${f.value ? 'border-indigo-400 text-indigo-700 font-bold' : ''}`}
-                >
-                  <option value="">All {f.label}s</option>
-                  {f.opts.map(o => <option key={o}>{o}</option>)}
-                </select>
-              </div>
-            ))}
+            <select
+              value={filterRole}
+              onChange={e => setFilterRole(e.target.value)}
+              className={`input bg-white cursor-pointer pr-8 text-xs ${filterRole ? 'border-indigo-400 text-indigo-700 font-bold' : ''}`}
+            >
+              <option value="">All Roles</option>
+              {roleOptions.map(o => <option key={o}>{o}</option>)}
+            </select>
             {hasFilters && (
               <button onClick={clearFilters} className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors">
                 <X className="w-3.5 h-3.5" /> Clear
@@ -387,7 +375,7 @@ export default function UserManagement() {
                       <td className="px-4 py-3.5 whitespace-nowrap">
                         <div className="flex flex-col gap-1">
                           <StatusBadge status={user.status} />
-                          {user.forceReset && (
+                          {!!user.forceReset && (
                             <span className="text-[10px] font-bold text-amber-600 flex items-center gap-1">
                               <Key className="w-2.5 h-2.5" /> Reset pending
                             </span>
@@ -399,7 +387,7 @@ export default function UserManagement() {
                       <td className="px-4 py-3.5 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           <Clock className="w-3 h-3 text-slate-300 shrink-0" />
-                          <span className="text-xs text-slate-500 font-medium">{user.lastLogin}</span>
+                          <span className="text-xs text-slate-500 font-medium">{user.lastLogin ? formatDateTime(user.lastLogin) : 'Never'}</span>
                         </div>
                       </td>
 
@@ -417,7 +405,7 @@ export default function UserManagement() {
                             onView={() => setSelectedUser(user)}
                             onToggleStatus={s => handleStatusChange(user.id, s)}
                             onDelete={() => handleDelete(user.id)}
-                            onResetPwd={() => {}}
+                            onResetPwd={() => setResetUser(user)}
                           />
                         </div>
                       </td>
@@ -441,6 +429,22 @@ export default function UserManagement() {
         user={selectedUser}
         onClose={() => setSelectedUser(null)}
         onStatusChange={s => selectedUser && handleStatusChange(selectedUser.id, s)}
+        onResetPassword={() => setResetUser(selectedUser)}
+        onUpdated={changes => {
+          setSelectedUser(u => (u ? { ...u, ...changes } : u));
+          fetchUsers();
+          fetchDashboard();
+        }}
+      />
+
+      <ResetPasswordModal
+        user={resetUser}
+        onClose={() => setResetUser(null)}
+        onDone={() => {
+          if (selectedUser?.id === resetUser?.id) setSelectedUser(u => ({ ...u, forceReset: 1 }));
+          fetchUsers();
+          fetchDashboard();
+        }}
       />
 
     </div>

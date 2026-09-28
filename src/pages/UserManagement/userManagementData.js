@@ -1,17 +1,5 @@
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-export const ROLES = [
-  'Administrator', 'Finance Manager', 'Operations Manager',
-  'Maintenance Supervisor', 'HR Manager', 'Viewer',
-];
-
-export const PLANTS = [
-  'Hyderabad Plant', 'Bengaluru Plant', 'Chennai Plant', 'Mumbai Plant',
-  'Delhi Plant', 'Pune Plant', 'Kolkata Plant', 'Ahmedabad Plant',
-];
-
-export const DEPARTMENTS = ['Finance', 'Operations', 'Maintenance', 'HR', 'Administration'];
-
 export const AVATAR_COLORS = [
   'bg-indigo-100 text-indigo-700', 'bg-green-100 text-green-700',
   'bg-blue-100 text-blue-700',     'bg-purple-100 text-purple-700',
@@ -148,21 +136,21 @@ export const defaultPermissions = () => ({
 
 // ─── Role Cards Config ────────────────────────────────────────────────────────
 
-export const ROLE_CARDS = [
-  { role: 'Administrator',          desc: 'Full system access. Manage all modules.',         color: 'border-purple-200 bg-purple-50 text-purple-700' },
-  { role: 'Finance Manager',        desc: 'Access to Finance, Vendors and Payments.',        color: 'border-blue-200 bg-blue-50 text-blue-700'       },
-  { role: 'Operations Manager',     desc: 'Access to Trips, Vehicles and Fuel.',             color: 'border-indigo-200 bg-indigo-50 text-indigo-700'  },
-  { role: 'Maintenance Supervisor', desc: 'Service, Tyres, Parts and Inspection access.',    color: 'border-amber-200 bg-amber-50 text-amber-700'     },
-  { role: 'HR Manager',             desc: 'Staff Management and Document Vault access.',     color: 'border-pink-200 bg-pink-50 text-pink-700'        },
-  { role: 'Viewer',                 desc: 'Read-only access to all non-sensitive modules.',  color: 'border-slate-200 bg-slate-50 text-slate-600'     },
-];
-
 // ─── Detail Drawer Tabs ───────────────────────────────────────────────────────
+
+// dd/mm/yyyy, hh:mm am/pm (IST display)
+export const formatDateTime = value => {
+  if (!value) return '—';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-IN', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  });
+};
 
 export const DETAIL_TABS = [
   { id: 'overview', label: 'Overview'      },
-  { id: 'roles',    label: 'Roles'         },
-  { id: 'perms',    label: 'Permissions'   },
   { id: 'history',  label: 'Login History' },
   { id: 'audit',    label: 'Audit Trail'   },
 ];

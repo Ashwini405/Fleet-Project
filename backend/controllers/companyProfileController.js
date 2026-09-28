@@ -209,16 +209,28 @@ const updateCompanyProfile = async (req, res) => {
       files.insurance_certificate?.[0]?.filename ||
       existing.insurance_certificate;
 
+    body.company_status =
+      body.company_status ||
+      existing.company_status ||
+      "Active";
+
     await companyProfileModel.updateCompanyProfile(
       req.params.id,
       body
     );
 
+    const updated =
+      await companyProfileModel.getCompanyProfileById(
+        req.params.id
+      );
+
     res.json({
 
       success: true,
 
-      message: "Company Profile Updated Successfully"
+      message: "Company Profile Updated Successfully",
+
+      data: updated
 
     });
 

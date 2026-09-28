@@ -339,7 +339,7 @@ export default function VehicleMaster() {
             driver: v.assigned_driver_name || v.driver_name || '—',
             plant: v.station_name || '—',
             type: v.type || '—',
-            odometer: v.initial_odometer || 0,
+            odometer: v.current_odometer ?? v.initial_odometer ?? 0,
             supervisor: v.supervisor_name || '—',
             fuelType: v.fuel_type || '—',
             vehicleCategory: v.vehicle_category || '—',

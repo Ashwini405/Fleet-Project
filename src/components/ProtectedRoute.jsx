@@ -11,8 +11,8 @@ function PageLoader() {
     );
 }
 
-export default function ProtectedRoute({ module, action = "view", children }) {
-    const { isAuthenticated, loading, hasPermission } = useAuth();
+export default function ProtectedRoute({ module, action = "view", redirectIfDenied = false, children }) {
+    const { isAuthenticated, loading, hasPermission, sidebar } = useAuth();
     const location = useLocation();
 
     if (loading) {
@@ -24,6 +24,11 @@ export default function ProtectedRoute({ module, action = "view", children }) {
     }
 
     if (module && !hasPermission(module, action)) {
+        // e.g. the home route: send users without Dashboard access to their first allowed page
+        const firstAllowed = sidebar?.[0]?.items?.[0]?.path;
+        if (redirectIfDenied && firstAllowed && firstAllowed !== location.pathname) {
+            return <Navigate to={firstAllowed} replace />;
+        }
         return <AccessDenied />;
     }
 

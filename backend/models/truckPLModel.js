@@ -108,13 +108,25 @@ const getRevenue = async (vehicleId, startDate = null, endDate = null) => {
     incomeDateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
   );
 
+  // Trip-linked income is attributed to the trip's month, not the month the
+  // income entry was created, so fetch it by trip without the date filter.
+  const tripKeys = tripRows.flatMap(row => [row.id, row.trip_id]).filter(k => k !== null && k !== undefined && k !== "");
+  let linkedIncomeRows = [];
+  if (tripKeys.length) {
+    [linkedIncomeRows] = await db.query(
+      `SELECT trip_id, amount
+       FROM income_entries
+       WHERE income_category NOT IN ('Rental', 'Rental Income')
+         AND trip_id IN (?)`,
+      [tripKeys]
+    );
+  }
+
   const incomeByTrip = new Map();
-  incomeRows
-    .filter(row => !["Rental", "Rental Income"].includes(row.income_category) && row.trip_id !== null && row.trip_id !== undefined && row.trip_id !== "")
-    .forEach(row => {
-      const key = String(row.trip_id);
-      incomeByTrip.set(key, (incomeByTrip.get(key) || 0) + Number(row.amount || 0));
-    });
+  linkedIncomeRows.forEach(row => {
+    const key = String(row.trip_id);
+    incomeByTrip.set(key, (incomeByTrip.get(key) || 0) + Number(row.amount || 0));
+  });
 
   const trips = tripRows.map(row => {
     const linkedIncome = incomeByTrip.get(String(row.id)) || incomeByTrip.get(String(row.trip_id));
@@ -793,8 +805,12 @@ const getEmiCost = async (vehicleId, startDate = null, endDate = null) => {
 // ============================================
 const getDriverSettlement = async (vehicleId, startDate = null, endDate = null) => {
 
-  const dateFilter = (startDate && endDate) ? " AND (ds.created_at BETWEEN ? AND ? OR ds.statement_month BETWEEN DATE_FORMAT(?, '%Y-%m') AND DATE_FORMAT(?, '%Y-%m'))" : "";
-  const dateParams = (startDate && endDate) ? [startDate, endDate, startDate, endDate] : [];
+  // A settlement belongs to its statement month (fallback: creation month), so
+  // an August settlement created in September is not counted in both months.
+  const dateFilter = (startDate && endDate)
+    ? " AND COALESCE(NULLIF(ds.statement_month, ''), DATE_FORMAT(ds.created_at, '%Y-%m')) BETWEEN DATE_FORMAT(?, '%Y-%m') AND DATE_FORMAT(?, '%Y-%m')"
+    : "";
+  const dateParams = (startDate && endDate) ? [startDate, endDate] : [];
 
   const [rows] = await db.query(
     `

@@ -82,7 +82,7 @@ async function buildPermissionsAndSidebar(userId, roleId) {
     const sidebar = SIDEBAR_CONFIG
         .map((group) => ({
             ...group,
-            items: group.items.filter((item) => viewable.has(item.module)),
+            items: group.items.filter((item) => item.module === null || viewable.has(item.module)),
         }))
         .filter((group) => group.items.length > 0);
 
@@ -460,7 +460,7 @@ class AuthController {
                 });
             }
 
-            await UserManagementModel.resetPassword(userId, newPassword);
+            await AuthModel.updateOwnPassword(userId, await bcrypt.hash(newPassword, 10));
 
             await logAudit(req, {
                 module_name: 'Authentication',
@@ -477,6 +477,166 @@ class AuthController {
             return res.status(500).json({
                 success: false,
                 message: 'Unable to change password.',
+                error: error.message,
+            });
+        }
+    }
+
+    // ==========================================================
+    // My Account - Profile
+    // ==========================================================
+
+    static async getProfile(req, res) {
+        try {
+            const user = await UserManagementModel.getUserById(req.user.id);
+
+            if (!user) {
+                return res.status(404).json({ success: false, message: 'User not found.' });
+            }
+
+            return res.status(200).json({
+                success: true,
+                data: {
+                    ...sanitizeUser(user),
+                    phone: user.phone,
+                    status: user.status,
+                    last_login: user.last_login,
+                    created_at: user.created_at,
+                },
+            });
+        } catch (error) {
+            console.error('GET PROFILE ERROR:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to fetch profile.',
+                error: error.message,
+            });
+        }
+    }
+
+    static async updateProfile(req, res) {
+        try {
+            const employee_name = (req.body.employee_name || '').trim();
+            const email = (req.body.email || '').trim();
+            const phone = (req.body.phone || '').trim();
+
+            if (!employee_name || !email) {
+                return res.status(400).json({ success: false, message: 'Full name and email are required.' });
+            }
+
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                return res.status(400).json({ success: false, message: 'Enter a valid email address.' });
+            }
+
+            if (phone && !/^[0-9+\-\s()]{7,20}$/.test(phone)) {
+                return res.status(400).json({ success: false, message: 'Enter a valid phone number.' });
+            }
+
+            const existing = await UserManagementModel.getUserById(req.user.id);
+
+            if (!existing) {
+                return res.status(404).json({ success: false, message: 'User not found.' });
+            }
+
+            if (await UserManagementModel.emailExists(email, req.user.id)) {
+                return res.status(409).json({ success: false, message: 'This email is already used by another user.' });
+            }
+
+            await AuthModel.updateOwnProfile(req.user.id, { employee_name, email, phone });
+
+            await logAudit(req, {
+                module_name: 'My Account',
+                action: 'PROFILE_UPDATE',
+                description: `${existing.username} updated their profile.`,
+                old_data: { employee_name: existing.employee_name, email: existing.email, phone: existing.phone },
+                new_data: { employee_name, email, phone },
+            });
+
+            const updated = await UserManagementModel.getUserById(req.user.id);
+
+            return res.status(200).json({
+                success: true,
+                message: 'Profile updated successfully.',
+                data: {
+                    ...sanitizeUser(updated),
+                    phone: updated.phone,
+                    status: updated.status,
+                    last_login: updated.last_login,
+                    created_at: updated.created_at,
+                },
+            });
+        } catch (error) {
+            console.error('UPDATE PROFILE ERROR:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to update profile.',
+                error: error.message,
+            });
+        }
+    }
+
+    // ==========================================================
+    // My Account - Login History
+    // ==========================================================
+
+    static async getMyLoginHistory(req, res) {
+        try {
+            const rows = await AuthModel.getLoginHistory(req.user.id);
+            return res.status(200).json({ success: true, data: rows });
+        } catch (error) {
+            console.error('GET LOGIN HISTORY ERROR:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to fetch login history.',
+                error: error.message,
+            });
+        }
+    }
+
+    // ==========================================================
+    // My Account - Active Sessions
+    // ==========================================================
+
+    static async getMySessions(req, res) {
+        try {
+            const rawToken = req.cookies?.[REFRESH_COOKIE_NAME];
+            const currentHash = rawToken ? hashToken(rawToken) : null;
+            const rows = await AuthModel.getActiveSessions(req.user.id);
+
+            return res.status(200).json({
+                success: true,
+                data: rows.map(({ token_hash, ...s }) => ({ ...s, current: token_hash === currentHash })),
+            });
+        } catch (error) {
+            console.error('GET SESSIONS ERROR:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to fetch active sessions.',
+                error: error.message,
+            });
+        }
+    }
+
+    static async revokeMySession(req, res) {
+        try {
+            const revoked = await AuthModel.revokeUserSession(req.params.id, req.user.id);
+
+            if (!revoked) {
+                return res.status(404).json({ success: false, message: 'Session not found.' });
+            }
+
+            await logAudit(req, {
+                module_name: 'My Account',
+                action: 'SESSION_REVOKED',
+                description: `${req.user.username} signed out session #${req.params.id}.`,
+            });
+
+            return res.status(200).json({ success: true, message: 'Session signed out.' });
+        } catch (error) {
+            console.error('REVOKE SESSION ERROR:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Unable to sign out session.',
                 error: error.message,
             });
         }

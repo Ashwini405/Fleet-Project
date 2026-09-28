@@ -48,7 +48,7 @@ export function ReadMatrix({ permissions }) {
                 </tr>
                 {mods.map(mod => (
                   <tr key={mod.key} className="border-b border-slate-100 hover:bg-slate-50/40">
-                    <td className="px-4 py-2.5 font-semibold text-slate-700">{mod.label}</td>
+                    <td className="px-4 py-2.5 font-semibold text-slate-700">{mod.name || mod.label}</td>
                     {PERMS.map(p => {
                       const granted = permissions?.[mod.key]?.[p];
                       return (
@@ -114,7 +114,7 @@ export function EditMatrix({ permissions, onChange }) {
                 </tr>
                 {mods.map(mod => (
                   <tr key={mod.key} className="border-b border-slate-100 hover:bg-indigo-50/20">
-                    <td className="px-4 py-2 font-semibold text-slate-700">{mod.label}</td>
+                    <td className="px-4 py-2 font-semibold text-slate-700">{mod.name || mod.label}</td>
                     {PERMS.map(p => (
                       <td key={p} className="px-3 py-2 text-center">
                         <input

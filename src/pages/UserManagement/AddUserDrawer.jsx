@@ -3,13 +3,19 @@ import {
   UserPlus, X, ChevronDown, Save, Key, Globe, Smartphone,
 } from 'lucide-react';
 import {
-  ROLES, PLANTS, EMPTY_FORM,
+  EMPTY_FORM,
   avatarColor, initials,
 } from './userManagementData';
 import { Toggle } from './UserManagementHelpers';
 import api from '../../services/api';
 
 // ─── Add User Drawer ──────────────────────────────────────────────────────────
+
+const TYPE_BADGE = {
+  Employee:   'bg-blue-50 text-blue-700 border-blue-200',
+  Supervisor: 'bg-amber-50 text-amber-700 border-amber-200',
+  Driver:     'bg-emerald-50 text-emerald-700 border-emerald-200',
+};
 
 export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) {
   const [form, setForm]           = useState(EMPTY_FORM);
@@ -18,13 +24,15 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
   const [empSearch, setEmpSearch] = useState('');
   const [employees, setEmployees] = useState([]);
   const [roles, setRoles]         = useState([]);
+  const [plants, setPlants]       = useState([]);
+  const [staffType, setStaffType] = useState('All');
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [empOpen, setEmpOpen]     = useState(false);
   const empRef = useRef(null);
 
   // ── Fetch employees + roles on open ──
   useEffect(() => {
-    if (open) { fetchEmployees(); fetchRoles(); }
+    if (open) { fetchEmployees(); fetchRoles(); fetchPlants(); }
   }, [open]);
 
   const fetchRoles = async () => {
@@ -36,10 +44,20 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
     }
   };
 
+  const fetchPlants = async () => {
+    try {
+      const { data } = await api.get('/users/plants');
+      if (data.success) setPlants(data.data.map(p => p.name));
+    } catch (e) {
+      console.error('Error fetching plants:', e);
+    }
+  };
+
+  // Employees, supervisors and drivers from Staff Management without a login yet
   const fetchEmployees = async () => {
     try {
       setLoadingEmployees(true);
-      const { data } = await api.get('/employees/dropdown');
+      const { data } = await api.get('/users/available-staff');
       if (data.success) setEmployees(data.data || []);
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -50,12 +68,13 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
 
   const selectedEmp = employees.find(e => e.id === form.empId);
 
-  const usedEmpIds    = existingUsers.map(u => u.empId);
   const availableEmps = employees.filter(e =>
-    !usedEmpIds.includes(e.id) &&
+    (staffType === 'All' || e.type === staffType) &&
     (e.name.toLowerCase().includes(empSearch.toLowerCase()) ||
      e.id.toLowerCase().includes(empSearch.toLowerCase()))
   );
+
+  const plantOptions = form.plant && !plants.includes(form.plant) ? [form.plant, ...plants] : plants;
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -68,26 +87,11 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
 
   const handleEmpSearch = value => {
     setEmpSearch(value);
-    setEmpOpen(!!value);
+    setEmpOpen(true);
 
-    // Try to find employee by ID or name
-    const emp = employees.find(e =>
-      e.id.toLowerCase() === value.toLowerCase() || 
-      e.name.toLowerCase().includes(value.toLowerCase())
-    );
-
-    if (emp) {
-      setForm(f => ({
-        ...f,
-        empId: emp.id,
-        email: emp.email,
-        phone: emp.phone,
-        plant: emp.plant,
-        username: emp.name.replace(/\s+/g, ".").toLowerCase()
-      }));
-      setErrors(e => ({ ...e, empId: '', email: '', phone: '' }));
-    } else {
-      setForm(f => ({ ...f, empId: '', email: '', phone: '', plant: '', username: '' }));
+    // Typing clears any previous pick; an employee is linked only when chosen from the list
+    if (form.empId) {
+      setForm(f => ({ ...f, empId: '', email: '', phone: '', plant: '', username: '', role: '' }));
     }
   };
 
@@ -95,12 +99,13 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
     setForm(f => ({
       ...f,
       empId:    emp.id,
-      email:    emp.email,
-      phone:    emp.phone,
-      plant:    emp.plant,
-      username: emp.name.replace(/\s+/g, ".").toLowerCase()
+      email:    emp.email || '',
+      phone:    emp.phone || '',
+      plant:    emp.plant || '',
+      role:     emp.suggested_role && roles.includes(emp.suggested_role) ? emp.suggested_role : f.role,
+      username: emp.name.trim().replace(/\s+/g, ".").toLowerCase()
     }));
-    setEmpSearch(emp.name);
+    setEmpSearch(emp.name.trim());
     setEmpOpen(false);
     setErrors(e => ({ ...e, empId: '', email: '', phone: '' }));
   };
@@ -112,7 +117,7 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
 
   const validate = () => {
     const e = {};
-    if (!form.empId)           e.empId    = 'Select an employee';
+    if (!form.empId)           e.empId    = 'Select a staff member';
     if (!form.username.trim()) e.username = 'Username is required';
     else if (existingUsers.some(u => u.username === form.username.trim())) e.username = 'Username already taken';
     if (!form.email.trim())    e.email    = 'Email is required';
@@ -139,7 +144,7 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
 
       const { data: result } = await api.post('/users', {
         employee_id: form.empId,
-        employee_name: emp?.name || '',
+        employee_name: emp?.name.trim() || '',
         username: form.username.trim(),
         email: form.email.trim(),
         phone: form.phone,
@@ -197,40 +202,55 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
 
   return (
     <>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/30 z-40" onClick={handleClose} />
-
-      {/* Drawer */}
-      <div className="fixed top-0 right-0 h-full w-full max-w-md bg-white z-50 shadow-2xl flex flex-col">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={handleClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
+        onClick={e => e.stopPropagation()}
+      >
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
-              <UserPlus className="w-4 h-4 text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-black text-slate-800">Add User Account</p>
-              <p className="text-[10px] text-slate-400 font-medium mt-0.5">Link an employee to an ERP login</p>
-            </div>
+        <div className="flex justify-between items-center p-5 border-b border-gray-100 shrink-0 bg-slate-50">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-indigo-600" /> Add User Account
+            </h3>
+            <p className="text-[12px] font-medium text-gray-500 mt-0.5">Select an employee and create their ERP login</p>
           </div>
-          <button onClick={handleClose} className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:bg-slate-100 transition-colors">
-            <X className="w-4 h-4" />
+          <button onClick={handleClose} className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-500 transition-colors">
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6">
 
-          {/* ── Select Employee ── */}
+          {/* ── Select Staff Member ── */}
           <div>
-            <label className="label">Select Employee <span className="text-red-500">*</span></label>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <label className="label !mb-0">Select Staff Member <span className="text-red-500">*</span></label>
+              <div className="flex gap-1">
+                {['All', 'Employee', 'Supervisor', 'Driver'].map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => { setStaffType(t); setEmpOpen(true); }}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${
+                      staffType === t
+                        ? 'bg-indigo-600 text-white border-indigo-600'
+                        : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {t === 'All' ? 'All' : `${t}s`}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="relative" ref={empRef}>
               <input
                 value={empSearch}
                 onChange={e => { handleEmpSearch(e.target.value); setEmpOpen(true); }}
                 onFocus={() => setEmpOpen(true)}
-                placeholder="Search Employee Name or Employee ID"
+                placeholder="Search by name or ID (EMP / SUP / DRV)"
                 className={`input w-full ${errors.empId ? 'border-red-300' : ''}`}
               />
               <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-1/2 -translate-y-1/2" />
@@ -244,20 +264,26 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
                 <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-10 overflow-hidden">
                   <div className="max-h-48 overflow-y-auto">
                     {availableEmps.length === 0 ? (
-                      <p className="text-xs text-slate-400 text-center py-4 font-medium">No available employees</p>
+                      <p className="text-xs text-slate-400 text-center py-4 font-medium">No staff without a login</p>
                     ) : availableEmps.map(emp => (
                       <button
                         key={emp.id}
+                        type="button"
                         onClick={() => handleEmpSelect(emp)}
                         className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50 transition-colors text-left"
                       >
                         <span className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 ${avatarColor(emp.name)}`}>
                           {initials(emp.name)}
                         </span>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-slate-800">{emp.name}</p>
-                          <p className="text-[11px] text-slate-400 font-medium">{emp.id} · {emp.dept} · {emp.plant}</p>
+                          <p className="text-[11px] text-slate-400 font-medium">
+                            {[emp.id, emp.type === 'Employee' ? emp.dept : null, emp.plant].filter(Boolean).join(' · ')}
+                          </p>
                         </div>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${TYPE_BADGE[emp.type]}`}>
+                          {emp.type}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -275,7 +301,9 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-bold text-slate-800">{selectedEmp.name}</p>
-                <p className="text-[11px] text-slate-400 font-medium">{selectedEmp.dept} · {selectedEmp.plant} · {selectedEmp.phone}</p>
+                <p className="text-[11px] text-slate-400 font-medium">
+                  {[selectedEmp.type, selectedEmp.type === 'Employee' ? selectedEmp.dept : null, selectedEmp.plant, selectedEmp.phone].filter(Boolean).join(' · ')}
+                </p>
               </div>
               <span className="ml-auto text-[10px] font-black text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full shrink-0">
                 {selectedEmp.id}
@@ -289,6 +317,7 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
               <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Login Credentials</span>
               <div className="flex-1 h-px bg-slate-100" />
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label">Username <span className="text-red-500">*</span></label>
               <input
@@ -319,6 +348,7 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
                 placeholder="+91-98765-43210"
               />
             </div>
+            </div>
           </div>
 
           {/* ── Access Configuration ── */}
@@ -327,6 +357,7 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
               <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Access Configuration</span>
               <div className="flex-1 h-px bg-slate-100" />
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label">Role <span className="text-red-500">*</span></label>
               <select
@@ -347,7 +378,7 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
                 className={`input bg-white cursor-pointer ${errors.plant ? 'border-red-300' : ''}`}
               >
                 <option value="">Select plant...</option>
-                {PLANTS.map(p => <option key={p}>{p}</option>)}
+                {plantOptions.map(p => <option key={p}>{p}</option>)}
               </select>
               {errors.plant && <p className="text-[11px] text-red-500 mt-1 font-bold">{errors.plant}</p>}
             </div>
@@ -362,6 +393,7 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
                 <option>Disabled</option>
               </select>
             </div>
+            </div>
           </div>
 
           {/* ── Password ── */}
@@ -370,6 +402,7 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
               <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">Password</span>
               <div className="flex-1 h-px bg-slate-100" />
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="label">Password <span className="text-red-500">*</span></label>
               <input
@@ -391,6 +424,7 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
                 placeholder="Re-enter password"
               />
               {errors.confirmPassword && <p className="text-[11px] text-red-500 mt-1 font-bold">{errors.confirmPassword}</p>}
+            </div>
             </div>
           </div>
 
@@ -418,25 +452,28 @@ export default function AddUserDrawer({ open, onClose, existingUsers, onSave }) 
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-slate-200 shrink-0 flex items-center gap-2 bg-slate-50">
+        <div className="p-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
           <button
+            type="button"
             onClick={handleClose}
-            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+            className="px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-colors"
           >
-            <X className="w-3.5 h-3.5" /> Cancel
+            Cancel
           </button>
           <button
+            type="button"
             onClick={handleSave}
             disabled={saving}
-            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-70"
+            className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-70"
           >
             {saving
               ? <><div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Creating...</>
-              : <><Save className="w-3.5 h-3.5" /> Create User</>
+              : <><Save className="w-4 h-4" /> Create User</>
             }
           </button>
         </div>
 
+      </div>
       </div>
     </>
   );
