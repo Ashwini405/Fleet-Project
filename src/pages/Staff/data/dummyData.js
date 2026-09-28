@@ -3,8 +3,7 @@ export const userRoles = [
   { id: "stations", label: "Operational Station", short: "Operational Station", icon: "Building2" },
   { id: "supervisors", label: "Supervisors", short: "Supervisors", icon: "UsersRound" },
   { id: "drivers", label: "Drivers", short: "Drivers", icon: "SteeringWheel" },
-  { id: "employees", label: "Employees", short: "Employees", icon: "Briefcase" },
-  { id: "ledgers", label: "Ledgers", short: "Ledgers", icon: "BookOpen" }
+  { id: "employees", label: "Employees", short: "Employees", icon: "Briefcase" }
 ];
 
 export const dummyStations = [

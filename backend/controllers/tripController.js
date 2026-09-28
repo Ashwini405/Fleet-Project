@@ -267,8 +267,8 @@ const deleteTrip = async (req, res) => {
 const getExpenses = async (req, res) => {
   try {
     const { tripId } = req.params;
-    const [[tripRow]] = await db.query('SELECT id, trip_id AS trip_code FROM trips WHERE id = ? OR trip_id = ?', [tripId, tripId]);
-    const tripKeys = [...new Set([tripId, tripRow?.id, tripRow?.trip_code].filter(value => value !== undefined && value !== null))];
+    const tripRow = await Trip.getByIdAny(tripId);
+    const tripKeys = [...new Set([tripId, tripRow?.id, tripRow?.trip_id].filter(value => value !== undefined && value !== null))];
     let tripExpenses = [];
     if (tripKeys.length) {
       const placeholders = tripKeys.map(() => '?').join(',');
@@ -310,8 +310,8 @@ const getExpenses = async (req, res) => {
 const getFuel = async (req, res) => {
   try {
     const { tripId } = req.params;
-    const [[tripRow]] = await db.query('SELECT id, trip_id AS trip_code FROM trips WHERE id = ? OR trip_id = ?', [tripId, tripId]);
-    const tripKeys = [...new Set([tripId, tripRow?.id, tripRow?.trip_code].filter(value => value !== undefined && value !== null))];
+    const tripRow = await Trip.getByIdAny(tripId);
+    const tripKeys = [...new Set([tripId, tripRow?.id, tripRow?.trip_id].filter(value => value !== undefined && value !== null))];
     const placeholders = tripKeys.map(() => '?').join(',');
     const [legacyFuel] = tripKeys.length
       ? await db.query(`SELECT * FROM trip_fuel WHERE trip_id IN (${placeholders}) ORDER BY created_at DESC`, tripKeys)

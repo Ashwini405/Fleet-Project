@@ -375,9 +375,6 @@ export default function Payments() {
       if (driverParam) setHistoryFilterDriver(driverParam);
     } else if (tabParam === 'prepare' || tabParam === '1' || driverIdParam) {
       setActiveTab('1. Prepare Settlement');
-      const year = new Date().getFullYear();
-      const seq = String(pendingList.length + historyList.length + 1).padStart(3, '0');
-      setDraftId(prev => prev || `SET-${year}-${seq}`);
 
       if (driverIdParam) {
         loadDriverSettlementDirect(driverIdParam, monthParam, plantParam, truckParam);
@@ -498,9 +495,7 @@ export default function Payments() {
   // DRIVER HANDLERS
   // ──────────────────────────────────────────────────────
   const handleNewSettlement = () => {
-    const year = new Date().getFullYear();
-    const seq = String(pendingList.length + historyList.length + 1).padStart(3, '0');
-    setDraftId(`SET-${year}-${seq}`);
+    setDraftId('');
     setPlant(plants[0]?.source_plant || '');
     setTruckNo('');
     setStatementMonth(new Date().toISOString().slice(0, 7));
@@ -524,7 +519,6 @@ export default function Payments() {
       }
 
       const payload = {
-        settlement_no: draftId,
         plant_name: plant,
         vehicle_id: parseInt(vehicleId),
         vehicle_no: truckNo,
@@ -552,7 +546,8 @@ export default function Payments() {
         status: 'Submitted'
       };
 
-      await axios.post('http://localhost:5001/api/driver-settlements', payload);
+      const response = await axios.post('http://localhost:5001/api/driver-settlements', payload);
+      setDraftId(response.data.data.settlement_no);
       alert('Settlement saved successfully!');
       setSettlementStatus('Submitted');
       await fetchPendingSettlements();

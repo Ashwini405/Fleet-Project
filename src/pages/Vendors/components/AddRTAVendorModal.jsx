@@ -209,7 +209,8 @@ export default function AddRTAVendorModal({ isOpen, onClose, onAdd, existingVend
             </div>
           </div>
 
-          {/* Section 2: Bank Details */}
+          {/* Section 2: Bank Details — credit only */}
+          {form.paymentTerms === 'credit' && (
           <div className="pt-2 border-t border-gray-100">
             <p className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">
               <FiHome size={11} /> Bank Details (Optional)
@@ -249,6 +250,7 @@ export default function AddRTAVendorModal({ isOpen, onClose, onAdd, existingVend
               </div>
             </div>
           </div>
+          )}
 
           {/* Section 3: Additional Information */}
           <div className="pt-2 border-t border-gray-100">
