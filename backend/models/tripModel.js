@@ -1,5 +1,16 @@
 const db = require('../config/db');
 
+const tripIdentifierLookup = (tripId, alias = '') => {
+  const prefix = alias ? `${alias}.` : '';
+  if (/^\d+$/.test(String(tripId))) {
+    return {
+      where: `(${prefix}trip_id = ? OR ${prefix}id = ?)`,
+      values: [tripId, tripId]
+    };
+  }
+  return { where: `${prefix}trip_id = ?`, values: [tripId] };
+};
+
 const Trip = {
 
   // ✅ CREATE TRIP
@@ -30,6 +41,7 @@ getAll: async () => {
 },
   // ✅ GET SINGLE TRIP (exclude soft-deleted)
 getById: async (tripId) => {
+  const lookup = tripIdentifierLookup(tripId, 't');
   const [rows] = await db.query(`
     SELECT 
       t.*,
@@ -40,8 +52,8 @@ getById: async (tripId) => {
     LEFT JOIN drivers d ON t.driver_id = d.id
     LEFT JOIN supervisors s ON t.supervisor_id = s.id
     LEFT JOIN stations st ON t.station_id = st.id
-    WHERE (t.trip_id = ? OR t.id = ?) AND t.is_deleted = 0
-  `, [tripId, tripId]);
+    WHERE ${lookup.where} AND t.is_deleted = 0
+  `, lookup.values);
   return rows[0];
 },
 
@@ -66,11 +78,8 @@ addExpense: async (tripId, expenseData) => {
 
 updateExpense: async (tripId, expenseId, expenseData) => {
   const { amount, type, notes } = expenseData;
-  const [[trip]] = await db.query(
-    `SELECT id, trip_id AS trip_code FROM trips WHERE id = ? OR trip_id = ? LIMIT 1`,
-    [tripId, tripId]
-  );
-  const tripKeys = [tripId, trip?.id, trip?.trip_code]
+  const trip = await Trip.getByIdAny(tripId);
+  const tripKeys = [tripId, trip?.id, trip?.trip_id]
     .filter(value => value !== undefined && value !== null)
     .map(value => String(value));
   const [result] = await db.query(
@@ -81,11 +90,8 @@ updateExpense: async (tripId, expenseId, expenseData) => {
 },
 
 deleteExpense: async (tripId, expenseId) => {
-  const [[trip]] = await db.query(
-    `SELECT id, trip_id AS trip_code FROM trips WHERE id = ? OR trip_id = ? LIMIT 1`,
-    [tripId, tripId]
-  );
-  const tripKeys = [tripId, trip?.id, trip?.trip_code]
+  const trip = await Trip.getByIdAny(tripId);
+  const tripKeys = [tripId, trip?.id, trip?.trip_id]
     .filter(value => value !== undefined && value !== null)
     .map(value => String(value));
   const [result] = await db.query(
@@ -133,24 +139,27 @@ getFuel: async (tripId) => {
 
   // ✅ UPDATE TRIP
   update: async (id, tripData) => {
+    const lookup = tripIdentifierLookup(id);
     const [result] = await db.query(
-      'UPDATE trips SET ? WHERE trip_id = ? OR id = ?',
-      [tripData, id, id]
+      `UPDATE trips SET ? WHERE ${lookup.where}`,
+      [tripData, ...lookup.values]
     );
     return result;
   },
 
   // ✅ SOFT DELETE TRIP
   softDelete: async (id) => {
+    const lookup = tripIdentifierLookup(id);
     const [result] = await db.query(
-      `UPDATE trips SET is_deleted = 1, deleted_at = NOW() WHERE trip_id = ? OR id = ?`,
-      [id, id]
+      `UPDATE trips SET is_deleted = 1, deleted_at = NOW() WHERE ${lookup.where}`,
+      lookup.values
     );
     return result;
   },
 
   // ✅ GET BY ID (including soft-deleted, for internal use)
   getByIdAny: async (tripId) => {
+    const lookup = tripIdentifierLookup(tripId, 't');
     const [rows] = await db.query(
       `SELECT t.*, COALESCE(d.full_name, t.driver_name) AS driver_name,
               s.full_name AS supervisor_name, st.station_name
@@ -158,8 +167,8 @@ getFuel: async (tripId) => {
        LEFT JOIN drivers d ON t.driver_id = d.id
        LEFT JOIN supervisors s ON t.supervisor_id = s.id
        LEFT JOIN stations st ON t.station_id = st.id
-       WHERE (t.trip_id = ? OR t.id = ?)`,
-      [tripId, tripId]
+      WHERE ${lookup.where}`,
+          lookup.values
     );
     return rows[0];
   },

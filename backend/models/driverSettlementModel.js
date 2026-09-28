@@ -154,9 +154,7 @@ const getDriverDetails = async (
 // Create Settlement
 // =====================================
 const createSettlement = async (data) => {
-
-  const [result] = await db.query(
-    `
+  const insertQuery = `
     INSERT INTO driver_settlements
     (
       settlement_no,
@@ -191,9 +189,8 @@ const createSettlement = async (data) => {
       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?
     )
-    `,
-    [
-      data.settlement_no,
+    `;
+  const values = [
       data.plant_name,
       data.vehicle_id,
       data.vehicle_no,
@@ -218,10 +215,28 @@ const createSettlement = async (data) => {
       data.total_deductions,
       data.net_payable,
       data.status || "Draft"
-    ]
-  );
+  ];
 
-  return result;
+  const yearPrefix = `SET-${new Date().getFullYear()}-`;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const [[sequenceRow]] = await db.query(
+      `SELECT COALESCE(MAX(CAST(SUBSTRING_INDEX(settlement_no, '-', -1) AS UNSIGNED)), 0) AS last_sequence
+       FROM driver_settlements
+       WHERE settlement_no LIKE ?`,
+      [`${yearPrefix}%`]
+    );
+    const sequence = Number(sequenceRow.last_sequence) + 1;
+    const settlementNo = `${yearPrefix}${String(sequence).padStart(3, '0')}`;
+
+    try {
+      const [result] = await db.query(insertQuery, [settlementNo, ...values]);
+      return { insertId: result.insertId, settlement_no: settlementNo };
+    } catch (error) {
+      if (error.code !== 'ER_DUP_ENTRY' || attempt === 4) throw error;
+    }
+  }
+
+  throw new Error('Unable to generate a unique settlement number');
 };
 
 // =====================================

@@ -1,21 +1,19 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Building2, UsersRound, Truck, Briefcase, BookOpen } from 'lucide-react';
+import { LayoutDashboard, Building2, UsersRound, Truck, Briefcase } from 'lucide-react';
 import { userRoles } from './data/dummyData';
 import DashboardTab from './components/DashboardTab';
 import StationsTab from './components/StationsTab';
 import SupervisorsTab from './components/SupervisorsTab';
 import DriversTab from './components/DriversTab';
 import EmployeesTab from './components/EmployeesTab';
-import LedgersTab from './components/LedgersTab';
 
 const iconMap = {
   LayoutDashboard: <LayoutDashboard className="w-4 h-4 mb-1" />,
   Building2: <Building2 className="w-4 h-4 mb-1" />,
   UsersRound: <UsersRound className="w-4 h-4 mb-1" />,
   SteeringWheel: <Truck className="w-4 h-4 mb-1" />, 
-  Briefcase: <Briefcase className="w-4 h-4 mb-1" />,
-  BookOpen: <BookOpen className="w-4 h-4 mb-1" />
+  Briefcase: <Briefcase className="w-4 h-4 mb-1" />
 };
 
 export default function Staff() {
@@ -28,7 +26,6 @@ export default function Staff() {
       case "supervisors": return <SupervisorsTab />;
       case "drivers": return <DriversTab />;
       case "employees": return <EmployeesTab />;
-      case "ledgers": return <LedgersTab />;
       default: return null;
     }
   };

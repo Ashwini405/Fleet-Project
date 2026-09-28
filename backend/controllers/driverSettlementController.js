@@ -188,7 +188,7 @@ const createSettlement = async (
 ) => {
   try {
 
-    await driverSettlementModel.createSettlement(
+    const settlement = await driverSettlementModel.createSettlement(
       req.body
     );
 
@@ -196,6 +196,7 @@ const createSettlement = async (
       success: true,
       message:
         "Settlement saved successfully",
+      data: settlement,
     });
 
   } catch (error) {
