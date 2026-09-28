@@ -105,7 +105,10 @@ export default function InspectionModule() {
   }, []);
 
   const handleAddNewInspection = (newRecord) => {
-    setHistoryData([newRecord, ...historyData]);
+    if (newRecord) {
+      setHistoryData(prev => [newRecord, ...prev]);
+    }
+    fetchInspections();
   };
 
   return (
