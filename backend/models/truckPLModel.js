@@ -1,5 +1,20 @@
 const db = require("../config/db");
 
+const EFFECTIVE_VEHICLE_STATUS = `CASE
+  WHEN EXISTS (
+    SELECT 1 FROM trips t
+    WHERE t.vehicle_id = v.id
+      AND t.trip_status IN ('Active', 'In Transit', 'Started', 'Planned')
+  ) THEN 'On Trip'
+  WHEN EXISTS (
+    SELECT 1 FROM repair_services r
+    WHERE r.vehicle_id = v.id
+      AND r.status IN ('Reported', 'Under Repair', 'In Progress')
+  ) THEN 'Under Repair'
+  WHEN LOWER(COALESCE(v.vehicle_status, 'active')) = 'inactive' THEN 'Inactive'
+  ELSE 'Active'
+END`;
+
 // ============================================
 // Get Truck Header Information
 // ============================================
@@ -12,7 +27,7 @@ const getTruckInfo = async (vehicleId) => {
       v.id,
       v.vehicle_no,
       v.make_brand,
-      v.vehicle_status,
+      ${EFFECTIVE_VEHICLE_STATUS} AS vehicle_status,
 
       d.id AS driver_id,
       d.full_name,
@@ -1128,7 +1143,7 @@ const getTruckPLList = async (startDate = null, endDate = null, options = {}) =>
             v.id,
             v.vehicle_no,
             v.make_brand,
-            v.vehicle_status,
+            ${EFFECTIVE_VEHICLE_STATUS} AS vehicle_status,
             v.emi_amount,
             IFNULL(d.full_name,'-') AS driver,
             IFNULL(s.station_name,'-') AS plant

@@ -65,7 +65,7 @@ exports.getVendorTransactions = async (req, res) => {
             rs.files AS proof_files
       FROM repair_services rs
           LEFT JOIN vehicles v ON rs.vehicle_id = v.id
-          WHERE rs.garage_id = ? OR (rs.garage_id IS NULL AND rs.garage = ?)
+          WHERE rs.garage_id = ? OR (rs.garage_id IS NULL AND rs.labour_vendor_id IS NULL AND rs.garage = ?)
 
       UNION ALL
 

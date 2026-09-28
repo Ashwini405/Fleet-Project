@@ -70,7 +70,13 @@ export default function LabourPage() {
   }
 
   if (selectedVendor) {
-    return <LabourLedger vendor={selectedVendor} onBack={() => setSelectedVendor(null)} />;
+    return (
+      <LabourLedger
+        vendor={selectedVendor}
+        onVendorUpdated={setSelectedVendor}
+        onBack={() => { setSelectedVendor(null); fetchLabourVendors(); }}
+      />
+    );
   }
 
   return (
@@ -158,21 +164,27 @@ export default function LabourPage() {
             </div>
             <div className="border-t border-gray-100 pt-4 flex justify-between items-end">
               <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Ledger Balance</span>
-              {!vendor.opening_balance || Number(vendor.opening_balance) === 0 ? (
-                <div className="flex flex-col items-end">
-                  <span className="font-bold text-lg text-gray-400">₹0</span>
-                  <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">Settled</span>
-                </div>
-              ) : (
-                <div className="flex flex-col items-end">
-                  <span className={`font-bold text-lg ${Number(vendor.opening_balance) < 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    ₹{Math.abs(Number(vendor.opening_balance)).toLocaleString()}
-                  </span>
-                  <span className="text-[10px] font-medium text-gray-400">
-                    {Number(vendor.opening_balance) < 0 ? 'Advance Balance' : 'Outstanding Payable'}
-                  </span>
-                </div>
-              )}
+              {(() => {
+                const balance = (vendor.payment_terms || 'credit') === 'cash' ? 0 : Number(vendor.outstanding_balance || 0);
+                if (balance === 0) {
+                  return (
+                    <div className="flex flex-col items-end">
+                      <span className="font-bold text-lg text-gray-400">₹0</span>
+                      <span className="text-[10px] font-bold text-green-500 bg-green-50 px-2 py-0.5 rounded-full">Settled</span>
+                    </div>
+                  );
+                }
+                return (
+                  <div className="flex flex-col items-end">
+                    <span className={`font-bold text-lg ${balance < 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      ₹{Math.abs(balance).toLocaleString('en-IN')}
+                    </span>
+                    <span className="text-[10px] font-medium text-gray-400">
+                      {balance < 0 ? 'Advance Paid' : 'Outstanding Payable'}
+                    </span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         ))}

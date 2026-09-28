@@ -11,6 +11,7 @@ export function TruckPLHeader({ info, period, reportRef }) {
     active: 'bg-green-100 text-green-700 border-green-300',
     inactive: 'bg-red-100 text-red-700 border-red-300',
     maintenance: 'bg-yellow-100 text-yellow-700 border-yellow-300',
+    'under repair': 'bg-yellow-100 text-yellow-700 border-yellow-300',
     breakdown: 'bg-red-100 text-red-700 border-red-300',
     available: 'bg-green-100 text-green-700 border-green-300',
     'on trip': 'bg-blue-100 text-blue-700 border-blue-300',
