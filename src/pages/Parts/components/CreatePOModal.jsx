@@ -9,28 +9,6 @@ const CATEGORY_COLORS = {
 };
 const DEFAULT_CATEGORY_COLOR = 'bg-indigo-50 text-indigo-700 border-indigo-200';
 
-// Items per category — matching inventory
-const ITEMS_BY_CATEGORY = {
-  Batteries: [
-    { id: 'battery-stock', name: 'Truck Battery', unit: 'pcs', price: 0 },
-  ],
-  Spares: [
-    { id: 'i1',  name: 'Brake Pads',     unit: 'pcs',    price: 560  },
-    { id: 'i2',  name: 'Clutch Plate',   unit: 'pcs',    price: 2200 },
-    { id: 'i3',  name: 'Air Filter',     unit: 'pcs',    price: 180  },
-    { id: 'i4',  name: 'Wiper Blades',   unit: 'pcs',    price: 320  },
-    { id: 'i5',  name: 'Fuel Filter',    unit: 'pcs',    price: 420  },
-    { id: 'i6',  name: 'Headlight Bulb', unit: 'pcs',    price: 280  },
-  ],
-  Lubricants: [
-    { id: 'i7',  name: 'Engine Oil 15W40', unit: 'liters', price: 560 },
-    { id: 'i8',  name: 'Gear Oil',         unit: 'liters', price: 380 },
-    { id: 'i9',  name: 'Grease',           unit: 'kg',     price: 160 },
-    { id: 'i10', name: 'Coolant',          unit: 'liters', price: 220 },
-    { id: 'i11', name: 'Brake Fluid',      unit: 'liters', price: 310 },
-  ],
-};
-
 const EMPTY = {
   category: '', vendorId: '', vendor: '',
   itemId: '', item_name: '', unit: '',
@@ -134,9 +112,11 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy,
   // The application has two vendor groups; inventory categories remain independent.
   const vendorsForCategory = form.category === 'Lubricants' ? oilVendors : partsVendors;
 
-  const inventoryItemsForCategory = form.category === 'Batteries' ? [] : inventory
+  const normalizedVendor = form.vendor.trim().toLowerCase();
+  const itemsForVendor = inventory
     .filter(item => (
       (item.category || '').trim().toLowerCase() === (form.category || '').trim().toLowerCase()
+      && (item.preferred_vendor || item.preferredVendor || '').trim().toLowerCase() === normalizedVendor
     ))
     .map((item, index) => ({
       id: String(item.id || `inventory-${index}`),
@@ -145,9 +125,7 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy,
       price: Number(item.cost_price || item.costPrice || 0),
     }))
     .filter(item => item.name);
-  const itemsForCategory = inventoryItemsForCategory.length
-    ? inventoryItemsForCategory
-    : (ITEMS_BY_CATEGORY[form.category] || []);
+  const itemsForCategory = itemsForVendor;
 
   const total = (Number(form.quantity) || 0) * (Number(form.unit_price) || 0);
 
@@ -188,7 +166,9 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy,
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          vendor: form.vendor, item_name: form.item_name,
+          vendor: form.vendor,
+          part_id: /^\d+$/.test(form.itemId) ? Number(form.itemId) : null,
+          item_name: form.item_name,
           quantity: Number(form.quantity), unit_price: Number(form.unit_price) || 0,
           total_amount: total, category: form.category,
           expected_delivery: form.expected_delivery || null,
@@ -285,6 +265,9 @@ export default function CreatePOModal({ isOpen, onClose, onSuccess, requestedBy,
                   </option>
                 ))}
               </select>
+              {itemsForCategory.length === 0 && (
+                <p className="mt-1 text-[11px] text-slate-400">No inventory products are assigned to this vendor yet. You can enter an item below.</p>
+              )}
               <Err msg={errors.itemId} />
               <div className="flex items-center gap-2 my-2">
                 <div className="flex-1 h-px bg-slate-100" />

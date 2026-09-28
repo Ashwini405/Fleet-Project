@@ -58,7 +58,7 @@ export default function AddInventoryModal({
   onEdit,
   editItem
 }) {
-  const { vendorList, warehouseList, vehicleList } = useContext(InventoryContext);
+  const { warehouseList, vehicleList } = useContext(InventoryContext);
   const isEditMode = !!editItem;
   const [step, setStep] = useState(0);
   const [form, setForm] = useState({
@@ -77,7 +77,7 @@ export default function AddInventoryModal({
     vehicleType: 'All',
     compatibleVehicles: '',
     serviceInterval: '',
-    preferredVendor: vendorList?.[0] || '',
+    preferredVendor: '',
     gst: '',
     vendorContact: '',
     warehouse: warehouseList?.[0] || 'Main Warehouse',
@@ -99,9 +99,38 @@ export default function AddInventoryModal({
   const [vehicleTags, setVehicleTags] = useState([]);
   const [tagInput, setTagInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [partsVendors, setPartsVendors] = useState([]);
+  const [oilVendors, setOilVendors] = useState([]);
   const fileInputRef = useRef(null);
   const tagInputRef = useRef(null);
   const skuRandRef = useRef(Math.floor(1000 + Math.random() * 9000));
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    Promise.all([
+      fetch('http://localhost:5001/api/parts-vendors').then(res => res.json()),
+      fetch('http://localhost:5001/api/oil-vendors').then(res => res.json()),
+    ]).then(([partsResponse, oilsResponse]) => {
+      if (cancelled) return;
+      const nextPartsVendors = partsResponse.data || [];
+      const nextOilVendors = oilsResponse.data || [];
+      setPartsVendors(nextPartsVendors);
+      setOilVendors(nextOilVendors);
+      setForm(current => {
+        if (isEditMode) return current;
+        const choices = current.category === 'Lubricants' ? nextOilVendors : nextPartsVendors;
+        const matchingVendor = choices.find(v =>
+          v.vendor_name?.toLowerCase() === current.preferredVendor.toLowerCase()
+        );
+        return {
+          ...current,
+          preferredVendor: matchingVendor?.vendor_name || choices[0]?.vendor_name || '',
+        };
+      });
+    }).catch(error => console.error('Inventory vendor fetch error:', error));
+    return () => { cancelled = true; };
+  }, [isOpen, isEditMode]);
 
   // Pre-fill form when editItem changes
   useEffect(() => {
@@ -122,7 +151,7 @@ export default function AddInventoryModal({
         vehicleType: editItem.vehicle_type || 'All',
         compatibleVehicles: '',
         serviceInterval: editItem.service_interval || '',
-        preferredVendor: editItem.preferred_vendor || vendorList?.[0] || '',
+        preferredVendor: editItem.preferred_vendor || '',
         gst: editItem.gst_number || '',
         vendorContact: editItem.vendor_contact || '',
         warehouse: editItem.warehouse || warehouseList?.[0] || 'Main Warehouse',
@@ -144,9 +173,22 @@ export default function AddInventoryModal({
       setStep(0);
       setSaved(false);
     }
-  }, [editItem, isEditMode, vendorList, warehouseList]);
+  }, [editItem, isEditMode, warehouseList]);
 
   const set = (k, v) => setForm((p) => ({ ...p, [k]: v }));
+  const inventoryVendorOptions = form.category === 'Lubricants' ? oilVendors : partsVendors;
+  const activeInventoryVendorOptions = inventoryVendorOptions.filter(v => v.status !== 'Inactive');
+  const handleInventoryCategoryChange = (category) => {
+    const options = (category === 'Lubricants' ? oilVendors : partsVendors)
+      .filter(v => v.status !== 'Inactive');
+    setForm(current => ({
+      ...current,
+      category,
+      preferredVendor: options.find(v =>
+        v.vendor_name?.toLowerCase() === current.preferredVendor.toLowerCase()
+      )?.vendor_name || options[0]?.vendor_name || '',
+    }));
+  };
 
   // Auto-generate SKU
   useEffect(() => {
@@ -198,6 +240,7 @@ export default function AddInventoryModal({
     if (!form.name.trim()) e.name = 'Required';
     if (!form.brand.trim()) e.brand = 'Required';
     if (!Number.isFinite(Number(form.costPrice)) || Number(form.costPrice) <= 0) e.costPrice = 'Enter a cost price greater than 0';
+    if (!form.preferredVendor) e.preferredVendor = 'Select a vendor';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -219,7 +262,7 @@ export default function AddInventoryModal({
       vehicleType: 'All',
       compatibleVehicles: '',
       serviceInterval: '',
-      preferredVendor: vendorList?.[0] || '',
+      preferredVendor: '',
       gst: '',
       vendorContact: '',
       warehouse: warehouseList?.[0] || 'Main Warehouse',
@@ -535,7 +578,7 @@ export default function AddInventoryModal({
                     </Field>
 
                     <Field label="Category">
-                      <Select value={form.category} onChange={(e) => set('category', e.target.value)}>
+                      <Select value={form.category} onChange={(e) => handleInventoryCategoryChange(e.target.value)}>
                         {categories.map((c) => <option key={c}>{c}</option>)}
                       </Select>
                     </Field>
@@ -793,9 +836,13 @@ export default function AddInventoryModal({
                         <p className="mt-1 text-[10px] text-slate-400">Press Enter or select from suggestions to add a vehicle.</p>
                       </div>
 
-                      <Field label="Preferred Vendor">
+                      <Field label="Preferred Vendor" error={errors.preferredVendor}>
                         <Select value={form.preferredVendor} onChange={(e) => set('preferredVendor', e.target.value)}>
-                          {vendorList?.map((v) => <option key={v}>{v}</option>)}
+                          <option value="">Select vendor</option>
+                          {form.preferredVendor && !activeInventoryVendorOptions.some(v => v.vendor_name === form.preferredVendor) && (
+                            <option value={form.preferredVendor}>{form.preferredVendor}</option>
+                          )}
+                          {activeInventoryVendorOptions.map(v => <option key={v.id} value={v.vendor_name}>{v.vendor_name}</option>)}
                         </Select>
                       </Field>
                       <Field label="GST Number">

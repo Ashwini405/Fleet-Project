@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   FiChevronDown, FiChevronUp, FiPlus, FiDownload,
   FiTruck, FiMapPin, FiAlertTriangle, FiCheckCircle,
@@ -463,6 +463,7 @@ function TripCard({ trip, onAddEntry, onView, onEdit }) {
 // ─── Main FuelLogs (fully dynamic, with all fixes) ───────────────────────────
 export default function FuelLogs() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [vehicleFilter, setVehicle] = useState('all');
   const [fuelTypeFilter, setFuelType] = useState('all');
@@ -552,7 +553,12 @@ export default function FuelLogs() {
     setSelectedTrip(match);
     setAddModal(true);
     if (truckParam) setVehicle(truckParam);
-  }, [location.search, trips]);
+    params.delete('trip_id');
+    navigate({
+      pathname: location.pathname,
+      search: params.toString() ? `?${params.toString()}` : '',
+    }, { replace: true });
+  }, [location.pathname, location.search, trips, navigate]);
 
   const vehicles = useMemo(() => ['all', ...new Set(trips.map(t => t.vehicle))], [trips]);
   const fuelTypes = ['all', 'Diesel', 'Petrol', 'CNG', 'AdBlue'];
