@@ -608,10 +608,23 @@ if (fs.existsSync(path.join(frontendDir, 'index.html'))) {
 // 🔥 ERROR HANDLER (GOOD PRACTICE)
 app.use((err, req, res, next) => {
   console.error("Global Error:", err);
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({
+      success: false,
+      message: 'File is too large. Maximum size is 10 MB.'
+    });
+  }
   if (err.name === 'MulterError' || err.message === 'Only images (jpg, png) and PDF files are allowed') {
     return res.status(400).json({
       success: false,
       message: err.message || 'Invalid upload.'
+    });
+  }
+  // Cloudinary rejected the file (bad credentials, size, etc.) — show why
+  if (err.message?.startsWith('Cloud upload failed')) {
+    return res.status(502).json({
+      success: false,
+      message: err.message
     });
   }
   res.status(500).json({
