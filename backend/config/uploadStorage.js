@@ -1,5 +1,28 @@
 const multer = require('multer');
 const path = require('path');
+
+// The Cloudinary SDK parses CLOUDINARY_URL as soon as it is required and throws
+// (crashing the whole server) if it is malformed. Clean up common paste mistakes
+// first — surrounding quotes/spaces or a copied "CLOUDINARY_URL=" prefix — and if
+// it is still invalid, log it and fall back to local disk instead of crashing.
+function normalizeCloudinaryEnv() {
+  const raw = process.env.CLOUDINARY_URL;
+  if (raw === undefined) return;
+  const value = raw.trim().replace(/^CLOUDINARY_URL\s*=\s*/i, '').replace(/^['"]|['"]$/g, '').trim();
+  let valid = false;
+  try {
+    const url = new URL(value);
+    valid = url.protocol === 'cloudinary:' && url.username && url.password && url.hostname;
+  } catch { /* invalid URL */ }
+  if (valid) {
+    process.env.CLOUDINARY_URL = value;
+  } else {
+    if (value) console.error('CLOUDINARY_URL is invalid (expected cloudinary://<api_key>:<api_secret>@<cloud_name>) — uploads will be saved to local disk.');
+    delete process.env.CLOUDINARY_URL;
+  }
+}
+normalizeCloudinaryEnv();
+
 const cloudinary = require('cloudinary').v2;
 
 // ======================================================
