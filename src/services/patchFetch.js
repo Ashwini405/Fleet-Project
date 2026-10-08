@@ -33,8 +33,16 @@ function requestUrl(input) {
     return "";
 }
 
+// BACKEND_ORIGIN is rewritten to "" in same-origin deployments (see vite.config.js),
+// so compare resolved origins instead of string prefixes.
+const backendOrigin = new URL(BACKEND_ORIGIN || "/", window.location.href).origin;
+
 function isBackendRequest(url) {
-    return url.startsWith(BACKEND_ORIGIN);
+    try {
+        return new URL(url, window.location.href).origin === backendOrigin;
+    } catch {
+        return false;
+    }
 }
 
 function isAuthEndpoint(url) {
