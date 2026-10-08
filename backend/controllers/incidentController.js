@@ -287,7 +287,9 @@ const uploadIncidentFile = async (req, res) => {
       });
     }
 
-    const filePath = `http://localhost:5001/uploads/${req.file.filename}`;
+    // Absolute URL of this server (Render sits behind a proxy, hence x-forwarded-proto)
+    const origin = `${req.get('x-forwarded-proto') || req.protocol}://${req.get('host')}`;
+    const filePath = `${origin}/uploads/${req.file.filename}`;
 
     res.status(200).json({
       success: true,
