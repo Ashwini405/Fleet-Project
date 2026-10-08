@@ -274,7 +274,7 @@ export default function DashboardTab({ incidentsData = [], onAdd, onView }) {
     <div className="space-y-5 bg-slate-50 min-h-screen p-0">
 
       {/* ── STAT CARDS ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         {stats.map((s, i) => {
           const Icon = s.icon;
           return (

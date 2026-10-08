@@ -585,16 +585,16 @@ export default function TripMaster() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/50 p-6">
+    <div className="min-h-screen bg-gray-50/50 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+          className="flex flex-col xl:flex-row xl:items-center justify-between gap-4"
         >
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
               Trip Master 
               {/* {activeTab === 'present' ? 'Present Trips' : 'Past Trips'} */}
             </h1>
@@ -605,7 +605,7 @@ export default function TripMaster() {
               }
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {/* View Selector */}
             <div className="relative">
               <div className="flex items-center gap-2">
@@ -703,14 +703,14 @@ export default function TripMaster() {
               </AnimatePresence>
             </div>
 
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
                 placeholder="Search by Trip ID / Truck / Driver"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-80 shadow-sm"
+                className="pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-full sm:w-80 shadow-sm"
               />
             </div>
             <button className="px-4 py-2.5 bg-white border border-gray-200 text-gray-700 rounded-xl hover:bg-gray-50 shadow-sm transition-colors flex items-center gap-2">
@@ -736,45 +736,45 @@ export default function TripMaster() {
           <div className="flex items-center gap-1">
             <button
               onClick={() => setActiveTab('present')}
-              className={`flex-1 px-5 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === 'present'
+              className={`flex-1 min-w-0 px-2 sm:px-5 py-3 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === 'present'
                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
                 : 'text-gray-700 bg-white hover:bg-gray-50'
                 }`}
             >
-              <div className="flex items-center justify-center gap-2">
-                <FiClock className="w-4 h-4" />
+              <div className="flex items-center justify-center gap-1 sm:gap-2">
+                <FiClock className="hidden sm:block w-4 h-4" />
                 Present Trips
-                <span className={`ml-2 inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'present' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
+                <span className={`sm:ml-2 inline-flex items-center justify-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'present' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'}`}>
                   {presentTripCount}
                 </span>
               </div>
             </button>
             <button
               onClick={() => setActiveTab('past')}
-              className={`flex-1 px-5 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === 'past'
+              className={`flex-1 min-w-0 px-2 sm:px-5 py-3 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === 'past'
                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
                 : 'text-gray-700 bg-white hover:bg-gray-50'
                 }`}
             >
-              <div className="flex items-center justify-center gap-2">
-                <FiCheck className="w-4 h-4" />
+              <div className="flex items-center justify-center gap-1 sm:gap-2">
+                <FiCheck className="hidden sm:block w-4 h-4" />
                 Past Trips
-                <span className={`ml-2 inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'past' ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'}`}>
+                <span className={`sm:ml-2 inline-flex items-center justify-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'past' ? 'bg-white/20 text-white' : 'bg-green-100 text-green-700'}`}>
                   {pastTripCount}
                 </span>
               </div>
             </button>
             <button
               onClick={() => setActiveTab('drafts')}
-              className={`flex-1 px-5 py-3 text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === 'drafts'
+              className={`flex-1 min-w-0 px-2 sm:px-5 py-3 text-xs sm:text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === 'drafts'
                 ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
                 : 'text-gray-700 bg-white hover:bg-gray-50'
                 }`}
             >
-              <div className="flex items-center justify-center gap-2">
-                <FiSave className="w-4 h-4" />
+              <div className="flex items-center justify-center gap-1 sm:gap-2">
+                <FiSave className="hidden sm:block w-4 h-4" />
                 Drafts
-                <span className={`ml-2 inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'drafts' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'}`}>
+                <span className={`sm:ml-2 inline-flex items-center justify-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-semibold ${activeTab === 'drafts' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-700'}`}>
                   {draftTripCount}
                 </span>
               </div>
@@ -813,13 +813,13 @@ export default function TripMaster() {
               )}
             </select>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <FiCalendar className="w-4 h-4 text-gray-500" />
               <input
                 type="date"
                 value={dateRange.start}
                 onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="min-w-0 flex-1 sm:flex-none px-2 sm:px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="Start Date"
               />
               <span className="text-gray-400">to</span>
@@ -827,7 +827,7 @@ export default function TripMaster() {
                 type="date"
                 value={dateRange.end}
                 onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="min-w-0 flex-1 sm:flex-none px-2 sm:px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 placeholder="End Date"
               />
             </div>

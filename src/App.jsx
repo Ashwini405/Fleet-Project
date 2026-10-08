@@ -104,8 +104,9 @@ function InnerApp() {
           </div>
 
           {isTyresPage && (
-            <div className="flex-1 flex justify-center">
-              <div className="flex bg-slate-100 p-1 rounded-full border border-slate-200 shadow-sm">
+            <div className="flex-1 min-w-0 flex justify-center mx-2">
+              {/* Scrolls sideways on narrow screens instead of widening the page */}
+              <div className="flex max-w-full overflow-x-auto bg-slate-100 p-1 rounded-full border border-slate-200 shadow-sm [scrollbar-width:none]">
                 {[
                   { id: 'active',     label: 'Active Tyres'      },
                   { id: 'stock',      label: 'In Stock Tyres'    },
@@ -117,7 +118,7 @@ function InnerApp() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTyresTab(tab.id)}
-                    className={`relative px-5 py-2 text-xs font-bold rounded-full transition-all ${activeTyresTab === tab.id ? 'text-white' : 'text-slate-500 hover:text-slate-800'}`}
+                    className={`relative shrink-0 whitespace-nowrap px-3 sm:px-5 py-2 text-xs font-bold rounded-full transition-all ${activeTyresTab === tab.id ? 'text-white' : 'text-slate-500 hover:text-slate-800'}`}
                   >
                     {activeTyresTab === tab.id && (
                       <div className="absolute inset-0 bg-slate-900 rounded-full shadow-md" />
@@ -133,7 +134,9 @@ function InnerApp() {
         </div>
 
         <InventoryProvider>
-          <div className="flex-1 p-4 md:p-6">
+          {/* overflow-x-clip: stops brief sideways page scroll on phones (charts sizing,
+              slide-in animations) without breaking sticky elements like overflow-hidden would */}
+          <div className="flex-1 min-w-0 p-3 sm:p-4 md:p-6 overflow-x-clip">
             <Suspense fallback={<PageLoader />}>
                   <Routes>
                     <Route path="/" element={<ProtectedRoute module="Dashboard" redirectIfDenied><Dashboard /></ProtectedRoute>} />

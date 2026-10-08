@@ -124,7 +124,7 @@ export default function InspectionModule() {
         <div className="bg-white border-b border-gray-200 px-4 py-3 shrink-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3 z-10">
            
            {/* Tab Navigation */}
-           <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100 self-start sm:self-auto">
+           <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100 self-start sm:self-auto max-w-full overflow-x-auto">
              {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -132,7 +132,7 @@ export default function InspectionModule() {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`relative flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg transition-colors ${
+                    className={`relative shrink-0 whitespace-nowrap flex items-center gap-2 px-3 sm:px-4 py-2 text-xs font-bold rounded-lg transition-colors ${
                       isActive ? 'text-blue-700 bg-white shadow-sm' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100/50'
                     }`}
                   >

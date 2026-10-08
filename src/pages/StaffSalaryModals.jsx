@@ -146,7 +146,7 @@ export function StaffSalaryDetailModal({
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-1.5">
               <FiCreditCard className="text-indigo-500" /> Banking & Disbursal Information
             </p>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div><span className="text-slate-500 block text-[11px]">Bank Name</span><span className="font-bold text-slate-800">{detailItem.bank_name || '—'}</span></div>
               <div><span className="text-slate-500 block text-[11px]">Account Number</span><span className="font-mono font-bold text-slate-800">{detailItem.account_number || '—'}</span></div>
               <div><span className="text-slate-500 block text-[11px]">IFSC Code</span><span className="font-mono font-bold text-slate-800">{detailItem.ifsc_code || '—'}</span></div>
@@ -159,7 +159,7 @@ export function StaffSalaryDetailModal({
               <p className="text-[10px] font-bold text-emerald-800 uppercase tracking-widest mb-2 flex items-center gap-1.5">
                 <FiCheckCircle className="text-emerald-600" /> Payment Disbursal Record
               </p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div><span className="text-emerald-600 block text-[11px]">Payment Date</span><span className="font-bold text-emerald-900">{detailItem.payment_date ? new Date(detailItem.payment_date).toLocaleDateString('en-GB') : '—'}</span></div>
                 <div><span className="text-emerald-600 block text-[11px]">Payment Mode</span><span className="font-bold text-emerald-900">{detailItem.payment_method || 'Bank Transfer'}</span></div>
                 <div><span className="text-emerald-600 block text-[11px]">Reference / UTR</span><span className="font-mono font-bold text-emerald-900">{detailItem.payment_reference || '—'}</span></div>
@@ -603,13 +603,13 @@ export function StaffSalaryPayslipModal({ voucherData, onClose }) {
               {/* Bank Details Table */}
               <div className="border border-slate-200 rounded-lg p-4 mb-10 text-xs text-slate-600">
                 <div className="font-bold text-slate-800 uppercase tracking-wider mb-2">Payment Details</div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div><span className="text-slate-400 block">Bank Name:</span> <span className="font-semibold text-slate-800">{voucherData.bank_name || 'Direct Transfer'}</span></div>
                   <div><span className="text-slate-400 block">Account Number:</span> <span className="font-mono font-semibold text-slate-800">{voucherData.account_number || '—'}</span></div>
                   <div><span className="text-slate-400 block">IFSC Code:</span> <span className="font-mono font-semibold text-slate-800">{voucherData.ifsc_code || '—'}</span></div>
                 </div>
                 {voucherData.status === 'Paid' && (
-                  <div className="mt-3 pt-3 border-t border-slate-200 grid grid-cols-3 gap-4 text-emerald-800">
+                  <div className="mt-3 pt-3 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-4 text-emerald-800">
                     <div><span className="text-slate-400 block">Payment Date:</span> <span className="font-bold">{voucherData.payment_date ? new Date(voucherData.payment_date).toLocaleDateString('en-GB') : '—'}</span></div>
                     <div><span className="text-slate-400 block">Payment Mode:</span> <span className="font-bold">{voucherData.payment_method || 'Bank Transfer'}</span></div>
                     <div><span className="text-slate-400 block">Txn Reference:</span> <span className="font-mono font-bold">{voucherData.payment_reference || '—'}</span></div>

@@ -412,7 +412,7 @@ export default function AddIncidentModal({ isOpen, onClose, onSubmit }) {
 
                         {/* ══ STEP 1 ══════════════════════════════════════════════ */}
                         {step === 1 && (
-                           <div className="grid grid-cols-3 gap-4 max-w-2xl">
+                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 max-w-2xl">
                               {incidentTypes.map(type => {
                                  const Icon = type.icon;
                                  const active = fd.type === type.id;
@@ -488,7 +488,7 @@ export default function AddIncidentModal({ isOpen, onClose, onSubmit }) {
                         {/* ══ STEP 3 ══════════════════════════════════════════════ */}
                         {step === 3 && (
                            <div className="max-w-xl space-y-5">
-                              <div className="grid grid-cols-4 gap-4">
+                              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                                  <Inp label="Date" required icon={Calendar} type="date" value={fd.incident_date} onChange={e => set('incident_date', e.target.value)} />
                                  <Inp label="Time" required icon={Clock3} type="time" value={fd.incident_time} onChange={e => set('incident_time', e.target.value)} />
                                  <Sel label="Severity" required value={fd.severity} onChange={e => set('severity', e.target.value)}>
@@ -565,7 +565,7 @@ export default function AddIncidentModal({ isOpen, onClose, onSubmit }) {
                               {fd.type === 'Breakdown' && (
                                  <div className="space-y-4">
                                     <p className="text-xs font-black text-slate-600 uppercase tracking-widest">Breakdown Information</p>
-                                    <div className="grid grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                        <Sel label="Breakdown Category" required value={fd.breakdown_category} onChange={e => set('breakdown_category', e.target.value)}>
                                           <option>Engine Failure</option>
                                           <option>Battery Issue</option>
@@ -589,7 +589,7 @@ export default function AddIncidentModal({ isOpen, onClose, onSubmit }) {
                               {fd.type === 'Accident' && (
                                  <div className="space-y-4">
                                     <p className="text-xs font-black text-slate-600 uppercase tracking-widest">Accident Information</p>
-                                    <div className="grid grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                        <Sel label="Damage Type" required value={fd.damage_type} onChange={e => set('damage_type', e.target.value)}>
                                           <option value="">Select</option>
                                           <option>Minor Damage</option><option>Major Damage</option><option>Total Loss</option>
