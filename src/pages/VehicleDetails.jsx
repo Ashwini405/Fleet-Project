@@ -596,7 +596,8 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
     vehicle: '', type: '', validUntil: '', file: null
   });
   const handleDocFormChange = (e) => {
-    setDocForm({ ...docForm, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setDocForm(prev => ({ ...prev, [name]: value }));
   };
 
   const [isAddBatteryModalOpen, setIsAddBatteryModalOpen] = useState(false);
@@ -1426,7 +1427,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files[0];
-                      setDocForm({ ...docForm, file });
+                      setDocForm(prev => ({ ...prev, file }));
                     }}
                   />
 
@@ -1610,7 +1611,7 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files[0];
-                      setDocForm({ ...docForm, file });
+                      setDocForm(prev => ({ ...prev, file }));
                     }}
                   />
 
