@@ -1,20 +1,10 @@
 const multer = require('multer');
 const path = require('path');
 
-// ✅ STORAGE CONFIG
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
+const { uploadStorage } = require('./uploadStorage');
 
-  filename: (req, file, cb) => {
-    const uniqueName =
-      Date.now() + '-' + Math.round(Math.random() * 1E9) +
-      path.extname(file.originalname);
-
-    cb(null, uniqueName);
-  }
-});
+// ✅ STORAGE CONFIG (Cloudinary when CLOUDINARY_URL is set, else uploads/)
+const storage = uploadStorage;
 
 // ✅ FILE FILTER (VERY IMPORTANT)
 const fileFilter = (req, file, cb) => {

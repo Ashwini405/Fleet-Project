@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 
 const multer = require("multer");
-const path = require("path");
 
 const companyProfileController = require("../controllers/companyProfileController");
 const { protect } = require("../middleware/permissionMiddleware");
@@ -11,25 +10,8 @@ const { protect } = require("../middleware/permissionMiddleware");
 // Multer Storage
 // ======================================================
 
-const storage = multer.diskStorage({
-
-    destination: (req, file, cb) => {
-        cb(null, "uploads/");
-    },
-
-    filename: (req, file, cb) => {
-
-        const uniqueName =
-            Date.now() +
-            "-" +
-            Math.round(Math.random() * 1E9) +
-            path.extname(file.originalname);
-
-        cb(null, uniqueName);
-
-    }
-
-});
+// Cloudinary when CLOUDINARY_URL is set, else uploads/
+const { uploadStorage: storage } = require("../config/uploadStorage");
 
 // ======================================================
 // File Filter

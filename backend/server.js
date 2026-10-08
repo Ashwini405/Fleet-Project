@@ -5,6 +5,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const fs = require('fs');
+const { cloudinaryUrl } = require('./config/uploadStorage');
 
 const vehicleRoutes = require('./routes/vehicleRoutes');
 const stationRoutes = require('./routes/stationRoutes');
@@ -405,6 +406,11 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 app.use('/uploads', express.static(uploadsDir));
+// Files not on local disk were uploaded to Cloudinary (see config/uploadStorage.js)
+app.get('/uploads/:filename', (req, res, next) => {
+  const url = cloudinaryUrl(path.basename(req.params.filename));
+  return url ? res.redirect(302, url) : next();
+});
 
 
 // 🔥 API ROUTES
