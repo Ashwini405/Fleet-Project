@@ -969,18 +969,14 @@ export default function VehicleDetails({ vehicles: propVehicles }) {
                   </div>
                 )}
 
-                {fastagAccount && (
-                  <div className="mt-2">
-                    <p className="text-xs uppercase tracking-wider font-semibold text-slate-500">Fastag Balance</p>
-                    <button
-                      onClick={() => navigate('/fastag')}
-                      className={`text-sm font-bold hover:underline ${Number(fastagAccount.balance) < Number(fastagAccount.low_balance_threshold || 200) ? 'text-red-600' : 'text-slate-900'}`}
-                    >
-                      ₹{Number(fastagAccount.balance).toLocaleString('en-IN')}
-                      {Number(fastagAccount.balance) < Number(fastagAccount.low_balance_threshold || 200) && ' (Low)'}
-                    </button>
-                  </div>
-                )}
+                <div className="mt-2">
+                  <button
+                    onClick={() => navigate(`/fastag?tab=Expenses&vehicle_id=${vehicle.id}`)}
+                    className="text-sm font-bold text-indigo-600 hover:underline"
+                  >
+                    View FASTag expenses →
+                  </button>
+                </div>
 
               </div>
             </div>

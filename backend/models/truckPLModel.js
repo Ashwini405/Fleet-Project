@@ -295,18 +295,31 @@ const getFuel = async (vehicleId, startDate = null, endDate = null) => {
 // Get Fastag Toll Expenses
 // ============================================
 const getFastagExpenses = async (vehicleId, startDate = null, endDate = null) => {
+  // FASTag deductions are recorded as 'FASTag' expense entries (bulk upload);
+  // toll deductions from the old wallet flow are kept so history isn't lost.
+  // getMiscExpenses excludes 'FASTag' so these are not counted twice.
   const dateFilter = (startDate && endDate) ? " AND t.date BETWEEN ? AND ?" : "";
+  const expenseDateFilter = (startDate && endDate) ? " AND e.expense_date BETWEEN ? AND ?" : "";
   const [rows] = await db.query(
     `
-    SELECT t.date, t.toll_plaza_name, t.type, t.amount, t.reference_no
+    SELECT e.expense_date AS date, e.toll_plaza AS toll_plaza_name, e.amount, e.toll_receipt_number AS reference_no
+    FROM expense_entries e
+    WHERE e.vehicle_id = ?
+      AND e.expense_category = 'FASTag'
+      AND COALESCE(e.entry_status, '') != 'Deleted'
+      ${expenseDateFilter}
+    UNION ALL
+    SELECT t.date, t.toll_plaza_name, t.amount, t.reference_no
     FROM fastag_transactions t
     INNER JOIN fastag_accounts fa ON fa.id = t.fastag_account_id
     WHERE fa.vehicle_id = ?
       AND t.type = 'toll_deduction'
       ${dateFilter}
-    ORDER BY t.date DESC, t.id DESC
+    ORDER BY date DESC
     `,
-    dateFilter ? [vehicleId, startDate, endDate] : [vehicleId]
+    dateFilter
+      ? [vehicleId, startDate, endDate, vehicleId, startDate, endDate]
+      : [vehicleId, vehicleId]
   );
 
   const entries = rows.map(row => ({
@@ -1065,7 +1078,8 @@ const getMiscExpenses = async (vehicleId, startDate = null, endDate = null) => {
       'Salary',
       'Driver Salary',
       'EMI',
-      'RTA'
+      'RTA',
+      'FASTag'
     )
     ${dateFilter}
     ORDER BY expense_date DESC

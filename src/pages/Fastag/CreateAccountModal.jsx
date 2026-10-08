@@ -3,7 +3,6 @@ import { FiX, FiAlertCircle, FiLoader } from 'react-icons/fi';
 
 const emptyForm = {
   vehicle_id: '', fastag_id: '', bank_issuer: '', linked_account_no: '',
-  balance: '0', low_balance_threshold: '200',
 };
 
 export default function CreateAccountModal({ isOpen, onClose, onSuccess }) {
@@ -61,7 +60,7 @@ export default function CreateAccountModal({ isOpen, onClose, onSuccess }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in fade-in zoom-in-95 duration-200">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="text-base font-bold text-slate-800">Create Fastag Account</h2>
+          <h2 className="text-base font-bold text-slate-800">Link FASTag to Vehicle</h2>
           <button onClick={onClose} disabled={loading} className="text-slate-400 hover:text-slate-600 transition disabled:opacity-40">
             <FiX className="h-5 w-5" />
           </button>
@@ -105,19 +104,6 @@ export default function CreateAccountModal({ isOpen, onClose, onSuccess }) {
               className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Opening Balance (₹)</label>
-              <input type="number" min="0" value={form.balance} onChange={e => set('balance', e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Low Balance Alert (₹)</label>
-              <input type="number" min="0" value={form.low_balance_threshold} onChange={e => set('low_balance_threshold', e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-            </div>
-          </div>
-
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} disabled={loading}
               className="flex-1 rounded-xl border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50">
@@ -126,7 +112,7 @@ export default function CreateAccountModal({ isOpen, onClose, onSuccess }) {
             <button type="submit" disabled={loading}
               className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 transition disabled:opacity-50">
               {loading && <FiLoader className="h-4 w-4 animate-spin" />}
-              {loading ? 'Creating…' : 'Create Account'}
+              {loading ? 'Saving…' : 'Link FASTag'}
             </button>
           </div>
         </form>

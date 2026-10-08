@@ -1,40 +1,11 @@
 const Fastag = require("../models/fastagModel");
-const db = require("../config/db");
 const { logAudit } = require("../middleware/auditMiddleware");
 
-// ==========================================================
-// Fires a low-balance notification if the account has dropped
-// below its threshold and one hasn't already been sent today.
-// ==========================================================
-async function checkLowBalance(account, vehicleNo) {
-  const balance = Number(account.balance);
-  const threshold = Number(account.low_balance_threshold || 200);
-
-  if (balance >= threshold) return;
-
-  const [existing] = await db.query(
-    `SELECT id FROM fastag_notifications
-     WHERE fastag_account_id = ? AND DATE(created_at) = CURDATE()`,
-    [account.id]
-  );
-  if (existing.length > 0) return;
-
-  const severity = balance <= 0 ? "Critical" : "High";
-  const title = balance <= 0
-    ? `Fastag Balance Exhausted — ${vehicleNo || account.fastag_id || "Unknown Vehicle"}`
-    : `Fastag Low Balance — ${vehicleNo || account.fastag_id || "Unknown Vehicle"}`;
-  const message = `Fastag balance for ${vehicleNo || "vehicle"} is ₹${balance.toFixed(2)}, below the threshold of ₹${threshold.toFixed(2)}.`;
-
-  await db.query(
-    `INSERT INTO fastag_notifications
-      (fastag_account_id, vehicle_no, title, message, severity)
-     VALUES (?, ?, ?, ?, ?)`,
-    [account.id, vehicleNo || null, title, message, severity]
-  );
-}
+const MAX_UPLOAD_ROWS = 5000;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // ========================================
-// ACCOUNTS
+// ACCOUNTS (vehicle ↔ FASTag tag mapping)
 // ========================================
 exports.getAllAccounts = async (req, res) => {
   try {
@@ -82,7 +53,7 @@ exports.updateAccount = async (req, res) => {
       return res.status(404).json({ success: false, message: "Fastag account not found" });
     }
 
-    await Fastag.updateAccount(id, req.body);
+    await Fastag.updateAccount(id, { ...before, ...req.body });
 
     await logAudit(req, {
       module_name: "Fastag",
@@ -99,9 +70,7 @@ exports.updateAccount = async (req, res) => {
   }
 };
 
-// ========================================
-// TRANSACTIONS
-// ========================================
+// Legacy wallet transactions for a vehicle (still read by Fuel / Vehicle pages)
 exports.getTransactionsByVehicle = async (req, res) => {
   try {
     const { vehicleId } = req.params;
@@ -118,98 +87,292 @@ exports.getTransactionsByVehicle = async (req, res) => {
   }
 };
 
-exports.getAllTransactions = async (req, res) => {
+// ========================================
+// FASTAG EXPENSES
+// ========================================
+const clean = (value) => String(value ?? "").trim();
+const normalizeKey = (value) => clean(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
+const duplicateKey = (vehicleId, date, amount, plaza) =>
+  `${vehicleId}|${date}|${Number(amount).toFixed(2)}|${normalizeKey(plaza)}`;
+
+const todayISO = () => {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+};
+
+// Resolves each raw row to a vehicle (by vehicle number or tag id),
+// validates it, flags duplicates and attaches the trip/driver for that date.
+async function prepareRows(rawRows) {
+  const lookup = await Fastag.getVehicleLookup();
+  const byVehicleNo = new Map();
+  const byTag = new Map();
+  lookup.forEach(vehicle => {
+    byVehicleNo.set(normalizeKey(vehicle.vehicle_no), vehicle);
+    [vehicle.vehicle_fastag_id, vehicle.account_fastag_id].forEach(tag => {
+      if (!clean(tag)) return;
+      const key = normalizeKey(tag);
+      const matches = byTag.get(key) || [];
+      if (!matches.some(match => match.vehicle_id === vehicle.vehicle_id)) matches.push(vehicle);
+      byTag.set(key, matches);
+    });
+  });
+
+  const today = todayISO();
+  const rows = rawRows.map((raw, index) => {
+    const row = {
+      row_no: raw.row_no || index + 1,
+      vehicle_no_input: clean(raw.vehicle_no),
+      tag_id: clean(raw.tag_id),
+      date: clean(raw.date),
+      amount: Number(String(raw.amount ?? "").replace(/[^0-9.-]/g, "")),
+      toll_plaza: clean(raw.toll_plaza).slice(0, 255),
+      transaction_id: clean(raw.transaction_id).slice(0, 255),
+      description: clean(raw.description),
+      errors: [],
+    };
+
+    const vehicleByNo = row.vehicle_no_input ? byVehicleNo.get(normalizeKey(row.vehicle_no_input)) : null;
+    const tagMatches = row.tag_id ? byTag.get(normalizeKey(row.tag_id)) || [] : [];
+    // A tag entered on several vehicles can't identify the truck on its own.
+    const vehicleByTag = tagMatches.length === 1 ? tagMatches[0] : null;
+    const vehicle = vehicleByNo || vehicleByTag;
+
+    if (!row.vehicle_no_input && !row.tag_id) {
+      row.errors.push("Vehicle number or Tag ID is required");
+    } else if (!vehicleByNo && tagMatches.length > 1) {
+      row.errors.push(`Tag ID ${row.tag_id} is linked to ${tagMatches.length} vehicles (${tagMatches.map(m => m.vehicle_no).join(", ")}); add the vehicle number`);
+    } else if (!vehicle) {
+      row.errors.push(row.vehicle_no_input
+        ? `Vehicle ${row.vehicle_no_input} not found in fleet`
+        : `Tag ID ${row.tag_id} is not linked to any vehicle`);
+    } else if (vehicleByNo && tagMatches.length && !tagMatches.some(m => m.vehicle_id === vehicleByNo.vehicle_id)) {
+      row.errors.push(`Tag ID ${row.tag_id} belongs to ${tagMatches.map(m => m.vehicle_no).join(", ")}, not ${vehicleByNo.vehicle_no}`);
+    }
+
+    if (!DATE_RE.test(row.date) || Number.isNaN(new Date(row.date).getTime())) {
+      row.errors.push("Invalid date (use YYYY-MM-DD or DD-MM-YYYY)");
+    } else if (row.date > today) {
+      row.errors.push("Date is in the future");
+    }
+
+    if (!Number.isFinite(row.amount) || row.amount <= 0) {
+      row.errors.push("Amount must be greater than 0");
+    }
+
+    if (vehicle) {
+      row.vehicle_id = vehicle.vehicle_id;
+      row.vehicle_no = vehicle.vehicle_no;
+      row.driver_id = vehicle.driver_id || null;
+      row.driver_name = vehicle.driver_name || null;
+      row.bank_issuer = vehicle.bank_issuer || null;
+      if (!row.tag_id) row.tag_id = vehicle.account_fastag_id || vehicle.vehicle_fastag_id || "";
+    }
+    return row;
+  });
+
+  const candidates = rows.filter(row => !row.errors.length);
+  if (candidates.length) {
+    const vehicleIds = [...new Set(candidates.map(row => row.vehicle_id))];
+    const dates = candidates.map(row => row.date).sort();
+    const fromDate = dates[0];
+    const toDate = dates[dates.length - 1];
+    const transactionIds = [...new Set(candidates.map(row => row.transaction_id).filter(Boolean))];
+
+    const [existing, trips] = await Promise.all([
+      Fastag.getExistingExpenseKeys(transactionIds, vehicleIds, fromDate, toDate),
+      Fastag.getTripsForVehicles(vehicleIds, fromDate, toDate),
+    ]);
+
+    const existingTxnIds = new Set(existing.map(e => normalizeKey(e.toll_receipt_number)).filter(Boolean));
+    // Count-based so re-uploading the same file is caught, while two genuine
+    // identical tolls on the same day can still be uploaded together once.
+    const existingCounts = new Map();
+    existing.forEach(e => {
+      const key = duplicateKey(e.vehicle_id, e.expense_date, e.amount, e.toll_plaza);
+      existingCounts.set(key, (existingCounts.get(key) || 0) + 1);
+    });
+
+    const seenTxnIds = new Set();
+    candidates.forEach(row => {
+      const txnKey = normalizeKey(row.transaction_id);
+      if (txnKey) {
+        if (existingTxnIds.has(txnKey)) row.duplicate = "Transaction ID already recorded";
+        else if (seenTxnIds.has(txnKey)) row.duplicate = "Duplicate transaction ID in file";
+        seenTxnIds.add(txnKey);
+      } else {
+        const key = duplicateKey(row.vehicle_id, row.date, row.amount, row.toll_plaza);
+        const count = existingCounts.get(key) || 0;
+        if (count > 0) {
+          row.duplicate = "Same vehicle, date, plaza and amount already recorded";
+          existingCounts.set(key, count - 1);
+        }
+      }
+
+      const trip = trips.find(t =>
+        t.vehicle_id === row.vehicle_id && t.start_date <= row.date && row.date <= t.end_date
+      );
+      if (trip) {
+        row.trip_id = trip.id;
+        row.trip_number = trip.trip_id;
+        // The trip's driver wins; driver_id is null when that driver no longer exists.
+        if (trip.driver_id || trip.driver_name) {
+          row.driver_id = trip.driver_id || null;
+          row.driver_name = trip.driver_name || null;
+        }
+      }
+    });
+  }
+
+  return rows.map(({ errors, duplicate, vehicle_no_input, ...row }) => ({
+    ...row,
+    vehicle_no: row.vehicle_no || vehicle_no_input,
+    status: errors.length ? "error" : duplicate ? "duplicate" : "valid",
+    message: errors.length ? errors.join("; ") : duplicate || "",
+  }));
+}
+
+function toExpenseEntries(rows, createdBy) {
+  const stamp = Date.now();
+  return rows.map((row, index) => ({
+    expense_number: `EXP-FT-${stamp}-${index + 1}`,
+    expense_category: "FASTag",
+    vehicle_id: row.vehicle_id,
+    vehicle_number: row.vehicle_no,
+    driver_id: row.driver_id || null,
+    driver_name: row.driver_name || null,
+    trip_id: row.trip_id || null,
+    trip_number: row.trip_number || null,
+    expense_date: row.date,
+    amount: row.amount,
+    payment_method: "FASTag",
+    payment_status: "Paid",
+    vendor_payee: row.bank_issuer || null,
+    description: row.description || null,
+    attachment: "[]",
+    toll_plaza: row.toll_plaza || null,
+    toll_receipt_number: row.transaction_id || null,
+    expense_title: `FASTag Toll${row.toll_plaza ? ` - ${row.toll_plaza}` : ""}`.slice(0, 255),
+    created_by: createdBy,
+  }));
+}
+
+function readRows(req, res) {
+  const rows = Array.isArray(req.body?.rows) ? req.body.rows : null;
+  if (!rows || !rows.length) {
+    res.status(400).json({ success: false, message: "No rows to process" });
+    return null;
+  }
+  if (rows.length > MAX_UPLOAD_ROWS) {
+    res.status(400).json({ success: false, message: `Upload at most ${MAX_UPLOAD_ROWS} rows at a time` });
+    return null;
+  }
+  return rows;
+}
+
+const summarize = (rows) => ({
+  total: rows.length,
+  valid: rows.filter(r => r.status === "valid").length,
+  duplicate: rows.filter(r => r.status === "duplicate").length,
+  error: rows.filter(r => r.status === "error").length,
+});
+
+exports.getExpenses = async (req, res) => {
   try {
-    const { vehicleId, type, from, to } = req.query;
-    const data = await Fastag.getAllTransactions({ vehicleId, type, from, to });
+    const { vehicleId, from, to } = req.query;
+    const data = await Fastag.getExpenses({ vehicleId, from, to });
     res.json({ success: true, count: data.length, data });
   } catch (error) {
-    console.error("GET ALL FASTAG TRANSACTIONS ERROR:", error);
+    console.error("GET FASTAG EXPENSES ERROR:", error);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };
 
-exports.recharge = async (req, res) => {
+// Dry run: resolves vehicles and flags problems without saving anything.
+exports.validateExpenses = async (req, res) => {
   try {
-    const { fastag_account_id, amount, date, reference_no, proof_upload, created_by } = req.body;
-
-    if (!fastag_account_id || !amount || Number(amount) <= 0) {
-      return res.status(400).json({ success: false, message: "Account and a valid amount are required" });
-    }
-
-    const account = await Fastag.getAccountById(fastag_account_id);
-    if (!account) {
-      return res.status(404).json({ success: false, message: "Fastag account not found" });
-    }
-
-    const newBalance = Number(account.balance) + Number(amount);
-    await Fastag.updateBalance(fastag_account_id, newBalance);
-
-    const result = await Fastag.createTransaction({
-      fastag_account_id,
-      type: "recharge",
-      amount,
-      date: date || new Date().toISOString().slice(0, 10),
-      balance_after: newBalance,
-      reference_no,
-      proof_upload,
-      created_by,
-    });
-
-    await logAudit(req, {
-      module_name: "Fastag",
-      action: "CREATE",
-      description: `Recharged Fastag account #${fastag_account_id} with ₹${amount}. New balance ₹${newBalance}.`,
-      new_data: { fastag_account_id, amount, newBalance },
-    });
-
-    res.status(201).json({ success: true, message: "Recharge recorded", data: { id: result.insertId, balance: newBalance } });
+    const rawRows = readRows(req, res);
+    if (!rawRows) return;
+    const rows = await prepareRows(rawRows);
+    res.json({ success: true, summary: summarize(rows), data: rows });
   } catch (error) {
-    console.error("FASTAG RECHARGE ERROR:", error);
+    console.error("VALIDATE FASTAG UPLOAD ERROR:", error);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };
 
-exports.tollDeduction = async (req, res) => {
+// Saves every valid row as a FASTag expense; duplicates and errors are skipped.
+exports.bulkUploadExpenses = async (req, res) => {
   try {
-    const { fastag_account_id, amount, date, toll_plaza_name, reference_no, created_by } = req.body;
+    const rawRows = readRows(req, res);
+    if (!rawRows) return;
+    const rows = await prepareRows(rawRows);
+    const validRows = rows.filter(r => r.status === "valid");
+    const createdBy = req.user?.username || "FASTag Upload";
+    const inserted = await Fastag.insertExpenses(toExpenseEntries(validRows, createdBy));
 
-    if (!fastag_account_id || !amount || Number(amount) <= 0) {
-      return res.status(400).json({ success: false, message: "Account and a valid amount are required" });
+    if (inserted) {
+      const total = validRows.reduce((sum, r) => sum + Number(r.amount), 0);
+      await logAudit(req, {
+        module_name: "Fastag",
+        action: "CREATE",
+        description: `Bulk uploaded ${inserted} FASTag expense(s) totalling ₹${total.toFixed(2)} across ${new Set(validRows.map(r => r.vehicle_id)).size} vehicle(s).`,
+        new_data: { inserted, skipped: rows.length - inserted, file: req.body.file_name || null },
+      });
     }
 
-    const account = await Fastag.getAccountById(fastag_account_id);
-    if (!account) {
-      return res.status(404).json({ success: false, message: "Fastag account not found" });
-    }
-
-    const newBalance = Number(account.balance) - Number(amount);
-    await Fastag.updateBalance(fastag_account_id, newBalance);
-
-    const result = await Fastag.createTransaction({
-      fastag_account_id,
-      type: "toll_deduction",
-      amount,
-      date: date || new Date().toISOString().slice(0, 10),
-      toll_plaza_name,
-      balance_after: newBalance,
-      reference_no,
-      created_by,
+    res.status(201).json({
+      success: true,
+      message: `${inserted} FASTag expense(s) added`,
+      summary: { ...summarize(rows), inserted },
+      data: rows,
     });
+  } catch (error) {
+    console.error("BULK UPLOAD FASTAG ERROR:", error);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+exports.createExpense = async (req, res) => {
+  try {
+    const [row] = await prepareRows([req.body || {}]);
+    if (row.status !== "valid") {
+      return res.status(400).json({ success: false, message: row.message, data: row });
+    }
+    await Fastag.insertExpenses(toExpenseEntries([row], req.user?.username || "Admin"));
 
     await logAudit(req, {
       module_name: "Fastag",
       action: "CREATE",
-      description: `Toll deduction of ₹${amount} on Fastag account #${fastag_account_id}${toll_plaza_name ? ` at ${toll_plaza_name}` : ""}. New balance ₹${newBalance}.`,
-      new_data: { fastag_account_id, amount, toll_plaza_name, newBalance },
+      description: `Added FASTag expense of ₹${row.amount} for ${row.vehicle_no}${row.toll_plaza ? ` at ${row.toll_plaza}` : ""}.`,
+      new_data: row,
     });
 
-    const updatedAccount = await Fastag.getAccountById(fastag_account_id);
-    await checkLowBalance(updatedAccount, updatedAccount.vehicle_no);
-
-    res.status(201).json({ success: true, message: "Toll deduction recorded", data: { id: result.insertId, balance: newBalance } });
+    res.status(201).json({ success: true, message: "FASTag expense added", data: row });
   } catch (error) {
-    console.error("FASTAG TOLL DEDUCTION ERROR:", error);
+    console.error("CREATE FASTAG EXPENSE ERROR:", error);
+    res.status(500).json({ success: false, message: "Server Error" });
+  }
+};
+
+exports.deleteExpense = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const before = await Fastag.getExpenseById(id);
+    if (!before) {
+      return res.status(404).json({ success: false, message: "FASTag expense not found" });
+    }
+    await Fastag.deleteExpense(id);
+
+    await logAudit(req, {
+      module_name: "Fastag",
+      action: "DELETE",
+      description: `Deleted FASTag expense ${before.expense_number} (₹${before.amount}, ${before.vehicle_number}).`,
+      old_data: before,
+    });
+
+    res.json({ success: true, message: "FASTag expense deleted" });
+  } catch (error) {
+    console.error("DELETE FASTAG EXPENSE ERROR:", error);
     res.status(500).json({ success: false, message: "Server Error" });
   }
 };

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { TrendingDown, Plus, Eye, Fuel, Wrench, CircleDot, BatteryCharging, UserRound, Utensils, Route, MoreHorizontal, Landmark } from "lucide-react";
+import { TrendingDown, Plus, Eye, Fuel, Wrench, CircleDot, BatteryCharging, UserRound, Utensils, Route, MoreHorizontal, Landmark, CreditCard } from "lucide-react";
 import Modal from "../components/Modal";
 import Can from "../../../components/Can";
 
@@ -75,6 +75,7 @@ const CATEGORY_TONE = {
   "Food Allowance": "yellow",
   Other: "neutral",
   Toll: "gray",
+  FASTag: "purple",
   Miscellaneous: "neutral",
 };
 
@@ -90,6 +91,7 @@ const CATEGORY_ICON_MAP = {
   "Food Allowance": Utensils,
   Other: MoreHorizontal,
   Toll: Route,
+  FASTag: CreditCard,
   Miscellaneous: MoreHorizontal,
 };
 

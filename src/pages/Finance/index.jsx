@@ -55,6 +55,7 @@ export default function Finance() {
     "Driver Settlement",
     "Food Allowance",
     "Toll",
+    "FASTag",
     "Miscellaneous",
     "Other"
   ];
