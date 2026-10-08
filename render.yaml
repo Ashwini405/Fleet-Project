@@ -1,0 +1,34 @@
+# Render Blueprint: one web service that builds the React app and serves it
+# from Express together with the API (same origin → no CORS/cookie issues).
+services:
+  - type: web
+    name: fleet-project
+    runtime: node
+    plan: starter
+    branch: main
+    # --include=dev: vite is a devDependency and NODE_ENV=production would skip it.
+    # VITE_API_URL= (empty) rewrites http://localhost:5001 to relative /api URLs.
+    buildCommand: npm ci --include=dev && VITE_API_URL= npm run build && npm ci --prefix backend
+    startCommand: cd backend && node server.js
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_NAME
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_EXPIRES_IN
+        value: 15m
+      - key: REFRESH_TOKEN_EXPIRES_DAYS
+        value: "7"

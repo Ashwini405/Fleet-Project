@@ -583,10 +583,20 @@ app.use(
     backupRestoreRoutes
 );
 
-// 🔥 TEST ROUTE
-app.get('/', (req, res) => {
-  res.send('Fleet Management Backend is running...');
-});
+// 🔥 FRONTEND (production): serve the built React app from ../dist on the same
+// origin as the API, so no CORS / cross-site cookie setup is needed.
+const frontendDir = path.join(__dirname, '..', 'dist');
+if (fs.existsSync(path.join(frontendDir, 'index.html'))) {
+  app.use(express.static(frontendDir));
+  // SPA fallback: any non-API GET (e.g. /fastag after a refresh) gets index.html
+  app.get(/^\/(?!api\/|uploads\/).*/, (req, res) => {
+    res.sendFile(path.join(frontendDir, 'index.html'));
+  });
+} else {
+  app.get('/', (req, res) => {
+    res.send('Fleet Management Backend is running...');
+  });
+}
 
 
 // 🔥 ERROR HANDLER (GOOD PRACTICE)
