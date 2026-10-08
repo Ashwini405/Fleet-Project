@@ -287,7 +287,7 @@ export function FastagSection({ data, total, prevTotal, vehicleId }) {
       source="Fastag Management"
       records={`${data.count || 0} Fastag Entries`}
       viewLabel="View Fastag Entries →"
-      viewPath={`/fastag?tab=Transactions&vehicle_id=${vehicleId}`}
+      viewPath={`/fastag?tab=Expenses&vehicle_id=${vehicleId}`}
     >
       <PLTable
         cols={[

@@ -71,11 +71,7 @@ export default function EditAccountModal({ account, isOpen, onClose, onSuccess }
               <input value={form.linked_account_no} onChange={event => set('linked_account_no', event.target.value)} className={inputClass} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1">Low Balance Alert</label>
-              <input type="number" min="0" value={form.low_balance_threshold} onChange={event => set('low_balance_threshold', event.target.value)} className={inputClass} />
-            </div>
+          <div>
             <div>
               <label className="block text-xs font-semibold text-slate-600 mb-1">Status</label>
               <select value={form.status} onChange={event => set('status', event.target.value)} className={inputClass}>

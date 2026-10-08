@@ -69,14 +69,6 @@ const Fastag = {
     return result;
   },
 
-  updateBalance: async (id, newBalance) => {
-    const [result] = await db.query(
-      `UPDATE fastag_accounts SET balance = ? WHERE id = ?`,
-      [newBalance, id]
-    );
-    return result;
-  },
-
   postMonthlyFuel: async ({ fastagAccountId, fuelDate }) => {
     const conn = await db.getConnection();
     try {
@@ -173,131 +165,207 @@ const Fastag = {
     return rows;
   },
 
-  getAllTransactions: async (filters = {}) => {
-    const conditions = [];
-    const params = [];
+  // ========================================
+  // FASTAG EXPENSES
+  // FASTag deductions are stored as truck expenses (expense_entries,
+  // category 'FASTag'). There is no wallet/balance tracking.
+  // ========================================
 
-    if (filters.vehicleId) {
-      conditions.push("fa.vehicle_id = ?");
-      params.push(filters.vehicleId);
-    }
-    if (filters.type) {
-      conditions.push("t.type = ?");
-      params.push(filters.type);
-    }
-    if (filters.from) {
-      conditions.push("t.date >= ?");
-      params.push(filters.from);
-    }
-    if (filters.to) {
-      conditions.push("t.date <= ?");
-      params.push(filters.to);
-    }
-
-    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-
-    const [rows] = await db.query(
-      `SELECT
-        t.*,
-        fa.balance AS account_balance,
-        v.vehicle_no,
-        fa.fastag_id
-      FROM fastag_transactions t
-      JOIN fastag_accounts fa ON fa.id = t.fastag_account_id
-      LEFT JOIN vehicles v ON v.id = fa.vehicle_id
-      ${whereClause}
-      UNION ALL
+  // Every vehicle with its tag id(s) and currently assigned driver,
+  // used to resolve uploaded rows by vehicle number or tag id.
+  getVehicleLookup: async () => {
+    const [rows] = await db.query(`
       SELECT
-        CONCAT('fuel-month-', fa.vehicle_id, '-', DATE_FORMAT(MIN(f.date), '%Y-%m')) AS id,
-        MAX(fa.id) AS fastag_account_id,
-        'fuel_monthly' AS type,
-        SUM(f.total_cost) AS amount,
-        STR_TO_DATE(CONCAT(DATE_FORMAT(MIN(f.date), '%Y-%m'), '-01'), '%Y-%m-%d') AS date,
-        CONCAT('Fuel usage - ', DATE_FORMAT(MIN(f.date), '%M %Y')) AS toll_plaza_name,
-        MAX(fa.balance) AS balance_after,
-        NULL AS reference_no,
-        NULL AS proof_upload,
-        'Fuel Logs' AS created_by,
-        NULL AS created_at,
-        MAX(fa.balance) AS account_balance,
-        MAX(v.vehicle_no) AS vehicle_no,
-        MAX(fa.fastag_id) AS fastag_id
-      FROM fuel_entries f
-      JOIN fastag_accounts fa ON fa.id = f.fastag_account_id
-      LEFT JOIN vehicles v ON v.id = f.vehicle_id
-      WHERE f.payment_method = 'FASTag Wallet'
-        AND f.fastag_account_id IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1
-          FROM fastag_monthly_postings p
-          WHERE p.fastag_account_id = f.fastag_account_id
-            AND p.month = STR_TO_DATE(CONCAT(DATE_FORMAT(f.date, '%Y-%m'), '-01'), '%Y-%m-%d')
-        )
-        ${filters.type && filters.type !== 'fuel_monthly' ? 'AND 1 = 0' : ''}
-        ${filters.vehicleId ? 'AND fa.vehicle_id = ?' : ''}
-        ${filters.from ? 'AND f.date >= ?' : ''}
-        ${filters.to ? 'AND f.date <= ?' : ''}
-      GROUP BY fa.vehicle_id, DATE_FORMAT(f.date, '%Y-%m')
-      ORDER BY date DESC, id DESC`,
-      [...params, ...(filters.vehicleId ? [filters.vehicleId] : []), ...(filters.from ? [filters.from] : []), ...(filters.to ? [filters.to] : [])]
-    );
-
-    if (!filters.type && !filters.from && !filters.to) {
-      const byAccount = new Map();
-      rows.forEach(row => {
-        const accountRows = byAccount.get(row.fastag_account_id) || [];
-        accountRows.push(row);
-        byAccount.set(row.fastag_account_id, accountRows);
-      });
-
-      byAccount.forEach(accountRows => {
-        accountRows.sort((a, b) => {
-          const dateDiff = new Date(a.date) - new Date(b.date);
-          if (dateDiff !== 0) return dateDiff;
-          const createdDiff = new Date(a.created_at || a.date) - new Date(b.created_at || b.date);
-          if (createdDiff !== 0) return createdDiff;
-          return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
-        });
-
-        let runningBalance = Number(accountRows[0]?.account_balance || 0);
-        for (let index = accountRows.length - 1; index >= 0; index -= 1) {
-          const row = accountRows[index];
-          row.balance_after = runningBalance;
-          const change = row.type === 'recharge'
-            ? Number(row.amount || 0)
-            : -Number(row.amount || 0);
-          runningBalance -= change;
-        }
-      });
-
-      rows.sort((a, b) => {
-        const dateDiff = new Date(b.date) - new Date(a.date);
-        if (dateDiff !== 0) return dateDiff;
-        const createdDiff = new Date(b.created_at || b.date) - new Date(a.created_at || a.date);
-        if (createdDiff !== 0) return createdDiff;
-        return String(b.id).localeCompare(String(a.id), undefined, { numeric: true });
-      });
-    }
-
+        v.id AS vehicle_id,
+        v.vehicle_no,
+        v.fastag_id AS vehicle_fastag_id,
+        fa.fastag_id AS account_fastag_id,
+        fa.bank_issuer,
+        d.id AS driver_id,
+        d.full_name AS driver_name
+      FROM vehicles v
+      LEFT JOIN fastag_accounts fa ON fa.vehicle_id = v.id
+      LEFT JOIN drivers d ON d.id = v.assigned_driver
+    `);
     return rows;
   },
 
-  createTransaction: async (data) => {
+  // Trips running on the given vehicles between the two dates, so each
+  // FASTag deduction can be attached to the trip it happened on.
+  getTripsForVehicles: async (vehicleIds, fromDate, toDate) => {
+    if (!vehicleIds.length) return [];
+    const [rows] = await db.query(
+      `SELECT
+         t.id,
+         t.trip_id,
+         t.vehicle_id,
+         -- trips can point at drivers that no longer exist; expense_entries.driver_id has an FK
+         d.id AS driver_id,
+         COALESCE(NULLIF(TRIM(t.driver_name), ''), d.full_name) AS driver_name,
+         DATE_FORMAT(DATE(COALESCE(t.start_time, t.trip_date)), '%Y-%m-%d') AS start_date,
+         DATE_FORMAT(DATE(COALESCE(
+           t.unloading_time,
+           CASE WHEN t.trip_status IN ('Started', 'In Transit') THEN CURDATE() END,
+           t.eta,
+           t.start_time,
+           t.trip_date
+         )), '%Y-%m-%d') AS end_date
+       FROM trips t
+       LEFT JOIN drivers d ON d.id = t.driver_id
+       WHERE t.vehicle_id IN (?)
+         AND COALESCE(t.is_deleted, 0) = 0
+         AND COALESCE(t.trip_status, '') NOT IN ('Draft', 'Cancelled')
+         AND DATE(COALESCE(t.start_time, t.trip_date)) <= ?
+         AND DATE(COALESCE(t.unloading_time, CASE WHEN t.trip_status IN ('Started', 'In Transit') THEN CURDATE() END, t.eta, t.start_time, t.trip_date)) >= ?
+       ORDER BY COALESCE(t.start_time, t.trip_date) DESC`,
+      [vehicleIds, toDate, fromDate]
+    );
+    return rows;
+  },
+
+  // Existing FASTag expenses that could clash with an upload: same
+  // transaction id anywhere, or same vehicle within the date range.
+  getExistingExpenseKeys: async (transactionIds, vehicleIds, fromDate, toDate) => {
+    const conditions = [];
+    const params = [];
+    if (transactionIds.length) {
+      conditions.push("toll_receipt_number IN (?)");
+      params.push(transactionIds);
+    }
+    if (vehicleIds.length) {
+      conditions.push("(vehicle_id IN (?) AND expense_date BETWEEN ? AND ?)");
+      params.push(vehicleIds, fromDate, toDate);
+    }
+    if (!conditions.length) return [];
+    const [rows] = await db.query(
+      `SELECT vehicle_id, DATE_FORMAT(expense_date, '%Y-%m-%d') AS expense_date,
+              amount, toll_plaza, toll_receipt_number
+       FROM expense_entries
+       WHERE expense_category = 'FASTag'
+         AND COALESCE(entry_status, '') != 'Deleted'
+         AND (${conditions.join(" OR ")})`,
+      params
+    );
+    return rows;
+  },
+
+  insertExpenses: async (entries) => {
+    if (!entries.length) return 0;
+    const columns = [
+      "expense_number", "expense_category", "vehicle_id", "vehicle_number",
+      "driver_id", "driver_name", "trip_id", "trip_number", "expense_date",
+      "amount", "payment_method", "payment_status", "vendor_payee",
+      "description", "attachment", "toll_plaza", "toll_receipt_number",
+      "expense_title", "created_by",
+    ];
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+      for (let start = 0; start < entries.length; start += 500) {
+        const chunk = entries.slice(start, start + 500);
+        await conn.query(
+          `INSERT INTO expense_entries (${columns.join(", ")}) VALUES ?`,
+          [chunk.map(entry => columns.map(column => entry[column] ?? null))]
+        );
+      }
+      await conn.commit();
+      return entries.length;
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
+  },
+
+  // FASTag expenses plus any toll deductions recorded under the old
+  // wallet flow, so history stays visible in one list.
+  getExpenses: async (filters = {}) => {
+    const expenseConditions = ["e.expense_category = 'FASTag'", "COALESCE(e.entry_status, '') != 'Deleted'"];
+    const legacyConditions = ["t.type = 'toll_deduction'"];
+    const expenseParams = [];
+    const legacyParams = [];
+
+    if (filters.vehicleId) {
+      expenseConditions.push("e.vehicle_id = ?");
+      expenseParams.push(filters.vehicleId);
+      legacyConditions.push("fa.vehicle_id = ?");
+      legacyParams.push(filters.vehicleId);
+    }
+    if (filters.from) {
+      expenseConditions.push("e.expense_date >= ?");
+      expenseParams.push(filters.from);
+      legacyConditions.push("t.date >= ?");
+      legacyParams.push(filters.from);
+    }
+    if (filters.to) {
+      expenseConditions.push("e.expense_date <= ?");
+      expenseParams.push(filters.to);
+      legacyConditions.push("t.date <= ?");
+      legacyParams.push(filters.to);
+    }
+
+    const [rows] = await db.query(
+      `SELECT
+         e.id,
+         'expense' AS source,
+         e.expense_number,
+         e.vehicle_id,
+         COALESCE(v.vehicle_no, e.vehicle_number) AS vehicle_no,
+         e.driver_name,
+         e.trip_id,
+         e.trip_number,
+         DATE_FORMAT(e.expense_date, '%Y-%m-%d') AS date,
+         e.amount,
+         e.toll_plaza,
+         e.toll_receipt_number AS transaction_id,
+         e.description,
+         e.created_by,
+         e.created_at
+       FROM expense_entries e
+       LEFT JOIN vehicles v ON v.id = e.vehicle_id
+       WHERE ${expenseConditions.join(" AND ")}
+       UNION ALL
+       SELECT
+         t.id,
+         'legacy' AS source,
+         NULL AS expense_number,
+         fa.vehicle_id,
+         v.vehicle_no,
+         NULL AS driver_name,
+         NULL AS trip_id,
+         NULL AS trip_number,
+         DATE_FORMAT(t.date, '%Y-%m-%d') AS date,
+         t.amount,
+         t.toll_plaza_name AS toll_plaza,
+         t.reference_no AS transaction_id,
+         NULL AS description,
+         t.created_by,
+         t.created_at
+       FROM fastag_transactions t
+       JOIN fastag_accounts fa ON fa.id = t.fastag_account_id
+       LEFT JOIN vehicles v ON v.id = fa.vehicle_id
+       WHERE ${legacyConditions.join(" AND ")}
+       ORDER BY date DESC, created_at DESC`,
+      [...expenseParams, ...legacyParams]
+    );
+    return rows;
+  },
+
+  getExpenseById: async (id) => {
+    const [rows] = await db.query(
+      `SELECT * FROM expense_entries
+       WHERE id = ? AND expense_category = 'FASTag' AND COALESCE(entry_status, '') != 'Deleted'`,
+      [id]
+    );
+    return rows[0];
+  },
+
+  deleteExpense: async (id) => {
     const [result] = await db.query(
-      `INSERT INTO fastag_transactions
-        (fastag_account_id, type, amount, date, toll_plaza_name, balance_after, reference_no, proof_upload, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        data.fastag_account_id,
-        data.type,
-        data.amount,
-        data.date,
-        data.toll_plaza_name || null,
-        data.balance_after,
-        data.reference_no || null,
-        data.proof_upload || null,
-        data.created_by || "Admin",
-      ]
+      `UPDATE expense_entries SET entry_status = 'Deleted'
+       WHERE id = ? AND expense_category = 'FASTag'`,
+      [id]
     );
     return result;
   },

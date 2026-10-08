@@ -138,6 +138,21 @@ db.query(`
 `).then(() => console.log('tyre_notifications table ready'))
   .catch(e => console.error('tyre_notifications table error:', e.message));
 
+// Legacy per-trip fuel table (fuel_entries is canonical now). Trip fuel lookup and
+// trip closing still read it, so make sure it exists on databases restored without it.
+db.query(`
+  CREATE TABLE IF NOT EXISTS trip_fuel (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    trip_id VARCHAR(50) DEFAULT NULL,
+    quantity DECIMAL(10,2) DEFAULT NULL,
+    rate DECIMAL(10,2) DEFAULT NULL,
+    vendor VARCHAR(255) DEFAULT NULL,
+    created_at TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+    location VARCHAR(255) DEFAULT NULL
+  )
+`).then(() => console.log('trip_fuel table ready'))
+  .catch(e => console.error('trip_fuel table error:', e.message));
+
 // Keep monthly FASTag fuel postings available for installations that predate the migration.
 db.query(`
   CREATE TABLE IF NOT EXISTS fastag_monthly_postings (
@@ -380,7 +395,7 @@ app.use(cors({
   credentials: true,
 }));
 app.use(cookieParser());
-app.use(express.json());
+app.use(express.json({ limit: "5mb" })); // large enough for FASTag statement bulk uploads
 app.use(express.urlencoded({ extended: true })); // ✅ IMPORTANT for form-data
 
 
