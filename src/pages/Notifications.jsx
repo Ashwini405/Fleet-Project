@@ -64,7 +64,7 @@ export default function Notifications() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-black text-slate-800 flex items-center gap-2">
             <Bell className="w-5 h-5 text-blue-600" /> Tyre Notifications
@@ -73,7 +73,7 @@ export default function Notifications() {
             {unreadCount > 0 ? `${unreadCount} unread notifications` : 'All caught up'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button onClick={handleSync} disabled={syncing}
             className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white rounded-xl text-sm font-bold transition-colors disabled:opacity-60">
             <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />

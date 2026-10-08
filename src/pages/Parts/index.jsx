@@ -879,7 +879,7 @@ export default function PartsModule() {
 
             {/* Category tabs + Search */}
             <div className="px-5 pt-4 pb-3 flex flex-col sm:flex-row sm:items-center gap-3">
-              <div className="flex gap-1 overflow-x-auto pb-0.5 sm:pb-0 shrink-0">
+              <div className="flex gap-1 overflow-x-auto pb-0.5 sm:pb-0 min-w-0">
                 {allCategories.map(cat => (
                   <button key={cat} onClick={() => { setActiveCategory(cat); setSearch(''); }}
                     className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-bold transition

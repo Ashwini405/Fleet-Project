@@ -27,7 +27,7 @@ export default function FilterBar({
 
       {/* Real-time Search Input */}
       {setSearchQuery && (
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
+        <div className="relative flex-1 min-w-0 basis-full sm:basis-auto sm:min-w-[200px] max-w-full sm:max-w-sm">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           <input
             type="text"
@@ -52,7 +52,7 @@ export default function FilterBar({
       <select
         value={selectedTruck}
         onChange={e => setSelectedTruck(e.target.value)}
-        className={inputCls + " min-w-[150px]"}
+        className={inputCls + " w-full sm:w-auto sm:min-w-[150px]"}
       >
         <option value="All">All Trucks / Vehicles</option>
         <option value="General">🏢 General / Staff / Office</option>
@@ -68,7 +68,7 @@ export default function FilterBar({
         <select
           value={categoryFilter}
           onChange={e => setCategoryFilter(e.target.value)}
-          className={inputCls + " min-w-[140px]"}
+          className={inputCls + " w-full sm:w-auto sm:min-w-[140px]"}
         >
           <option value="All">All Categories</option>
           {categories.map(c => (
@@ -78,14 +78,14 @@ export default function FilterBar({
       )}
 
       {/* Date Range */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 flex-1 sm:flex-none min-w-0">
         <span className="text-xs text-gray-400 font-medium">From</span>
-        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={inputCls} />
+        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className={inputCls + " min-w-0 flex-1 sm:flex-none"} />
       </div>
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 flex-1 sm:flex-none min-w-0">
         <span className="text-xs text-gray-400 font-medium">To</span>
-        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={inputCls} />
+        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className={inputCls + " min-w-0 flex-1 sm:flex-none"} />
       </div>
 
       {(selectedTruck !== "All" || dateFrom || dateTo || searchQuery || (categoryFilter && categoryFilter !== "All")) && (

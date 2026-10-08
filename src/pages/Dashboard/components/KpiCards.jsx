@@ -5,13 +5,13 @@ const INR = (n) => '₹' + Number(n).toLocaleString('en-IN');
 
 function KpiCard({ label, value, sub, icon: Icon, iconBg, valueColor = 'text-slate-800', trend }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex items-start gap-4 hover:shadow-md transition-shadow">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5 flex flex-col sm:flex-row items-start gap-3 sm:gap-4 hover:shadow-md transition-shadow">
+      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBg}`}>
         <Icon className="w-5 h-5" />
       </div>
-      <div className="min-w-0">
-        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-0.5 truncate">{label}</p>
-        <p className={`text-2xl font-black leading-tight ${valueColor}`}>{value}</p>
+      <div className="min-w-0 w-full">
+        <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider sm:tracking-widest mb-0.5 sm:truncate">{label}</p>
+        <p className={`text-xl sm:text-2xl font-black leading-tight break-words ${valueColor}`}>{value}</p>
         {sub && <p className="text-xs text-slate-500 mt-0.5 font-medium">{sub}</p>}
         {trend !== undefined && (
           <div className={`flex items-center gap-1 mt-1 text-[11px] font-bold ${trend >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
@@ -37,7 +37,7 @@ export function FleetKpiRow({ data }) {
 
 export function TripKpiRow({ data }) {
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <KpiCard label="Running Trips"   value={data.running}   icon={Navigation}   iconBg="bg-indigo-50 text-indigo-600"  valueColor="text-indigo-700" />
       <KpiCard label="Completed Trips" value={data.completed} icon={CheckCircle2} iconBg="bg-green-50 text-green-600"    valueColor="text-green-700" />
       <KpiCard label="Cancelled"       value={data.cancelled} icon={UserX}        iconBg="bg-red-50 text-red-500"        valueColor="text-red-600" />
@@ -50,7 +50,7 @@ export function FinanceKpiRow({ data }) {
     ? +((data.netProfit / data.totalRevenue) * 100).toFixed(1)
     : 0;
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <KpiCard label="Total Revenue" value={INR(data.totalRevenue)} icon={TrendingUp}    iconBg="bg-green-50 text-green-600"   valueColor="text-green-700"  trend={12} />
       <KpiCard label="Total Expenses" value={INR(data.totalExpenses)} icon={TrendingDown} iconBg="bg-red-50 text-red-500"      valueColor="text-red-600"    trend={-5} />
       <KpiCard label="Net Profit"     value={INR(data.netProfit)}     icon={DollarSign}   iconBg="bg-emerald-50 text-emerald-600" valueColor="text-emerald-700" sub={`Margin: ${margin}%`} />
@@ -60,7 +60,7 @@ export function FinanceKpiRow({ data }) {
 
 export function StaffKpiRow({ data }) {
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       <KpiCard label="Total Drivers"    value={data.totalDrivers} icon={Users}      iconBg="bg-indigo-50 text-indigo-600" />
       <KpiCard label="Drivers On Trip"  value={data.onTrip}       icon={Navigation} iconBg="bg-blue-50 text-blue-600"    valueColor="text-blue-700" />
       <KpiCard label="Available"        value={data.available}    icon={UserCheck}  iconBg="bg-green-50 text-green-600"  valueColor="text-green-700" />

@@ -421,15 +421,15 @@ export default function VehicleMaster() {
           <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">Vehicle Master</h1>
           <p className="text-sm text-slate-500 mt-1">Manage and track your entire fleet operations</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative w-full sm:w-auto">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
             <input
               type="text"
               placeholder="Search trucks..."
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
-              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-56 shadow-sm"
+              className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 w-full sm:w-56 shadow-sm"
             />
           </div>
           {/* Column Settings Button */}

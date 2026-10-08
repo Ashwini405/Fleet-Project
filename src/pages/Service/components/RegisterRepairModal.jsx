@@ -1200,7 +1200,7 @@ export default function RegisterRepairModal({ isOpen, onClose, logData }) {
                 <div className="p-1.5 bg-emerald-500 rounded-full text-white"><Wrench className="w-3 h-3" /></div>
                 <h3 className="text-sm font-bold text-emerald-900">Completion Summary</h3>
               </div>
-              <div className="grid grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                 <div className="bg-white rounded-xl p-3 border border-emerald-100 shadow-sm">
                   <p className="text-[10px] uppercase text-emerald-600 font-bold mb-1">Total Bill</p>
                   <p className="text-lg font-bold text-emerald-900">
