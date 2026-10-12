@@ -223,15 +223,15 @@ export default function EditSupervisorModal({ isOpen, onClose, staff, onSuccess 
                   </div>
                   <div className="col-span-2 sm:col-span-1">
                     <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1.5">Wallet Balance (₹)</label>
+                    {/* Read-only: the balance changes only through Supervisor Wallet
+                        (Add Money / Expense / Adjustment), so every change is on the statement. */}
                     <input
-                      type="number"
-                      name="wallet_balance"
-                      value={formData.wallet_balance}
-                      onChange={handleChange}
-                      placeholder="e.g. 10000"
-                      className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:bg-white focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-sm transition-all"
+                      type="text"
+                      value={`₹ ${Number(formData.wallet_balance || 0).toLocaleString('en-IN')}`}
+                      readOnly
+                      className={`w-full p-3 bg-gray-100 border border-gray-200 rounded-xl text-sm cursor-not-allowed ${Number(formData.wallet_balance) < 0 ? 'text-red-600 font-bold' : 'text-gray-600'}`}
                     />
-                    <p className="text-[10px] text-gray-400 mt-1">Current cash balance of this supervisor</p>
+                    <p className="text-[10px] text-gray-400 mt-1">Change it from <span className="font-semibold">Finance &amp; Staff → Supervisor Wallet</span></p>
                   </div>
                 </motion.div>
               )}

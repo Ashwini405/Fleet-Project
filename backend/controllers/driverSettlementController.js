@@ -118,6 +118,24 @@ const getDriverByVehicle = async (
 // ======================================
 // Get Driver Details directly by Driver ID
 // ======================================
+// ======================================
+// Month trips + fuel/mileage for a salary sheet
+// GET /month-details?vehicle_no=&driver_id=&month=YYYY-MM
+// ======================================
+const getMonthDetails = async (req, res) => {
+  try {
+    const { vehicle_no: vehicleNo, driver_id: driverId, month } = req.query;
+    if (!vehicleNo || !/^\d{4}-\d{2}$/.test(month || '')) {
+      return res.status(400).json({ success: false, message: 'vehicle_no and month (YYYY-MM) are required' });
+    }
+    const data = await driverSettlementModel.getMonthDetails({ vehicleNo, driverId: driverId || null, month });
+    res.json({ success: true, data });
+  } catch (error) {
+    console.error('Get Month Details Error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 const getDriverByIdDirect = async (req, res) => {
   try {
     const driverId = req.params.driverId;
@@ -411,6 +429,7 @@ async (req, res) => {
 };
 
 module.exports = {
+  getMonthDetails,
   getPlants,
   getVehiclesByPlant,
   getDriverByVehicle,

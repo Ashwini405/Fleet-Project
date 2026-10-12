@@ -16,8 +16,10 @@ getAll: async () => {
   const [rows] = await db.query(`
     SELECT f.*,
            v.vehicle_no,
-          t.trip_id AS trip_number,
-           t.driver_name,
+           t.trip_id AS trip_number,
+           t.trip_status,
+           -- trip driver for trip fuel; the driver saved on the entry for fuel added without a trip
+           COALESCE(NULLIF(t.driver_name, ''), f.driver_name) AS driver_name,
            s.full_name AS supervisor_name   -- ✅ ADD THIS
     FROM fuel_entries f
     LEFT JOIN vehicles v ON f.vehicle_id = v.id

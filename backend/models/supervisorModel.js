@@ -50,11 +50,14 @@ const Supervisor = {
   },
 
   // UPDATE
+  // wallet_balance is NOT updated here: it changes only through the wallet
+  // ledger (services/supervisorWalletService), otherwise saving this form
+  // could overwrite advances/settlements recorded since it was opened.
   update: async (id, data) => {
     const [result] = await db.query(
       `UPDATE supervisors SET
         full_name=?, mobile=?, id_card_number=?, status=?, address=?, station_id=?,
-        wallet_balance=?, bank_name=?, account_number=?, ifsc_code=?, notes=?,
+        bank_name=?, account_number=?, ifsc_code=?, notes=?,
         profile_photo=COALESCE(?, profile_photo),
         id_document=COALESCE(?, id_document),
         bank_document=COALESCE(?, bank_document)
@@ -66,7 +69,6 @@ const Supervisor = {
         data.status,
         data.address,
         data.station_id || null,
-        data.wallet_balance !== '' && data.wallet_balance != null ? Number(data.wallet_balance) : 0,
         data.bank_name,
         data.account_number,
         data.ifsc_code,

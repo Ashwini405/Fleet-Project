@@ -154,6 +154,22 @@ db.query(`
 `).then(() => console.log('trip_fuel table ready'))
   .catch(e => console.error('trip_fuel table error:', e.message));
 
+// Supervisor wallet ledger (+ opening balance for supervisors without one).
+require('./services/supervisorWalletService').ensureTable()
+  .then(() => console.log('supervisor_wallet_transactions table ready'))
+  .catch(e => console.error('supervisor wallet table error:', e.message));
+
+// "Supervisor Wallet" permissions for every role that doesn't have them yet:
+// Admin gets full access, other roles none until granted in Roles & Permissions.
+db.query(`
+  INSERT INTO role_permissions
+    (role_id, module_name, can_view, can_create, can_edit, can_delete, can_approve, can_reject, can_export, can_print)
+  SELECT r.id, 'Supervisor Wallet', a, a, a, a, a, a, a, a
+  FROM (SELECT id, IF(role_name = 'Admin', 1, 0) AS a FROM roles) r
+  WHERE NOT EXISTS (SELECT 1 FROM role_permissions rp WHERE rp.role_id = r.id AND rp.module_name = 'Supervisor Wallet')
+`).then(() => console.log('Supervisor Wallet permissions ready'))
+  .catch(e => console.error('Supervisor Wallet permissions error:', e.message));
+
 // Keep monthly FASTag fuel postings available for installations that predate the migration.
 db.query(`
   CREATE TABLE IF NOT EXISTS fastag_monthly_postings (
@@ -570,6 +586,7 @@ app.use("/api/reports", reportsRoutes);
 app.use("/api/truck-inventory", truckInventoryRoutes);
 app.use("/api/fastag", fastagRoutes);
 app.use("/api/fastag-notifications", fastagNotificationRoutes);
+app.use("/api/supervisor-wallet", require("./routes/supervisorWalletRoutes"));
 app.use("/api/tenders", tenderRoutes);
 
 app.use(

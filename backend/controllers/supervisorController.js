@@ -1,4 +1,5 @@
 const Supervisor = require('../models/supervisorModel');
+const wallet = require('../services/supervisorWalletService');
 
 // CREATE
 exports.createSupervisor = async (req, res) => {
@@ -9,7 +10,9 @@ exports.createSupervisor = async (req, res) => {
       id_document:   req.files?.id_document?.[0]?.filename   || null,
       bank_document: req.files?.bank_document?.[0]?.filename || null,
     };
-    await Supervisor.create(data);
+    const created = await Supervisor.create(data);
+    // The wallet statement starts with the balance entered on this form.
+    await wallet.recordOpening(created.insertId, Number(data.wallet_balance) || 0, req.user?.username);
     res.json({ success: true });
   } catch (err) {
     console.error('createSupervisor error:', err);

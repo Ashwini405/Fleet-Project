@@ -29,15 +29,17 @@ router.get('/by-vehicle/:vehicleId', ...protect('Trip Master', 'view'), getTrips
 
 
 // ✅ MAIN TRIP ROUTES
+// invoice_file: optional invoice uploaded with trip generation (multipart);
+// plain JSON requests pass through multer unchanged.
 router.route('/')
   .get(...protect('Trip Master', 'view'), getTrips)
-  .post(...protect('Trip Master', 'create'), createTrip);
+  .post(...protect('Trip Master', 'create'), upload.single('invoice_file'), createTrip);
 
 
 // ✅ SINGLE TRIP ROUTES
 router.route('/:id')
   .get(...protect('Trip Master', 'view'), getTripById)
-  .put(...protect('Trip Master', 'edit'), updateTrip)
+  .put(...protect('Trip Master', 'edit'), upload.single('invoice_file'), updateTrip)
   .delete(...protect('Trip Master', 'delete'), deleteTrip);
 
 

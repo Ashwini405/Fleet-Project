@@ -258,7 +258,7 @@ export function FuelSection({ data, total, prevTotal, vehicleId }) {
       title="Fuel Expenses" subtitle={`${totalLitres.toLocaleString()} L total · ${data.fillups || 0} fill-ups`}
       total={total} totalLabel="Total Fuel Expense" accent="red" prevTotal={prevTotal}
       source="Fuel Management" records={`${data.fillups || 0} Fuel Entries`}
-      viewLabel="View Fuel Entries →" viewPath={`/fuel?vehicle_id=${vehicleId}`}
+      viewLabel="View Fuel Entries →" viewPath={`/fuel/logs?vehicle_id=${vehicleId}`}
     >
       <PLTable
         cols={[

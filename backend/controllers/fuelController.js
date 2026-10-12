@@ -1,6 +1,7 @@
 const Fuel = require('../models/fuelModel');
 const Fastag = require('../models/fastagModel');
 const db = require('../config/db');
+const wallet = require('../services/supervisorWalletService');
 
 // ✅ CREATE FUEL ENTRY
 const createFuel = async (req, res) => {
@@ -23,6 +24,13 @@ const createFuel = async (req, res) => {
     }
     if (tankCapacityValue > 0 && quantityValue > tankCapacityValue) {
       return res.status(400).json({ success: false, message: `Fuel quantity cannot exceed tank capacity (${tankCapacityValue} L).` });
+    }
+    // Driver Advance is paid from the trip supervisor's wallet, so it needs a trip.
+    if (payment_method === 'Driver Advance' && !trip_id) {
+      return res.status(400).json({ success: false, message: 'Driver Advance can only be used for fuel filled on a trip. Choose another payment method.' });
+    }
+    if (!vehicle_id) {
+      return res.status(400).json({ success: false, message: 'Select a vehicle.' });
     }
     const total_cost = Number(quantity) * Number(rate);
     let fastag_account_id = null;
@@ -80,13 +88,20 @@ const createFuel = async (req, res) => {
     // ── Driver Advance: deduct from supervisor wallet ─────────────────────────
     if (payment_method === 'Driver Advance' && trip_id) {
       const [tripRows] = await db.query(
-        'SELECT supervisor_id FROM trips WHERE id = ?', [trip_id]
+        'SELECT id, trip_id, supervisor_id FROM trips WHERE id = ?', [trip_id]
       );
       if (tripRows.length && tripRows[0].supervisor_id) {
-        await db.query(
-          'UPDATE supervisors SET wallet_balance = wallet_balance - ? WHERE id = ?',
-          [total_cost, tripRows[0].supervisor_id]
-        );
+        await wallet.post({
+          supervisorId: tripRows[0].supervisor_id,
+          amount: -total_cost,
+          type: wallet.TYPES.FUEL,
+          tripId: tripRows[0].id,
+          tripCode: tripRows[0].trip_id,
+          vehicleNo: fuelData.vehicle_no,
+          fuelEntryId: result.insertId,
+          description: `Fuel ${fuelData.date || ''} · ${Number(quantity)} L @ ₹${Number(rate)}${fuelData.vendor ? ` · ${fuelData.vendor}` : ''}`,
+          createdBy: req.user?.username,
+        });
       }
     }
 

@@ -5,12 +5,20 @@ const driverAdvanceModel = require("./driverAdvanceModel");
 // Get Plants
 // =====================================
 const getPlants = async () => {
+  // Plants trips started from, plus the stations trucks are assigned to — so
+  // a truck with no trip yet can still get its salary sheet.
   const [rows] = await db.query(`
-    SELECT DISTINCT
-      source_plant
-    FROM trips
-    WHERE source_plant IS NOT NULL
-      AND source_plant <> ''
+    SELECT source_plant FROM (
+      SELECT source_plant
+      FROM trips
+      WHERE source_plant IS NOT NULL AND source_plant <> ''
+        AND COALESCE(is_deleted, 0) = 0
+      UNION
+      SELECT st.station_name AS source_plant
+      FROM vehicles v
+      JOIN stations st ON st.id = v.station_id
+      WHERE st.station_name IS NOT NULL AND st.station_name <> ''
+    ) p
     ORDER BY source_plant
   `);
 
@@ -21,18 +29,25 @@ const getPlants = async () => {
 // Get Vehicles By Plant
 // =====================================
 const getVehiclesByPlant = async (plant) => {
+  // Trucks assigned to this plant/station, and trucks that ran trips from it
+  // (trips matched by vehicle id as well as by truck number).
   const [rows] = await db.query(
     `
-    SELECT DISTINCT
+    SELECT
       v.id AS vehicle_id,
       v.vehicle_no
     FROM vehicles v
-    INNER JOIN trips t
-      ON v.vehicle_no = t.truck_no
-    WHERE t.source_plant = ?
+    LEFT JOIN stations st ON st.id = v.station_id
+    WHERE st.station_name = ?
+       OR EXISTS (
+         SELECT 1 FROM trips t
+         WHERE t.source_plant = ?
+           AND COALESCE(t.is_deleted, 0) = 0
+           AND (t.vehicle_id = v.id OR t.truck_no = v.vehicle_no)
+       )
     ORDER BY v.vehicle_no
     `,
-    [plant]
+    [plant, plant]
   );
 
   return rows;
@@ -115,10 +130,13 @@ const getDriverDetails = async (
   month
 ) => {
 
+  // Battha counts real trips only: deleted, draft and cancelled trips are
+  // left out. Advances of a cancelled trip were still handed over, so they
+  // are still recovered.
   const [rows] = await db.query(
     `
     SELECT
-      COUNT(*) AS total_trips,
+      COALESCE(SUM(trip_status <> 'Cancelled'), 0) AS total_trips,
 
       COALESCE(
         SUM(driver_advance),
@@ -128,6 +146,8 @@ const getDriverDetails = async (
     FROM trips
 
     WHERE driver_id = ?
+      AND COALESCE(is_deleted, 0) = 0
+      AND COALESCE(trip_status, '') <> 'Draft'
 
     AND DATE_FORMAT(
       trip_date,
@@ -147,6 +167,121 @@ const getDriverDetails = async (
   return {
     ...rows[0],
     total_advance: Number(rows[0].total_advance) + outstandingOther
+  };
+};
+
+// =====================================
+// Month details for the salary sheet: the truck's trips (and the driver's
+// trips on other trucks) plus the truck's fuel and mileage for the month.
+// =====================================
+const getMonthDetails = async ({ vehicleNo, driverId, month }) => {
+  const [[vehicle]] = await db.query(
+    'SELECT id, vehicle_no, mileage FROM vehicles WHERE vehicle_no = ? LIMIT 1',
+    [vehicleNo]
+  );
+  const vehicleId = vehicle?.id || null;
+
+  const [trips] = await db.query(
+    `
+    SELECT
+      t.id, t.trip_id, DATE_FORMAT(t.trip_date, '%Y-%m-%d') AS trip_date, t.trip_status,
+      t.driver_id, COALESCE(d.full_name, t.driver_name) AS driver_name,
+      t.vehicle_id, t.truck_no, COALESCE(t.source, t.source_plant) AS source, t.destination,
+      t.est_distance, t.driver_advance, t.hamali_advance, t.other_advance
+    FROM trips t
+    LEFT JOIN drivers d ON d.id = t.driver_id
+    WHERE COALESCE(t.is_deleted, 0) = 0
+      AND COALESCE(t.trip_status, '') <> 'Draft'
+      AND DATE_FORMAT(t.trip_date, '%Y-%m') = ?
+      AND (t.vehicle_id = ? OR t.truck_no = ? OR (? IS NOT NULL AND t.driver_id = ?))
+    ORDER BY t.trip_date ASC, t.id ASC
+    `,
+    [month, vehicleId, vehicleNo, driverId || null, driverId || null]
+  );
+
+  const [fuel] = await db.query(
+    `
+    SELECT
+      f.id, DATE_FORMAT(f.date, '%Y-%m-%d') AS date, f.fuel_type, f.quantity, f.rate, f.total_cost,
+      f.previous_odo, f.current_odo, f.distance, f.mileage, f.payment_method, f.vendor, f.full_tank,
+      t.trip_id AS trip_code
+    FROM fuel_entries f
+    LEFT JOIN trips t ON t.id = f.trip_id
+    WHERE (f.vehicle_id = ? OR (f.vehicle_id IS NULL AND f.vehicle_no = ?))
+      AND DATE_FORMAT(f.date, '%Y-%m') = ?
+    ORDER BY f.date ASC, f.id ASC
+    `,
+    [vehicleId, vehicleNo, month]
+  );
+
+  const tripRows = trips.map(t => ({
+    ...t,
+    est_distance: Number(t.est_distance) || 0,
+    driver_advance: Number(t.driver_advance) || 0,
+    hamali_advance: Number(t.hamali_advance) || 0,
+    other_advance: Number(t.other_advance) || 0,
+    on_this_truck: (vehicleId != null && t.vehicle_id === vehicleId) || t.truck_no === vehicleNo,
+    // battha goes to the driver who did the trip; cancelled trips earn none
+    counted: !!driverId && Number(t.driver_id) === Number(driverId) && t.trip_status !== 'Cancelled',
+  }));
+
+  const fuelRows = fuel.map(f => ({
+    ...f,
+    quantity: Number(f.quantity) || 0,
+    rate: Number(f.rate) || 0,
+    total_cost: Number(f.total_cost) || 0,
+    distance: Number(f.distance) || 0,
+    mileage: Number(f.mileage) || 0,
+  }));
+
+  // KM run = odometer range of the month's fills (reading before the first
+  // fill → last reading); robust to a duplicated fill, unlike adding each
+  // fill's distance. The litres of those fills cover exactly that range, so
+  // mileage = KM run ÷ litres. AdBlue is not propulsion fuel and is left out.
+  const propulsion = fuelRows.filter(f => f.fuel_type !== 'AdBlue');
+  const fuelLitres = propulsion.reduce((s, f) => s + f.quantity, 0);
+  const fuelCost = propulsion.reduce((s, f) => s + f.total_cost, 0);
+  const withOdo = propulsion.filter(f => Number(f.current_odo) > 0);
+  const odoStart = withOdo.length
+    ? Math.min(...withOdo.map(f => (Number(f.previous_odo) > 0 ? Number(f.previous_odo) : Number(f.current_odo))))
+    : 0;
+  const odoEnd = withOdo.length ? Math.max(...withOdo.map(f => Number(f.current_odo))) : 0;
+  const measuredKm = Math.max(odoEnd - odoStart, 0);
+  const measuredLitres = measuredKm > 0 ? fuelLitres : 0;
+  const avgMileage = measuredLitres > 0 ? measuredKm / measuredLitres : 0;
+  const expectedMileage = Number(vehicle?.mileage) || 0;
+  const expectedLitres = expectedMileage > 0 ? measuredKm / expectedMileage : 0;
+  const excessLitres = expectedLitres > 0 && measuredLitres > expectedLitres ? measuredLitres - expectedLitres : 0;
+  const avgRate = fuelLitres > 0 ? fuelCost / fuelLitres : 0;
+  const round = (n, d = 2) => Math.round(n * 10 ** d) / 10 ** d;
+
+  const truckTrips = tripRows.filter(t => t.on_this_truck);
+  return {
+    vehicle: { id: vehicleId, vehicle_no: vehicleNo, expected_mileage: expectedMileage },
+    month,
+    trips: tripRows,
+    fuel: fuelRows,
+    summary: {
+      truck_trips: truckTrips.length,
+      counted_trips: tripRows.filter(t => t.counted).length,
+      other_driver_trips: truckTrips.filter(t => !t.counted && t.trip_status !== 'Cancelled').length,
+      planned_km: truckTrips.reduce((s, t) => s + t.est_distance, 0),
+      // same rule as the settlement's Driver Advance deduction (this driver's trips)
+      trip_advances: tripRows.filter(t => driverId && Number(t.driver_id) === Number(driverId))
+        .reduce((s, t) => s + t.driver_advance, 0),
+      fills: fuelRows.length,
+      fuel_litres: round(fuelLitres),
+      fuel_cost: round(fuelCost),
+      adblue_litres: round(fuelRows.filter(f => f.fuel_type === 'AdBlue').reduce((s, f) => s + f.quantity, 0)),
+      km_run: round(measuredKm, 0),
+      odo_start: odoStart,
+      odo_end: odoEnd,
+      avg_mileage: round(avgMileage),
+      expected_mileage: expectedMileage,
+      expected_litres: round(expectedLitres),
+      excess_litres: round(excessLitres),
+      excess_value: round(excessLitres * avgRate, 0),
+    },
   };
 };
 
@@ -473,6 +608,7 @@ module.exports = {
   getDriverById,
   getAllSettlementDrivers,
   getDriverDetails,
+  getMonthDetails,
   createSettlement,
   getSettlements,
   getPendingSettlements,

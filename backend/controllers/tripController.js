@@ -2,12 +2,63 @@ const Trip = require('../models/tripModel');
 const db = require('../config/db');
 const lifecycle = require('../services/maintenanceLifecycleService');
 
+// Today's date in India (the server may run in UTC), as YYYY-MM-DD.
+const todayIST = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+
+// Only the Admin role may give a trip a date before today. The role is read
+// from the users table so a role change applies immediately.
+async function isAdminUser(req) {
+  if (!req.user?.id) return false;
+  const [[row]] = await db.query(
+    `SELECT COALESCE(r.role_name, u.role) AS role
+     FROM users u LEFT JOIN roles r ON r.id = u.role_id
+     WHERE u.id = ?`,
+    [req.user.id]
+  );
+  return String(row?.role || '').trim().toLowerCase() === 'admin';
+}
+
+async function checkTripDate(req, tripDate) {
+  if (!tripDate) return null;
+  const date = String(tripDate).slice(0, 10);
+  if (date < todayIST() && !(await isAdminUser(req))) {
+    return 'Only an admin can create a trip with a past date. Use today\'s date.';
+  }
+  return null;
+}
+
+const wallet = require('../services/supervisorWalletService');
+
+const totalAdvanceOf = (t) =>
+  (Number(t.driver_advance) || 0) + (Number(t.hamali_advance) || 0) + (Number(t.other_advance) || 0);
+
+const advanceDescription = (t) => [
+  Number(t.driver_advance) > 0 && `Driver ₹${Number(t.driver_advance)}`,
+  Number(t.hamali_advance) > 0 && `Hamali ₹${Number(t.hamali_advance)}`,
+  Number(t.other_advance) > 0 && `Other ₹${Number(t.other_advance)}`,
+].filter(Boolean).join(' · ') + (t.destination ? ` → ${t.destination}` : '');
+
+// Multipart requests send every field as text; turn "" back into NULL.
+function normalizeTripBody(body) {
+  const data = { ...body };
+  Object.keys(data).forEach(key => {
+    if (data[key] === '' || data[key] === 'null' || data[key] === 'undefined') data[key] = null;
+  });
+  return data;
+}
+
 
 // ✅ CREATE TRIP
 const createTrip = async (req, res) => {
   try {
     console.log("REQ BODY:", req.body);
-    const tripData = req.body;
+    const tripData = req.is('multipart/form-data') ? normalizeTripBody(req.body) : req.body;
+
+    const dateError = await checkTripDate(req, tripData.trip_date);
+    if (dateError) return res.status(403).json({ success: false, message: dateError });
+
+    // Invoice uploaded at trip generation (given before loading)
+    if (req.file) tripData.invoice_file = req.file.filename;
 
     // Auto-generate serial trip ID
     const [[lastTrip]] = await db.query('SELECT trip_id FROM trips ORDER BY id DESC LIMIT 1');
@@ -62,16 +113,21 @@ const createTrip = async (req, res) => {
     if (tripData.vehicle_id) await lifecycle.syncVehicleOperationalStatus(tripData.vehicle_id);
 
     // ── Deduct total advance from supervisor wallet ──────────────────────
-    const totalAdvance =
-      (Number(tripData.driver_advance)  || 0) +
-      (Number(tripData.hamali_advance)  || 0) +
-      (Number(tripData.other_advance)   || 0);
+    // The wallet may go below zero (client requirement). A draft is not a
+    // trip yet: its advance is deducted when the draft is generated (updateTrip).
+    const totalAdvance = totalAdvanceOf(tripData);
 
-    if (tripData.supervisor_id && totalAdvance > 0) {
-      await db.query(
-        `UPDATE supervisors SET wallet_balance = wallet_balance - ? WHERE id = ?`,
-        [totalAdvance, tripData.supervisor_id]
-      );
+    if (tripData.trip_status !== 'Draft' && tripData.supervisor_id && totalAdvance > 0) {
+      await wallet.post({
+        supervisorId: tripData.supervisor_id,
+        amount: -totalAdvance,
+        type: wallet.TYPES.TRIP_ADVANCE,
+        tripId: newTrip.insertId,
+        tripCode: tripData.trip_id,
+        vehicleNo: tripData.truck_no,
+        description: advanceDescription(tripData),
+        createdBy: req.user?.username,
+      });
     }
 
     res.status(201).json({
@@ -218,8 +274,36 @@ const updateTrip = async (req, res) => {
       });
     }
 
-    await Trip.update(id, req.body);
+    const data = req.is('multipart/form-data') ? normalizeTripBody(req.body) : { ...req.body };
+
+    // A draft keeps the date rule: no past dates unless admin (only when the date changes)
+    const existingDate = existing.trip_date ? new Date(existing.trip_date).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) : null;
+    if (data.trip_date && String(data.trip_date).slice(0, 10) !== existingDate) {
+      const dateError = await checkTripDate(req, data.trip_date);
+      if (dateError) return res.status(403).json({ success: false, message: dateError });
+    }
+
+    if (req.file) data.invoice_file = req.file.filename;
+
+    await Trip.update(id, data);
     const updated = await Trip.getById(id);
+
+    // Draft generated into a real trip → deduct its advance now (once).
+    if (existing.trip_status === 'Draft' && updated?.trip_status && updated.trip_status !== 'Draft') {
+      const advance = totalAdvanceOf(updated);
+      if (updated.supervisor_id && advance > 0) {
+        await wallet.post({
+          supervisorId: updated.supervisor_id,
+          amount: -advance,
+          type: wallet.TYPES.TRIP_ADVANCE,
+          tripId: updated.id,
+          tripCode: updated.trip_id,
+          vehicleNo: updated.truck_no,
+          description: advanceDescription(updated),
+          createdBy: req.user?.username,
+        });
+      }
+    }
     if (existing.vehicle_id) await lifecycle.syncVehicleOperationalStatus(existing.vehicle_id);
     if (updated?.vehicle_id && updated.vehicle_id !== existing.vehicle_id) await lifecycle.syncVehicleOperationalStatus(updated.vehicle_id);
 
@@ -360,7 +444,8 @@ const updateTripStatus = async (req, res) => {
     if (trip?.vehicle_id) await lifecycle.syncVehicleOperationalStatus(trip.vehicle_id);
 
     // ── On Closed: settle supervisor wallet (refund unspent advance) ─────
-    if (status === 'Closed' && trip?.supervisor_id) {
+    // Once per trip — closing again must not settle twice.
+    if (status === 'Closed' && trip?.supervisor_id && !(await wallet.hasTripSettlement(trip.id))) {
       const [[fuelRow]] = await db.query(
         `SELECT COALESCE(SUM(quantity * rate), 0) AS fuel_cost FROM trip_fuel WHERE trip_id = ?`,
         [trip.id]
@@ -369,10 +454,13 @@ const updateTripStatus = async (req, res) => {
         `SELECT COALESCE(SUM(amount), 0) AS exp_cost FROM trip_expenses WHERE trip_id IN (?, ?)`,
         [String(trip.id), String(trip.trip_id)]
       );
+      // Expenses the supervisor paid from the wallet were already deducted
+      // when recorded, so they are not part of the driver's advance spend.
       const [[financeExpRow]] = await db.query(
         `SELECT COALESCE(SUM(amount), 0) AS exp_cost
          FROM expense_entries
-         WHERE trip_id = ? AND entry_status != 'Deleted'`,
+         WHERE trip_id = ? AND entry_status != 'Deleted'
+           AND COALESCE(payment_method, '') != 'Supervisor Wallet'`,
         [trip.id]
       );
       const totalAdvance =
@@ -385,10 +473,18 @@ const updateTripStatus = async (req, res) => {
       // refund > 0 → driver returned cash, add back to wallet
       // refund < 0 → supervisor paid extra, deduct more from wallet
       if (refund !== 0) {
-        await db.query(
-          `UPDATE supervisors SET wallet_balance = wallet_balance + ? WHERE id = ?`,
-          [refund, trip.supervisor_id]
-        );
+        await wallet.post({
+          supervisorId: trip.supervisor_id,
+          amount: refund,
+          type: wallet.TYPES.SETTLEMENT,
+          tripId: trip.id,
+          tripCode: trip.trip_id,
+          vehicleNo: trip.truck_no,
+          description: refund > 0
+            ? `Unspent advance returned (advance ₹${totalAdvance} − spent ₹${totalSpent})`
+            : `Trip spend above advance (advance ₹${totalAdvance} − spent ₹${totalSpent})`,
+          createdBy: req.user?.username,
+        });
       }
     }
 

@@ -3,6 +3,7 @@ import {
   FiSearch, FiCheckCircle, FiFileText, FiTrash2, FiPrinter, FiX, FiCheck,
   FiDownload, FiDollarSign, FiClock, FiPlus, FiInfo, FiEdit2, FiRefreshCw,
 } from 'react-icons/fi';
+import SettlementMonthDetails from './SettlementMonthDetails';
 
 // ─────────────────────────────────────────────
 // TAB 1: PREPARE SETTLEMENT (FULLY DATABASE-DRIVEN)
@@ -167,6 +168,11 @@ export function PrepareSettlementTab({
             </div>
           )}
         </div>
+
+        {/* Month's trips of the truck + fuel & mileage (driver salary sheet) */}
+        {truckNo && statementMonth && (
+          <SettlementMonthDetails vehicleNo={truckNo} driverId={driver?.id} month={statementMonth} />
+        )}
 
         {/* Earnings Card */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">

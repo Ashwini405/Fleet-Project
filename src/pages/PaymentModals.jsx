@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import SettlementMonthDetails from './SettlementMonthDetails';
 import {
   FiFileText, FiX, FiCheck, FiCheckCircle, FiPrinter, FiDownload,
   FiDollarSign, FiClock, FiEdit2, FiRefreshCw,
@@ -44,6 +45,14 @@ export function DetailModal({ detailItem, onClose, onApprove, onReject, onEdit, 
               <p className="text-xs text-slate-500 mt-0.5">Month: {detailItem.statement_month} &bull; {detailItem.total_trips} Trips</p>
             </div>
           </div>
+
+          {/* Trips + fuel & mileage of the month, so the approver can verify */}
+          <SettlementMonthDetails
+            vehicleNo={detailItem.vehicle_no}
+            driverId={detailItem.driver_id}
+            month={detailItem.statement_month}
+            compact
+          />
 
           {/* Rejected Banner */}
           {detailItem.status === 'Rejected' && (

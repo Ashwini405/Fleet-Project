@@ -2,7 +2,10 @@ const express = require("express");
 
 const router = express.Router();
 
+const { protect } = require("../middleware/permissionMiddleware");
+
 const {
+  getMonthDetails,
   getPlants,
   getVehiclesByPlant,
   getDriverByVehicle,
@@ -18,6 +21,15 @@ const {
   duplicateSettlement
 } = require(
   "../controllers/driverSettlementController"
+);
+
+// ====================================
+// Month trips + fuel/mileage for the salary sheet
+// ====================================
+router.get(
+  "/month-details",
+  ...protect("Operational Payments", "view"),
+  getMonthDetails
 );
 
 // ====================================

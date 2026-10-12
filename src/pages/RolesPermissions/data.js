@@ -17,6 +17,7 @@ export const MODULES = [
   { key: 'vendor',           label: 'Vendor',               name: 'Vendor Ledgers',         group: 'Finance & Staff'     },
   { key: 'payments',         label: 'Operational Payments', name: 'Operational Payments',   group: 'Finance & Staff'     },
   { key: 'fastag',           label: 'Fastag',               name: 'Fastag Management',      group: 'Finance & Staff'     },
+  { key: 'supervisorWallet', label: 'Supervisor Wallet',    name: 'Supervisor Wallet',      group: 'Finance & Staff'     },
   { key: 'reports',          label: 'Reports',              name: 'Profit & Loss Reports',  group: 'Finance & Staff'     },
   { key: 'truckPL',          label: 'Truck Profit & Loss',  name: 'Truck P&L (detail)',     group: 'Finance & Staff'     },
   { key: 'staff',            label: 'Staff Management',     name: 'Staff Management',       group: 'Finance & Staff'     },

@@ -52,6 +52,7 @@ const UserManagement        = lazy(() => import("./pages/UserManagement/UserMana
 const RolesPermissions      = lazy(() => import("./pages/RolesPermissions"));
 const BackupRestore         = lazy(() => import("./pages/BackupRestore"));
 const Fastag                = lazy(() => import("./pages/Fastag"));
+const SupervisorWallet      = lazy(() => import("./pages/SupervisorWallet"));
 const Tenders                = lazy(() => import("./pages/Tenders"));
 
 function PageLoader() {
@@ -166,6 +167,7 @@ function InnerApp() {
                     <Route path="/vendors" element={<ProtectedRoute module="Vendor" action="view"><Vendors /></ProtectedRoute>} />
                     <Route path="/payments" element={<ProtectedRoute module="Operational Payments" action="view"><Payments /></ProtectedRoute>} />
                     <Route path="/fastag" element={<ProtectedRoute module="Fastag" action="view"><Fastag /></ProtectedRoute>} />
+                    <Route path="/supervisor-wallet" element={<ProtectedRoute module="Supervisor Wallet" action="view"><SupervisorWallet /></ProtectedRoute>} />
                     <Route path="/tenders" element={<ProtectedRoute module="Tender Data" action="view"><Tenders /></ProtectedRoute>} />
                     <Route path="/reports" element={<ProtectedRoute module="Reports" action="view"><Reports /></ProtectedRoute>} />
                     <Route path="/reports/trucks" element={<Navigate to="/reports" replace />} />

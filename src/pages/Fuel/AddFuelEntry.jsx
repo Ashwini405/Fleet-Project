@@ -5,7 +5,9 @@ const inp = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-wh
 const inpDisabled = 'w-full px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-slate-100 text-slate-600 cursor-not-allowed';
 const lbl = 'block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5';
 
-export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
+// trip    — fuel filled during a trip (vehicle locked to the trip's truck)
+// vehicle — optional { id, vehicle_no } to pre-select when adding fuel without a trip
+export default function AddFuelEntry({ isOpen, onClose, onSave, trip, vehicle }) {
   const [vehicles, setVehicles] = useState([]);
   const [fuelVendors, setFuelVendors] = useState([]);
   const [vehicleInfo, setVehicleInfo] = useState(null);
@@ -51,9 +53,16 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
       .then(r => r.json()).then(d => d.success && setFuelVendors(d.data || [])).catch(() => {});
   }, [isOpen]);
 
-  // ── Pre-fill from trip prop ───────────────────────────────────────────────
+  // ── Pre-fill a chosen vehicle when adding fuel without a trip ────────────
   useEffect(() => {
-    if (!trip) return;
+    if (!isOpen || trip || !vehicle?.id) return;
+    setForm(p => ({ ...p, vehicle_id: vehicle.id, vehicle_no: vehicle.vehicle_no }));
+    fetchVehicleInfo(vehicle.id);
+  }, [isOpen, trip, vehicle]);
+
+  // ── Pre-fill from trip prop (on every open, since closing resets the form) ─
+  useEffect(() => {
+    if (!isOpen || !trip) return;
     const vehicleNo = trip.vehicle || trip.vehicle_no || trip.truck_no || '';
     const vehicleId = trip.vehicle_id || trip.vehicleId || '';
     setForm(p => ({ ...p, vehicle_id: vehicleId, vehicle_no: vehicleNo }));
@@ -79,7 +88,7 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
           if (sup) setSupervisorWallet(Number(sup.wallet_balance || 0));
         }).catch(() => {});
     }
-  }, [trip]);
+  }, [isOpen, trip]);
 
   // ── Fetch vehicle info when vehicle selected ──────────────────────────────
   const fetchVehicleInfo = (vehicleId) => {
@@ -89,7 +98,7 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
         if (d.success && d.data) {
           const v = d.data;
           setVehicleInfo({
-            driver: v.driver_name || '—',
+            driver: v.driver_name || '',
             lastOdo: v.current_odometer ?? v.initial_odometer ?? 0,
             expectedMileage: Number(v.mileage) || 4.5,
             tankCapacity: Number(v.tank_capacity) || 200,
@@ -247,10 +256,12 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
             <span className="text-2xl">⛽</span>
             <div>
               <h2 className="text-base font-bold text-slate-800">Add Fuel Entry</h2>
-              {trip && (
+              {trip ? (
                 <p className="text-xs text-slate-400 mt-0.5">
                   {trip.tripId} · {trip.vehicle} · {trip.source} → {trip.destination}
                 </p>
+              ) : (
+                <p className="text-xs text-slate-400 mt-0.5">Not linked to a trip</p>
               )}
             </div>
           </div>
@@ -307,7 +318,7 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
           <div>
             <label className={lbl}>Driver (Auto)</label>
             <input value={vehicleInfo?.driver || ''} disabled className={inpDisabled}
-              placeholder="Select vehicle first" />
+              placeholder={vehicleInfo ? 'No driver assigned' : 'Select vehicle first'} />
           </div>
 
           {/* Row 3 — Last ODO (auto) & Current ODO */}
@@ -352,7 +363,8 @@ export default function AddFuelEntry({ isOpen, onClose, onSave, trip }) {
             <div>
               <label className={lbl}>Payment Method</label>
               <div className="flex flex-wrap gap-2">
-                {['Cash', 'Fuel Card', 'Credit', 'UPI', 'FASTag Wallet', 'Driver Advance'].map(opt => (
+                {/* Driver Advance comes out of the trip supervisor's wallet, so it needs a trip */}
+                {['Cash', 'Fuel Card', 'Credit', 'UPI', 'FASTag Wallet', ...(trip ? ['Driver Advance'] : [])].map(opt => (
                   <button key={opt} type="button"
                     onClick={() => handlePaymentChange(opt)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition ${

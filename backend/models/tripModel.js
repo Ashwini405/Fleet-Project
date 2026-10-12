@@ -5,7 +5,8 @@ const tripIdentifierLookup = (tripId, alias = '') => {
   if (/^\d+$/.test(String(tripId))) {
     return {
       where: `(${prefix}trip_id = ? OR ${prefix}id = ?)`,
-      values: [tripId, tripId]
+      // trip_id is text: compare it as text, or MySQL casts every "TRIP-xxxx" to a number
+      values: [String(tripId), Number(tripId)]
     };
   }
   return { where: `${prefix}trip_id = ?`, values: [tripId] };

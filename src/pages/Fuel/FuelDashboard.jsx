@@ -96,7 +96,8 @@ export default function FuelDashboard() {
     return trips.map(t => {
       const distance        = Number(t.distance || t.est_distance || 0);
       const expectedMileage = Number(t.expected_mileage || 0);
-      const tripEntries     = byTrip[t.trip_id] || [];
+      // fuel_entries.trip_id holds the trip's numeric id (trips.id), not its "TRIP-xxxx" code
+      const tripEntries     = byTrip[t.id] || [];
 
       // ── Fuel validation: skip entries with qty <= 0 ──
       const validEntries = tripEntries.filter(e => Number(e.quantity || 0) > 0);
@@ -171,21 +172,27 @@ export default function FuelDashboard() {
   // avgMileage = totalDistanceOfFueledTrips / totalActualFuel  (correct formula)
   const fleet = useMemo(() => {
     const fueledTrips = tripRows.filter(t => t.actualFuel > 0);
-    const totalFuel   = fueledTrips.reduce((s, t) => s + t.actualFuel, 0);
-    const totalCost   = fueledTrips.reduce((s, t) => s + t.totalCost, 0);
+    // Fuel & cost totals cover every entry, including fuel filled without a trip.
+    const validEntries   = entries.filter(e => Number(e.quantity || 0) > 0);
+    const fuelEntries    = validEntries.filter(e => e.fuel_type !== 'AdBlue');
+    const adBlueEntries  = validEntries.filter(e => e.fuel_type === 'AdBlue');
+    const totalFuel   = fuelEntries.reduce((s, e) => s + Number(e.quantity), 0);
+    const totalCost   = fuelEntries.reduce((s, e) => s + Number(e.total_cost || 0), 0);
+    // Mileage needs a trip's distance, so it stays trip-based:
+    // total distance of fueled trips / their fuel (not an average of per-trip KMPLs)
+    const tripFuel    = fueledTrips.reduce((s, t) => s + t.actualFuel, 0);
     const totalDist   = fueledTrips.reduce((s, t) => s + t.distance, 0);
-    // correct avg: total distance of fueled trips / total fuel (not sum of per-trip KMPLs)
-    const avgMileage  = totalFuel > 0 ? totalDist / totalFuel : 0;
+    const avgMileage  = tripFuel > 0 ? totalDist / tripFuel : 0;
     const alertCount  = fueledTrips.filter(t => t.status !== 'normal').length;
     const noFuelCount = tripRows.filter(t => t.status === 'no-fuel').length;
-    const totalAdBlueQty  = tripRows.reduce((s, t) => s + Number(t.adBlueQty || 0), 0);
-    const totalAdBlueCost = tripRows.reduce((s, t) => s + Number(t.adBlueCost || 0), 0);
+    const totalAdBlueQty  = adBlueEntries.reduce((s, e) => s + Number(e.quantity), 0);
+    const totalAdBlueCost = adBlueEntries.reduce((s, e) => s + Number(e.total_cost || 0), 0);
     return {
       totalFuel: fmt1(totalFuel), totalCost, avgMileage: fmt2(avgMileage),
       activeTrips: fueledTrips.length, alertCount, noFuelCount,
       totalAdBlueQty: fmt1(totalAdBlueQty), totalAdBlueCost,
     };
-  }, [tripRows]);
+  }, [tripRows, entries]);
 
   // ─── Unique vehicles for filter dropdown ─────────────────────────────────
   const uniqueVehicles = useMemo(() =>
@@ -245,12 +252,18 @@ export default function FuelDashboard() {
     <div className="flex flex-col gap-5">
 
       {/* ── Header ── */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-black text-slate-800">Fuel Dashboard</h1>
           <p className="text-sm text-slate-500 mt-0.5">Trip-wise fuel summary · click any row to drill down</p>
         </div>
-       
+        {/* Fuel for any vehicle, with or without a trip */}
+        <button
+          onClick={() => setAddOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition whitespace-nowrap"
+        >
+          <FiPlus className="w-4 h-4" /> Add Fuel Entry
+        </button>
       </div>
 
       {/* ── Summary Cards ── */}
@@ -259,13 +272,13 @@ export default function FuelDashboard() {
           icon={<FiDroplet className="w-5 h-5 text-blue-600" />}
           label="Total Fuel Used" accent="bg-blue-50"
           value={`${fleet.totalFuel} L`}
-          sub="Sum of valid entries only"
+          sub="All entries, incl. without trip"
         />
         <Card
           icon={<FiDollarSign className="w-5 h-5 text-emerald-600" />}
           label="Total Fuel Cost" accent="bg-emerald-50"
           value={compactINR(fleet.totalCost)}
-          sub="Sum of all amounts"
+          sub="All entries, incl. without trip"
         />
         <Card
           icon={<FiActivity className="w-5 h-5 text-amber-600" />}

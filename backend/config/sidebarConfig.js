@@ -41,6 +41,7 @@ const SIDEBAR_CONFIG = [
             { name: 'Vendor Ledgers', path: '/vendors', module: 'Vendor' },
             { name: 'Operational Payments', path: '/payments', module: 'Operational Payments' },
             { name: 'Fastag Management', path: '/fastag', module: 'Fastag' },
+            { name: 'Supervisor Wallet', path: '/supervisor-wallet', module: 'Supervisor Wallet' },
             { name: 'Profit & Loss Reports', path: '/reports', module: 'Reports' },
             { name: 'Staff Management', path: '/staff', module: 'Staff Management' },
         ],
