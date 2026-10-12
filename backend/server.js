@@ -109,6 +109,60 @@ const roleRoutes = require("./routes/roleRoutes");
 const backupRestoreRoutes = require("./routes/backupRestoreRoutes");
 const authRoutes = require("./routes/authRoutes");
 
+// Auto-create audit_logs table
+db.query(`
+  CREATE TABLE IF NOT EXISTS audit_logs (
+    id           INT AUTO_INCREMENT PRIMARY KEY,
+    user_id      INT          NULL,
+    module_name  VARCHAR(100) NOT NULL,
+    action       VARCHAR(100) NOT NULL,
+    description  TEXT         NULL,
+    old_data     TEXT         NULL,
+    new_data     TEXT         NULL,
+    ip_address   VARCHAR(64)  NULL,
+    browser      VARCHAR(255) NULL,
+    performed_by VARCHAR(100) NOT NULL DEFAULT 'system',
+    created_at   TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+`).then(() => console.log('audit_logs table ready'))
+  .catch(e => console.error('audit_logs table error:', e.message));
+
+// Auto-create user_login_history table
+db.query(`
+  CREATE TABLE IF NOT EXISTS user_login_history (
+    id               INT AUTO_INCREMENT PRIMARY KEY,
+    user_id          INT          NOT NULL,
+    login_time       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    logout_time      DATETIME     NULL,
+    ip_address       VARCHAR(64)  NULL,
+    browser          VARCHAR(255) NULL,
+    device           VARCHAR(100) NULL,
+    operating_system VARCHAR(100) NULL,
+    login_type       VARCHAR(50)  NOT NULL DEFAULT 'Web',
+    status           VARCHAR(20)  NOT NULL DEFAULT 'Success',
+    remarks          TEXT         NULL,
+    created_at       TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+`).then(() => console.log('user_login_history table ready'))
+  .catch(e => console.error('user_login_history table error:', e.message));
+
+// Auto-create refresh_tokens table
+db.query(`
+  CREATE TABLE IF NOT EXISTS refresh_tokens (
+    id             INT AUTO_INCREMENT PRIMARY KEY,
+    user_id        INT          NOT NULL,
+    token_hash     VARCHAR(255) NOT NULL,
+    expires_at     DATETIME     NOT NULL,
+    revoked_at     DATETIME     NULL,
+    created_by_ip  VARCHAR(64)  NULL,
+    user_agent     VARCHAR(255) NULL,
+    created_at     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_refresh_hash (token_hash),
+    INDEX idx_refresh_user (user_id)
+  )
+`).then(() => console.log('refresh_tokens table ready'))
+  .catch(e => console.error('refresh_tokens table error:', e.message));
+
 // Truck assignments must support the same dynamic categories as warehouse inventory.
 db.query(`
   ALTER TABLE truck_inventory
@@ -155,6 +209,21 @@ db.query(`
   )
 `).then(() => console.log('fastag_monthly_postings table ready'))
   .catch(e => console.error('fastag_monthly_postings table error:', e.message));
+
+// Auto-create fastag_notifications table
+db.query(`
+  CREATE TABLE IF NOT EXISTS fastag_notifications (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    vehicle_no  VARCHAR(50),
+    fastag_id   VARCHAR(60),
+    title       VARCHAR(255) NOT NULL,
+    message     TEXT         NOT NULL,
+    severity    ENUM('Low','Medium','High','Critical') NOT NULL DEFAULT 'Medium',
+    is_read     BOOLEAN      NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )
+`).then(() => console.log('fastag_notifications table ready'))
+  .catch(e => console.error('fastag_notifications table error:', e.message));
 
 // Auto-create warranty_notifications table
 db.query(`

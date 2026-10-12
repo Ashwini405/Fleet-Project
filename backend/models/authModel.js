@@ -115,11 +115,16 @@ class AuthModel {
 
     static async createLoginHistory({ userId, ip, browser, loginType = 'Web', status, remarks = null }) {
 
-        await pool.query(`
-            INSERT INTO user_login_history
-            (user_id, login_time, ip_address, browser, login_type, status, remarks)
-            VALUES (?, NOW(), ?, ?, ?, ?, ?)
-        `, [userId, ip || null, browser || null, loginType, status, remarks]);
+        try {
+            await pool.query(`
+                INSERT INTO user_login_history
+                (user_id, login_time, ip_address, browser, login_type, status, remarks)
+                VALUES (?, NOW(), ?, ?, ?, ?, ?)
+            `, [userId, ip || null, browser || null, loginType, status, remarks]);
+        } catch (err) {
+            // Non-fatal: login history insert failure should not block authentication
+            console.error('LOGIN HISTORY INSERT ERROR:', err.message);
+        }
 
     }
 

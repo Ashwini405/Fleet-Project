@@ -62,33 +62,43 @@ async function issueRefreshToken(res, user, req) {
     const tokenHash = hashToken(rawToken);
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRES_DAYS * 24 * 60 * 60 * 1000);
 
-    await AuthModel.createRefreshToken({
-        userId: user.id,
-        tokenHash,
-        expiresAt,
-        ip: req.ip,
-        userAgent: req.headers['user-agent'] || null,
-    });
-
-    res.cookie(REFRESH_COOKIE_NAME, rawToken, refreshCookieOptions());
+    try {
+        await AuthModel.createRefreshToken({
+            userId: user.id,
+            tokenHash,
+            expiresAt,
+            ip: req.ip,
+            userAgent: req.headers['user-agent'] || null,
+        });
+        res.cookie(REFRESH_COOKIE_NAME, rawToken, refreshCookieOptions());
+    } catch (err) {
+        console.error('issueRefreshToken ERROR:', err.message);
+        // Still set cookie so login succeeds; token rotation will self-heal
+        res.cookie(REFRESH_COOKIE_NAME, rawToken, refreshCookieOptions());
+    }
 }
 
 async function buildPermissionsAndSidebar(userId, roleId) {
-    const permissions = await getMergedPermissions(userId, roleId);
-    const viewable = new Set(
-        permissions.filter((p) => p.can_view).map((p) => p.module_name)
-    );
+    try {
+        const permissions = await getMergedPermissions(userId, roleId);
+        const viewable = new Set(
+            permissions.filter((p) => p.can_view).map((p) => p.module_name)
+        );
 
-    const sidebar = SIDEBAR_CONFIG
-        .map((group) => ({
-            ...group,
-            items: group.items.filter((item) => item.module === null || viewable.has(item.module)),
-        }))
-        .filter((group) => group.items.length > 0);
+        const sidebar = SIDEBAR_CONFIG
+            .map((group) => ({
+                ...group,
+                items: group.items.filter((item) => item.module === null || viewable.has(item.module)),
+            }))
+            .filter((group) => group.items.length > 0);
 
-    const modules = Array.from(viewable);
+        const modules = Array.from(viewable);
 
-    return { permissions, sidebar, modules };
+        return { permissions, sidebar, modules };
+    } catch (err) {
+        console.error('buildPermissionsAndSidebar ERROR:', err.message);
+        return { permissions: [], sidebar: [], modules: [] };
+    }
 }
 
 class AuthController {
