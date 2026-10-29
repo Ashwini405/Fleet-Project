@@ -11,6 +11,14 @@ const db = require('../config/db');
       console.log('drivers: added wallet_balance column');
     }
 
+    const [licenseCols] = await db.query(
+      `SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'drivers' AND COLUMN_NAME = 'driving_license'`
+    );
+    if (!licenseCols.length) {
+      await db.query(`ALTER TABLE drivers ADD COLUMN driving_license VARCHAR(255) DEFAULT NULL`);
+      console.log('drivers: added driving_license column');
+    }
+
     // 1. If multiple vehicles point to same driver, keep only newest vehicle assignment
     await db.query(`
       UPDATE vehicles v
@@ -80,9 +88,10 @@ const Driver = {
         wallet_balance,
         profile_photo,
         id_document,
+        driving_license,
         bank_document
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         data.full_name,
         data.mobile,
@@ -100,6 +109,7 @@ const Driver = {
         // frontend/multer field is named `id_proof`; DB column is `id_document`
         data.profile_photo || null,
         data.id_proof || null,
+        data.driving_license || null,
         data.bank_document || null
       ]
     );
@@ -234,6 +244,10 @@ const Driver = {
     if (data.id_proof) {
       fields.push('id_document = ?');
       params.push(data.id_proof);
+    }
+    if (data.driving_license) {
+      fields.push('driving_license = ?');
+      params.push(data.driving_license);
     }
     if (data.bank_document) {
       fields.push('bank_document = ?');

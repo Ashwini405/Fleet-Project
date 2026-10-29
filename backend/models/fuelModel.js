@@ -29,7 +29,7 @@ getAll: async () => {
 },
 
   // ✅ GET BY VEHICLE (WITH TRIP INFO)
-  getByVehicle: async (vehicleId) => {
+  getByVehicle: async (vehicleId, month = null) => {
     const [rows] = await db.query(`
       SELECT f.*,
              t.trip_id,
@@ -37,8 +37,9 @@ getAll: async () => {
       FROM fuel_entries f
       LEFT JOIN trips t ON f.trip_id = t.id
       WHERE f.vehicle_id = ?
+        AND (? IS NULL OR DATE_FORMAT(f.date, '%Y-%m') = ?)
       ORDER BY f.created_at DESC
-    `, [vehicleId]);
+    `, [vehicleId, month, month]);
     return rows;
   },
 

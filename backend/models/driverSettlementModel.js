@@ -140,12 +140,47 @@ const getDriverDetails = async (
     ]
   );
 
+  const [tripDetails] = await db.query(
+    `
+    SELECT
+      trip_id,
+      trip_date,
+      truck_no,
+      source,
+      destination,
+      trip_status,
+      expected_mileage,
+      CASE
+        WHEN last_odometer > start_odometer AND (
+          SELECT SUM(fe.quantity)
+          FROM fuel_entries fe
+          WHERE fe.trip_id = trips.id
+        ) > 0
+        THEN ROUND(
+          (last_odometer - start_odometer) / (
+            SELECT SUM(fe.quantity)
+            FROM fuel_entries fe
+            WHERE fe.trip_id = trips.id
+          ),
+          2
+        )
+        ELSE NULL
+      END AS actual_mileage
+    FROM trips
+    WHERE driver_id = ?
+      AND DATE_FORMAT(trip_date, '%Y-%m') = ?
+    ORDER BY trip_date DESC, id DESC
+    `,
+    [driverId, month]
+  );
+
   // Any manually-given ("Other") advances still outstanding are also due
   // for recovery, regardless of which month they were given in.
   const outstandingOther = await driverAdvanceModel.getOutstandingTotal(driverId);
 
   return {
     ...rows[0],
+    trip_details: tripDetails,
     total_advance: Number(rows[0].total_advance) + outstandingOther
   };
 };

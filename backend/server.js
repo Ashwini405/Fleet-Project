@@ -154,6 +154,23 @@ db.query(`
 `).then(() => console.log('trip_fuel table ready'))
   .catch(e => console.error('trip_fuel table error:', e.message));
 
+const supervisorWalletCreditsSchemaReady = db.query(`
+  CREATE TABLE IF NOT EXISTS supervisor_wallet_credits (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    supervisor_id INT NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_supervisor_wallet_credits_supervisor (supervisor_id),
+    CONSTRAINT fk_supervisor_wallet_credits_supervisor
+      FOREIGN KEY (supervisor_id) REFERENCES supervisors(id) ON DELETE CASCADE
+  )
+`).then(() => {
+  console.log('supervisor_wallet_credits table ready');
+}).catch(error => {
+  console.error('supervisor_wallet_credits table error:', error.message);
+  throw error;
+});
+
 // Keep monthly FASTag fuel postings available for installations that predate the migration.
 db.query(`
   CREATE TABLE IF NOT EXISTS fastag_monthly_postings (
@@ -637,6 +654,13 @@ app.use((err, req, res, next) => {
 // 🔥 START SERVER
 const PORT = process.env.PORT || 5001;
 
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+supervisorWalletCreditsSchemaReady
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  })
+  .catch(() => {
+    console.error('Server startup stopped because supervisor wallet credits could not be initialized.');
+    process.exitCode = 1;
+  });

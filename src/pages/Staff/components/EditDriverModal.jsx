@@ -28,6 +28,7 @@ export default function EditDriverModal({ isOpen, onClose, onSuccess, driver }) 
   const [files, setFiles] = useState({
     profile_photo: null,
     id_proof: null,
+    driving_license: null,
     bank_document: null
   });
 
@@ -51,7 +52,7 @@ export default function EditDriverModal({ isOpen, onClose, onSuccess, driver }) 
       ifsc_code: driver.ifsc_code || ''
     });
 
-    setFiles({ profile_photo: null, id_proof: null, bank_document: null });
+    setFiles({ profile_photo: null, id_proof: null, driving_license: null, bank_document: null });
     setActiveTab('personal');
     setToast(null);
   }, [driver]);
@@ -115,6 +116,7 @@ export default function EditDriverModal({ isOpen, onClose, onSuccess, driver }) 
 
     if (files.profile_photo) form.append('profile_photo', files.profile_photo);
     if (files.id_proof) form.append('id_proof', files.id_proof);
+    if (files.driving_license) form.append('driving_license', files.driving_license);
     if (files.bank_document) form.append('bank_document', files.bank_document);
 
     try {
@@ -159,6 +161,7 @@ export default function EditDriverModal({ isOpen, onClose, onSuccess, driver }) 
   const existingFiles = {
     profile_photo: driver.profile_photo,
     id_proof: driver.id_document,
+    driving_license: driver.driving_license,
     bank_document: driver.bank_document
   };
 
@@ -402,6 +405,7 @@ export default function EditDriverModal({ isOpen, onClose, onSuccess, driver }) 
                   {[
                     { key: 'profile_photo', label: 'Profile Photo' },
                     { key: 'id_proof', label: 'ID Card (Aadhar/Pan)' },
+                    { key: 'driving_license', label: 'Driving License' },
                     { key: 'bank_document', label: 'Bank Passbook / Cheque' },
                   ].map(({ key, label }) => {
                     const selected = files[key];

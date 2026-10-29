@@ -53,6 +53,8 @@ exports.createDriver = async (req, res) => {
         req.files?.profile_photo?.[0]?.filename || null,
       id_proof:
         req.files?.id_proof?.[0]?.filename || null,
+      driving_license:
+        req.files?.driving_license?.[0]?.filename || null,
       bank_document:
         req.files?.bank_document?.[0]?.filename || null,
     };
@@ -128,6 +130,8 @@ exports.updateDriver = async (req, res) => {
         req.files?.profile_photo?.[0]?.filename || null,
       id_proof:
         req.files?.id_proof?.[0]?.filename || null,
+      driving_license:
+        req.files?.driving_license?.[0]?.filename || null,
       bank_document:
         req.files?.bank_document?.[0]?.filename || null,
     };

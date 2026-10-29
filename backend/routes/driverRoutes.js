@@ -24,6 +24,10 @@ router.post(
       maxCount: 1
     },
     {
+      name: 'driving_license',
+      maxCount: 1
+    },
+    {
       name: 'bank_document',
       maxCount: 1
     }
@@ -41,6 +45,10 @@ router.put(
     },
     {
       name: 'id_proof',
+      maxCount: 1
+    },
+    {
+      name: 'driving_license',
       maxCount: 1
     },
     {

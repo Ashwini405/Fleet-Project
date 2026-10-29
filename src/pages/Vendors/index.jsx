@@ -12,6 +12,7 @@ import OilsPage         from './pages/OilsPage';
 import FuelVendorPage   from './pages/FuelVendorPage';
 import RTAPage          from './pages/RTAPage';
 import LabourPage       from './pages/LabourPage';
+import SupervisorLedgerPage from './pages/SupervisorLedgerPage';
 import {
   FiGrid, FiTool, FiUsers, FiBriefcase,
   FiSettings, FiCircle, FiDroplet, FiFeather, FiFileText,
@@ -103,6 +104,8 @@ export default function Vendors() {
           )
         ) : activePage === 'dashboard' ? (
           <DashboardPage onVendorClick={handleVendorClick} />
+        ) : activePage === 'supervisors' ? (
+          <SupervisorLedgerPage />
         ) : activePage === 'garages' ? (
           <GaragesPage onVendorClick={handleVendorClick} />
         ) : activePage === 'showrooms' ? (

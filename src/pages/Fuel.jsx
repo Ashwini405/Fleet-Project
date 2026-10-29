@@ -1,12 +1,13 @@
 import React from 'react';
-import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
-import { FiPieChart, FiList } from 'react-icons/fi';
+import { Routes, Route, NavLink, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { FiPieChart, FiList, FiPlus } from 'react-icons/fi';
 
 import FuelDashboard from './Fuel/FuelDashboard';
 import FuelLogs from './Fuel/FuelLogs';
 
 export default function Fuel() {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const tabs = [
     { name: 'Dashboard', path: '/fuel', icon: FiPieChart, exact: true },
@@ -17,8 +18,8 @@ export default function Fuel() {
     <div className="flex flex-col h-full animate-in fade-in duration-200">
       
       {/* Top Navigation Tabs */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 px-4">
-        <nav className="flex space-x-8" aria-label="Tabs">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 px-4 flex items-center justify-between gap-3">
+        <nav className="flex min-w-0 space-x-8" aria-label="Tabs">
           {tabs.map((tab) => {
             const isActive = tab.exact ? location.pathname === tab.path : location.pathname.startsWith(tab.path);
             const Icon = tab.icon;
@@ -40,6 +41,15 @@ export default function Fuel() {
             );
           })}
         </nav>
+        <button
+          type="button"
+          onClick={() => navigate('/fuel/logs', { state: { openAddFuelEntry: true } })}
+          className="flex shrink-0 items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-indigo-700 sm:px-4"
+        >
+          <FiPlus className="h-4 w-4" />
+          <span className="hidden sm:inline">Add Fuel Entry</span>
+          <span className="sm:hidden">Add Entry</span>
+        </button>
       </div>
 
       {/* Main Content Area */}

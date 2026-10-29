@@ -46,6 +46,8 @@ export default function Payments() {
   const [vehicleId, setVehicleId] = useState('');
   const [driverId, setDriverId] = useState('');
   const [totalTrips, setTotalTrips] = useState(0);
+  const [tripDetails, setTripDetails] = useState([]);
+  const [fuelEntries, setFuelEntries] = useState([]);
   const [totalAdvances, setTotalAdvances] = useState(0);
 
   // Prepare Settlement form state
@@ -285,6 +287,7 @@ export default function Payments() {
           }
         }
         setTotalTrips(Number(data.total_trips) || 0);
+        setTripDetails(data.trip_details || []);
         setTotalAdvances(Number(data.total_advance) || 0);
       }
     } catch (err) {
@@ -299,6 +302,7 @@ export default function Payments() {
       setVehicleId('');
       setTruckNo('');
       setTotalTrips(0);
+      setTripDetails([]);
       setTotalAdvances(0);
       return;
     }
@@ -442,6 +446,27 @@ export default function Payments() {
     fetchDriver();
   }, [truckNo]);
 
+  useEffect(() => {
+    if (!vehicleId || !statementMonth) {
+      setFuelEntries([]);
+      return;
+    }
+
+    const fetchFuelEntries = async () => {
+      try {
+        const response = await axios.get(
+          `http://localhost:5001/api/fuel/vehicle/${vehicleId}?month=${statementMonth}`
+        );
+        setFuelEntries(response.data.data || []);
+      } catch (error) {
+        console.error('Error fetching monthly fuel entries:', error);
+        setFuelEntries([]);
+      }
+    };
+
+    fetchFuelEntries();
+  }, [vehicleId, statementMonth]);
+
   const fetchDriver = async () => {
     try {
       const response = await axios.get(
@@ -458,6 +483,7 @@ export default function Payments() {
         setVehicleId(data.vehicle_id || '');
         setDriverId(data.driver_id || '');
         setTotalTrips(Number(data.total_trips) || 0);
+        setTripDetails(data.trip_details || []);
         setTotalAdvances(Number(data.total_advance) || 0);
       }
     } catch (error) {
@@ -1160,6 +1186,8 @@ export default function Payments() {
                 draftId={draftId}
                 settlementStatus={settlementStatus}
                 totalTrips={totalTrips}
+                tripDetails={tripDetails}
+                fuelEntries={fuelEntries}
                 totalAdvances={totalAdvances}
                 totalBattha={totalBattha}
                 totalAdditions={totalAdditions}
