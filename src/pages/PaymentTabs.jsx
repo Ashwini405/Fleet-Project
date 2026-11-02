@@ -48,6 +48,8 @@ export function PrepareSettlementTab({
   settlementStatus,
 
   totalTrips,
+  tripDetails = [],
+  fuelEntries = [],
   totalAdvances,
   totalBattha,
   totalAdditions,
@@ -224,6 +226,98 @@ export function PrepareSettlementTab({
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Monthly Trip Details */}
+        {driverName && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500" />
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-bold text-slate-800">Trip Details — {statementMonth}</h2>
+              <span className="text-xs font-semibold text-slate-500">{tripDetails.length} trips</span>
+            </div>
+            {tripDetails.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100">
+                      {['Trip ID', 'Date', 'Route', 'Vehicle', 'Trip Mileage', 'Expected Mileage', 'Status'].map(label => (
+                        <th key={label} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {tripDetails.map((trip, index) => (
+                      <tr key={trip.trip_id || index}>
+                        <td className="px-4 py-3 font-bold text-slate-800">{trip.trip_id || `Trip ${index + 1}`}</td>
+                        <td className="px-4 py-3 text-xs text-slate-600">
+                          {trip.trip_date ? new Date(trip.trip_date).toLocaleDateString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          }) : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{trip.source || '—'} → {trip.destination || '—'}</td>
+                        <td className="px-4 py-3 text-slate-600">{trip.truck_no || truckNo || '—'}</td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {Number(trip.actual_mileage) > 0 ? `${Number(trip.actual_mileage).toFixed(2)} km/L` : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">
+                          {Number(trip.expected_mileage) > 0 ? `${Number(trip.expected_mileage).toFixed(2)} km/L` : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{trip.trip_status || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <p className="px-5 py-6 text-sm text-slate-500">No trips found for this month.</p>
+            )}
+          </div>
+        )}
+
+        {/* Monthly Fuel Logs */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-amber-500" />
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-bold text-slate-800">Fuel Logs — {statementMonth}</h2>
+            <span className="text-xs font-semibold text-slate-500">{fuelEntries.length} entries</span>
+          </div>
+          {fuelEntries.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-100">
+                    {['Date', 'Fuel Type', 'Quantity', 'Rate', 'Total Cost', 'Vendor', 'Payment'].map(label => (
+                      <th key={label} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {fuelEntries.map((entry, index) => (
+                    <tr key={entry.id || index}>
+                      <td className="px-4 py-3 text-xs text-slate-600">
+                        {entry.date ? new Date(entry.date).toLocaleDateString('en-IN', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        }) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">{entry.fuel_type || '—'}</td>
+                      <td className="px-4 py-3 font-semibold text-slate-800">{Number(entry.quantity || 0).toFixed(2)} L</td>
+                      <td className="px-4 py-3 text-slate-600">₹{Number(entry.rate || 0).toFixed(2)}</td>
+                      <td className="px-4 py-3 font-bold text-emerald-700">₹{Number(entry.total_cost || 0).toLocaleString('en-IN')}</td>
+                      <td className="px-4 py-3 text-slate-600">{entry.vendor || '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{entry.payment_method || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="px-5 py-6 text-sm text-slate-500">No fuel entries found for this vehicle and month.</p>
+          )}
         </div>
 
         {/* Additional Earnings Card */}

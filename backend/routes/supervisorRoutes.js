@@ -11,6 +11,9 @@ const supervisorUpload = upload.fields([
 
 router.post('/', supervisorUpload, controller.createSupervisor);
 router.get('/', controller.getSupervisors);
+router.get('/:id/ledger', controller.getSupervisorLedger);
+router.post('/:id/wallet-credits', controller.addSupervisorWalletCredit);
+router.post('/:id/expenses', controller.createSupervisorLedgerExpense);
 router.put('/:id', supervisorUpload, controller.updateSupervisor);
 router.delete('/:id', controller.deleteSupervisor);
 

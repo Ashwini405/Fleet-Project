@@ -734,6 +734,7 @@ function DocumentsTab({ documents, driver }) {
   const uploadedFiles = [
     { label: 'Profile Photo',          file: driver?.profile_photo },
     { label: 'ID Proof',               file: driver?.id_document },
+    { label: 'Driving License',        file: driver?.driving_license },
     { label: 'Bank Passbook / Cheque', file: driver?.bank_document },
   ].filter(f => f.file);
 

@@ -126,7 +126,7 @@ const getFuelEntries = async (req, res) => {
 const getFuelByVehicle = async (req, res) => {
   try {
     const { vehicleId } = req.params;
-    const data = await Fuel.getByVehicle(vehicleId);
+    const data = await Fuel.getByVehicle(vehicleId, req.query.month || null);
 
     res.json({
       success: true,

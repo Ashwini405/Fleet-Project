@@ -1,5 +1,6 @@
 export const vendorCategories = [
   { id: "dashboard", label: "Dashboard",      short: "Dashboard",      icon: "FiGrid" },
+  { id: "supervisors", label: "Supervisor Ledger", short: "Supervisor Ledger", icon: "FiUsers" },
   { id: "garages",   label: "Garages",        short: "Garages",        icon: "FiTool" },
   { id: "showrooms", label: "Showrooms",      short: "Showrooms",      icon: "FiBriefcase" },
   { id: "parts",     label: "Parts & Spares", short: "Parts & Spares", icon: "FiSettings" },
